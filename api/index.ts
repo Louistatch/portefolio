@@ -2,11 +2,17 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
+import { Resend } from "resend";
 
 // ── Supabase client ──
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://gcfcdkzmfybiigbnlwvb.supabase.co";
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjZmNka3ptZnliaWlnYm5sd3ZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNTU3OTQsImV4cCI6MjA4ODYzMTc5NH0.61Xs-82V1fW6ZoDq-Te44f31BDivuXvRQkO9SS-MpTc";
 const supabase = createClient(supabaseUrl, supabaseKey);
+
+// ── Email (Resend) ──
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const FROM_EMAIL = process.env.FROM_EMAIL || "Louis TATCHIDA <onboarding@resend.dev>";
+const SITE_URL = process.env.SITE_URL || "https://portefolio-louistatchs-projects.vercel.app";
 
 // ── Auth helpers ──
 const JWT_SECRET = process.env.JWT_SECRET || "lt-portfolio-admin-secret-change-me";
@@ -97,6 +103,11 @@ app.post("/api/subscribe", async (req, res) => {
     if (error.code === "23505") return res.status(409).json({ message: "Already subscribed" });
     return res.status(400).json({ message: error.message });
   }
+  // Send welcome email
+  if (resend) {
+    const greeting = name ? `Bonjour ${name},` : "Bonjour,";
+    resend.emails.send({ from: FROM_EMAIL, to: email, subject: "Bienvenue dans la communauté — Louis TATCHIDA", html: welcomeEmailHtml(greeting, name) }).catch(e => console.error("Welcome email error:", e));
+  }
   res.status(201).json(data);
 });
 
@@ -171,6 +182,20 @@ app.post("/api/admin/posts", requireAuth, async (req, res) => {
   const { title, slug, content, summary, tags, image_url } = req.body;
   const { data, error } = await supabase.from("posts").insert({ title, slug, content, summary, tags, image_url }).select().single();
   if (error) return res.status(400).json({ message: error.message });
+  // Notify all active subscribers
+  if (resend && data) {
+    const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
+    if (subs?.length) {
+      for (let i = 0; i < subs.length; i += 50) {
+        const batch = subs.slice(i, i + 50).map(s => ({
+          from: FROM_EMAIL, to: s.email,
+          subject: `Nouvelle publication : ${title}`,
+          html: publicationEmailHtml(s.name, { title, slug, summary, image_url }),
+        }));
+        resend.batch.send(batch).catch(e => console.error("Notification error:", e));
+      }
+    }
+  }
   res.status(201).json(data);
 });
 app.put("/api/admin/posts/:id", requireAuth, async (req, res) => {
@@ -366,11 +391,28 @@ app.put("/api/admin/campaigns/:id", requireAuth, async (req, res) => {
   res.json(data);
 });
 app.post("/api/admin/campaigns/:id/send", requireAuth, async (req, res) => {
-  const { data: subs } = await supabase.from("subscribers").select("email").eq("status", "active");
+  // Get campaign content
+  const { data: campaign } = await supabase.from("newsletter_campaigns").select("*").eq("id", Number(req.params.id)).single();
+  if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+  const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
   const count = subs?.length || 0;
+
+  // Actually send emails via Resend
+  if (resend && subs?.length) {
+    for (let i = 0; i < subs.length; i += 50) {
+      const batch = subs.slice(i, i + 50).map(s => ({
+        from: FROM_EMAIL, to: s.email,
+        subject: campaign.subject,
+        html: campaignEmailHtml(s.name, campaign.subject, campaign.content),
+      }));
+      resend.batch.send(batch).catch(e => console.error("Campaign send error:", e));
+    }
+  }
+
   const { data, error } = await supabase.from("newsletter_campaigns").update({ status: "sent", recipients_count: count, sent_at: new Date().toISOString() }).eq("id", Number(req.params.id)).select().single();
   if (error) return res.status(400).json({ message: error.message });
-  res.json({ ...data, message: `Campaign marked as sent to ${count} subscribers` });
+  res.json({ ...data, message: `Campagne envoyée à ${count} abonné${count > 1 ? "s" : ""}` });
 });
 app.delete("/api/admin/campaigns/:id", requireAuth, async (req, res) => {
   const { error } = await supabase.from("newsletter_campaigns").delete().eq("id", Number(req.params.id));
@@ -418,5 +460,30 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     res.status(err.status || 500).json({ message: err.message || "Internal Server Error" });
   }
 });
+
+// ══════════════════════════════════════
+// EMAIL TEMPLATES (inline for serverless)
+// ══════════════════════════════════════
+
+function emailLayout(content: string) {
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<style>body{margin:0;padding:0;background:#f4f4f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}.c{max-width:600px;margin:32px auto;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.06)}.h{background:linear-gradient(135deg,#16a34a,#15803d);padding:40px 32px;text-align:center}.h h1{color:#fff;font-size:24px;margin:0;font-weight:700}.h p{color:rgba(255,255,255,.85);font-size:14px;margin:8px 0 0}.b{padding:32px}.b p{color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px}.cta{display:inline-block;background:#16a34a;color:#fff!important;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:600;font-size:15px;margin:8px 0 24px}.cd{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin:16px 0}.cd h3{color:#111;font-size:17px;margin:0 0 8px}.cd p{color:#6b7280;font-size:14px;margin:0}.cd img{width:100%;height:200px;object-fit:cover;border-radius:8px;margin-bottom:12px}.f{padding:24px 32px;text-align:center;border-top:1px solid #e5e7eb}.f p{color:#9ca3af;font-size:12px;margin:0 0 4px}.f a{color:#16a34a;text-decoration:none}.dv{height:1px;background:#e5e7eb;margin:24px 0}.bg{display:inline-block;background:#dcfce7;color:#16a34a;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;margin-bottom:16px}</style></head><body><div class="c">${content}<div class="f"><p>Louis TATCHIDA — Agronome & Expert Finance Agricole</p><p>Lomé, Togo · <a href="mailto:tatchida@gmail.com">tatchida@gmail.com</a></p><p style="margin-top:12px"><a href="${SITE_URL}">Site</a> · <a href="${SITE_URL}/publications">Publications</a> · <a href="${SITE_URL}/blog">Blog</a></p><p style="margin-top:16px;font-size:11px;color:#d1d5db">Vous recevez cet email car vous êtes abonné(e) à la newsletter.</p></div></div></body></html>`;
+}
+
+function welcomeEmailHtml(greeting: string, _name?: string) {
+  return emailLayout(`<div class="h"><h1>Bienvenue dans la communauté !</h1><p>Newsletter de Louis TATCHIDA</p></div><div class="b"><span class="bg">✨ Nouveau membre</span><p>${greeting}</p><p>Merci de rejoindre ma communauté de professionnels passionnés par le développement agricole durable en Afrique de l'Ouest.</p><p>En tant qu'abonné(e), vous recevrez :</p><div class="cd"><h3>📄 Nouvelles publications</h3><p>Notification dès qu'un nouvel article ou une pensée scientifique est publiée.</p></div><div class="cd"><h3>📊 Analyses exclusives</h3><p>Décryptages sur la finance agricole, la résilience climatique et la digitalisation rurale.</p></div><div class="cd"><h3>🌍 Actualités terrain</h3><p>Retours d'expérience de mes missions au Togo et en Afrique de l'Ouest.</p></div><div class="dv"></div><p>Découvrez mes dernières publications :</p><p style="text-align:center"><a href="${SITE_URL}/publications" class="cta">Voir les publications</a></p><p>À très bientôt,<br><strong>Louis TATCHIDA</strong><br><em>Agronome & Expert en Finance Agricole</em></p></div>`);
+}
+
+function publicationEmailHtml(name: string | undefined, post: { title: string; slug: string; summary?: string; image_url?: string }) {
+  const g = name ? `Bonjour ${name},` : "Bonjour,";
+  const img = post.image_url ? `<img src="${post.image_url}" alt="${post.title}">` : "";
+  return emailLayout(`<div class="h"><h1>Nouvelle Publication</h1><p>Louis TATCHIDA vient de publier un nouvel article</p></div><div class="b"><span class="bg">📝 Nouveau contenu</span><p>${g}</p><p>Un nouvel article vient d'être publié. Je pense qu'il pourrait vous intéresser :</p><div class="cd">${img}<h3>${post.title}</h3>${post.summary ? `<p>${post.summary}</p>` : ""}</div><p style="text-align:center"><a href="${SITE_URL}/blog/${post.slug}" class="cta">Lire l'article complet</a></p><p>N'hésitez pas à commenter et partager !</p><p>Bonne lecture,<br><strong>Louis TATCHIDA</strong></p></div>`);
+}
+
+function campaignEmailHtml(name: string | undefined, subject: string, content: string) {
+  const g = name ? `Bonjour ${name},` : "Bonjour,";
+  const html = content.replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>");
+  return emailLayout(`<div class="h"><h1>${subject}</h1><p>Newsletter de Louis TATCHIDA</p></div><div class="b"><p>${g}</p><p>${html}</p><div class="dv"></div><p style="text-align:center"><a href="${SITE_URL}" class="cta">Visiter le site</a></p><p>Cordialement,<br><strong>Louis TATCHIDA</strong></p></div>`);
+}
 
 export default app;

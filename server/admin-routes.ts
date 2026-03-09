@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { supabase } from "./supabase";
 import { requireAuth, verifyCredentials, generateToken, ensureAdminExists } from "./auth";
 import bcrypt from "bcryptjs";
+import { sendPublicationNotification, sendCampaignEmail } from "./email";
 
 export function registerAdminRoutes(app: Express) {
   // Ensure default admin exists on startup
@@ -35,6 +36,9 @@ export function registerAdminRoutes(app: Express) {
     const { title, slug, content, summary, tags, image_url } = req.body;
     const { data, error } = await supabase.from("posts").insert({ title, slug, content, summary, tags, image_url }).select().single();
     if (error) return res.status(400).json({ message: error.message });
+    // Notify subscribers
+    const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
+    if (subs?.length) sendPublicationNotification(subs, { title, slug, summary, image_url }).catch(() => {});
     res.status(201).json(data);
   });
 
@@ -249,11 +253,17 @@ export function registerAdminRoutes(app: Express) {
   });
 
   app.post("/api/admin/campaigns/:id/send", requireAuth, async (req, res) => {
-    const { data: subs } = await supabase.from("subscribers").select("email").eq("status", "active");
+    const { data: campaign } = await supabase.from("newsletter_campaigns").select("*").eq("id", Number(req.params.id)).single();
+    if (!campaign) return res.status(404).json({ message: "Campaign not found" });
+
+    const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
     const count = subs?.length || 0;
+
+    if (subs?.length) sendCampaignEmail(subs, campaign.subject, campaign.content).catch(() => {});
+
     const { data, error } = await supabase.from("newsletter_campaigns").update({ status: "sent", recipients_count: count, sent_at: new Date().toISOString() }).eq("id", Number(req.params.id)).select().single();
     if (error) return res.status(400).json({ message: error.message });
-    res.json({ ...data, message: `Campaign marked as sent to ${count} subscribers` });
+    res.json({ ...data, message: `Campagne envoyée à ${count} abonné${count > 1 ? "s" : ""}` });
   });
 
   app.delete("/api/admin/campaigns/:id", requireAuth, async (req, res) => {

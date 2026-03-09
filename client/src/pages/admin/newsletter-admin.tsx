@@ -5,7 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { Trash2, Send, Plus, Edit2, Loader2, Mail, Users, CheckCircle2, FileText } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
+import { Trash2, Send, Plus, Edit2, Loader2, Mail, Users, CheckCircle2, FileText, AlertTriangle } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ export default function AdminNewsletter() {
   const [subject, setSubject] = useState("");
   const [content, setContent] = useState("");
   const [preview, setPreview] = useState(false);
+  const [sendDialog, setSendDialog] = useState<Campaign | null>(null);
 
   const { data: campaigns, isLoading } = useQuery<Campaign[]>({
     queryKey: ["admin-campaigns"],
@@ -182,7 +184,7 @@ export default function AdminNewsletter() {
                   {c.status === "draft" && (
                     <>
                       <Button size="sm" variant="outline" onClick={() => startEdit(c)}><Edit2 className="w-3 h-3 mr-1" /> Modifier</Button>
-                      <Button size="sm" onClick={() => { if (confirm(`Envoyer à ${activeSubCount} abonnés ?`)) sendCampaign.mutate(c.id); }} disabled={sendCampaign.isPending}>
+                      <Button size="sm" onClick={() => setSendDialog(c)} disabled={sendCampaign.isPending}>
                         <Send className="w-3 h-3 mr-1" /> Envoyer
                       </Button>
                     </>
@@ -194,6 +196,57 @@ export default function AdminNewsletter() {
           ))}
         </div>
       )}
+
+      {/* Send Confirmation Dialog */}
+      <Dialog open={!!sendDialog} onOpenChange={(open) => { if (!open) setSendDialog(null); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-primary" /> Confirmer l'envoi
+            </DialogTitle>
+            <DialogDescription>
+              Vous êtes sur le point d'envoyer cette campagne à tous les abonnés actifs.
+            </DialogDescription>
+          </DialogHeader>
+
+          {sendDialog && (
+            <div className="space-y-4 py-2">
+              {/* Campaign preview */}
+              <div className="bg-muted/30 rounded-xl border border-border/50 overflow-hidden">
+                <div className="bg-gradient-to-r from-primary to-primary/80 px-4 py-3">
+                  <p className="text-primary-foreground font-semibold text-sm">{sendDialog.subject}</p>
+                </div>
+                <div className="p-4">
+                  <p className="text-sm text-muted-foreground line-clamp-4">{sendDialog.content}</p>
+                </div>
+              </div>
+
+              {/* Stats */}
+              <div className="flex items-center gap-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800/30">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-amber-800 dark:text-amber-200">
+                    {activeSubCount} abonné{activeSubCount > 1 ? "s" : ""} actif{activeSubCount > 1 ? "s" : ""} recevront cet email
+                  </p>
+                  <p className="text-amber-600 dark:text-amber-400 text-xs mt-0.5">Cette action est irréversible.</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button variant="outline" onClick={() => setSendDialog(null)}>Annuler</Button>
+            <Button
+              onClick={() => { if (sendDialog) { sendCampaign.mutate(sendDialog.id); setSendDialog(null); } }}
+              disabled={sendCampaign.isPending}
+              className="gap-2"
+            >
+              {sendCampaign.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Envoyer à {activeSubCount} abonné{activeSubCount > 1 ? "s" : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

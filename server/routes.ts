@@ -3,6 +3,7 @@ import type { Server } from "http";
 import { supabase } from "./supabase";
 import { registerAdminRoutes } from "./admin-routes";
 import { registerUploadRoutes } from "./upload";
+import { sendWelcomeEmail, sendPublicationNotification } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -105,6 +106,7 @@ export async function registerRoutes(
       if (error.code === "23505") return res.status(409).json({ message: "Already subscribed" });
       return res.status(400).json({ message: error.message });
     }
+    sendWelcomeEmail(email, name).catch(() => {});
     res.status(201).json(data);
   });
 
