@@ -4,6 +4,7 @@ import { Menu, X, BookOpen, User, Home, Lightbulb, Calendar, Mail, FileText } fr
 import { Button } from "@/components/ui/button";
 import { Newsletter } from "@/components/newsletter";
 import { NewsletterPopup } from "@/components/newsletter-popup";
+import { useQuery } from "@tanstack/react-query";
 
 const NAV_ITEMS = [
   { href: "/", label: "Accueil", icon: Home },
@@ -20,6 +21,12 @@ export function Layout({ children }: { children: ReactNode }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
+  const { data: profile } = useQuery({
+    queryKey: ["profile"],
+    queryFn: async () => { const r = await fetch("/api/profile"); return r.json(); },
+    staleTime: 1000 * 60 * 30,
+  });
+
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener("scroll", handleScroll);
@@ -35,9 +42,13 @@ export function Layout({ children }: { children: ReactNode }) {
       <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass-nav py-3" : "bg-transparent py-5"}`}>
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold tracking-tighter text-foreground hover:text-primary transition-colors flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-serif italic text-lg">
-              LT
-            </div>
+            {profile?.photo_url ? (
+              <img src={profile.photo_url} alt="Louis TATCHIDA" className="w-9 h-9 rounded-full object-cover border-2 border-primary/30 shadow-sm" />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center text-primary-foreground font-serif italic text-lg">
+                LT
+              </div>
+            )}
             Louis TATCHIDA
           </Link>
 
