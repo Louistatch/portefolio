@@ -1,38 +1,72 @@
-import { type User, type InsertUser } from "@shared/schema";
-import { randomUUID } from "crypto";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
+import {
+  posts, comments, publications, appointments,
+  type Post, type Comment, type Publication, type Appointment,
+} from "@shared/schema";
+import type { z } from "zod";
+import type { api } from "@shared/routes";
 
-// modify the interface with any CRUD methods
-// you might need
+type InsertPost = z.infer<typeof api.posts.create.input>;
+type InsertComment = z.infer<typeof api.comments.create.input>;
+type InsertPublication = z.infer<typeof api.publications.create.input>;
+type InsertAppointment = z.infer<typeof api.appointments.create.input>;
 
 export interface IStorage {
-  getUser(id: string): Promise<User | undefined>;
-  getUserByUsername(username: string): Promise<User | undefined>;
-  createUser(user: InsertUser): Promise<User>;
+  // Posts
+  getPosts(): Promise<Post[]>;
+  getPostBySlug(slug: string): Promise<Post | undefined>;
+  createPost(post: InsertPost): Promise<Post>;
+
+  // Comments
+  getCommentsByPostId(postId: number): Promise<Comment[]>;
+  createComment(comment: InsertComment): Promise<Comment>;
+
+  // Publications
+  getPublications(): Promise<Publication[]>;
+  createPublication(pub: InsertPublication): Promise<Publication>;
+
+  // Appointments
+  createAppointment(appt: InsertAppointment): Promise<Appointment>;
 }
 
-export class MemStorage implements IStorage {
-  private users: Map<string, User>;
-
-  constructor() {
-    this.users = new Map();
+export class DatabaseStorage implements IStorage {
+  // Posts
+  async getPosts(): Promise<Post[]> {
+    return await db.select().from(posts).orderBy(posts.publishedAt);
+  }
+  async getPostBySlug(slug: string): Promise<Post | undefined> {
+    const result = await db.select().from(posts).where(eq(posts.slug, slug));
+    return result[0];
+  }
+  async createPost(post: InsertPost): Promise<Post> {
+    const [result] = await db.insert(posts).values(post).returning();
+    return result;
   }
 
-  async getUser(id: string): Promise<User | undefined> {
-    return this.users.get(id);
+  // Comments
+  async getCommentsByPostId(postId: number): Promise<Comment[]> {
+    return await db.select().from(comments).where(eq(comments.postId, postId)).orderBy(comments.createdAt);
+  }
+  async createComment(comment: InsertComment): Promise<Comment> {
+    const [result] = await db.insert(comments).values(comment).returning();
+    return result;
   }
 
-  async getUserByUsername(username: string): Promise<User | undefined> {
-    return Array.from(this.users.values()).find(
-      (user) => user.username === username,
-    );
+  // Publications
+  async getPublications(): Promise<Publication[]> {
+    return await db.select().from(publications).orderBy(publications.year);
+  }
+  async createPublication(pub: InsertPublication): Promise<Publication> {
+    const [result] = await db.insert(publications).values(pub).returning();
+    return result;
   }
 
-  async createUser(insertUser: InsertUser): Promise<User> {
-    const id = randomUUID();
-    const user: User = { ...insertUser, id };
-    this.users.set(id, user);
-    return user;
+  // Appointments
+  async createAppointment(appt: InsertAppointment): Promise<Appointment> {
+    const [result] = await db.insert(appointments).values(appt).returning();
+    return result;
   }
 }
 
-export const storage = new MemStorage();
+export const storage = new DatabaseStorage();
