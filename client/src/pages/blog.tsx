@@ -8,6 +8,7 @@ import { AlertCircle, ArrowRight, Eye, Heart, Clock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
 import { estimateReadingTime } from "@/components/reading-progress";
+import { NewsletterHero } from "@/components/newsletter";
 
 export default function BlogList() {
   const { data: posts, isLoading, error } = usePosts();
@@ -95,6 +96,9 @@ export default function BlogList() {
             </Link>
           ))}
         </div>
+
+        {/* Newsletter CTA */}
+        <NewsletterHero />
       </div>
     </>
   );

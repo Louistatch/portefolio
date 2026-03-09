@@ -2,7 +2,7 @@ import { Link } from "wouter";
 import { ArrowRight, BookOpen, Leaf, LineChart, Cpu, Droplets, ShieldCheck, Users, TrendingUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
-import { Newsletter } from "@/components/newsletter";
+import { Newsletter, NewsletterHero } from "@/components/newsletter";
 import { useQuery } from "@tanstack/react-query";
 
 interface Profile {
@@ -146,15 +146,7 @@ export default function Home() {
       </section>
       
       {/* Newsletter */}
-      <section className="py-20 bg-muted/30 border-y border-border/50">
-        <div className="max-w-3xl mx-auto px-6 text-center">
-          <h2 className="text-3xl font-bold mb-4">Restez Informé</h2>
-          <p className="text-muted-foreground mb-8 font-serif">Recevez les dernières publications sur l'agriculture, la finance agricole et la résilience climatique.</p>
-          <div className="flex justify-center">
-            <Newsletter />
-          </div>
-        </div>
-      </section>
+      <NewsletterHero />
 
       {/* CTA */}
       <section className="py-32 relative overflow-hidden">

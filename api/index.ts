@@ -90,9 +90,9 @@ app.post("/api/appointments", async (req, res) => {
 });
 
 app.post("/api/subscribe", async (req, res) => {
-  const { email } = req.body;
+  const { email, name, source } = req.body;
   if (!email) return res.status(400).json({ message: "Email required" });
-  const { data, error } = await supabase.from("subscribers").insert({ email }).select().single();
+  const { data, error } = await supabase.from("subscribers").insert({ email, name: name || null, source: source || "website" }).select().single();
   if (error) {
     if (error.code === "23505") return res.status(409).json({ message: "Already subscribed" });
     return res.status(400).json({ message: error.message });
@@ -112,6 +112,12 @@ app.get("/api/profile", async (_req, res) => {
   const { data, error } = await supabase.from("profile").select("*").eq("id", 1).single();
   if (error) return res.status(500).json({ message: error.message });
   res.json(data);
+});
+
+app.get("/api/subscribers/count", async (_req, res) => {
+  const { count, error } = await supabase.from("subscribers").select("id", { count: "exact", head: true }).eq("status", "active");
+  if (error) return res.status(500).json({ message: error.message });
+  res.json({ count: count || 0 });
 });
 
 // ── Likes & Views ──

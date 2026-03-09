@@ -1,12 +1,18 @@
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
+
+interface SubscribeData {
+  email: string;
+  name?: string;
+  source?: string;
+}
 
 export function useSubscribe() {
   return useMutation({
-    mutationFn: async (email: string) => {
+    mutationFn: async (data: SubscribeData) => {
       const res = await fetch("/api/subscribe", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(data),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -14,5 +20,17 @@ export function useSubscribe() {
       }
       return res.json();
     },
+  });
+}
+
+export function useSubscriberCount() {
+  return useQuery({
+    queryKey: ["subscriber-count"],
+    queryFn: async () => {
+      const res = await fetch("/api/subscribers/count");
+      if (!res.ok) return { count: 0 };
+      return res.json() as Promise<{ count: number }>;
+    },
+    staleTime: 60000,
   });
 }

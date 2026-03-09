@@ -3,6 +3,7 @@ import { ReactNode, useState, useEffect } from "react";
 import { Menu, X, BookOpen, User, Home, Lightbulb, Calendar, Mail, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Newsletter } from "@/components/newsletter";
+import { NewsletterPopup } from "@/components/newsletter-popup";
 
 const NAV_ITEMS = [
   { href: "/", label: "Accueil", icon: Home },
@@ -74,6 +75,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="flex-1 pt-24 pb-12 w-full page-enter">
         {children}
       </main>
+      <NewsletterPopup />
 
       <footer className="border-t border-border/50 py-12 mt-auto bg-muted/30">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
