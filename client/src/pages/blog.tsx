@@ -4,23 +4,24 @@ import { SearchBar } from "@/components/search";
 import { Link } from "wouter";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { AlertCircle, ArrowRight } from "lucide-react";
+import { AlertCircle, ArrowRight, Eye, Heart, Clock } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Skeleton } from "@/components/ui/skeleton";
+import { estimateReadingTime } from "@/components/reading-progress";
 
 export default function BlogList() {
   const { data: posts, isLoading, error } = usePosts();
 
   return (
     <>
-      <SEO title="Blog Scientifique" description="Articles sur l'agriculture, la finance agricole et la digitalisation rurale." path="/blog" />
+      <SEO title="Blog Scientifique" description="Articles et pensées sur l'agriculture, la finance agricole et la digitalisation rurale par Louis TATCHIDA." path="/blog" />
 
       <div className="max-w-5xl mx-auto px-6 py-12 lg:py-20">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
           <div>
             <h1 className="text-4xl lg:text-5xl font-bold mb-4">Blog Scientifique</h1>
             <p className="text-xl text-muted-foreground font-serif max-w-2xl">
-              Analyses et réflexions sur l'agriculture durable et la technologie.
+              Analyses, pensées et réflexions sur l'agriculture durable et la technologie.
             </p>
           </div>
           <SearchBar />
@@ -57,8 +58,14 @@ export default function BlogList() {
             <Link key={post.id} href={`/blog/${post.slug}`}
               className={`group flex flex-col bg-card rounded-3xl overflow-hidden border border-border/50 hover:shadow-xl hover:border-primary/30 transition-all duration-300 ${i === 0 ? "md:col-span-2" : ""}`}>
               {post.image_url && (
-                <div className={`overflow-hidden ${i === 0 ? "h-64" : "h-48"}`}>
+                <div className={`overflow-hidden relative ${i === 0 ? "h-72" : "h-48"}`}>
                   <img src={post.image_url} alt={post.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
+                  <div className="absolute bottom-4 left-4 flex items-center gap-3 text-white/90 text-xs">
+                    <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {post.views_count}</span>
+                    <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5" /> {post.likes_count}</span>
+                    <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {estimateReadingTime(post.content)} min</span>
+                  </div>
                 </div>
               )}
               <div className="p-8 flex-1 flex flex-col">
@@ -72,8 +79,17 @@ export default function BlogList() {
                 </div>
                 <h2 className={`font-bold mb-3 group-hover:text-primary transition-colors ${i === 0 ? "text-3xl" : "text-2xl"}`}>{post.title}</h2>
                 <p className="text-muted-foreground font-serif line-clamp-3 mb-6 flex-1">{post.summary}</p>
-                <div className="flex items-center text-sm font-medium text-primary mt-auto">
-                  Lire l'article <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center text-sm font-medium text-primary">
+                    Lire l'article <ArrowRight className="ml-2 w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                  {!post.image_url && (
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" /> {post.views_count}</span>
+                      <span className="flex items-center gap-1"><Heart className="w-3.5 h-3.5" /> {post.likes_count}</span>
+                      <span className="flex items-center gap-1"><Clock className="w-3.5 h-3.5" /> {estimateReadingTime(post.content)} min</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </Link>

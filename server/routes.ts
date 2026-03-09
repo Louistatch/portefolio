@@ -130,6 +130,24 @@ export async function registerRoutes(
     res.json(data);
   });
 
+  // ── Likes & Views ──
+  app.post("/api/posts/:id/like", async (req, res) => {
+    await supabase.rpc("increment_counter", { p_table: "posts", p_column: "likes_count", p_id: Number(req.params.id) });
+    res.json({ message: "Liked" });
+  });
+  app.post("/api/posts/:id/view", async (req, res) => {
+    await supabase.rpc("increment_counter", { p_table: "posts", p_column: "views_count", p_id: Number(req.params.id) });
+    res.json({ message: "Viewed" });
+  });
+  app.post("/api/publications/:id/like", async (req, res) => {
+    await supabase.rpc("increment_counter", { p_table: "publications", p_column: "likes_count", p_id: Number(req.params.id) });
+    res.json({ message: "Liked" });
+  });
+  app.post("/api/publications/:id/view", async (req, res) => {
+    await supabase.rpc("increment_counter", { p_table: "publications", p_column: "views_count", p_id: Number(req.params.id) });
+    res.json({ message: "Viewed" });
+  });
+
   // ── Health ──
   app.get("/api/health", (_req, res) => {
     res.json({ status: "ok" });

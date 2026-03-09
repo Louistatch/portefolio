@@ -9,6 +9,8 @@ export interface Publication {
   category: string;
   year: number;
   image_url: string | null;
+  views_count: number;
+  likes_count: number;
 }
 
 export function usePublications() {

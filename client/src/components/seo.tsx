@@ -5,25 +5,28 @@ interface SEOProps {
   description?: string;
   type?: string;
   path?: string;
-  article?: { publishedTime?: string; tags?: string[] };
+  image?: string;
+  article?: { publishedTime?: string; tags?: string[]; author?: string };
 }
 
 const SITE_NAME = "Louis Tatchida";
-const DEFAULT_DESC = "Louis Tatchida - Expert in Agriculture, AI, Climate Finance, and Rural Digitalization.";
+const DEFAULT_DESC = "Louis Tatchida — Agronome, Expert en Finance Agricole et Digitalisation Rurale en Afrique de l'Ouest.";
+const DEFAULT_IMAGE = "https://gcfcdkzmfybiigbnlwvb.supabase.co/storage/v1/object/public/images/og-default.png";
 
-export function SEO({ title, description = DEFAULT_DESC, type = "website", path = "/", article }: SEOProps) {
+export function SEO({ title, description = DEFAULT_DESC, type = "website", path = "/", image, article }: SEOProps) {
   const siteUrl = typeof window !== 'undefined' ? window.location.origin : '';
   const fullUrl = `${siteUrl}${path}`;
   const fullTitle = `${title} | ${SITE_NAME}`;
+  const ogImage = image || DEFAULT_IMAGE;
 
   const personSchema = {
     "@context": "https://schema.org",
     "@type": "Person",
     name: "Louis Tatchida",
-    jobTitle: "Agricultural AI Researcher & Consultant",
+    jobTitle: "Agronome & Expert en Finance Agricole",
     url: siteUrl,
-    sameAs: ["https://linkedin.com/in/louistatchida", "https://twitter.com/louistatchida"],
-    knowsAbout: ["AI Agriculture", "Climate Agriculture", "Agricultural Finance", "Agricultural Insurance", "Rural Digitalization"],
+    sameAs: ["https://linkedin.com/in/louistatchida"],
+    knowsAbout: ["Agriculture Durable", "Finance Agricole", "Résilience Climatique", "Digitalisation Rurale"],
   };
 
   const articleSchema = article ? {
@@ -31,32 +34,39 @@ export function SEO({ title, description = DEFAULT_DESC, type = "website", path 
     "@type": "ScholarlyArticle",
     headline: title,
     description,
-    author: { "@type": "Person", name: "Louis Tatchida" },
+    image: ogImage,
+    author: { "@type": "Person", name: article.author || "Louis Tatchida" },
     datePublished: article.publishedTime,
     keywords: article.tags?.join(", "),
     url: fullUrl,
+    publisher: { "@type": "Person", name: "Louis Tatchida" },
   } : null;
 
   return (
     <Helmet>
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
-      <meta name="keywords" content="AI agriculture, climate agriculture, agricultural finance, agricultural insurance, rural digitalization" />
+      {/* Open Graph — rich preview on Facebook, LinkedIn, WhatsApp, Telegram */}
       <meta property="og:title" content={fullTitle} />
       <meta property="og:description" content={description} />
       <meta property="og:type" content={type} />
       <meta property="og:url" content={fullUrl} />
       <meta property="og:site_name" content={SITE_NAME} />
+      <meta property="og:image" content={ogImage} />
+      <meta property="og:image:width" content="1200" />
+      <meta property="og:image:height" content="630" />
+      <meta property="og:locale" content="fr_FR" />
+      {article?.publishedTime && <meta property="article:published_time" content={article.publishedTime} />}
+      {article?.author && <meta property="article:author" content={article.author} />}
+      {article?.tags?.map(tag => <meta key={tag} property="article:tag" content={tag} />)}
+      {/* Twitter Card — rich preview on X/Twitter */}
       <meta name="twitter:card" content="summary_large_image" />
       <meta name="twitter:title" content={fullTitle} />
       <meta name="twitter:description" content={description} />
+      <meta name="twitter:image" content={ogImage} />
       <link rel="canonical" href={fullUrl} />
-      {type === "website" && (
-        <script type="application/ld+json">{JSON.stringify(personSchema)}</script>
-      )}
-      {articleSchema && (
-        <script type="application/ld+json">{JSON.stringify(articleSchema)}</script>
-      )}
+      {type === "website" && <script type="application/ld+json">{JSON.stringify(personSchema)}</script>}
+      {articleSchema && <script type="application/ld+json">{JSON.stringify(articleSchema)}</script>}
     </Helmet>
   );
 }
