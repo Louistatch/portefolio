@@ -3,37 +3,38 @@ import { usePublications } from "@/hooks/use-publications";
 import { BookOpen, FileText, Download, Quote } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 export default function Publications() {
   const { data: publications, isLoading } = usePublications();
+  const { toast } = useToast();
+  const categories = publications ? Array.from(new Set(publications.map(p => p.category))) : [];
 
-  // Group by category if we have data
-  const categories = publications 
-    ? Array.from(new Set(publications.map(p => p.category)))
-    : [];
+  const copyCitation = (citation: string) => {
+    navigator.clipboard.writeText(citation);
+    toast({ title: "Citation copiée", description: "La citation a été copiée dans le presse-papiers." });
+  };
 
   return (
     <>
-      <SEO title="Publications & Papers" description="Scientific library and PDF downloads." />
-      
+      <SEO title="Publications" description="Bibliothèque scientifique de Louis TATCHIDA : articles, rapports et communications." path="/publications" />
+
       <div className="max-w-5xl mx-auto px-6 py-12 lg:py-20">
         <div className="mb-16">
-          <h1 className="text-4xl lg:text-5xl font-bold mb-6">Publications Archive</h1>
+          <h1 className="text-4xl lg:text-5xl font-bold mb-6">Publications</h1>
           <p className="text-xl text-muted-foreground max-w-3xl font-serif">
-            A comprehensive library of peer-reviewed papers, whitepapers, and conference proceedings.
+            Articles scientifiques, rapports techniques et communications de recherche.
           </p>
         </div>
 
         {isLoading ? (
           <div className="space-y-6">
-            {[1,2,3].map(i => (
-              <Skeleton key={i} className="h-40 w-full rounded-2xl" />
-            ))}
+            {[1,2,3].map(i => <Skeleton key={i} className="h-40 w-full rounded-2xl" />)}
           </div>
         ) : publications?.length === 0 ? (
           <div className="text-center py-20 bg-card rounded-3xl border border-border border-dashed">
             <BookOpen className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-            <p className="text-muted-foreground font-serif">Library is currently being updated.</p>
+            <p className="text-muted-foreground font-serif">La bibliothèque est en cours de mise à jour.</p>
           </div>
         ) : (
           <div className="space-y-16">
@@ -45,32 +46,42 @@ export default function Publications() {
                   </div>
                   {category}
                 </h2>
-                
                 <div className="space-y-6">
                   {publications?.filter(p => p.category === category).map(pub => (
-                    <div key={pub.id} className="bg-card p-6 lg:p-8 rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow">
-                      <div className="flex flex-col lg:flex-row gap-6 justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <span className="text-primary font-bold">{pub.year}</span>
+                    <div key={pub.id} className="bg-card rounded-2xl border border-border/50 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
+                      <div className="flex flex-col lg:flex-row">
+                        {pub.image_url && (
+                          <div className="lg:w-48 h-48 lg:h-auto shrink-0">
+                            <img src={pub.image_url} alt={pub.title} className="w-full h-full object-cover" />
                           </div>
-                          <h3 className="text-xl font-bold mb-3">{pub.title}</h3>
-                          <p className="text-sm text-muted-foreground font-serif leading-relaxed mb-6">
-                            {pub.abstract}
-                          </p>
-                          
-                          <div className="bg-muted/50 p-4 rounded-xl border border-border/50 text-xs font-mono text-muted-foreground overflow-x-auto">
-                            {pub.citation}
+                        )}
+                        <div className="p-6 lg:p-8 flex-1">
+                          <div className="flex flex-col lg:flex-row gap-6 justify-between items-start">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <span className="text-primary font-bold">{pub.year}</span>
+                              </div>
+                              <h3 className="text-xl font-bold mb-3">{pub.title}</h3>
+                              <p className="text-sm text-muted-foreground font-serif leading-relaxed mb-4">{pub.abstract}</p>
+                              {pub.citation && (
+                                <div className="bg-muted/50 p-4 rounded-xl border border-border/50 text-xs font-mono text-muted-foreground overflow-x-auto">
+                                  {pub.citation}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex lg:flex-col gap-3 w-full lg:w-auto shrink-0">
+                              {pub.pdf_url && (
+                                <Button className="w-full lg:w-40 bg-primary/10 text-primary hover:bg-primary/20" variant="secondary" onClick={() => window.open(pub.pdf_url, "_blank")}>
+                                  <Download className="w-4 h-4 mr-2" /> PDF
+                                </Button>
+                              )}
+                              {pub.citation && (
+                                <Button className="w-full lg:w-40" variant="outline" onClick={() => copyCitation(pub.citation)}>
+                                  <Quote className="w-4 h-4 mr-2" /> Copier
+                                </Button>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                        
-                        <div className="flex lg:flex-col gap-3 w-full lg:w-auto shrink-0">
-                          <Button className="w-full lg:w-40 hover-elevate bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary" variant="secondary" onClick={() => window.open(pub.pdfUrl, '_blank')}>
-                            <Download className="w-4 h-4 mr-2" /> PDF
-                          </Button>
-                          <Button className="w-full lg:w-40 hover-elevate" variant="outline" onClick={() => navigator.clipboard.writeText(pub.citation)}>
-                            <Quote className="w-4 h-4 mr-2" /> Copy Cite
-                          </Button>
                         </div>
                       </div>
                     </div>

@@ -1,0 +1,10 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K[2m10:49:49 AM[22m [36m[1m[vite][22m[39m [90m[2m(client)[22m[39m Re-optimizing dependencies because lockfile has changed
+10:49:49 AM [express] serving on port 5000
+10:52:19 AM [express] GET /api/publications 200 in 24ms :: [{"id":1,"title":"Predictive Models for Crop Yield via Neural Networks","abstract":"This paper introduces a novel neural network architecture for predicting crop yields based on multi-modal climate and soil data.","pdfUrl":"https://example.com/paper1.pdf","citation":"Tatchida, L., et al. (2024). Predictive Models for Crop Yield. Journal of Agricultural AI, 12(3), 45-60.","category":"Research","year":2024}]
+10:52:29 AM [express] GET /api/posts 200 in 2ms :: [{"id":1,"title":"AI in Modern Agriculture","slug":"ai-in-modern-agriculture","content":"# AI in Agriculture\nArtificial intelligence allows for unprecedented precision in agriculture. From drone imagery to soil sensors...","summary":"Exploring how artificial intelligence is transforming crop yield predictions.","tags":["AI","Agriculture","Climate"],"publishedAt":"2026-03-09T10:49:48.562Z"},{"id":2,"title":"Climate Resilient Farming","slug":"climate-resilient-farming","content":"# Climate Resilient Farming\nAs climate change brings unpredictable weather patterns, agriculture must adapt. Strategies include drought-resistant crops and advanced irrigation...","summary":"Adapting farming techniques to extreme weather patterns.","tags":["Climate","Agriculture"],"publishedAt":"2026-03-09T10:49:48.570Z"}]
+10:52:33 AM [express] GET /api/posts/climate-resilient-farming 200 in 3ms :: {"id":2,"title":"Climate Resilient Farming","slug":"climate-resilient-farming","content":"# Climate Resilient Farming\nAs climate change brings unpredictable weather patterns, agriculture must adapt. Strategies include drought-resistant crops and advanced irrigation...","summary":"Adapting farming techniques to extreme weather patterns.","tags":["Climate","Agriculture"],"publishedAt":"2026-03-09T10:49:48.570Z"}
+10:52:33 AM [express] GET /api/posts/2/comments 200 in 2ms :: []

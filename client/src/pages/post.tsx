@@ -2,6 +2,7 @@ import { SEO } from "@/components/seo";
 import { usePost, useComments, useCreateComment } from "@/hooks/use-posts";
 import { useRoute } from "wouter";
 import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -14,11 +15,9 @@ import { useState } from "react";
 export default function BlogPost() {
   const [, params] = useRoute("/blog/:slug");
   const slug = params?.slug || "";
-  
   const { data: post, isLoading } = usePost(slug);
   const { data: comments } = useComments(post?.id);
   const createComment = useCreateComment(post?.id || 0);
-
   const [authorName, setAuthorName] = useState("");
   const [content, setContent] = useState("");
 
@@ -33,32 +32,38 @@ export default function BlogPost() {
   if (!post) {
     return (
       <div className="max-w-3xl mx-auto px-6 py-32 text-center">
-        <h1 className="text-3xl font-bold mb-4">Post not found</h1>
-        <p className="text-muted-foreground">The article you're looking for doesn't exist.</p>
+        <h1 className="text-3xl font-bold mb-4">Article introuvable</h1>
+        <p className="text-muted-foreground">L'article que vous cherchez n'existe pas.</p>
       </div>
     );
   }
 
   const handleComment = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!authorName.trim() || !content.trim() || !post) return;
-    
+    if (!authorName.trim() || !content.trim()) return;
     createComment.mutate(
-      { authorName, content, postId: post.id },
-      {
-        onSuccess: () => {
-          setAuthorName("");
-          setContent("");
-        }
-      }
+      { author_name: authorName, content },
+      { onSuccess: () => { setAuthorName(""); setContent(""); } }
     );
   };
 
   return (
     <>
-      <SEO title={post.title} description={post.summary || ""} type="article" />
-      
+      <SEO
+        title={post.title}
+        description={post.summary || ""}
+        type="article"
+        path={`/blog/${post.slug}`}
+        article={{ publishedTime: post.published_at || undefined, tags: post.tags || undefined }}
+      />
+
       <article className="max-w-3xl mx-auto px-6 py-12 lg:py-20">
+        {post.image_url && (
+          <div className="rounded-3xl overflow-hidden mb-10 shadow-xl border border-border/50">
+            <img src={post.image_url} alt={post.title} className="w-full h-64 lg:h-80 object-cover" />
+          </div>
+        )}
+
         <header className="mb-12 text-center">
           <div className="flex flex-wrap justify-center gap-2 mb-6">
             {post.tags?.map(tag => (
@@ -71,17 +76,17 @@ export default function BlogPost() {
             {post.title}
           </h1>
           <div className="text-muted-foreground flex items-center justify-center gap-4 text-sm font-medium">
-            <span>Louis Tatchida</span>
-            <span>•</span>
-            <time dateTime={post.publishedAt?.toString() || ""}>
-              {post.publishedAt ? format(new Date(post.publishedAt), 'MMMM d, yyyy') : 'Unpublished'}
+            <span>Louis TATCHIDA</span>
+            <span>·</span>
+            <time dateTime={post.published_at || ""}>
+              {post.published_at ? format(new Date(post.published_at), "d MMMM yyyy", { locale: fr }) : "Non publié"}
             </time>
           </div>
         </header>
 
         <div className="prose prose-lg dark:prose-invert max-w-none font-serif article-body mb-20">
-          <ReactMarkdown 
-            remarkPlugins={[remarkGfm]} 
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw]}
             components={{
               h2: ({node, ...props}) => <h2 className="font-sans font-bold mt-12 mb-6" {...props} />,
@@ -94,38 +99,19 @@ export default function BlogPost() {
           </ReactMarkdown>
         </div>
 
-        {/* Comments Section */}
         <section className="border-t border-border/50 pt-16">
           <h3 className="text-2xl font-bold flex items-center gap-2 mb-8">
             <MessageSquare className="w-6 h-6 text-primary" />
-            Discussion ({comments?.length || 0})
+            Commentaires ({comments?.length || 0})
           </h3>
 
           <form onSubmit={handleComment} className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm mb-12">
-            <h4 className="font-medium mb-4">Leave a comment</h4>
+            <h4 className="font-medium mb-4">Laisser un commentaire</h4>
             <div className="space-y-4">
-              <Input 
-                placeholder="Your Name" 
-                value={authorName}
-                onChange={e => setAuthorName(e.target.value)}
-                className="bg-background"
-                required
-              />
-              <Textarea 
-                placeholder="Share your thoughts on this topic..." 
-                value={content}
-                onChange={e => setContent(e.target.value)}
-                className="bg-background min-h-[100px]"
-                required
-              />
-              <Button 
-                type="submit" 
-                disabled={createComment.isPending}
-                className="w-full sm:w-auto"
-              >
-                {createComment.isPending ? "Posting..." : (
-                  <>Post Comment <Send className="w-4 h-4 ml-2" /></>
-                )}
+              <Input placeholder="Votre nom" value={authorName} onChange={e => setAuthorName(e.target.value)} className="bg-background" required />
+              <Textarea placeholder="Partagez votre avis..." value={content} onChange={e => setContent(e.target.value)} className="bg-background min-h-[100px]" required />
+              <Button type="submit" disabled={createComment.isPending} className="w-full sm:w-auto">
+                {createComment.isPending ? "Envoi..." : (<>Publier <Send className="w-4 h-4 ml-2" /></>)}
               </Button>
             </div>
           </form>
@@ -134,9 +120,9 @@ export default function BlogPost() {
             {comments?.map(comment => (
               <div key={comment.id} className="bg-background p-6 rounded-2xl border border-border/30">
                 <div className="flex justify-between items-center mb-3">
-                  <strong className="font-medium">{comment.authorName}</strong>
+                  <strong className="font-medium">{comment.author_name}</strong>
                   <span className="text-xs text-muted-foreground">
-                    {comment.createdAt ? format(new Date(comment.createdAt), 'MMM d, yyyy') : ''}
+                    {comment.created_at ? format(new Date(comment.created_at), "d MMM yyyy", { locale: fr }) : ""}
                   </span>
                 </div>
                 <p className="text-muted-foreground font-serif text-sm leading-relaxed whitespace-pre-wrap">

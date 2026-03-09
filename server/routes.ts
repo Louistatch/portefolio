@@ -1,132 +1,138 @@
 import type { Express } from "express";
 import type { Server } from "http";
-import { storage } from "./storage";
-import { api } from "@shared/routes";
-import { z } from "zod";
-
-async function seedDatabase() {
-  const existingPosts = await storage.getPosts();
-  if (existingPosts.length === 0) {
-    await storage.createPost({
-      title: "AI in Modern Agriculture",
-      slug: "ai-in-modern-agriculture",
-      summary: "Exploring how artificial intelligence is transforming crop yield predictions.",
-      content: "# AI in Agriculture\nArtificial intelligence allows for unprecedented precision in agriculture. From drone imagery to soil sensors...",
-      tags: ["AI", "Agriculture", "Climate"],
-    });
-    
-    await storage.createPost({
-      title: "Climate Resilient Farming",
-      slug: "climate-resilient-farming",
-      summary: "Adapting farming techniques to extreme weather patterns.",
-      content: "# Climate Resilient Farming\nAs climate change brings unpredictable weather patterns, agriculture must adapt. Strategies include drought-resistant crops and advanced irrigation...",
-      tags: ["Climate", "Agriculture"],
-    });
-  }
-
-  const existingPubs = await storage.getPublications();
-  if (existingPubs.length === 0) {
-    await storage.createPublication({
-      title: "Predictive Models for Crop Yield via Neural Networks",
-      abstract: "This paper introduces a novel neural network architecture for predicting crop yields based on multi-modal climate and soil data.",
-      pdfUrl: "https://example.com/paper1.pdf",
-      citation: "Tatchida, L., et al. (2024). Predictive Models for Crop Yield. Journal of Agricultural AI, 12(3), 45-60.",
-      category: "Research",
-      year: 2024
-    });
-  }
-}
+import { supabase } from "./supabase";
+import { registerAdminRoutes } from "./admin-routes";
+import { registerUploadRoutes } from "./upload";
 
 export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Seed initial data
-  seedDatabase().catch(console.error);
+  // Admin panel routes
+  registerAdminRoutes(app);
+  registerUploadRoutes(app);
 
-  // Posts
-  app.get(api.posts.list.path, async (req, res) => {
-    const postsList = await storage.getPosts();
-    res.json(postsList);
+  // ── Posts ──
+  app.get("/api/posts", async (_req, res) => {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+      .order("published_at", { ascending: false });
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(data);
   });
 
-  app.get(api.posts.get.path, async (req, res) => {
-    const post = await storage.getPostBySlug(req.params.slug);
-    if (!post) {
-      return res.status(404).json({ message: "Post not found" });
+  app.get("/api/posts/:slug", async (req, res) => {
+    const { data, error } = await supabase
+      .from("posts")
+      .select("*")
+      .eq("slug", req.params.slug)
+      .single();
+    if (error) return res.status(404).json({ message: "Post not found" });
+    res.json(data);
+  });
+
+  // ── Search ──
+  app.get("/api/search", async (req, res) => {
+    const q = req.query.q as string;
+    if (!q || q.length < 2) return res.json([]);
+    const { data, error } = await supabase.rpc("search_posts", { search_query: q });
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(data);
+  });
+
+  // ── Comments ──
+  app.get("/api/posts/:postId/comments", async (req, res) => {
+    const { data, error } = await supabase
+      .from("comments")
+      .select("*")
+      .eq("post_id", Number(req.params.postId))
+      .eq("status", "approved")
+      .order("created_at", { ascending: true });
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(data);
+  });
+
+  app.post("/api/posts/:postId/comments", async (req, res) => {
+    const { author_name, content } = req.body;
+    if (!author_name || !content) {
+      return res.status(400).json({ message: "author_name and content required" });
     }
-    res.json(post);
+    const { data, error } = await supabase
+      .from("comments")
+      .insert({ post_id: Number(req.params.postId), author_name, content })
+      .select()
+      .single();
+    if (error) return res.status(400).json({ message: error.message });
+    res.status(201).json(data);
   });
 
-  app.post(api.posts.create.path, async (req, res) => {
-    try {
-      const input = api.posts.create.input.parse(req.body);
-      const post = await storage.createPost(input);
-      res.status(201).json(post);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
-      }
-      throw err;
+  // ── Publications ──
+  app.get("/api/publications", async (_req, res) => {
+    const { data, error } = await supabase
+      .from("publications")
+      .select("*")
+      .order("year", { ascending: false });
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(data);
+  });
+
+  // ── Appointments ──
+  app.post("/api/appointments", async (req, res) => {
+    const { name, email, date, topic } = req.body;
+    if (!name || !email || !date || !topic) {
+      return res.status(400).json({ message: "All fields required" });
     }
+    const { data, error } = await supabase
+      .from("appointments")
+      .insert({ name, email, date, topic })
+      .select()
+      .single();
+    if (error) return res.status(400).json({ message: error.message });
+    res.status(201).json(data);
   });
 
-  // Comments
-  app.get(api.comments.list.path, async (req, res) => {
-    const comments = await storage.getCommentsByPostId(Number(req.params.postId));
-    res.json(comments);
-  });
-
-  app.post(api.comments.create.path, async (req, res) => {
-    try {
-      const input = api.comments.create.input.parse(req.body);
-      // Ensure the postId from URL matches the body or inject it
-      const commentInput = { ...input, postId: Number(req.params.postId) };
-      const comment = await storage.createComment(commentInput);
-      res.status(201).json(comment);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
-      }
-      throw err;
+  // ── Newsletter ──
+  app.post("/api/subscribe", async (req, res) => {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: "Email required" });
+    const { data, error } = await supabase
+      .from("subscribers")
+      .insert({ email })
+      .select()
+      .single();
+    if (error) {
+      if (error.code === "23505") return res.status(409).json({ message: "Already subscribed" });
+      return res.status(400).json({ message: error.message });
     }
+    res.status(201).json(data);
   });
 
-  // Publications
-  app.get(api.publications.list.path, async (req, res) => {
-    const pubs = await storage.getPublications();
-    res.json(pubs);
-  });
-
-  app.post(api.publications.create.path, async (req, res) => {
-    try {
-      const input = api.publications.create.input.parse(req.body);
-      const pub = await storage.createPublication(input);
-      res.status(201).json(pub);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
-      }
-      throw err;
+  // ── Contact ──
+  app.post("/api/contact", async (req, res) => {
+    const { name, email, subject, message } = req.body;
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ message: "All fields required" });
     }
+    const { data, error } = await supabase
+      .from("contact_messages")
+      .insert({ name, email, subject, message })
+      .select()
+      .single();
+    if (error) return res.status(400).json({ message: error.message });
+    res.status(201).json(data);
   });
 
-  // Appointments
-  app.post(api.appointments.create.path, async (req, res) => {
-    try {
-      // Extend schema with coercion for date since it comes as string/JSON
-      const schemaWithCoercion = api.appointments.create.input.extend({
-        date: z.coerce.date()
-      });
-      const input = schemaWithCoercion.parse(req.body);
-      const appt = await storage.createAppointment(input);
-      res.status(201).json(appt);
-    } catch (err) {
-      if (err instanceof z.ZodError) {
-        return res.status(400).json({ message: err.errors[0].message, field: err.errors[0].path.join('.') });
-      }
-      throw err;
-    }
+  // ── Profile (public) ──
+  app.get("/api/profile", async (_req, res) => {
+    const { data, error } = await supabase.from("profile").select("*").eq("id", 1).single();
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(data);
+  });
+
+  // ── Health ──
+  app.get("/api/health", (_req, res) => {
+    res.json({ status: "ok" });
   });
 
   return httpServer;

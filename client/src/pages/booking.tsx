@@ -21,22 +21,17 @@ export default function Booking() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!date || !name || !email || !topic) {
-      toast({ title: "Validation Error", description: "Please fill all fields and select a date.", variant: "destructive" });
+      toast({ title: "Erreur", description: "Veuillez remplir tous les champs et sélectionner une date.", variant: "destructive" });
       return;
     }
 
-    createAppointment.mutate({
-      name,
-      email,
-      date,
-      topic
-    }, {
+    createAppointment.mutate({ name, email, date, topic }, {
       onSuccess: () => {
         setIsSuccess(true);
-        toast({ title: "Request Sent", description: "Your appointment request has been received." });
+        toast({ title: "Demande envoyée", description: "Votre demande de rendez-vous a été reçue." });
       },
       onError: (err) => {
-        toast({ title: "Booking Failed", description: err.message, variant: "destructive" });
+        toast({ title: "Erreur", description: err.message, variant: "destructive" });
       }
     });
   };
@@ -47,32 +42,31 @@ export default function Booking() {
         <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
           <CheckCircle2 className="w-10 h-10 text-primary" />
         </div>
-        <h1 className="text-4xl font-bold mb-4">Request Submitted</h1>
+        <h1 className="text-4xl font-bold mb-4">Demande Envoyée</h1>
         <p className="text-xl text-muted-foreground font-serif mb-8">
-          Thank you for reaching out. I will review your request for the proposed date and reply to your email shortly to confirm the meeting details.
+          Merci pour votre demande. Je reviendrai vers vous par email pour confirmer les détails du rendez-vous.
         </p>
-        <Button onClick={() => window.location.href = '/'}>Return to Home</Button>
+        <Button onClick={() => window.location.href = '/'}>Retour à l'accueil</Button>
       </div>
     );
   }
 
   return (
     <>
-      <SEO title="Schedule a Meeting" description="Book a consultation or research meeting with Louis Tatchida." />
+      <SEO title="Prendre Rendez-vous" description="Planifiez une consultation ou une réunion avec Louis TATCHIDA." />
       
       <div className="max-w-6xl mx-auto px-6 py-12 lg:py-20">
         <div className="mb-12 text-center max-w-2xl mx-auto">
-          <h1 className="text-4xl lg:text-5xl font-bold mb-6">Schedule a Meeting</h1>
+          <h1 className="text-4xl lg:text-5xl font-bold mb-6">Prendre Rendez-vous</h1>
           <p className="text-lg text-muted-foreground font-serif">
-            Select a preferred date and provide details about the consultation. I'm available for academic collaborations, industry advisory, and speaking engagements.
+            Sélectionnez une date et décrivez l'objet de la consultation. Je suis disponible pour des collaborations académiques, du conseil technique et des interventions terrain.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start bg-card p-8 lg:p-12 rounded-3xl border border-border/50 shadow-xl">
-          {/* Calendar Side */}
           <div className="flex flex-col space-y-6">
             <h2 className="text-2xl font-bold flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5 text-primary" /> Select Date
+              <CalendarIcon className="w-5 h-5 text-primary" /> Choisir une Date
             </h2>
             <div className="bg-background border border-border/50 p-4 rounded-2xl flex justify-center shadow-inner">
               <Calendar
@@ -86,52 +80,28 @@ export default function Booking() {
             {date && (
               <div className="bg-primary/5 border border-primary/20 p-4 rounded-xl flex items-center gap-3 text-primary font-medium">
                 <Clock className="w-5 h-5" />
-                Selected: {date.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                {date.toLocaleDateString('fr-FR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
               </div>
             )}
           </div>
 
-          {/* Form Side */}
           <div className="flex flex-col space-y-6">
-            <h2 className="text-2xl font-bold">Your Details</h2>
+            <h2 className="text-2xl font-bold">Vos Informations</h2>
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
-                <label className="text-sm font-medium mb-1.5 block">Full Name</label>
-                <Input 
-                  placeholder="Dr. Jane Doe" 
-                  value={name} onChange={e => setName(e.target.value)} 
-                  className="bg-background px-4 py-6 rounded-xl"
-                  required 
-                />
+                <label className="text-sm font-medium mb-1.5 block">Nom complet</label>
+                <Input placeholder="Votre nom" value={name} onChange={e => setName(e.target.value)} className="bg-background px-4 py-6 rounded-xl" required />
               </div>
-              
               <div>
-                <label className="text-sm font-medium mb-1.5 block">Email Address</label>
-                <Input 
-                  type="email" 
-                  placeholder="jane.doe@university.edu" 
-                  value={email} onChange={e => setEmail(e.target.value)} 
-                  className="bg-background px-4 py-6 rounded-xl"
-                  required 
-                />
+                <label className="text-sm font-medium mb-1.5 block">Adresse email</label>
+                <Input type="email" placeholder="votre@email.com" value={email} onChange={e => setEmail(e.target.value)} className="bg-background px-4 py-6 rounded-xl" required />
               </div>
-              
               <div>
-                <label className="text-sm font-medium mb-1.5 block">Meeting Topic / Agenda</label>
-                <Textarea 
-                  placeholder="Please describe the purpose of our meeting..." 
-                  value={topic} onChange={e => setTopic(e.target.value)} 
-                  className="bg-background min-h-[150px] p-4 rounded-xl resize-none"
-                  required 
-                />
+                <label className="text-sm font-medium mb-1.5 block">Sujet / Ordre du jour</label>
+                <Textarea placeholder="Décrivez l'objet de notre rencontre..." value={topic} onChange={e => setTopic(e.target.value)} className="bg-background min-h-[150px] p-4 rounded-xl resize-none" required />
               </div>
-
-              <Button 
-                type="submit" 
-                className="w-full py-6 text-lg rounded-xl shadow-lg hover-elevate" 
-                disabled={createAppointment.isPending}
-              >
-                {createAppointment.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Submit Request"}
+              <Button type="submit" className="w-full py-6 text-lg rounded-xl shadow-lg hover:shadow-xl transition-shadow" disabled={createAppointment.isPending}>
+                {createAppointment.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : "Envoyer la Demande"}
               </Button>
             </form>
           </div>

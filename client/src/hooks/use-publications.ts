@@ -1,14 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
-import { api } from "@shared/routes";
+
+export interface Publication {
+  id: number;
+  title: string;
+  abstract: string;
+  pdf_url: string;
+  citation: string;
+  category: string;
+  year: number;
+  image_url: string | null;
+}
 
 export function usePublications() {
   return useQuery({
-    queryKey: [api.publications.list.path],
+    queryKey: ["publications"],
     queryFn: async () => {
-      const res = await fetch(api.publications.list.path);
+      const res = await fetch("/api/publications");
       if (!res.ok) throw new Error("Failed to fetch publications");
-      const data = await res.json();
-      return api.publications.list.responses[200].parse(data);
+      return res.json() as Promise<Publication[]>;
     },
   });
 }
