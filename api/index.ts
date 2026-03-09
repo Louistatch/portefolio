@@ -2,7 +2,6 @@ import express, { type Request, Response, NextFunction } from "express";
 import type { Express } from "express";
 import { supabase } from "../server/supabase";
 import { registerAdminRoutes } from "../server/admin-routes";
-import { registerUploadRoutes } from "../server/upload";
 
 const app: Express = express();
 
@@ -10,8 +9,8 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 // Register all routes directly (no http server needed for serverless)
+// Upload routes removed — files upload directly to Supabase Storage from the client
 registerAdminRoutes(app);
-registerUploadRoutes(app);
 
 // ── Posts ──
 app.get("/api/posts", async (_req, res) => {

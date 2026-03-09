@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, X, FileText, Image, Loader2, CheckCircle2 } from "lucide-react";
-import { getToken } from "@/lib/admin";
+import { supabase } from "@/lib/supabase";
 
 interface FileUploadProps {
   type: "document" | "image";
@@ -13,6 +13,11 @@ interface FileUploadProps {
 const ACCEPT_MAP = {
   document: ".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx",
   image: ".jpg,.jpeg,.png,.gif,.webp,.svg",
+};
+
+const BUCKET_MAP = {
+  document: "documents",
+  image: "images",
 };
 
 export function FileUpload({ type, value, onChange, accept }: FileUploadProps) {
@@ -29,22 +34,22 @@ export function FileUpload({ type, value, onChange, accept }: FileUploadProps) {
     setError("");
     setFileName(file.name);
 
-    const formData = new FormData();
-    formData.append("file", file);
-
     try {
-      const res = await fetch(`/api/admin/upload/${type}`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${getToken()}` },
-        body: formData,
-      });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message);
-      }
-      const data = await res.json();
-      onChange(data.url);
-      setFileName(data.filename);
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      const uniqueName = `${crypto.randomUUID()}.${ext}`;
+      const bucket = BUCKET_MAP[type];
+
+      const { error: uploadError } = await supabase.storage
+        .from(bucket)
+        .upload(uniqueName, file, {
+          contentType: file.type,
+          upsert: false,
+        });
+
+      if (uploadError) throw new Error(uploadError.message);
+
+      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(uniqueName);
+      onChange(urlData.publicUrl);
     } catch (err: any) {
       setError(err.message || "Upload failed");
     } finally {
@@ -68,7 +73,7 @@ export function FileUpload({ type, value, onChange, accept }: FileUploadProps) {
             </div>
           )}
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{fileName || "File uploaded"}</p>
+            <p className="text-sm font-medium truncate">{fileName || "Fichier uploadé"}</p>
             <p className="text-xs text-muted-foreground truncate">{value}</p>
           </div>
           <div className="flex gap-1">
@@ -87,10 +92,10 @@ export function FileUpload({ type, value, onChange, accept }: FileUploadProps) {
           disabled={uploading}
         >
           {uploading ? (
-            <><Loader2 className="w-6 h-6 animate-spin" /><span className="text-xs">Uploading {fileName}...</span></>
+            <><Loader2 className="w-6 h-6 animate-spin" /><span className="text-xs">Upload de {fileName}...</span></>
           ) : (
             <><Upload className="w-6 h-6" /><span className="text-xs text-muted-foreground">
-              {type === "image" ? "Upload image (JPG, PNG, WebP, SVG)" : "Upload file (PDF, Word, Excel, PPT)"}
+              {type === "image" ? "Upload image (JPG, PNG, WebP, SVG)" : "Upload fichier (PDF, Word, Excel, PPT)"}
             </span></>
           )}
         </Button>
