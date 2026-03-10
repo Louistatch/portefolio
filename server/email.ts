@@ -1,56 +1,89 @@
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 
-const resend = new Resend(process.env.RESEND_API_KEY || "");
-const FROM_EMAIL = process.env.FROM_EMAIL || "Louis TATCHIDA <onboarding@resend.dev>";
+// ── Gmail SMTP Configuration ──
+// Requires: 2FA enabled on Google account + App Password generated
+// Generate at: https://myaccount.google.com/apppasswords
+const GMAIL_USER = process.env.GMAIL_USER || "tatchida@gmail.com";
+const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || "";
+const FROM_EMAIL = `Louis TATCHIDA <${GMAIL_USER}>`;
 const SITE_URL = process.env.SITE_URL || "https://portefolio-louistatchs-projects.vercel.app";
+
+function createTransporter() {
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: GMAIL_USER,
+      pass: GMAIL_APP_PASSWORD,
+    },
+  });
+}
+
+function isConfigured(): boolean {
+  return !!GMAIL_APP_PASSWORD && GMAIL_APP_PASSWORD.length > 0;
+}
 
 // ── Welcome email ──
 export async function sendWelcomeEmail(to: string, name?: string) {
-  if (!process.env.RESEND_API_KEY) return;
+  if (!isConfigured()) return;
   const greeting = name ? `Bonjour ${name},` : "Bonjour,";
 
-  await resend.emails.send({
-    from: FROM_EMAIL,
-    to,
-    subject: "Bienvenue dans la communauté — Louis TATCHIDA",
-    html: welcomeTemplate(greeting, name),
-  }).catch(err => console.error("Email error:", err));
+  try {
+    const transporter = createTransporter();
+    await transporter.sendMail({
+      from: FROM_EMAIL,
+      to,
+      subject: "Bienvenue dans la communauté — Louis TATCHIDA",
+      html: welcomeTemplate(greeting),
+    });
+  } catch (err) {
+    console.error("Welcome email error:", err);
+  }
 }
 
 // ── New publication notification ──
-export async function sendPublicationNotification(subscribers: { email: string; name?: string }[], post: { title: string; slug: string; summary?: string; image_url?: string }) {
-  if (!process.env.RESEND_API_KEY || !subscribers.length) return;
+export async function sendPublicationNotification(
+  subscribers: { email: string; name?: string }[],
+  post: { title: string; slug: string; summary?: string; image_url?: string }
+) {
+  if (!isConfigured() || !subscribers.length) return;
 
-  // Send in batches of 50
-  for (let i = 0; i < subscribers.length; i += 50) {
-    const batch = subscribers.slice(i, i + 50);
-    const emails = batch.map(sub => ({
-      from: FROM_EMAIL,
-      to: sub.email,
-      subject: `Nouvelle publication : ${post.title}`,
-      html: publicationTemplate(sub.name, post),
-    }));
-
-    await resend.batch.send(emails).catch(err => console.error("Batch email error:", err));
+  const transporter = createTransporter();
+  // Send one by one to avoid Gmail rate limits (max ~100/day for free accounts)
+  for (const sub of subscribers) {
+    try {
+      await transporter.sendMail({
+        from: FROM_EMAIL,
+        to: sub.email,
+        subject: `Nouvelle publication : ${post.title}`,
+        html: publicationTemplate(sub.name, post),
+      });
+    } catch (err) {
+      console.error(`Publication notification error for ${sub.email}:`, err);
+    }
   }
 }
 
 // ── Campaign email ──
-export async function sendCampaignEmail(subscribers: { email: string; name?: string }[], subject: string, content: string) {
-  if (!process.env.RESEND_API_KEY || !subscribers.length) return;
+export async function sendCampaignEmail(
+  subscribers: { email: string; name?: string }[],
+  subject: string,
+  content: string
+) {
+  if (!isConfigured() || !subscribers.length) return;
 
-  for (let i = 0; i < subscribers.length; i += 50) {
-    const batch = subscribers.slice(i, i + 50);
-    const emails = batch.map(sub => ({
-      from: FROM_EMAIL,
-      to: sub.email,
-      subject,
-      html: campaignTemplate(sub.name, subject, content),
-    }));
-
-    await resend.batch.send(emails).catch(err => console.error("Campaign email error:", err));
+  const transporter = createTransporter();
+  for (const sub of subscribers) {
+    try {
+      await transporter.sendMail({
+        from: FROM_EMAIL,
+        to: sub.email,
+        subject,
+        html: campaignTemplate(sub.name, subject, content),
+      });
+    } catch (err) {
+      console.error(`Campaign email error for ${sub.email}:`, err);
+    }
   }
-
   return subscribers.length;
 }
 
@@ -71,9 +104,7 @@ function baseLayout(content: string) {
   .header p{color:rgba(255,255,255,0.85);font-size:14px;margin:8px 0 0}
   .body{padding:32px}
   .body p{color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px}
-  .body h2{color:#111827;font-size:20px;margin:24px 0 12px}
   .cta{display:inline-block;background:#16a34a;color:#fff!important;text-decoration:none;padding:14px 32px;border-radius:12px;font-weight:600;font-size:15px;margin:8px 0 24px}
-  .cta:hover{background:#15803d}
   .card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:20px;margin:16px 0}
   .card h3{color:#111827;font-size:17px;margin:0 0 8px}
   .card p{color:#6b7280;font-size:14px;margin:0}
@@ -99,7 +130,7 @@ ${content}
 </html>`;
 }
 
-function welcomeTemplate(greeting: string, name?: string) {
+function welcomeTemplate(greeting: string) {
   return baseLayout(`
 <div class="header">
   <h1>Bienvenue dans la communauté !</h1>
@@ -155,7 +186,6 @@ function publicationTemplate(name: string | undefined, post: { title: string; sl
 
 function campaignTemplate(name: string | undefined, subject: string, content: string) {
   const greeting = name ? `Bonjour ${name},` : "Bonjour,";
-  // Convert markdown-like line breaks to HTML
   const htmlContent = content.replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>");
 
   return baseLayout(`
