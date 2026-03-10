@@ -12,7 +12,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // ── Email (Resend) ──
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
 const FROM_EMAIL = process.env.FROM_EMAIL || "Louis TATCHIDA <onboarding@resend.dev>";
-const SITE_URL = process.env.SITE_URL || "https://portefolio-louistatchs-projects.vercel.app";
+const SITE_URL = process.env.SITE_URL || "https://portefolio-virid-chi.vercel.app";
 
 // ── Auth helpers ──
 const JWT_SECRET = process.env.JWT_SECRET || "lt-portfolio-admin-secret-change-me";
