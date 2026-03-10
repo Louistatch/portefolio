@@ -2,8 +2,19 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const nodemailer = require("nodemailer");
+// Dynamic import for nodemailer (Vercel serverless ESM compatibility)
+let nodemailerModule: any = null;
+try {
+  nodemailerModule = require("nodemailer");
+} catch {
+  // nodemailer will be loaded dynamically if require fails (ESM)
+}
+
+async function getNodemailer() {
+  if (nodemailerModule) return nodemailerModule;
+  nodemailerModule = await import("nodemailer");
+  return nodemailerModule.default || nodemailerModule;
+}
 
 // ── Supabase client ──
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://gcfcdkzmfybiigbnlwvb.supabase.co";
@@ -15,8 +26,9 @@ const GMAIL_USER = process.env.GMAIL_USER || "tatchida@gmail.com";
 const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || "";
 const FROM_EMAIL = `Louis TATCHIDA <${GMAIL_USER}>`;
 function gmailConfigured() { return !!GMAIL_APP_PASSWORD && GMAIL_APP_PASSWORD.length > 0; }
-function createMailTransporter() {
-  return nodemailer.createTransport({ service: "gmail", auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD } });
+async function createMailTransporter() {
+  const nm = await getNodemailer();
+  return nm.createTransport({ service: "gmail", auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD } });
 }
 const SITE_URL = process.env.SITE_URL || "https://portefolio-louistatchs-projects.vercel.app";
 
@@ -111,9 +123,11 @@ app.post("/api/subscribe", async (req, res) => {
   }
   // Send welcome email via Gmail SMTP
   if (gmailConfigured()) {
-    const greeting = name ? `Bonjour ${name},` : "Bonjour,";
-    const transporter = createMailTransporter();
-    transporter.sendMail({ from: FROM_EMAIL, to: email, subject: "Bienvenue dans la communauté — Louis TATCHIDA", html: welcomeEmailHtml(greeting, name) }).catch((e: any) => console.error("Welcome email error:", e));
+    try {
+      const greeting = name ? `Bonjour ${name},` : "Bonjour,";
+      const transporter = await createMailTransporter();
+      transporter.sendMail({ from: FROM_EMAIL, to: email, subject: "Bienvenue dans la communauté — Louis TATCHIDA", html: welcomeEmailHtml(greeting, name) }).catch((e: any) => console.error("Welcome email error:", e));
+    } catch (e: any) { console.error("Mail transporter error:", e); }
   }
   res.status(201).json(data);
 });
@@ -216,18 +230,19 @@ app.post("/api/admin/posts", requireAuth, async (req, res) => {
   if (error) return res.status(400).json({ message: error.message });
   // Notify all active subscribers via Gmail SMTP
   if (gmailConfigured() && data) {
-    const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
-    if (subs?.length) {
-      const transporter = createMailTransporter();
-      // Send one by one to respect Gmail rate limits
-      for (const s of subs) {
-        transporter.sendMail({
-          from: FROM_EMAIL, to: s.email,
-          subject: `Nouvelle publication : ${title}`,
-          html: publicationEmailHtml(s.name, { title, slug, summary, image_url }),
-        }).catch((e: any) => console.error(`Notification error for ${s.email}:`, e));
+    try {
+      const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
+      if (subs?.length) {
+        const transporter = await createMailTransporter();
+        for (const s of subs) {
+          transporter.sendMail({
+            from: FROM_EMAIL, to: s.email,
+            subject: `Nouvelle publication : ${title}`,
+            html: publicationEmailHtml(s.name, { title, slug, summary, image_url }),
+          }).catch((e: any) => console.error(`Notification error for ${s.email}:`, e));
+        }
       }
-    }
+    } catch (e: any) { console.error("Mail transporter error:", e); }
   }
   res.status(201).json(data);
 });
@@ -433,14 +448,16 @@ app.post("/api/admin/campaigns/:id/send", requireAuth, async (req, res) => {
 
   // Send campaign emails via Gmail SMTP
   if (gmailConfigured() && subs?.length) {
-    const transporter = createMailTransporter();
-    for (const s of subs) {
-      transporter.sendMail({
-        from: FROM_EMAIL, to: s.email,
-        subject: campaign.subject,
-        html: campaignEmailHtml(s.name, campaign.subject, campaign.content),
-      }).catch((e: any) => console.error(`Campaign send error for ${s.email}:`, e));
-    }
+    try {
+      const transporter = await createMailTransporter();
+      for (const s of subs) {
+        transporter.sendMail({
+          from: FROM_EMAIL, to: s.email,
+          subject: campaign.subject,
+          html: campaignEmailHtml(s.name, campaign.subject, campaign.content),
+        }).catch((e: any) => console.error(`Campaign send error for ${s.email}:`, e));
+      }
+    } catch (e: any) { console.error("Mail transporter error:", e); }
   }
 
   const { data, error } = await supabase.from("newsletter_campaigns").update({ status: "sent", recipients_count: count, sent_at: new Date().toISOString() }).eq("id", Number(req.params.id)).select().single();

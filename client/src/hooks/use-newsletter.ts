@@ -15,8 +15,10 @@ export function useSubscribe() {
         body: JSON.stringify(data),
       });
       if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || "Subscription failed");
+        const text = await res.text();
+        let msg = "Subscription failed";
+        try { msg = JSON.parse(text).message || msg; } catch { msg = text || msg; }
+        throw new Error(msg);
       }
       return res.json();
     },
