@@ -14,6 +14,9 @@ import { useState, useEffect } from "react";
 import { ReadingProgress, estimateReadingTime } from "@/components/reading-progress";
 import { SocialShare } from "@/components/social-share";
 import { Reactions } from "@/components/reactions";
+import { TableOfContents } from "@/components/table-of-contents";
+import { RelatedPosts } from "@/components/related-posts";
+import { CitationButton } from "@/components/citation-button";
 
 export default function BlogPost() {
   const [, params] = useRoute("/blog/:slug");
@@ -107,7 +110,10 @@ export default function BlogPost() {
         {/* Floating action bar */}
         <div className="flex items-center justify-between mb-12 py-4 px-6 bg-card/80 backdrop-blur-sm rounded-2xl border border-border/50 shadow-sm sticky top-2 z-40">
           <Reactions type="post" id={post.id} likesCount={post.likes_count} viewsCount={post.views_count} />
-          <SocialShare url={`/blog/${post.slug}`} title={post.title} description={post.summary || ""} image={post.image_url || undefined} />
+          <div className="flex items-center gap-2">
+            <CitationButton title={post.title} url={`/blog/${post.slug}`} year={post.published_at ? new Date(post.published_at).getFullYear() : undefined} />
+            <SocialShare url={`/blog/${post.slug}`} title={post.title} description={post.summary || ""} image={post.image_url || undefined} />
+          </div>
         </div>
 
         {/* Article body */}
@@ -116,8 +122,18 @@ export default function BlogPost() {
             remarkPlugins={[remarkGfm]}
             rehypePlugins={[rehypeRaw]}
             components={{
-              h2: ({node, ...props}) => <h2 className="font-sans font-bold mt-12 mb-6" {...props} />,
-              h3: ({node, ...props}) => <h3 className="font-sans font-bold mt-8 mb-4" {...props} />,
+              h2: ({node, children, ...props}) => {
+                const text = String(children);
+                const lines = post.content.split("\n");
+                const idx = lines.findIndex(l => l.match(/^##\s+/) && l.includes(text));
+                return <h2 id={`heading-${idx}`} className="font-sans font-bold mt-12 mb-6" {...props}>{children}</h2>;
+              },
+              h3: ({node, children, ...props}) => {
+                const text = String(children);
+                const lines = post.content.split("\n");
+                const idx = lines.findIndex(l => l.match(/^###\s+/) && l.includes(text));
+                return <h3 id={`heading-${idx}`} className="font-sans font-bold mt-8 mb-4" {...props}>{children}</h3>;
+              },
               a: ({node, ...props}) => <a className="text-primary hover:text-primary/80 underline decoration-primary/30 underline-offset-4" {...props} />,
               blockquote: ({node, ...props}) => <blockquote className="border-l-4 border-primary pl-6 italic text-muted-foreground my-8" {...props} />
             }}
@@ -125,6 +141,9 @@ export default function BlogPost() {
             {post.content}
           </ReactMarkdown>
         </div>
+
+        {/* Table of Contents (floating) */}
+        <TableOfContents content={post.content} />
 
         {/* Bottom share + reactions */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6 py-8 px-6 bg-gradient-to-r from-primary/5 to-primary/10 rounded-3xl border border-primary/20 mb-16">
@@ -137,6 +156,9 @@ export default function BlogPost() {
             <SocialShare url={`/blog/${post.slug}`} title={post.title} description={post.summary || ""} image={post.image_url || undefined} />
           </div>
         </div>
+
+        {/* Related posts */}
+        <RelatedPosts currentSlug={post.slug} tags={post.tags} />
 
         {/* Comments section */}
         <section className="border-t border-border/50 pt-16">

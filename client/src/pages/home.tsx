@@ -1,9 +1,11 @@
 import { Link } from "wouter";
-import { ArrowRight, BookOpen, Leaf, LineChart, Cpu, Droplets, ShieldCheck, Users, TrendingUp } from "lucide-react";
+import { ArrowRight, BookOpen, Leaf, LineChart, Cpu, Droplets, ShieldCheck, Users, TrendingUp, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
 import { Newsletter, NewsletterHero } from "@/components/newsletter";
 import { useQuery } from "@tanstack/react-query";
+import { AnimatedCounter } from "@/components/animated-counter";
+import { Testimonials } from "@/components/testimonials";
 
 interface Profile {
   full_name: string; title: string; bio: string; photo_url: string;
@@ -72,14 +74,16 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
             {[
-              { value: "8+", label: "Années d'expérience", icon: TrendingUp },
-              { value: "3 000+", label: "Agriculteurs accompagnés", icon: Users },
-              { value: "200+", label: "Coopératives structurées", icon: ShieldCheck },
-              { value: "500M+", label: "FCFA mobilisés", icon: LineChart },
+              { value: 8, suffix: "+", label: "Années d'expérience", icon: TrendingUp },
+              { value: 3000, suffix: "+", label: "Agriculteurs accompagnés", icon: Users },
+              { value: 200, suffix: "+", label: "Coopératives structurées", icon: ShieldCheck },
+              { value: 500, suffix: "M+", label: "FCFA mobilisés", icon: LineChart },
             ].map((stat, i) => (
               <div key={i} className="space-y-2">
                 <stat.icon className="w-6 h-6 text-primary mx-auto mb-2" />
-                <p className="text-3xl lg:text-4xl font-bold text-foreground">{stat.value}</p>
+                <p className="text-3xl lg:text-4xl font-bold text-foreground">
+                  <AnimatedCounter end={stat.value} suffix={stat.suffix} />
+                </p>
                 <p className="text-sm text-muted-foreground">{stat.label}</p>
               </div>
             ))}
@@ -145,6 +149,9 @@ export default function Home() {
         </div>
       </section>
       
+      {/* Testimonials */}
+      <Testimonials />
+
       {/* Newsletter */}
       <NewsletterHero />
 

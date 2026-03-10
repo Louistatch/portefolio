@@ -27,6 +27,8 @@ import AdminSubscribers from "@/pages/admin/subscribers-admin";
 import AdminComments from "@/pages/admin/comments-admin";
 import AdminProfile from "@/pages/admin/profile-admin";
 import AdminNewsletter from "@/pages/admin/newsletter-admin";
+import AdminTestimonials from "@/pages/admin/testimonials-admin";
+import Stats from "@/pages/stats";
 import { getToken } from "@/lib/admin";
 import { useEffect } from "react";
 
@@ -57,6 +59,7 @@ function App() {
             <Route path="/admin/subscribers">{() => <RequireAuth><AdminSubscribers /></RequireAuth>}</Route>
             <Route path="/admin/comments">{() => <RequireAuth><AdminComments /></RequireAuth>}</Route>
             <Route path="/admin/newsletter">{() => <RequireAuth><AdminNewsletter /></RequireAuth>}</Route>
+            <Route path="/admin/testimonials">{() => <RequireAuth><AdminTestimonials /></RequireAuth>}</Route>
 
             {/* Public routes */}
             <Route path="/">{() => <Layout><Home /></Layout>}</Route>
@@ -67,6 +70,7 @@ function App() {
             <Route path="/publications">{() => <Layout><Publications /></Layout>}</Route>
             <Route path="/booking">{() => <Layout><Booking /></Layout>}</Route>
             <Route path="/contact">{() => <Layout><Contact /></Layout>}</Route>
+            <Route path="/stats">{() => <Layout><Stats /></Layout>}</Route>
             <Route>{() => <Layout><NotFound /></Layout>}</Route>
           </Switch>
         </TooltipProvider>

@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { adminFetch, clearToken } from "@/lib/admin";
 import { Link, useLocation } from "wouter";
-import { FileText, BookOpen, Calendar, Mail, Users, MessageSquare, LogOut, LayoutDashboard, UserCircle, Newspaper } from "lucide-react";
+import { FileText, BookOpen, Calendar, Mail, Users, MessageSquare, LogOut, LayoutDashboard, UserCircle, Newspaper, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 function useStats() {
@@ -24,6 +24,7 @@ const NAV = [
   { href: "/admin/subscribers", label: "Subscribers", icon: Users },
   { href: "/admin/comments", label: "Comments", icon: MessageSquare },
   { href: "/admin/newsletter", label: "Newsletter", icon: Newspaper },
+  { href: "/admin/testimonials", label: "Témoignages", icon: Star },
 ];
 
 export function AdminLayout({ children }: { children: React.ReactNode }) {

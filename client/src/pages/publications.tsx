@@ -1,22 +1,16 @@
 import { SEO } from "@/components/seo";
 import { usePublications } from "@/hooks/use-publications";
-import { BookOpen, FileText, Download, Quote, ExternalLink } from "lucide-react";
+import { BookOpen, FileText, Download, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
 import { SocialShare } from "@/components/social-share";
 import { Reactions } from "@/components/reactions";
+import { CitationButton } from "@/components/citation-button";
 import { useEffect } from "react";
 
 export default function Publications() {
   const { data: publications, isLoading } = usePublications();
-  const { toast } = useToast();
   const categories = publications ? Array.from(new Set(publications.map(p => p.category))) : [];
-
-  const copyCitation = (citation: string) => {
-    navigator.clipboard.writeText(citation);
-    toast({ title: "Citation copiée", description: "La citation a été copiée dans le presse-papiers." });
-  };
 
   // Track views for all publications on page load
   useEffect(() => {
@@ -100,9 +94,7 @@ export default function Publications() {
                               </Button>
                             )}
                             {pub.citation && (
-                              <Button size="sm" variant="outline" className="rounded-full" onClick={() => copyCitation(pub.citation)}>
-                                <Quote className="w-4 h-4 mr-2" /> Citer
-                              </Button>
+                              <CitationButton title={pub.title} url={`/publications#pub-${pub.id}`} year={pub.year} />
                             )}
                             <SocialShare
                               url={`/publications#pub-${pub.id}`}

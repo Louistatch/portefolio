@@ -102,7 +102,9 @@ export function Layout({ children }: { children: ReactNode }) {
               <li><Link href="/research" className="hover:text-primary transition-colors">Recherche & Projets</Link></li>
               <li><Link href="/publications" className="hover:text-primary transition-colors">Publications</Link></li>
               <li><Link href="/blog" className="hover:text-primary transition-colors">Blog Scientifique</Link></li>
+              <li><Link href="/stats" className="hover:text-primary transition-colors">Statistiques</Link></li>
               <li><Link href="/about" className="hover:text-primary transition-colors">À propos</Link></li>
+              <li><a href="/api/rss" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors">Flux RSS</a></li>
             </ul>
           </div>
           <div>

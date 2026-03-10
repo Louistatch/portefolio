@@ -65,6 +65,7 @@ export function SEO({ title, description = DEFAULT_DESC, type = "website", path 
       <meta name="twitter:description" content={description} />
       <meta name="twitter:image" content={ogImage} />
       <link rel="canonical" href={fullUrl} />
+      <link rel="alternate" type="application/rss+xml" title="Louis TATCHIDA — Blog RSS" href="/api/rss" />
       {type === "website" && <script type="application/ld+json">{JSON.stringify(personSchema)}</script>}
       {articleSchema && <script type="application/ld+json">{JSON.stringify(articleSchema)}</script>}
     </Helmet>

@@ -161,5 +161,32 @@ export async function registerRoutes(
     res.json({ status: "ok" });
   });
 
+  // ── Testimonials (public) ──
+  app.get("/api/testimonials", async (_req, res) => {
+    const { data, error } = await supabase.from("testimonials").select("*").eq("is_visible", true).order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(data);
+  });
+
+  // ── RSS Feed ──
+  app.get("/api/rss", async (_req, res) => {
+    const { data: posts } = await supabase.from("posts").select("title, slug, summary, published_at, tags").order("published_at", { ascending: false }).limit(20);
+    const siteUrl = "https://portefolio-louistatchs-projects.vercel.app";
+    const items = (posts || []).map(p => `<item><title><![CDATA[${p.title}]]></title><link>${siteUrl}/blog/${p.slug}</link><description><![CDATA[${p.summary || ""}]]></description><pubDate>${p.published_at ? new Date(p.published_at).toUTCString() : ""}</pubDate><guid>${siteUrl}/blog/${p.slug}</guid>${p.tags?.map((t: string) => `<category>${t}</category>`).join("") || ""}</item>`).join("\n");
+    res.setHeader("Content-Type", "application/rss+xml; charset=utf-8");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Louis TATCHIDA — Blog</title><link>${siteUrl}/blog</link><description>Articles et pensées sur l'agriculture durable, la finance agricole et la digitalisation rurale.</description><language>fr</language><atom:link href="${siteUrl}/api/rss" rel="self" type="application/rss+xml"/>${items}</channel></rss>`);
+  });
+
+  // ── Sitemap ──
+  app.get("/api/sitemap.xml", async (_req, res) => {
+    const siteUrl = "https://portefolio-louistatchs-projects.vercel.app";
+    const staticPages = ["/", "/about", "/research", "/publications", "/blog", "/booking", "/contact", "/stats"];
+    const { data: posts } = await supabase.from("posts").select("slug, published_at").order("published_at", { ascending: false });
+    const urls = staticPages.map(p => `<url><loc>${siteUrl}${p}</loc><changefreq>${p === "/" ? "weekly" : "monthly"}</changefreq><priority>${p === "/" ? "1.0" : "0.8"}</priority></url>`);
+    (posts || []).forEach(p => urls.push(`<url><loc>${siteUrl}/blog/${p.slug}</loc><lastmod>${p.published_at ? new Date(p.published_at).toISOString().split("T")[0] : ""}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`));
+    res.setHeader("Content-Type", "application/xml; charset=utf-8");
+    res.send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`);
+  });
+
   return httpServer;
 }

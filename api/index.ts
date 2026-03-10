@@ -153,6 +153,31 @@ app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+// ── Testimonials (public) ──
+app.get("/api/testimonials", async (_req, res) => {
+  const { data, error } = await supabase.from("testimonials").select("*").eq("is_visible", true).order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ message: error.message });
+  res.json(data);
+});
+
+// ── RSS Feed ──
+app.get("/api/rss", async (_req, res) => {
+  const { data: posts } = await supabase.from("posts").select("title, slug, summary, published_at, tags").order("published_at", { ascending: false }).limit(20);
+  const items = (posts || []).map(p => `<item><title><![CDATA[${p.title}]]></title><link>${SITE_URL}/blog/${p.slug}</link><description><![CDATA[${p.summary || ""}]]></description><pubDate>${p.published_at ? new Date(p.published_at).toUTCString() : ""}</pubDate><guid>${SITE_URL}/blog/${p.slug}</guid>${p.tags?.map((t: string) => `<category>${t}</category>`).join("") || ""}</item>`).join("\n");
+  res.setHeader("Content-Type", "application/rss+xml; charset=utf-8");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?><rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom"><channel><title>Louis TATCHIDA — Blog</title><link>${SITE_URL}/blog</link><description>Articles et pensées sur l'agriculture durable, la finance agricole et la digitalisation rurale.</description><language>fr</language><atom:link href="${SITE_URL}/api/rss" rel="self" type="application/rss+xml"/>${items}</channel></rss>`);
+});
+
+// ── Sitemap ──
+app.get("/api/sitemap.xml", async (_req, res) => {
+  const staticPages = ["/", "/about", "/research", "/publications", "/blog", "/booking", "/contact", "/stats"];
+  const { data: posts } = await supabase.from("posts").select("slug, published_at").order("published_at", { ascending: false });
+  const urls = staticPages.map(p => `<url><loc>${SITE_URL}${p}</loc><changefreq>${p === "/" ? "weekly" : "monthly"}</changefreq><priority>${p === "/" ? "1.0" : "0.8"}</priority></url>`);
+  (posts || []).forEach(p => urls.push(`<url><loc>${SITE_URL}/blog/${p.slug}</loc><lastmod>${p.published_at ? new Date(p.published_at).toISOString().split("T")[0] : ""}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`));
+  res.setHeader("Content-Type", "application/xml; charset=utf-8");
+  res.send(`<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">${urls.join("")}</urlset>`);
+});
+
 
 // ══════════════════════════════════════
 // ADMIN ROUTES
@@ -439,18 +464,44 @@ app.put("/api/admin/profile", requireAuth, async (req, res) => {
 
 // Dashboard stats
 app.get("/api/admin/stats", requireAuth, async (_req, res) => {
-  const [posts, pubs, appts, msgs, subs, comments] = await Promise.all([
+  const [posts, pubs, appts, msgs, subs, comments, testimonials] = await Promise.all([
     supabase.from("posts").select("id", { count: "exact", head: true }),
     supabase.from("publications").select("id", { count: "exact", head: true }),
     supabase.from("appointments").select("id", { count: "exact", head: true }),
     supabase.from("contact_messages").select("id", { count: "exact", head: true }),
     supabase.from("subscribers").select("id", { count: "exact", head: true }),
     supabase.from("comments").select("id", { count: "exact", head: true }),
+    supabase.from("testimonials").select("id", { count: "exact", head: true }),
   ]);
   res.json({
     posts: posts.count || 0, publications: pubs.count || 0, appointments: appts.count || 0,
     messages: msgs.count || 0, subscribers: subs.count || 0, comments: comments.count || 0,
+    testimonials: testimonials.count || 0,
   });
+});
+
+// ── Admin Testimonials CRUD ──
+app.get("/api/admin/testimonials", requireAuth, async (_req, res) => {
+  const { data, error } = await supabase.from("testimonials").select("*").order("created_at", { ascending: false });
+  if (error) return res.status(500).json({ message: error.message });
+  res.json(data);
+});
+app.post("/api/admin/testimonials", requireAuth, async (req, res) => {
+  const { name, title, organization, content, photo_url, rating, is_visible } = req.body;
+  const { data, error } = await supabase.from("testimonials").insert({ name, title, organization, content, photo_url, rating: rating || 5, is_visible: is_visible !== false }).select().single();
+  if (error) return res.status(400).json({ message: error.message });
+  res.status(201).json(data);
+});
+app.put("/api/admin/testimonials/:id", requireAuth, async (req, res) => {
+  const { name, title, organization, content, photo_url, rating, is_visible } = req.body;
+  const { data, error } = await supabase.from("testimonials").update({ name, title, organization, content, photo_url, rating, is_visible }).eq("id", Number(req.params.id)).select().single();
+  if (error) return res.status(400).json({ message: error.message });
+  res.json(data);
+});
+app.delete("/api/admin/testimonials/:id", requireAuth, async (req, res) => {
+  const { error } = await supabase.from("testimonials").delete().eq("id", Number(req.params.id));
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ message: "Deleted" });
 });
 
 // Error handler

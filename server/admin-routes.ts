@@ -292,13 +292,14 @@ export function registerAdminRoutes(app: Express) {
 
   // ── Dashboard stats ──
   app.get("/api/admin/stats", requireAuth, async (_req, res) => {
-    const [posts, pubs, appts, msgs, subs, comments] = await Promise.all([
+    const [posts, pubs, appts, msgs, subs, comments, testimonials] = await Promise.all([
       supabase.from("posts").select("id", { count: "exact", head: true }),
       supabase.from("publications").select("id", { count: "exact", head: true }),
       supabase.from("appointments").select("id", { count: "exact", head: true }),
       supabase.from("contact_messages").select("id", { count: "exact", head: true }),
       supabase.from("subscribers").select("id", { count: "exact", head: true }),
       supabase.from("comments").select("id", { count: "exact", head: true }),
+      supabase.from("testimonials").select("id", { count: "exact", head: true }),
     ]);
     res.json({
       posts: posts.count || 0,
@@ -307,6 +308,31 @@ export function registerAdminRoutes(app: Express) {
       messages: msgs.count || 0,
       subscribers: subs.count || 0,
       comments: comments.count || 0,
+      testimonials: testimonials.count || 0,
     });
+  });
+
+  // ── Testimonials CRUD ──
+  app.get("/api/admin/testimonials", requireAuth, async (_req, res) => {
+    const { data, error } = await supabase.from("testimonials").select("*").order("created_at", { ascending: false });
+    if (error) return res.status(500).json({ message: error.message });
+    res.json(data);
+  });
+  app.post("/api/admin/testimonials", requireAuth, async (req, res) => {
+    const { name, title, organization, content, photo_url, rating, is_visible } = req.body;
+    const { data, error } = await supabase.from("testimonials").insert({ name, title, organization, content, photo_url, rating: rating || 5, is_visible: is_visible !== false }).select().single();
+    if (error) return res.status(400).json({ message: error.message });
+    res.status(201).json(data);
+  });
+  app.put("/api/admin/testimonials/:id", requireAuth, async (req, res) => {
+    const { name, title, organization, content, photo_url, rating, is_visible } = req.body;
+    const { data, error } = await supabase.from("testimonials").update({ name, title, organization, content, photo_url, rating, is_visible }).eq("id", Number(req.params.id)).select().single();
+    if (error) return res.status(400).json({ message: error.message });
+    res.json(data);
+  });
+  app.delete("/api/admin/testimonials/:id", requireAuth, async (req, res) => {
+    const { error } = await supabase.from("testimonials").delete().eq("id", Number(req.params.id));
+    if (error) return res.status(400).json({ message: error.message });
+    res.json({ message: "Deleted" });
   });
 }
