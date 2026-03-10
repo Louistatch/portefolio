@@ -2,7 +2,8 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import nodemailer from "nodemailer";
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const nodemailer = require("nodemailer");
 
 // ── Supabase client ──
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://gcfcdkzmfybiigbnlwvb.supabase.co";
@@ -112,7 +113,7 @@ app.post("/api/subscribe", async (req, res) => {
   if (gmailConfigured()) {
     const greeting = name ? `Bonjour ${name},` : "Bonjour,";
     const transporter = createMailTransporter();
-    transporter.sendMail({ from: FROM_EMAIL, to: email, subject: "Bienvenue dans la communauté — Louis TATCHIDA", html: welcomeEmailHtml(greeting, name) }).catch(e => console.error("Welcome email error:", e));
+    transporter.sendMail({ from: FROM_EMAIL, to: email, subject: "Bienvenue dans la communauté — Louis TATCHIDA", html: welcomeEmailHtml(greeting, name) }).catch((e: any) => console.error("Welcome email error:", e));
   }
   res.status(201).json(data);
 });
@@ -224,7 +225,7 @@ app.post("/api/admin/posts", requireAuth, async (req, res) => {
           from: FROM_EMAIL, to: s.email,
           subject: `Nouvelle publication : ${title}`,
           html: publicationEmailHtml(s.name, { title, slug, summary, image_url }),
-        }).catch(e => console.error(`Notification error for ${s.email}:`, e));
+        }).catch((e: any) => console.error(`Notification error for ${s.email}:`, e));
       }
     }
   }
@@ -438,7 +439,7 @@ app.post("/api/admin/campaigns/:id/send", requireAuth, async (req, res) => {
         from: FROM_EMAIL, to: s.email,
         subject: campaign.subject,
         html: campaignEmailHtml(s.name, campaign.subject, campaign.content),
-      }).catch(e => console.error(`Campaign send error for ${s.email}:`, e));
+      }).catch((e: any) => console.error(`Campaign send error for ${s.email}:`, e));
     }
   }
 
