@@ -2,34 +2,16 @@ import express, { type Request, Response, NextFunction } from "express";
 import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-// Dynamic import for nodemailer (Vercel serverless ESM compatibility)
-let nodemailerModule: any = null;
-try {
-  nodemailerModule = require("nodemailer");
-} catch {
-  // nodemailer will be loaded dynamically if require fails (ESM)
-}
-
-async function getNodemailer() {
-  if (nodemailerModule) return nodemailerModule;
-  nodemailerModule = await import("nodemailer");
-  return nodemailerModule.default || nodemailerModule;
-}
+import { Resend } from "resend";
 
 // ── Supabase client ──
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://gcfcdkzmfybiigbnlwvb.supabase.co";
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjZmNka3ptZnliaWlnYm5sd3ZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNTU3OTQsImV4cCI6MjA4ODYzMTc5NH0.61Xs-82V1fW6ZoDq-Te44f31BDivuXvRQkO9SS-MpTc";
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ── Email (Gmail SMTP via Nodemailer) ──
-const GMAIL_USER = process.env.GMAIL_USER || "tatchida@gmail.com";
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD || "";
-const FROM_EMAIL = `Louis TATCHIDA <${GMAIL_USER}>`;
-function gmailConfigured() { return !!GMAIL_APP_PASSWORD && GMAIL_APP_PASSWORD.length > 0; }
-async function createMailTransporter() {
-  const nm = await getNodemailer();
-  return nm.createTransport({ service: "gmail", auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD } });
-}
+// ── Email (Resend) ──
+const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;
+const FROM_EMAIL = process.env.FROM_EMAIL || "Louis TATCHIDA <onboarding@resend.dev>";
 const SITE_URL = process.env.SITE_URL || "https://portefolio-louistatchs-projects.vercel.app";
 
 // ── Auth helpers ──
@@ -121,13 +103,10 @@ app.post("/api/subscribe", async (req, res) => {
     if (error.code === "23505") return res.status(409).json({ message: "Already subscribed" });
     return res.status(400).json({ message: error.message });
   }
-  // Send welcome email via Gmail SMTP
-  if (gmailConfigured()) {
-    try {
-      const greeting = name ? `Bonjour ${name},` : "Bonjour,";
-      const transporter = await createMailTransporter();
-      transporter.sendMail({ from: FROM_EMAIL, to: email, subject: "Bienvenue dans la communauté — Louis TATCHIDA", html: welcomeEmailHtml(greeting, name) }).catch((e: any) => console.error("Welcome email error:", e));
-    } catch (e: any) { console.error("Mail transporter error:", e); }
+  // Send welcome email
+  if (resend) {
+    const greeting = name ? `Bonjour ${name},` : "Bonjour,";
+    resend.emails.send({ from: FROM_EMAIL, to: email, subject: "Bienvenue dans la communauté — Louis TATCHIDA", html: welcomeEmailHtml(greeting, name) }).catch((e: any) => console.error("Welcome email error:", e));
   }
   res.status(201).json(data);
 });
@@ -228,21 +207,19 @@ app.post("/api/admin/posts", requireAuth, async (req, res) => {
   const { title, slug, content, summary, tags, image_url } = req.body;
   const { data, error } = await supabase.from("posts").insert({ title, slug, content, summary, tags, image_url }).select().single();
   if (error) return res.status(400).json({ message: error.message });
-  // Notify all active subscribers via Gmail SMTP
-  if (gmailConfigured() && data) {
-    try {
-      const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
-      if (subs?.length) {
-        const transporter = await createMailTransporter();
-        for (const s of subs) {
-          transporter.sendMail({
-            from: FROM_EMAIL, to: s.email,
-            subject: `Nouvelle publication : ${title}`,
-            html: publicationEmailHtml(s.name, { title, slug, summary, image_url }),
-          }).catch((e: any) => console.error(`Notification error for ${s.email}:`, e));
-        }
+  // Notify all active subscribers
+  if (resend && data) {
+    const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
+    if (subs?.length) {
+      for (let i = 0; i < subs.length; i += 50) {
+        const batch = subs.slice(i, i + 50).map((s: any) => ({
+          from: FROM_EMAIL, to: s.email,
+          subject: `Nouvelle publication : ${title}`,
+          html: publicationEmailHtml(s.name, { title, slug, summary, image_url }),
+        }));
+        resend.batch.send(batch).catch((e: any) => console.error("Notification error:", e));
       }
-    } catch (e: any) { console.error("Mail transporter error:", e); }
+    }
   }
   res.status(201).json(data);
 });
@@ -446,18 +423,16 @@ app.post("/api/admin/campaigns/:id/send", requireAuth, async (req, res) => {
   const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
   const count = subs?.length || 0;
 
-  // Send campaign emails via Gmail SMTP
-  if (gmailConfigured() && subs?.length) {
-    try {
-      const transporter = await createMailTransporter();
-      for (const s of subs) {
-        transporter.sendMail({
-          from: FROM_EMAIL, to: s.email,
-          subject: campaign.subject,
-          html: campaignEmailHtml(s.name, campaign.subject, campaign.content),
-        }).catch((e: any) => console.error(`Campaign send error for ${s.email}:`, e));
-      }
-    } catch (e: any) { console.error("Mail transporter error:", e); }
+  // Send campaign emails via Resend
+  if (resend && subs?.length) {
+    for (let i = 0; i < subs.length; i += 50) {
+      const batch = subs.slice(i, i + 50).map((s: any) => ({
+        from: FROM_EMAIL, to: s.email,
+        subject: campaign.subject,
+        html: campaignEmailHtml(s.name, campaign.subject, campaign.content),
+      }));
+      resend.batch.send(batch).catch((e: any) => console.error("Campaign send error:", e));
+    }
   }
 
   const { data, error } = await supabase.from("newsletter_campaigns").update({ status: "sent", recipients_count: count, sent_at: new Date().toISOString() }).eq("id", Number(req.params.id)).select().single();
