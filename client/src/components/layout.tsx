@@ -112,7 +112,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li><Link href="/booking" className="hover:text-primary transition-colors">Prendre rendez-vous</Link></li>
               <li><Link href="/contact" className="hover:text-primary transition-colors">Formulaire de contact</Link></li>
-              <li><a href="mailto:tatchida@gmail.com" className="hover:text-primary transition-colors">tatchida@gmail.com</a></li>
+              <li><a href="mailto:contact@louisfarm.com" className="hover:text-primary transition-colors">contact@louisfarm.com</a></li>
               <li><span>+228 92 54 88 38</span></li>
             </ul>
             <div className="mt-6">

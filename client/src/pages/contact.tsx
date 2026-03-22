@@ -56,8 +56,8 @@ export default function Contact() {
             <div className="bg-card p-8 rounded-2xl border border-border/50 shadow-sm">
               <Mail className="w-8 h-8 text-primary mb-4" />
               <h3 className="text-xl font-bold mb-2">Email</h3>
-              <a href={`mailto:${profile?.email || "tatchida@gmail.com"}`} className="text-primary hover:underline text-sm">
-                {profile?.email || "tatchida@gmail.com"}
+              <a href={`mailto:${profile?.email || "contact@louisfarm.com"}`} className="text-primary hover:underline text-sm">
+                {profile?.email || "contact@louisfarm.com"}
               </a>
             </div>
             <div className="bg-card p-8 rounded-2xl border border-border/50 shadow-sm">
