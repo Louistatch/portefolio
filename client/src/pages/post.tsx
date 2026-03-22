@@ -73,8 +73,34 @@ export default function BlogPost() {
         type="article"
         path={`/blog/${post.slug}`}
         image={post.image_url || undefined}
-        article={{ publishedTime: post.published_at || undefined, tags: post.tags || undefined, author: "Louis TATCHIDA" }}
+        article={{ publishedTime: post.published_at || undefined, modifiedTime: post.modified_at || undefined, tags: post.tags || undefined, author: "Louis TATCHIDA", content: post.content }}
       />
+      <script type="application/ld+json">
+        {JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          "itemListElement": [
+            {
+              "@type": "ListItem",
+              "position": 1,
+              "name": "Accueil",
+              "item": typeof window !== 'undefined' ? window.location.origin : ''
+            },
+            {
+              "@type": "ListItem",
+              "position": 2,
+              "name": "Blog",
+              "item": `${typeof window !== 'undefined' ? window.location.origin : ''}/blog`
+            },
+            {
+              "@type": "ListItem",
+              "position": 3,
+              "name": post.title,
+              "item": `${typeof window !== 'undefined' ? window.location.origin : ''}/blog/${post.slug}`
+            }
+          ]
+        })}
+      </script>
 
       <article className="max-w-3xl mx-auto px-6 py-12 lg:py-20">
         {/* Cover image */}

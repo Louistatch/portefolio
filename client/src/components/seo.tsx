@@ -6,7 +6,7 @@ interface SEOProps {
   type?: string;
   path?: string;
   image?: string;
-  article?: { publishedTime?: string; tags?: string[]; author?: string };
+  article?: { publishedTime?: string; modifiedTime?: string; tags?: string[]; author?: string; content?: string };
 }
 
 const SITE_NAME = "Louis Tatchida";
@@ -31,15 +31,28 @@ export function SEO({ title, description = DEFAULT_DESC, type = "website", path 
 
   const articleSchema = article ? {
     "@context": "https://schema.org",
-    "@type": "ScholarlyArticle",
+    "@type": "BlogPosting",
     headline: title,
     description,
-    image: ogImage,
-    author: { "@type": "Person", name: article.author || "Louis Tatchida" },
+    image: {
+      "@type": "ImageObject",
+      url: ogImage,
+      width: 1200,
+      height: 630
+    },
+    author: { "@type": "Person", name: article.author || "Louis Tatchida", url: siteUrl },
     datePublished: article.publishedTime,
+    dateModified: article.modifiedTime || article.publishedTime,
     keywords: article.tags?.join(", "),
     url: fullUrl,
     publisher: { "@type": "Person", name: "Louis Tatchida" },
+    articleBody: article.content,
+    inLanguage: "fr-FR",
+    isPartOf: {
+      "@type": "Blog",
+      "@id": `${siteUrl}/blog`,
+      name: "Blog de Louis Tatchida"
+    }
   } : null;
 
   return (

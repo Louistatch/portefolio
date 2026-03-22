@@ -105,6 +105,20 @@ export default function Publications() {
                           </div>
                         </div>
                       </div>
+                      <script type="application/ld+json">
+                        {JSON.stringify({
+                          "@context": "https://schema.org",
+                          "@type": "ScholarlyArticle",
+                          "name": pub.title,
+                          "abstract": pub.abstract,
+                          "url": `${typeof window !== 'undefined' ? window.location.origin : ''}/publications#pub-${pub.id}`,
+                          "datePublished": pub.year.toString(),
+                          "keywords": pub.category,
+                          "author": { "@type": "Person", "name": "Louis TATCHIDA" },
+                          "publisher": { "@type": "Person", "name": "Louis TATCHIDA" },
+                          "pdf": pub.pdf_url
+                        })}
+                      </script>
                     </div>
                   ))}
                 </div>

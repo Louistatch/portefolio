@@ -9,7 +9,11 @@ export const posts = pgTable("posts", {
   content: text("content").notNull(),
   summary: text("summary"),
   tags: text("tags").array(),
+  imageUrl: text("image_url"),
+  viewsCount: integer("views_count").default(0),
+  likesCount: integer("likes_count").default(0),
   publishedAt: timestamp("published_at").defaultNow(),
+  modifiedAt: timestamp("modified_at").defaultNow(),
 });
 
 export const comments = pgTable("comments", {
