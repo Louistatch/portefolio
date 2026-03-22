@@ -3,4 +3,4 @@ Allow: /
 Disallow: /admin/
 Disallow: /api/
 
-Sitemap: https://portefolio-virid-chi.vercel.app/sitemap.xml
+Sitemap: https://portefolio-virid-chi.vercel.app/api/sitemap.xml

@@ -1,5 +1,9 @@
 import { z } from 'zod';
-import { insertPostSchema, insertCommentSchema, insertPublicationSchema, insertAppointmentSchema, posts, comments, publications, appointments } from './schema';
+import {
+  insertPostSchema, insertCommentSchema, insertPublicationSchema,
+  insertAppointmentSchema, insertSubscriberSchema, insertContactMessageSchema,
+  posts, comments, publications, appointments, subscribers, contactMessages,
+} from './schema';
 
 export const errorSchemas = {
   validation: z.object({ message: z.string(), field: z.string().optional() }),
@@ -21,7 +25,7 @@ export const api = {
     },
     create: {
       method: 'POST' as const,
-      path: '/api/posts' as const,
+      path: '/api/admin/posts' as const,
       input: insertPostSchema,
       responses: { 201: z.custom<typeof posts.$inferSelect>(), 400: errorSchemas.validation },
     },
@@ -47,7 +51,7 @@ export const api = {
     },
     create: {
       method: 'POST' as const,
-      path: '/api/publications' as const,
+      path: '/api/admin/publications' as const,
       input: insertPublicationSchema,
       responses: { 201: z.custom<typeof publications.$inferSelect>(), 400: errorSchemas.validation },
     },
@@ -59,7 +63,23 @@ export const api = {
       input: insertAppointmentSchema,
       responses: { 201: z.custom<typeof appointments.$inferSelect>(), 400: errorSchemas.validation },
     },
-  }
+  },
+  subscribe: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/subscribe' as const,
+      input: insertSubscriberSchema,
+      responses: { 201: z.custom<typeof subscribers.$inferSelect>(), 400: errorSchemas.validation },
+    },
+  },
+  contact: {
+    create: {
+      method: 'POST' as const,
+      path: '/api/contact' as const,
+      input: insertContactMessageSchema,
+      responses: { 201: z.custom<typeof contactMessages.$inferSelect>(), 400: errorSchemas.validation },
+    },
+  },
 };
 
 export function buildUrl(path: string, params?: Record<string, string | number>): string {

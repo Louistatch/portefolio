@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useState, useEffect } from "react";
+import { useToast } from "@/hooks/use-toast";
 import { ReadingProgress, estimateReadingTime } from "@/components/reading-progress";
 import { SocialShare } from "@/components/social-share";
 import { Reactions } from "@/components/reactions";
@@ -26,6 +27,7 @@ export default function BlogPost() {
   const createComment = useCreateComment(post?.id || 0);
   const [authorName, setAuthorName] = useState("");
   const [content, setContent] = useState("");
+  const { toast } = useToast();
 
   // Track view once
   useEffect(() => {
@@ -60,7 +62,23 @@ export default function BlogPost() {
     if (!authorName.trim() || !content.trim()) return;
     createComment.mutate(
       { author_name: authorName, content },
-      { onSuccess: () => { setAuthorName(""); setContent(""); } }
+      {
+        onSuccess: () => {
+          setAuthorName("");
+          setContent("");
+          toast({
+            title: "Commentaire soumis",
+            description: "Votre commentaire sera visible après modération. Merci !",
+          });
+        },
+        onError: (err) => {
+          toast({
+            title: "Erreur",
+            description: err.message || "Impossible d'envoyer le commentaire.",
+            variant: "destructive",
+          });
+        },
+      }
     );
   };
 

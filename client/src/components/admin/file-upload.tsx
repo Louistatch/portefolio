@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Upload, X, FileText, Image, Loader2, CheckCircle2 } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { adminFetch } from "@/lib/admin";
 
 interface FileUploadProps {
   type: "document" | "image";
@@ -15,9 +15,9 @@ const ACCEPT_MAP = {
   image: ".jpg,.jpeg,.png,.gif,.webp,.svg",
 };
 
-const BUCKET_MAP = {
-  document: "documents",
-  image: "images",
+const ENDPOINT_MAP = {
+  document: "/api/admin/upload/document",
+  image: "/api/admin/upload/image",
 };
 
 export function FileUpload({ type, value, onChange, accept }: FileUploadProps) {
@@ -35,21 +35,21 @@ export function FileUpload({ type, value, onChange, accept }: FileUploadProps) {
     setFileName(file.name);
 
     try {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "";
-      const uniqueName = `${crypto.randomUUID()}.${ext}`;
-      const bucket = BUCKET_MAP[type];
+      const formData = new FormData();
+      formData.append("file", file);
 
-      const { error: uploadError } = await supabase.storage
-        .from(bucket)
-        .upload(uniqueName, file, {
-          contentType: file.type,
-          upsert: false,
-        });
+      const res = await adminFetch(ENDPOINT_MAP[type], {
+        method: "POST",
+        body: formData,
+      });
 
-      if (uploadError) throw new Error(uploadError.message);
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || "Upload failed");
+      }
 
-      const { data: urlData } = supabase.storage.from(bucket).getPublicUrl(uniqueName);
-      onChange(urlData.publicUrl);
+      const data = await res.json();
+      onChange(data.url);
     } catch (err: any) {
       setError(err.message || "Upload failed");
     } finally {

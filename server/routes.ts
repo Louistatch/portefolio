@@ -3,7 +3,7 @@ import type { Server } from "http";
 import { supabase } from "./supabase";
 import { registerAdminRoutes } from "./admin-routes";
 import { registerUploadRoutes } from "./upload";
-import { sendWelcomeEmail, sendPublicationNotification } from "./email";
+import { sendWelcomeEmail } from "./email";
 
 export async function registerRoutes(
   httpServer: Server,
@@ -61,7 +61,7 @@ export async function registerRoutes(
     }
     const { data, error } = await supabase
       .from("comments")
-      .insert({ post_id: Number(req.params.postId), author_name, content })
+      .insert({ post_id: Number(req.params.postId), author_name, content, status: "pending" })
       .select()
       .single();
     if (error) return res.status(400).json({ message: error.message });
@@ -86,7 +86,7 @@ export async function registerRoutes(
     }
     const { data, error } = await supabase
       .from("appointments")
-      .insert({ name, email, date, topic })
+      .insert({ name, email, date: new Date(date).toISOString(), topic })
       .select()
       .single();
     if (error) return res.status(400).json({ message: error.message });
