@@ -94,10 +94,10 @@ export default function Publications() {
                               </Button>
                             )}
                             {pub.citation && (
-                              <CitationButton title={pub.title} url={`/publications#pub-${pub.id}`} year={pub.year} />
+                              <CitationButton title={pub.title} url={`/api/og/publication/${pub.id}`} year={pub.year} />
                             )}
                             <SocialShare
-                              url={`/publications#pub-${pub.id}`}
+                              url={`/api/og/publication/${pub.id}`}
                               title={`${pub.title} — Louis TATCHIDA`}
                               description={pub.abstract}
                               image={pub.image_url || undefined}
@@ -111,7 +111,7 @@ export default function Publications() {
                           "@type": "ScholarlyArticle",
                           "name": pub.title,
                           "abstract": pub.abstract,
-                          "url": `${typeof window !== 'undefined' ? window.location.origin : ''}/publications#pub-${pub.id}`,
+                          "url": `${typeof window !== 'undefined' ? window.location.origin : ''}/api/og/publication/${pub.id}`,
                           "datePublished": pub.year.toString(),
                           "keywords": pub.category,
                           "author": { "@type": "Person", "name": "Louis TATCHIDA" },

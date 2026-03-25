@@ -55,7 +55,7 @@ export function SocialShare({ url, title, description, image }: ShareProps) {
             <div className="mb-4 rounded-xl overflow-hidden border border-border/30 bg-muted/30">
               {image && <img src={image} alt="" className="w-full h-32 object-cover" />}
               <div className="p-3">
-                <p className="text-xs text-muted-foreground mb-1">louistatchida.vercel.app</p>
+                <p className="text-xs text-muted-foreground mb-1">louisfarm.com</p>
                 <p className="text-sm font-semibold line-clamp-2">{title}</p>
                 {description && <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{description}</p>}
               </div>

@@ -155,8 +155,8 @@ export default function BlogPost() {
         <div className="flex items-center justify-between mb-12 py-4 px-6 bg-card/80 backdrop-blur-sm rounded-2xl border border-border/50 shadow-sm sticky top-2 z-40">
           <Reactions type="post" id={post.id} likesCount={post.likes_count} viewsCount={post.views_count} />
           <div className="flex items-center gap-2">
-            <CitationButton title={post.title} url={`/blog/${post.slug}`} year={post.published_at ? new Date(post.published_at).getFullYear() : undefined} />
-            <SocialShare url={`/blog/${post.slug}`} title={post.title} description={post.summary || ""} image={post.image_url || undefined} />
+            <CitationButton title={post.title} url={`/api/og/blog/${post.slug}`} year={post.published_at ? new Date(post.published_at).getFullYear() : undefined} />
+            <SocialShare url={`/api/og/blog/${post.slug}`} title={post.title} description={post.summary || ""} image={post.image_url || undefined} />
           </div>
         </div>
 
@@ -197,7 +197,7 @@ export default function BlogPost() {
           </div>
           <div className="flex items-center gap-4">
             <Reactions type="post" id={post.id} likesCount={post.likes_count} viewsCount={post.views_count} />
-            <SocialShare url={`/blog/${post.slug}`} title={post.title} description={post.summary || ""} image={post.image_url || undefined} />
+            <SocialShare url={`/api/og/blog/${post.slug}`} title={post.title} description={post.summary || ""} image={post.image_url || undefined} />
           </div>
         </div>
 
