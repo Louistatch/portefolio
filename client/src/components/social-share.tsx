@@ -23,6 +23,7 @@ export function SocialShare({ url, title, description, image }: ShareProps) {
   const [open, setOpen] = useState(false);
   const { toast } = useToast();
   const fullUrl = typeof window !== "undefined" ? `${window.location.origin}${url}` : url;
+  const shortDesc = description ? (description.length > 120 ? description.slice(0, 117) + "..." : description) : "";
 
   const copyLink = async () => {
     await navigator.clipboard.writeText(fullUrl);
@@ -34,7 +35,7 @@ export function SocialShare({ url, title, description, image }: ShareProps) {
   const nativeShare = async () => {
     if (navigator.share) {
       try {
-        await navigator.share({ title, text: description || title, url: fullUrl });
+        await navigator.share({ title, text: shortDesc || title, url: fullUrl });
       } catch {}
     } else {
       setOpen(!open);
@@ -57,7 +58,7 @@ export function SocialShare({ url, title, description, image }: ShareProps) {
               <div className="p-3">
                 <p className="text-xs text-muted-foreground mb-1">louisfarm.com</p>
                 <p className="text-sm font-semibold line-clamp-2">{title}</p>
-                {description && <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{description}</p>}
+                {shortDesc && <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{shortDesc}</p>}
               </div>
             </div>
 
