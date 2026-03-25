@@ -542,11 +542,13 @@ app.post("/api/admin/upload/image", requireAuth, upload.single("file"), async (r
 });
 
 // ── OG Meta for Publications (social sharing) ──
+function escHtml(s: string) { return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, " "); }
+
 app.get("/api/og/publication/:id", async (req, res) => {
   const { data: pub } = await supabase.from("publications").select("*").eq("id", Number(req.params.id)).single();
   if (!pub) return res.redirect(`${SITE_URL}/publications`);
-  const title = pub.title || "Publication";
-  const desc = (pub.abstract || "").slice(0, 120).replace(/"/g, "&quot;");
+  const title = escHtml(pub.title || "Publication");
+  const desc = escHtml((pub.abstract || "").slice(0, 120));
   const image = pub.image_url || `${SITE_URL}/favicon.svg`;
   const url = `${SITE_URL}/publications#pub-${pub.id}`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -574,8 +576,8 @@ app.get("/api/og/publication/:id", async (req, res) => {
 app.get("/api/og/blog/:slug", async (req, res) => {
   const { data: post } = await supabase.from("posts").select("*").eq("slug", req.params.slug).single();
   if (!post) return res.redirect(`${SITE_URL}/blog`);
-  const title = post.title || "Article";
-  const desc = (post.summary || "").slice(0, 120).replace(/"/g, "&quot;");
+  const title = escHtml(post.title || "Article");
+  const desc = escHtml((post.summary || "").slice(0, 120));
   const image = post.image_url || `${SITE_URL}/favicon.svg`;
   const url = `${SITE_URL}/blog/${post.slug}`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
