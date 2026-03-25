@@ -99,7 +99,7 @@ export default function Publications() {
                             <SocialShare
                               url={`/api/og/publication/${pub.id}`}
                               title={`${pub.title} — Louis TATCHIDA`}
-                              description={pub.abstract}
+                              description={pub.abstract?.slice(0, 120)}
                               image={pub.image_url || undefined}
                             />
                           </div>

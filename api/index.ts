@@ -546,7 +546,7 @@ app.get("/api/og/publication/:id", async (req, res) => {
   const { data: pub } = await supabase.from("publications").select("*").eq("id", Number(req.params.id)).single();
   if (!pub) return res.redirect(`${SITE_URL}/publications`);
   const title = pub.title || "Publication";
-  const desc = (pub.abstract || "").slice(0, 200);
+  const desc = (pub.abstract || "").slice(0, 120).replace(/"/g, "&quot;");
   const image = pub.image_url || `${SITE_URL}/favicon.svg`;
   const url = `${SITE_URL}/publications#pub-${pub.id}`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -558,6 +558,8 @@ app.get("/api/og/publication/:id", async (req, res) => {
 <meta property="og:title" content="${title}">
 <meta property="og:description" content="${desc}">
 <meta property="og:image" content="${image}">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
 <meta property="og:url" content="${url}">
 <meta property="og:site_name" content="Louis TATCHIDA">
 <meta name="twitter:card" content="summary_large_image">
@@ -573,7 +575,7 @@ app.get("/api/og/blog/:slug", async (req, res) => {
   const { data: post } = await supabase.from("posts").select("*").eq("slug", req.params.slug).single();
   if (!post) return res.redirect(`${SITE_URL}/blog`);
   const title = post.title || "Article";
-  const desc = (post.summary || "").slice(0, 200);
+  const desc = (post.summary || "").slice(0, 120).replace(/"/g, "&quot;");
   const image = post.image_url || `${SITE_URL}/favicon.svg`;
   const url = `${SITE_URL}/blog/${post.slug}`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
