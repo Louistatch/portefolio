@@ -541,6 +541,60 @@ app.post("/api/admin/upload/image", requireAuth, upload.single("file"), async (r
   res.json({ url: urlData.publicUrl, filename: req.file.originalname });
 });
 
+// ── OG Meta for Publications (social sharing) ──
+app.get("/api/og/publication/:id", async (req, res) => {
+  const { data: pub } = await supabase.from("publications").select("*").eq("id", Number(req.params.id)).single();
+  if (!pub) return res.redirect(`${SITE_URL}/publications`);
+  const title = pub.title || "Publication";
+  const desc = (pub.abstract || "").slice(0, 200);
+  const image = pub.image_url || `${SITE_URL}/favicon.svg`;
+  const url = `${SITE_URL}/publications#pub-${pub.id}`;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`<!DOCTYPE html><html lang="fr"><head>
+<meta charset="utf-8">
+<title>${title} — Louis TATCHIDA</title>
+<meta name="description" content="${desc}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
+<meta property="og:image" content="${image}">
+<meta property="og:url" content="${url}">
+<meta property="og:site_name" content="Louis TATCHIDA">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${image}">
+<meta http-equiv="refresh" content="0;url=${url}">
+</head><body><p>Redirection vers <a href="${url}">${title}</a>...</p></body></html>`);
+});
+
+// ── OG Meta for Blog Posts (social sharing) ──
+app.get("/api/og/blog/:slug", async (req, res) => {
+  const { data: post } = await supabase.from("posts").select("*").eq("slug", req.params.slug).single();
+  if (!post) return res.redirect(`${SITE_URL}/blog`);
+  const title = post.title || "Article";
+  const desc = (post.summary || "").slice(0, 200);
+  const image = post.image_url || `${SITE_URL}/favicon.svg`;
+  const url = `${SITE_URL}/blog/${post.slug}`;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(`<!DOCTYPE html><html lang="fr"><head>
+<meta charset="utf-8">
+<title>${title} — Louis TATCHIDA</title>
+<meta name="description" content="${desc}">
+<meta property="og:type" content="article">
+<meta property="og:title" content="${title}">
+<meta property="og:description" content="${desc}">
+<meta property="og:image" content="${image}">
+<meta property="og:url" content="${url}">
+<meta property="og:site_name" content="Louis TATCHIDA">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${title}">
+<meta name="twitter:description" content="${desc}">
+<meta name="twitter:image" content="${image}">
+<meta http-equiv="refresh" content="0;url=${url}">
+</head><body><p>Redirection vers <a href="${url}">${title}</a>...</p></body></html>`);
+});
+
 // Error handler
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error("Error:", err);
