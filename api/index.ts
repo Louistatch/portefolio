@@ -6,6 +6,7 @@ import { Resend } from "resend";
 import multer from "multer";
 import crypto from "crypto";
 import path from "path";
+import sharp from "sharp";
 
 // ── Supabase client ──
 const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://gcfcdkzmfybiigbnlwvb.supabase.co";
@@ -541,6 +542,47 @@ app.post("/api/admin/upload/image", requireAuth, upload.single("file"), async (r
   res.json({ url: urlData.publicUrl, filename: req.file.originalname });
 });
 
+// ── OG Image Proxy (converts any image to 1200x630 JPEG for social sharing) ──
+const ogImageCache = new Map<string, { buffer: Buffer; timestamp: number }>();
+const OG_CACHE_TTL = 1000 * 60 * 60; // 1 hour
+
+app.get("/api/og-image", async (req, res) => {
+  const url = req.query.url as string;
+  if (!url) return res.status(400).send("Missing url param");
+
+  try {
+    // Check cache
+    const cached = ogImageCache.get(url);
+    if (cached && Date.now() - cached.timestamp < OG_CACHE_TTL) {
+      res.setHeader("Content-Type", "image/jpeg");
+      res.setHeader("Cache-Control", "public, max-age=3600");
+      return res.send(cached.buffer);
+    }
+
+    // Fetch original image
+    const response = await fetch(url, { signal: AbortSignal.timeout(8000) });
+    if (!response.ok) return res.status(404).send("Image not found");
+    const arrayBuffer = await response.arrayBuffer();
+    const inputBuffer = Buffer.from(arrayBuffer);
+
+    // Convert to 1200x630 JPEG
+    const outputBuffer = await sharp(inputBuffer)
+      .resize(1200, 630, { fit: "cover", position: "center" })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    // Cache it
+    ogImageCache.set(url, { buffer: outputBuffer, timestamp: Date.now() });
+
+    res.setHeader("Content-Type", "image/jpeg");
+    res.setHeader("Cache-Control", "public, max-age=3600");
+    res.send(outputBuffer);
+  } catch (e: any) {
+    console.error("OG image error:", e.message);
+    res.status(500).send("Image processing failed");
+  }
+});
+
 // ── OG Meta for Publications (social sharing) ──
 function escHtml(s: string) { return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, " "); }
 
@@ -549,7 +591,7 @@ app.get("/api/og/publication/:id", async (req, res) => {
   if (!pub) return res.redirect(`${SITE_URL}/publications`);
   const title = escHtml(pub.title || "Publication");
   const desc = escHtml((pub.abstract || "").slice(0, 120));
-  const image = pub.image_url || `${SITE_URL}/favicon.svg`;
+  const image = pub.image_url ? `${SITE_URL}/api/og-image?url=${encodeURIComponent(pub.image_url)}` : `${SITE_URL}/favicon.svg`;
   const url = `${SITE_URL}/publications#pub-${pub.id}`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!DOCTYPE html><html lang="fr"><head>
@@ -578,7 +620,7 @@ app.get("/api/og/blog/:slug", async (req, res) => {
   if (!post) return res.redirect(`${SITE_URL}/blog`);
   const title = escHtml(post.title || "Article");
   const desc = escHtml((post.summary || "").slice(0, 120));
-  const image = post.image_url || `${SITE_URL}/favicon.svg`;
+  const image = post.image_url ? `${SITE_URL}/api/og-image?url=${encodeURIComponent(post.image_url)}` : `${SITE_URL}/favicon.svg`;
   const url = `${SITE_URL}/blog/${post.slug}`;
   res.setHeader("Content-Type", "text/html; charset=utf-8");
   res.send(`<!DOCTYPE html><html lang="fr"><head>
