@@ -13,6 +13,7 @@ import Research from "@/pages/research";
 import BlogList from "@/pages/blog";
 import BlogPost from "@/pages/post";
 import Publications from "@/pages/publications";
+import FAQ from "@/pages/faq";
 import Booking from "@/pages/booking";
 import Contact from "@/pages/contact";
 
@@ -68,6 +69,7 @@ function App() {
             <Route path="/blog">{() => <Layout><BlogList /></Layout>}</Route>
             <Route path="/blog/:slug">{(params) => <Layout><BlogPost /></Layout>}</Route>
             <Route path="/publications">{() => <Layout><Publications /></Layout>}</Route>
+            <Route path="/faq">{() => <Layout><FAQ /></Layout>}</Route>
             <Route path="/booking">{() => <Layout><Booking /></Layout>}</Route>
             <Route path="/contact">{() => <Layout><Contact /></Layout>}</Route>
             <Route path="/stats">{() => <Layout><Stats /></Layout>}</Route>

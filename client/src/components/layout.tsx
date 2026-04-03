@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { ReactNode, useState, useEffect } from "react";
-import { Menu, X, BookOpen, User, Home, Lightbulb, Calendar, Mail, FileText } from "lucide-react";
+import { Menu, X, BookOpen, User, Home, Lightbulb, Calendar, Mail, FileText, HelpCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Newsletter } from "@/components/newsletter";
 import { NewsletterPopup } from "@/components/newsletter-popup";
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/research", label: "Recherche", icon: Lightbulb },
   { href: "/publications", label: "Publications", icon: BookOpen },
   { href: "/blog", label: "Blog", icon: FileText },
+  { href: "/faq", label: "FAQ", icon: HelpCircle },
   { href: "/booking", label: "Rendez-vous", icon: Calendar },
   { href: "/contact", label: "Contact", icon: Mail },
 ];

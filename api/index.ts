@@ -174,7 +174,7 @@ app.get("/api/rss", async (_req, res) => {
 
 // ── Sitemap ──
 app.get("/api/sitemap.xml", async (_req, res) => {
-  const staticPages = ["/", "/about", "/research", "/publications", "/blog", "/booking", "/contact", "/stats"];
+  const staticPages = ["/", "/about", "/research", "/publications", "/blog", "/faq", "/booking", "/contact", "/stats"];
   const { data: posts } = await supabase.from("posts").select("slug, published_at").order("published_at", { ascending: false });
   const urls = staticPages.map(p => `<url><loc>${SITE_URL}${p}</loc><changefreq>${p === "/" ? "weekly" : "monthly"}</changefreq><priority>${p === "/" ? "1.0" : "0.8"}</priority></url>`);
   (posts || []).forEach(p => urls.push(`<url><loc>${SITE_URL}/blog/${p.slug}</loc><lastmod>${p.published_at ? new Date(p.published_at).toISOString().split("T")[0] : ""}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`));
