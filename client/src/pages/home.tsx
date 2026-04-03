@@ -51,7 +51,7 @@ export default function Home() {
               {profile?.full_name || "Louis TATCHIDA"}
             </h1>
             <p className="text-lg text-muted-foreground font-serif mb-4 max-w-2xl">
-              Agronome & Expert Finance Agricole · +8 ans en résilience climatique et digitalisation agricole en Afrique de l'Ouest.
+              Agronome & Expert Finance Agricole · +11 ans en résilience climatique et digitalisation agricole en Afrique de l'Ouest.
             </p>
             <div className="flex flex-wrap gap-3 justify-center md:justify-start">
               <Link href="/about" className="inline-flex items-center px-5 py-2.5 text-sm font-medium bg-primary text-primary-foreground rounded-xl shadow-lg shadow-primary/25 hover:shadow-xl hover:-translate-y-0.5 transition-all">
@@ -73,7 +73,7 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {[
-              { value: 8, suffix: "+", label: "Années d'expérience", icon: TrendingUp },
+              { value: 11, suffix: "+", label: "Années d'expérience", icon: TrendingUp },
               { value: 3000, suffix: "+", label: "Agriculteurs accompagnés", icon: Users },
               { value: 200, suffix: "+", label: "Coopératives structurées", icon: ShieldCheck },
               { value: 500, suffix: "M+", label: "FCFA mobilisés", icon: LineChart },
