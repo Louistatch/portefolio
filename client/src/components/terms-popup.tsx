@@ -95,6 +95,9 @@ export function TermsPopup() {
                         <li>• Protection de vos données personnelles</li>
                         <li>• Modération des commentaires</li>
                       </ul>
+                      <p className="text-xs text-muted-foreground mt-3 italic">
+                        Vous pouvez accepter immédiatement ou lire les conditions complètes ci-dessous.
+                      </p>
                     </div>
 
                     {/* Learn more button */}
@@ -207,9 +210,15 @@ export function TermsPopup() {
                     Refuser
                   </Button>
                   <Button disabled={!accepted} onClick={handleAccept} className="flex-1">
-                    Accepter et continuer
+                    {showFull ? "Accepter et continuer" : "Continuer"}
                   </Button>
                 </div>
+
+                {!showFull && (
+                  <p className="text-xs text-center text-muted-foreground">
+                    En cliquant sur "Continuer", vous acceptez nos conditions d'utilisation.
+                  </p>
+                )}
               </div>
             </div>
           </motion.div>
