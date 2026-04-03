@@ -67,8 +67,8 @@ export default function BlogPost() {
           setAuthorName("");
           setContent("");
           toast({
-            title: "Commentaire soumis",
-            description: "Votre commentaire sera visible après modération. Merci !",
+            title: "Commentaire publié",
+            description: "Votre commentaire est maintenant visible. Merci de votre contribution !",
           });
         },
         onError: (err) => {

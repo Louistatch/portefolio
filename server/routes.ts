@@ -63,7 +63,7 @@ export async function registerRoutes(
     }
     const { data, error } = await supabase
       .from("comments")
-      .insert({ post_id: Number(req.params.postId), author_name, content, status: "pending" })
+      .insert({ post_id: Number(req.params.postId), author_name, content, status: "approved" })
       .select()
       .single();
     if (error) return res.status(400).json({ message: error.message });
