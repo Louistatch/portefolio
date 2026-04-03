@@ -4,6 +4,7 @@ import { Menu, X, BookOpen, User, Home, Lightbulb, Calendar, Mail, FileText } fr
 import { Button } from "@/components/ui/button";
 import { Newsletter } from "@/components/newsletter";
 import { NewsletterPopup } from "@/components/newsletter-popup";
+import { TermsPopup } from "@/components/terms-popup";
 import { useQuery } from "@tanstack/react-query";
 
 const NAV_ITEMS = [
@@ -86,6 +87,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <main className="flex-1 pt-24 pb-12 w-full page-enter">
         {children}
       </main>
+      <TermsPopup />
       <NewsletterPopup />
 
       <footer className="border-t border-border/50 py-12 mt-auto bg-muted/30">
