@@ -6,7 +6,7 @@ import { fr } from "date-fns/locale";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { Loader2, MessageSquare, Send, Clock, BookOpen } from "lucide-react";
+import { Loader2, MessageSquare, Send, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";

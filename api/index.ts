@@ -72,7 +72,7 @@ app.get("/api/search", async (req, res) => {
 });
 
 app.get("/api/posts/:postId/comments", async (req, res) => {
-  const { data, error } = await supabase.from("comments").select("*").eq("post_id", Number(req.params.postId)).eq("status", "approved").order("created_at", { ascending: true });
+  const { data, error } = await supabase.from("comments").select("*").eq("post_id", Number(req.params.postId)).order("created_at", { ascending: true });
   if (error) return res.status(500).json({ message: error.message });
   res.json(data);
 });
@@ -80,7 +80,7 @@ app.get("/api/posts/:postId/comments", async (req, res) => {
 app.post("/api/posts/:postId/comments", async (req, res) => {
   const { author_name, content } = req.body;
   if (!author_name || !content) return res.status(400).json({ message: "author_name and content required" });
-  const { data, error } = await supabase.from("comments").insert({ post_id: Number(req.params.postId), author_name, content }).select().single();
+  const { data, error } = await supabase.from("comments").insert({ post_id: Number(req.params.postId), author_name, content, status: "approved" }).select().single();
   if (error) return res.status(400).json({ message: error.message });
   res.status(201).json(data);
 });

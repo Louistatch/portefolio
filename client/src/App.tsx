@@ -32,6 +32,7 @@ import AdminTestimonials from "@/pages/admin/testimonials-admin";
 import Stats from "@/pages/stats";
 import { getToken } from "@/lib/admin";
 import { useEffect } from "react";
+import { CookieConsent } from "@/components/cookie-consent";
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const [, navigate] = useLocation();
@@ -48,6 +49,7 @@ function App() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <Toaster />
+          <CookieConsent />
           <Switch>
             {/* Admin routes — must be before public catch-all */}
             <Route path="/admin/login" component={AdminLogin} />
