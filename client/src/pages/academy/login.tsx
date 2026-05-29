@@ -23,7 +23,15 @@ export default function AcademyLogin() {
       if (!res.ok) throw new Error(data.message || "Erreur de connexion");
       setStudentToken(data.token);
       setStudent(data.student);
-      navigate("/academy/dashboard");
+      // Vérifie si le test a déjà été passé et réussi
+      try {
+        const st = await fetch("/api/academy/test-status", {
+          headers: { Authorization: `Bearer ${data.token}` },
+        }).then(r => r.json());
+        navigate(st.passed ? "/academy/dashboard" : "/elearning");
+      } catch {
+        navigate("/academy/dashboard");
+      }
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
   }
 
