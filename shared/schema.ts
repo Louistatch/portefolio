@@ -130,6 +130,111 @@ export const newsletterCampaigns = pgTable("newsletter_campaigns", {
   createdAt: timestamp("created_at").defaultNow(),
 });
 
+
+// ════════════════════════════════════════════════
+// DataMEAL Academy — School Management System
+// ════════════════════════════════════════════════
+
+// ── Students ──
+export const students = pgTable("students", {
+  id: serial("id").primaryKey(),
+  fullName: text("full_name").notNull(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  phone: text("phone"),
+  country: text("country"),
+  organization: text("organization"),
+  entryScore: integer("entry_score").default(0),
+  avatarUrl: text("avatar_url"),
+  status: text("status").default("active"),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ── Courses ──
+export const smsCourses = pgTable("sms_courses", {
+  id: serial("id").primaryKey(),
+  code: text("code").notNull().unique(),
+  title: text("title").notNull(),
+  description: text("description"),
+  tools: text("tools").array(),
+  level: text("level").default("debutant"),
+  totalLessons: integer("total_lessons").default(0),
+  orderIndex: integer("order_index").default(0),
+  isPublished: boolean("is_published").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ── Lessons ──
+export const smsLessons = pgTable("sms_lessons", {
+  id: serial("id").primaryKey(),
+  courseId: integer("course_id").references(() => smsCourses.id).notNull(),
+  title: text("title").notNull(),
+  content: jsonb("content"),
+  type: text("type").default("notebook"),
+  points: integer("points").default(10),
+  orderIndex: integer("order_index").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+// ── Enrollments ──
+export const enrollments = pgTable("enrollments", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  courseId: integer("course_id").references(() => smsCourses.id).notNull(),
+  status: text("status").default("in_progress"),
+  progress: integer("progress").default(0),
+  enrolledAt: timestamp("enrolled_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+});
+
+// ── Grades ──
+export const grades = pgTable("grades", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  courseId: integer("course_id").references(() => smsCourses.id),
+  lessonId: integer("lesson_id").references(() => smsLessons.id),
+  title: text("title").notNull(),
+  score: integer("score").notNull(),
+  maxScore: integer("max_score").default(100),
+  type: text("type").default("lesson"),
+  feedback: text("feedback"),
+  gradedAt: timestamp("graded_at").defaultNow(),
+});
+
+// ── Submissions ──
+export const submissions = pgTable("submissions", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  courseId: integer("course_id").references(() => smsCourses.id).notNull(),
+  lessonId: integer("lesson_id").references(() => smsLessons.id),
+  content: jsonb("content"),
+  status: text("status").default("submitted"),
+  score: integer("score"),
+  feedback: text("feedback"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+});
+
+// ── Attestations ──
+export const attestations = pgTable("attestations", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  courseId: integer("course_id").references(() => smsCourses.id).notNull(),
+  certificateNo: text("certificate_no").unique(),
+  finalScore: integer("final_score"),
+  status: text("status").default("pending"),
+  requestedAt: timestamp("requested_at").defaultNow(),
+  issuedAt: timestamp("issued_at"),
+});
+
+// ── SMS Types ──
+export type Student = typeof students.$inferSelect;
+export type SmsCourse = typeof smsCourses.$inferSelect;
+export type SmsLesson = typeof smsLessons.$inferSelect;
+export type Enrollment = typeof enrollments.$inferSelect;
+export type Grade = typeof grades.$inferSelect;
+export type Submission = typeof submissions.$inferSelect;
+export type Attestation = typeof attestations.$inferSelect;
+
 // ── Insert Schemas ──
 export const insertPostSchema = createInsertSchema(posts).omit({ id: true, publishedAt: true, viewsCount: true, likesCount: true });
 export const insertCommentSchema = createInsertSchema(comments).omit({ id: true, createdAt: true, status: true });
