@@ -16,6 +16,7 @@ import Publications from "@/pages/publications";
 import FAQ from "@/pages/faq";
 import Booking from "@/pages/booking";
 import Contact from "@/pages/contact";
+import ELearning from "@/pages/elearning";
 
 // Admin
 import AdminLogin from "@/pages/admin/login";
@@ -75,6 +76,10 @@ function App() {
             <Route path="/booking">{() => <Layout><Booking /></Layout>}</Route>
             <Route path="/contact">{() => <Layout><Contact /></Layout>}</Route>
             <Route path="/stats">{() => <Layout><Stats /></Layout>}</Route>
+
+            {/* ── DataMEAL Academy ──────────────────────────── */}
+            <Route path="/elearning">{() => <Layout><ELearning /></Layout>}</Route>
+
             <Route>{() => <Layout><NotFound /></Layout>}</Route>
           </Switch>
         </TooltipProvider>
