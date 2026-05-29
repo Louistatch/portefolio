@@ -8,6 +8,7 @@ import {
   Star, Cpu, Globe, BarChart3, Download, Send, X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { isStudentLoggedIn, getStudent, studentFetch } from "@/lib/student";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type View = "landing" | "test" | "test-result" | "dashboard" | "notebook" | "cert";
@@ -193,13 +194,27 @@ export default function ELearning() {
 
   useEffect(() => { topRef.current?.scrollIntoView({ behavior: "smooth" }); }, [view, chapter]);
 
-  // ── SUBMIT TEST
-  function submitTest() {
+  // ── SUBMIT TEST (étudiant authentifié — score enregistré sur son compte)
+  async function submitTest() {
     let s = 0;
     QUESTIONS.forEach((q, i) => { if (answers[i] === q.ans) s++; });
     setScore(s);
-    if (s >= 21) sessionStorage.setItem("academy_entry_score", String(s));
     setView("test-result");
+    try {
+      await studentFetch("/api/academy/submit-test", {
+        method: "POST",
+        body: JSON.stringify({ score: s }),
+      });
+    } catch (e) { /* géré par studentFetch (redirige si session expirée) */ }
+  }
+
+  // ── Vérifie l'authentification avant de démarrer le test
+  function startTest() {
+    if (!isStudentLoggedIn()) {
+      navigate("/academy/login");
+      return;
+    }
+    setView("test");
   }
 
   // ── RUN CELL
@@ -220,6 +235,24 @@ export default function ELearning() {
       <div className="max-w-5xl mx-auto px-6 py-12 lg:py-20">
         <SEO title="DataMEAL Academy" description="Plateforme eLearning gratuite MEAL — KoboCollect, Python, QGIS. Apprenez par les projets terrain." />
 
+        {/* Bandeau authentification */}
+        {!isStudentLoggedIn() ? (
+          <div className="bg-card border border-border/50 rounded-2xl p-4 mb-8 flex items-center justify-between flex-wrap gap-3">
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">Connexion requise</span> — créez un compte pour passer le test d'aptitude.
+            </p>
+            <div className="flex gap-2">
+              <Button size="sm" variant="outline" onClick={() => navigate("/academy/login")}>Se connecter</Button>
+              <Button size="sm" onClick={() => navigate("/academy/register")}>Créer un compte</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-8 flex items-center gap-3">
+            <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
+            <p className="text-sm">Connecté en tant que <span className="font-medium">{getStudent()?.full_name}</span>. Vous pouvez passer le test.</p>
+          </div>
+        )}
+
         {/* Hero */}
         <div className="mb-16">
           <span className="inline-flex items-center gap-2 text-xs font-medium bg-primary/10 text-primary px-3 py-1.5 rounded-full mb-6">
@@ -232,7 +265,7 @@ export default function ELearning() {
             Une formation gratuite et intensive par projets sur KoboCollect, Python et QGIS pour construire des systèmes de Suivi-Évaluation dans les contextes humanitaires et de développement.
           </p>
           <div className="flex flex-wrap gap-4">
-            <Button size="lg" className="gap-2" onClick={() => setView("test")}>
+            <Button size="lg" className="gap-2" onClick={startTest}>
               <PlayCircle className="w-5 h-5" /> Passer le test de sélection
             </Button>
             <Button size="lg" variant="outline" className="gap-2" onClick={() => document.getElementById("how")?.scrollIntoView({ behavior: "smooth" })}>
@@ -305,7 +338,7 @@ export default function ELearning() {
           <GraduationCap className="w-12 h-12 text-primary mx-auto mb-4" />
           <h2 className="text-2xl font-bold mb-3">Prêt(e) à rejoindre la formation ?</h2>
           <p className="text-muted-foreground mb-6 max-w-lg mx-auto">La formation est entièrement gratuite. Passez le test de 30 questions pour être sélectionné(e).</p>
-          <Button size="lg" className="gap-2" onClick={() => setView("test")}>
+          <Button size="lg" className="gap-2" onClick={startTest}>
             Commencer le test <ArrowRight className="w-4 h-4" />
           </Button>
         </div>
@@ -384,20 +417,16 @@ export default function ELearning() {
         <h2 className="text-2xl font-bold mb-3">{passed ? "🎉 Félicitations !" : "📚 Continue à réviser"}</h2>
         <p className="text-muted-foreground mb-8 font-serif">
           {passed
-            ? `Score : ${pct}% — Vous êtes admis(e) ! Accédez maintenant à vos projets.`
+            ? `Score : ${pct}% — Vous êtes admis(e) ! Votre score a été enregistré sur votre compte.`
             : `Score : ${pct}% — Score requis : 70% (21/30). Révisez le MEAL, KoboCollect, Python et QGIS.`}
         </p>
         <div className="flex flex-wrap gap-4 justify-center mb-10">
           {passed
-            ? <Button size="lg" className="gap-2" onClick={() => navigate("/academy/register")}><GraduationCap className="w-4 h-4" /> Créer mon compte étudiant</Button>
+            ? <Button size="lg" className="gap-2" onClick={() => navigate("/academy/dashboard")}><GraduationCap className="w-4 h-4" /> Accéder à mes cours</Button>
             : <Button size="lg" className="gap-2" onClick={() => { setAnswers({}); setQIdx(0); setScore(null); setView("test"); }}>↺ Reprendre le test</Button>}
           <Button variant="outline" onClick={() => setView("landing")}>← Retour</Button>
         </div>
-        {passed && (
-          <p className="text-sm text-muted-foreground mb-6">
-            Déjà inscrit ? <button onClick={() => navigate("/academy/login")} className="text-primary hover:underline">Se connecter à mon espace</button>
-          </p>
-        )}
+
 
         {/* Détail */}
         <div className="bg-card rounded-2xl border border-border/50 p-6 text-left">
