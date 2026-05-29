@@ -18,6 +18,12 @@ import Booking from "@/pages/booking";
 import Contact from "@/pages/contact";
 import ELearning from "@/pages/elearning";
 
+// DataMEAL Academy
+import AcademyRegister from "@/pages/academy/register";
+import AcademyLogin from "@/pages/academy/login";
+import AcademyDashboard from "@/pages/academy/dashboard";
+import AcademyClassroom from "@/pages/academy/classroom";
+
 // Admin
 import AdminLogin from "@/pages/admin/login";
 import Dashboard, { AdminLayout } from "@/pages/admin/dashboard";
@@ -30,6 +36,7 @@ import AdminComments from "@/pages/admin/comments-admin";
 import AdminProfile from "@/pages/admin/profile-admin";
 import AdminNewsletter from "@/pages/admin/newsletter-admin";
 import AdminTestimonials from "@/pages/admin/testimonials-admin";
+import AdminStudents from "@/pages/admin/students-admin";
 import Stats from "@/pages/stats";
 import { getToken } from "@/lib/admin";
 import { useEffect } from "react";
@@ -64,6 +71,13 @@ function App() {
             <Route path="/admin/comments">{() => <RequireAuth><AdminComments /></RequireAuth>}</Route>
             <Route path="/admin/newsletter">{() => <RequireAuth><AdminNewsletter /></RequireAuth>}</Route>
             <Route path="/admin/testimonials">{() => <RequireAuth><AdminTestimonials /></RequireAuth>}</Route>
+            <Route path="/admin/students">{() => <RequireAuth><AdminStudents /></RequireAuth>}</Route>
+
+            {/* DataMEAL Academy — espace étudiant (pas de Layout admin) */}
+            <Route path="/academy/register">{() => <Layout><AcademyRegister /></Layout>}</Route>
+            <Route path="/academy/login">{() => <Layout><AcademyLogin /></Layout>}</Route>
+            <Route path="/academy/dashboard">{() => <Layout><AcademyDashboard /></Layout>}</Route>
+            <Route path="/academy/classroom/:id">{() => <Layout><AcademyClassroom /></Layout>}</Route>
 
             {/* Public routes */}
             <Route path="/">{() => <Layout><Home /></Layout>}</Route>
@@ -76,8 +90,6 @@ function App() {
             <Route path="/booking">{() => <Layout><Booking /></Layout>}</Route>
             <Route path="/contact">{() => <Layout><Contact /></Layout>}</Route>
             <Route path="/stats">{() => <Layout><Stats /></Layout>}</Route>
-
-            {/* ── DataMEAL Academy ──────────────────────────── */}
             <Route path="/elearning">{() => <Layout><ELearning /></Layout>}</Route>
 
             <Route>{() => <Layout><NotFound /></Layout>}</Route>
