@@ -664,74 +664,124 @@ function requireStudent(req: Request, res: Response, next: NextFunction) {
 }
 
 // ── Inscription (après réussite du test, score >= 21/30) ──
+// Helper: enregistrer un email envoyé
+async function logAcademyEmail(student_id: number | null, type: string, email: string, subject: string) {
+  await supabase.from("academy_emails").insert({ student_id, type, email, subject }).then(() => {}, () => {});
+}
+
 app.post("/api/academy/register", async (req, res) => {
   const { full_name, email, password, phone, country, organization } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ message: "Nom, email et mot de passe requis" });
   if (password.length < 6) return res.status(400).json({ message: "Le mot de passe doit faire au moins 6 caractères" });
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ message: "Email invalide" });
 
   const { data: existing } = await supabase.from("students").select("id").eq("email", email).maybeSingle();
   if (existing) return res.status(409).json({ message: "Un compte existe déjà avec cet email" });
 
   const hash = await bcrypt.hash(password, 10);
-  // status "pending_test" : doit passer le test avant d'accéder aux cours
+  const verifyToken = crypto.randomBytes(32).toString("hex");
+  const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
+
   const { data, error } = await supabase.from("students")
-    .insert({ full_name, email, password_hash: hash, phone, country, organization, entry_score: 0, status: "pending_test" })
-    .select("id, full_name, email, status").single();
+    .insert({
+      full_name, email, password_hash: hash, phone, country, organization,
+      entry_score: 0, status: "pending_test",
+      email_verified: false, verify_token: verifyToken, verify_expires: verifyExpires,
+    })
+    .select("id, full_name, email, status, email_verified").single();
   if (error) return res.status(400).json({ message: error.message });
 
-  const token = generateStudentToken(data.id, data.email);
-  res.status(201).json({ token, student: data });
-});
-
-// ── Soumettre le test d'aptitude (étudiant authentifié uniquement) ──
-app.post("/api/academy/submit-test", requireStudent, async (req, res) => {
-  const sid = (req as any).student.sid;
-  const { score } = req.body;
-  if (score == null) return res.status(400).json({ message: "Score requis" });
-
-  const passed = score >= 21;
-
-  // Mettre à jour le score d'entrée + statut
-  await supabase.from("students")
-    .update({ entry_score: score, status: passed ? "active" : "pending_test" })
-    .eq("id", sid);
-
-  // Enregistrer/mettre à jour la note du test
-  const { data: existingTest } = await supabase.from("grades")
-    .select("id").eq("student_id", sid).eq("type", "entry_test").maybeSingle();
-  if (existingTest) {
-    await supabase.from("grades").update({ score, graded_at: new Date().toISOString() }).eq("id", existingTest.id);
-  } else {
-    await supabase.from("grades").insert({
-      student_id: sid, title: "Test de sélection MEAL", score, max_score: 30, type: "entry_test",
-    });
+  // Email de validation
+  if (resend) {
+    const verifyUrl = `${SITE_URL}/academy/verify?token=${verifyToken}`;
+    resend.emails.send({
+      from: FROM_EMAIL, to: email,
+      subject: "Confirmez votre inscription — DataMEAL Academy",
+      html: verifyEmailHtml(full_name, verifyUrl),
+    }).then(() => logAcademyEmail(data.id, "verify", email, "Confirmez votre inscription"))
+      .catch((e: any) => console.error("Verify email error:", e));
   }
 
-  // Si réussi, inscrire automatiquement au cours 1 (si pas déjà inscrit)
-  if (passed) {
-    const { data: course1 } = await supabase.from("sms_courses").select("id").eq("code", "MEAL-01").single();
-    if (course1) {
-      const { data: enr } = await supabase.from("enrollments")
-        .select("id").eq("student_id", sid).eq("course_id", course1.id).maybeSingle();
-      if (!enr) await supabase.from("enrollments").insert({ student_id: sid, course_id: course1.id });
+  const token = generateStudentToken(data.id, data.email);
+  res.status(201).json({ token, student: data, emailSent: !!resend });
+});
+
+// ── Vérifier l'email via le token ──
+app.post("/api/academy/verify", async (req, res) => {
+  const { token } = req.body;
+  if (!token) return res.status(400).json({ message: "Token manquant" });
+  const { data, error } = await supabase.from("students")
+    .select("id, verify_expires, email_verified, full_name, email").eq("verify_token", token).maybeSingle();
+  if (error || !data) return res.status(400).json({ message: "Lien de validation invalide" });
+  if (data.email_verified) return res.json({ message: "Email déjà vérifié", alreadyVerified: true });
+  if (data.verify_expires && new Date(data.verify_expires) < new Date())
+    return res.status(400).json({ message: "Lien expiré. Demandez un nouvel email de validation." });
+
+  await supabase.from("students")
+    .update({ email_verified: true, verify_token: null, verify_expires: null })
+    .eq("id", data.id);
+  res.json({ message: "Email vérifié avec succès", verified: true });
+});
+
+// ── Renvoyer l'email de validation ──
+app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data } = await supabase.from("students").select("full_name, email, email_verified").eq("id", sid).single();
+  if (!data) return res.status(404).json({ message: "Compte introuvable" });
+  if (data.email_verified) return res.json({ message: "Email déjà vérifié" });
+
+  const verifyToken = crypto.randomBytes(32).toString("hex");
+  const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  await supabase.from("students").update({ verify_token: verifyToken, verify_expires: verifyExpires }).eq("id", sid);
+
+  if (resend) {
+    const verifyUrl = `${SITE_URL}/academy/verify?token=${verifyToken}`;
+    resend.emails.send({
+      from: FROM_EMAIL, to: data.email,
+      subject: "Confirmez votre inscription — DataMEAL Academy",
+      html: verifyEmailHtml(data.full_name, verifyUrl),
+    }).then(() => logAcademyEmail(sid, "verify", data.email, "Confirmez votre inscription")).catch(() => {});
+  }
+  res.json({ message: "Email de validation renvoyé" });
+});
+
+// ── Mot de passe oublié — demande ──
+app.post("/api/academy/forgot-password", async (req, res) => {
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ message: "Email requis" });
+  const { data } = await supabase.from("students").select("id, full_name").eq("email", email).maybeSingle();
+  // Réponse identique que le compte existe ou non (sécurité — pas de fuite d'info)
+  if (data) {
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const resetExpires = new Date(Date.now() + 60 * 60 * 1000).toISOString(); // 1h
+    await supabase.from("students").update({ reset_token: resetToken, reset_expires: resetExpires }).eq("id", data.id);
+    if (resend) {
+      const resetUrl = `${SITE_URL}/academy/reset-password?token=${resetToken}`;
+      resend.emails.send({
+        from: FROM_EMAIL, to: email,
+        subject: "Réinitialisation de votre mot de passe — DataMEAL Academy",
+        html: resetEmailHtml(data.full_name, resetUrl),
+      }).then(() => logAcademyEmail(data.id, "reset", email, "Réinitialisation mot de passe")).catch(() => {});
     }
   }
-
-  res.json({ passed, score, status: passed ? "active" : "pending_test" });
+  res.json({ message: "Si un compte existe avec cet email, un lien de réinitialisation a été envoyé." });
 });
 
-// ── Statut du test pour l'étudiant connecté ──
-app.get("/api/academy/test-status", requireStudent, async (req, res) => {
-  const sid = (req as any).student.sid;
-  const { data } = await supabase.from("students").select("entry_score, status").eq("id", sid).single();
-  const { data: test } = await supabase.from("grades")
-    .select("score, graded_at").eq("student_id", sid).eq("type", "entry_test").maybeSingle();
-  res.json({
-    hasTaken: !!test,
-    score: data?.entry_score ?? 0,
-    passed: (data?.entry_score ?? 0) >= 21,
-    status: data?.status ?? "pending_test",
-  });
+// ── Mot de passe oublié — réinitialisation ──
+app.post("/api/academy/reset-password", async (req, res) => {
+  const { token, password } = req.body;
+  if (!token || !password) return res.status(400).json({ message: "Token et nouveau mot de passe requis" });
+  if (password.length < 6) return res.status(400).json({ message: "Le mot de passe doit faire au moins 6 caractères" });
+  const { data } = await supabase.from("students").select("id, reset_expires").eq("reset_token", token).maybeSingle();
+  if (!data) return res.status(400).json({ message: "Lien de réinitialisation invalide" });
+  if (data.reset_expires && new Date(data.reset_expires) < new Date())
+    return res.status(400).json({ message: "Lien expiré. Refaites une demande." });
+
+  const hash = await bcrypt.hash(password, 10);
+  await supabase.from("students")
+    .update({ password_hash: hash, reset_token: null, reset_expires: null })
+    .eq("id", data.id);
+  res.json({ message: "Mot de passe réinitialisé avec succès" });
 });
 
 // ── Connexion ──
@@ -743,18 +793,51 @@ app.post("/api/academy/login", async (req, res) => {
   if (data.status === "suspended") return res.status(403).json({ message: "Compte suspendu" });
   const valid = await bcrypt.compare(password, data.password_hash);
   if (!valid) return res.status(401).json({ message: "Identifiants invalides" });
+  await supabase.from("students").update({ last_login: new Date().toISOString() }).eq("id", data.id);
   const token = generateStudentToken(data.id, data.email);
-  res.json({ token, student: { id: data.id, full_name: data.full_name, email: data.email, avatar_url: data.avatar_url } });
+  res.json({
+    token,
+    student: { id: data.id, full_name: data.full_name, email: data.email, avatar_url: data.avatar_url },
+    email_verified: data.email_verified,
+  });
 });
 
-// ── Profil étudiant connecté ──
+// ── Profil étudiant connecté (complet) ──
 app.get("/api/academy/me", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data, error } = await supabase.from("students")
-    .select("id, full_name, email, phone, country, organization, entry_score, avatar_url, status, created_at")
+    .select("id, full_name, email, phone, country, city, organization, profession, bio, gender, birth_year, linkedin, experience_level, interests, entry_score, avatar_url, status, email_verified, course_emails, created_at, last_login")
     .eq("id", sid).single();
   if (error) return res.status(404).json({ message: "Étudiant introuvable" });
   res.json(data);
+});
+
+// ── Mettre à jour son profil ──
+app.put("/api/academy/me", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const allowed = ["full_name", "phone", "country", "city", "organization", "profession", "bio", "gender", "birth_year", "linkedin", "experience_level", "interests", "avatar_url", "course_emails"];
+  const update: any = {};
+  for (const k of allowed) if (k in req.body) update[k] = req.body[k];
+  if (Object.keys(update).length === 0) return res.status(400).json({ message: "Aucun champ à mettre à jour" });
+  const { data, error } = await supabase.from("students").update(update).eq("id", sid)
+    .select("id, full_name, email, phone, country, city, organization, profession, bio, gender, birth_year, linkedin, experience_level, interests, avatar_url, course_emails").single();
+  if (error) return res.status(400).json({ message: error.message });
+  res.json(data);
+});
+
+// ── Changer son mot de passe (connecté) ──
+app.put("/api/academy/change-password", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { current_password, new_password } = req.body;
+  if (!current_password || !new_password) return res.status(400).json({ message: "Mot de passe actuel et nouveau requis" });
+  if (new_password.length < 6) return res.status(400).json({ message: "Le nouveau mot de passe doit faire au moins 6 caractères" });
+  const { data } = await supabase.from("students").select("password_hash").eq("id", sid).single();
+  if (!data) return res.status(404).json({ message: "Compte introuvable" });
+  const valid = await bcrypt.compare(current_password, data.password_hash);
+  if (!valid) return res.status(401).json({ message: "Mot de passe actuel incorrect" });
+  const hash = await bcrypt.hash(new_password, 10);
+  await supabase.from("students").update({ password_hash: hash }).eq("id", sid);
+  res.json({ message: "Mot de passe modifié" });
 });
 
 // ── Liste des cours ──
@@ -882,6 +965,59 @@ app.get("/api/academy/my-attestations", requireStudent, async (req, res) => {
   res.json(data);
 });
 
+
+// ── ADMIN : créer un cours + notifier les étudiants par email ──
+app.post("/api/admin/academy/courses", requireAuth, async (req, res) => {
+  const { code, title, description, tools, level, total_lessons, notify } = req.body;
+  if (!code || !title) return res.status(400).json({ message: "Code et titre requis" });
+  const { data, error } = await supabase.from("sms_courses")
+    .insert({ code, title, description, tools, level: level || "debutant", total_lessons: total_lessons || 0,
+              order_index: 99, is_published: true })
+    .select().single();
+  if (error) return res.status(400).json({ message: error.message });
+
+  // Notifier tous les étudiants actifs ayant accepté les emails de cours
+  if (notify && resend) {
+    const { data: students } = await supabase.from("students")
+      .select("id, full_name, email").eq("status", "active").eq("course_emails", true).eq("email_verified", true);
+    if (students?.length) {
+      const batch = students.map((s: any) => ({
+        from: FROM_EMAIL, to: s.email,
+        subject: `Nouveau cours : ${title} — DataMEAL Academy`,
+        html: newCourseEmailHtml(s.full_name, { code, title, description }),
+      }));
+      for (let i = 0; i < batch.length; i += 100) {
+        resend.batch.send(batch.slice(i, i + 100)).catch((e: any) => console.error("New course email error:", e));
+      }
+      students.forEach((s: any) => logAcademyEmail(s.id, "new_course", s.email, `Nouveau cours : ${title}`));
+    }
+  }
+  res.status(201).json({ course: data, notified: !!notify });
+});
+
+// ── ADMIN : notifier manuellement d'un cours existant ──
+app.post("/api/admin/academy/notify-course/:id", requireAuth, async (req, res) => {
+  const { data: course } = await supabase.from("sms_courses").select("*").eq("id", Number(req.params.id)).single();
+  if (!course) return res.status(404).json({ message: "Cours introuvable" });
+  if (!resend) return res.status(400).json({ message: "Email non configuré (RESEND_API_KEY manquant)" });
+  const { data: students } = await supabase.from("students")
+    .select("id, full_name, email").eq("status", "active").eq("course_emails", true).eq("email_verified", true);
+  let count = 0;
+  if (students?.length) {
+    const batch = students.map((s: any) => ({
+      from: FROM_EMAIL, to: s.email,
+      subject: `Nouveau cours : ${course.title} — DataMEAL Academy`,
+      html: newCourseEmailHtml(s.full_name, course),
+    }));
+    for (let i = 0; i < batch.length; i += 100) {
+      resend.batch.send(batch.slice(i, i + 100)).catch(() => {});
+    }
+    students.forEach((s: any) => logAcademyEmail(s.id, "new_course", s.email, `Nouveau cours : ${course.title}`));
+    count = students.length;
+  }
+  res.json({ message: `Notification envoyée à ${count} étudiant(s)`, count });
+});
+
 // ══════════════ ADMIN — Gestion école ══════════════
 
 app.get("/api/admin/academy/students", requireAuth, async (_req, res) => {
@@ -989,6 +1125,21 @@ function campaignEmailHtml(name: string | undefined, subject: string, content: s
   const g = name ? `Bonjour ${name},` : "Bonjour,";
   const html = content.replace(/\n\n/g, "</p><p>").replace(/\n/g, "<br>");
   return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="Louis TATCHIDA" class="av"><h1>${subject}</h1><p>Newsletter de Louis TATCHIDA</p></div><div class="b"><p>${g}</p><p>${html}</p><div class="dv"></div><p style="text-align:center"><a href="${SITE_URL}" class="cta">Visiter le site</a></p><p>Cordialement,<br><strong>Louis TATCHIDA</strong></p></div>`);
+}
+
+
+// ══════════════ Templates email Academy ══════════════
+function verifyEmailHtml(name: string, url: string) {
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Confirmez votre inscription</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">🎓 Bienvenue</span><p>Bonjour ${name},</p><p>Merci de rejoindre <strong>DataMEAL Academy</strong>, la formation gratuite par projets en MEAL (KoboCollect, Python, QGIS) pour l'Afrique de l'Ouest.</p><p>Pour activer votre compte et passer le test d'aptitude, confirmez votre adresse email :</p><p style="text-align:center"><a href="${url}" class="cta">Confirmer mon email</a></p><p style="font-size:13px;color:#9ca3af">Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, ignorez cet email.</p><p>À très vite en cours,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
+}
+
+function resetEmailHtml(name: string, url: string) {
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Réinitialisation du mot de passe</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">🔑 Sécurité</span><p>Bonjour ${name},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en choisir un nouveau :</p><p style="text-align:center"><a href="${url}" class="cta">Réinitialiser mon mot de passe</a></p><p style="font-size:13px;color:#9ca3af">Ce lien expire dans 1 heure. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe reste inchangé.</p><p>Cordialement,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
+}
+
+function newCourseEmailHtml(name: string | undefined, course: { code: string; title: string; description?: string }) {
+  const g = name ? `Bonjour ${name},` : "Bonjour,";
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Nouveau cours disponible</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">📚 Nouveau cours</span><p>${g}</p><p>Un nouveau cours vient d'être ajouté à votre académie :</p><div class="cd"><h3>${course.title}</h3>${course.description ? `<p>${course.description}</p>` : ""}<p style="margin-top:8px;font-size:12px;color:#16a34a;font-weight:600">Code : ${course.code}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="cta">Découvrir le cours</a></p><p>Bonne formation,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
 }
 
 export default app;
