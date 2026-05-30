@@ -6,7 +6,7 @@ import { fr } from "date-fns/locale";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { Loader2, MessageSquare, Send, Clock } from "lucide-react";
+import { Loader2, MessageSquare, Send, Clock, GraduationCap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,6 +18,7 @@ import { Reactions } from "@/components/reactions";
 import { TableOfContents } from "@/components/table-of-contents";
 import { RelatedPosts } from "@/components/related-posts";
 import { CitationButton } from "@/components/citation-button";
+import { getStudent } from "@/lib/student";
 
 export default function BlogPost() {
   const [, params] = useRoute("/blog/:slug");
@@ -25,9 +26,11 @@ export default function BlogPost() {
   const { data: post, isLoading } = usePost(slug);
   const { data: comments } = useComments(post?.id);
   const createComment = useCreateComment(post?.id || 0);
-  const [authorName, setAuthorName] = useState("");
+  const student = getStudent();
+  const [authorName, setAuthorName] = useState(student?.full_name || "");
   const [content, setContent] = useState("");
   const { toast } = useToast();
+  useEffect(() => { if (student?.full_name) setAuthorName(student.full_name); }, []);
 
   // Track view once
   useEffect(() => {
@@ -214,7 +217,17 @@ export default function BlogPost() {
           <form onSubmit={handleComment} className="bg-card p-6 rounded-2xl border border-border/50 shadow-sm mb-12">
             <h4 className="font-medium mb-4">Laisser un commentaire</h4>
             <div className="space-y-4">
-              <Input placeholder="Votre nom" value={authorName} onChange={e => setAuthorName(e.target.value)} className="bg-background" required />
+              {student ? (
+                <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/5 border border-primary/20 text-sm">
+                  <span className="w-7 h-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-xs font-bold">
+                    {student.full_name?.split(" ").map((n) => n[0]).slice(0,2).join("")}
+                  </span>
+                  <span>Vous commentez en tant que <strong className="text-primary">{student.full_name}</strong></span>
+                  <GraduationCap className="w-4 h-4 text-primary ml-auto" />
+                </div>
+              ) : (
+                <Input placeholder="Votre nom" value={authorName} onChange={e => setAuthorName(e.target.value)} className="bg-background" required />
+              )}
               <Textarea placeholder="Partagez votre avis sur cet article..." value={content} onChange={e => setContent(e.target.value)} className="bg-background min-h-[100px]" required />
               <Button type="submit" disabled={createComment.isPending} className="w-full sm:w-auto">
                 {createComment.isPending ? "Envoi..." : (<>Publier <Send className="w-4 h-4 ml-2" /></>)}
