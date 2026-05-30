@@ -21,19 +21,24 @@ export default function AcademyDashboard() {
   const [average, setAverage] = useState(0);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [attestations, setAttestations] = useState<any[]>([]);
+  const [testStatus, setTestStatus] = useState<any>(null);
+  const [allCourses, setAllCourses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
     (async () => {
       try {
-        const [g, e, a] = await Promise.all([
+        const [g, e, a, ts, ac] = await Promise.all([
           studentFetch("/api/academy/my-grades").then(r => r.json()),
           studentFetch("/api/academy/my-enrollments").then(r => r.json()),
           studentFetch("/api/academy/my-attestations").then(r => r.json()),
+          studentFetch("/api/academy/test-status").then(r => r.json()).catch(() => null),
+          fetch("/api/academy/courses").then(r => r.json()).catch(() => []),
         ]);
         setGrades(g.grades || []); setAverage(g.average || 0);
         setEnrollments(e || []); setAttestations(a || []);
+        setTestStatus(ts); setAllCourses(Array.isArray(ac) ? ac : []);
       } catch (err) { /* handled by studentFetch */ } finally { setLoading(false); }
     })();
   }, []);
@@ -140,7 +145,33 @@ export default function AcademyDashboard() {
       )}
 
       {/* My courses */}
-      <h2 className="text-lg font-bold mb-4">Mes cours</h2>
+      {testStatus && !testStatus.passed && (
+        <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-5 mb-8 flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center"><Target className="w-5 h-5 text-primary" /></div>
+            <div>
+              <p className="font-medium text-sm">{testStatus.hasTaken ? `Test passe : ${testStatus.score}/30` : "Passez le test d'aptitude"}</p>
+              <p className="text-xs text-muted-foreground">{testStatus.hasTaken ? "Score requis : 21/30. Vous pouvez le repasser." : "Reussissez le test (21/30) pour debloquer vos cours."}</p>
+            </div>
+          </div>
+          <Button onClick={() => navigate("/elearning")} className="gap-2">{testStatus.hasTaken ? "Repasser le test" : "Passer le test"} <ChevronRight className="w-4 h-4" /></Button>
+        </div>
+      )}
+
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold">Mes cours</h2>
+        {enrollments.length > 0 && <span className="text-xs text-muted-foreground">{enrollments.length} cours · {completedCourses} termine(s)</span>}
+      </div>
+
+      {enrollments.length === 0 && (
+        <div className="bg-card rounded-2xl border border-dashed border-border p-10 text-center mb-8">
+          <BookOpen className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
+          <p className="font-medium mb-1">Aucun cours pour le moment</p>
+          <p className="text-sm text-muted-foreground mb-5">{testStatus?.passed ? "Explorez le catalogue ci-dessous pour commencer." : "Reussissez d'abord le test d'aptitude pour debloquer l'acces aux cours."}</p>
+          {!testStatus?.passed && <Button onClick={() => navigate("/elearning")} className="gap-2">Passer le test <ChevronRight className="w-4 h-4" /></Button>}
+        </div>
+      )}
+
       <div className="grid lg:grid-cols-2 gap-4 mb-8">
         {enrollments.map(e => (
           <div key={e.id} className="group bg-card rounded-2xl p-5 border border-border/50 hover:border-primary/30 transition-colors cursor-pointer"
@@ -158,13 +189,37 @@ export default function AcademyDashboard() {
             <div className="h-1.5 bg-muted rounded-full mb-1">
               <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${e.progress}%` }} />
             </div>
-            <div className="flex justify-between items-center">
+            <div className="flex justify-between items-center mb-3">
               <span className="text-xs text-muted-foreground">{e.progress}% complété</span>
-              <ChevronRight className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
             </div>
+            <Button size="sm" className="w-full gap-1.5"><BookOpen className="w-3.5 h-3.5" /> {e.progress > 0 ? "Continuer le cours" : "Commencer le cours"}</Button>
           </div>
         ))}
       </div>
+
+      {allCourses.length > 0 && (
+        <div id="catalogue" className="mb-8">
+          <h2 className="text-lg font-bold mb-4">Catalogue des cours</h2>
+          <div className="grid lg:grid-cols-3 gap-4">
+            {allCourses.map((co: any) => {
+              const enrolled = enrollments.some(e => e.course_id === co.id);
+              return (
+                <div key={co.id} className="bg-card rounded-2xl p-5 border border-border/50">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-mono text-primary">{co.code}</span>
+                    <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground capitalize">{co.level}</span>
+                  </div>
+                  <h3 className="font-semibold text-sm mb-2 leading-snug">{co.title}</h3>
+                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{co.description}</p>
+                  {enrolled
+                    ? <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => navigate(`/academy/classroom/${co.id}`)}><CheckCircle2 className="w-3.5 h-3.5 text-primary" /> Inscrit — Ouvrir</Button>
+                    : <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={!testStatus?.passed} onClick={() => navigate(`/academy/classroom/${co.id}`)}>{testStatus?.passed ? "Ouvrir" : "Test requis"}</Button>}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Recent grades table */}
       {grades.length > 0 && (
