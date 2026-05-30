@@ -5,11 +5,11 @@ import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, Terminal,
   FileCode2, Loader2, Trophy, Lock, BookOpen, Star, Info, Lightbulb,
-  AlertTriangle, ExternalLink, MapPin, BookMarked,
+  AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn } from "@/lib/student";
 
-interface Cell { type: string; content?: string; lang?: string; code?: string; output?: string; variant?: string; title?: string; url?: string; provider?: string; desc?: string; question?: string; opts?: string[]; ans?: number; }
+interface Cell { type: string; content?: string; lang?: string; code?: string; output?: string; variant?: string; title?: string; url?: string; provider?: string; desc?: string; question?: string; opts?: string[]; ans?: number; svg?: string; caption?: string; }
 interface Lesson { id: number; title: string; content: { cells: Cell[] }; points: number; order_index: number; }
 interface Course { id: number; code: string; title: string; description: string; tools: string[]; lessons: Lesson[]; }
 
@@ -238,6 +238,26 @@ export default function AcademyClassroom() {
                     <Icon className="w-4 h-4" /> {cell.title || v.lab}
                   </div>
                   <p className="text-sm text-foreground/80 leading-relaxed">{cell.content}</p>
+                </div>
+              );
+            }
+
+            // ── Figure SVG (capture d'interface annotée) ──
+            if (cell.type === "figure") {
+              return (
+                <div key={ci} className="bg-card rounded-2xl border border-border/50 overflow-hidden">
+                  {cell.title && (
+                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-muted/30">
+                      <ImageIcon className="w-3.5 h-3.5 text-primary" />
+                      <span className="text-xs font-medium text-foreground">{cell.title}</span>
+                    </div>
+                  )}
+                  <div className="p-4 bg-white dark:bg-slate-900/40 flex justify-center overflow-x-auto" dangerouslySetInnerHTML={{ __html: cell.svg || "" }} />
+                  {cell.caption && (
+                    <div className="px-4 py-2.5 bg-muted/20 border-t border-border/50">
+                      <p className="text-xs text-muted-foreground leading-relaxed">{cell.caption}</p>
+                    </div>
+                  )}
                 </div>
               );
             }
