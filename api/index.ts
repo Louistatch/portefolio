@@ -669,6 +669,42 @@ async function logAcademyEmail(student_id: number | null, type: string, email: s
   await supabase.from("academy_emails").insert({ student_id, type, email, subject }).then(() => {}, () => {});
 }
 
+/**
+ * Dispatcher email centralisé pour DataMEAL Academy.
+ * - Idempotent : avec dedupeKey, n'envoie pas deux fois le même email de cycle de vie.
+ * - Journalise systématiquement dans academy_emails.
+ * - Ne bloque jamais la requête (fire-and-forget contrôlé), erreurs loggées.
+ */
+async function sendAcademyEmail(opts: {
+  studentId: number | null;
+  to: string;
+  type: string;
+  subject: string;
+  html: string;
+  dedupeKey?: string; // ex: "completed:12:3" → un seul envoi par (type, étudiant, cours)
+}): Promise<{ sent: boolean; reason?: string }> {
+  if (!resend) return { sent: false, reason: "resend_not_configured" };
+  if (!opts.to) return { sent: false, reason: "no_recipient" };
+  try {
+    // Idempotence : si un email de ce type+clé a déjà été envoyé, on ne renvoie pas
+    if (opts.dedupeKey) {
+      const { data: prior } = await supabase.from("academy_emails")
+        .select("id").eq("student_id", opts.studentId).eq("type", opts.type)
+        .eq("subject", opts.subject).limit(1).maybeSingle();
+      if (prior) return { sent: false, reason: "already_sent" };
+    }
+    await resend.emails.send({ from: FROM_EMAIL, to: opts.to, subject: opts.subject, html: opts.html });
+    await logAcademyEmail(opts.studentId, opts.type, opts.to, opts.subject);
+    return { sent: true };
+  } catch (e: any) {
+    console.error(`Academy email error [${opts.type}]:`, e?.message || e);
+    await supabase.from("academy_emails")
+      .insert({ student_id: opts.studentId, type: opts.type, email: opts.to, subject: opts.subject, status: "failed" })
+      .then(() => {}, () => {});
+    return { sent: false, reason: "send_failed" };
+  }
+}
+
 app.post("/api/academy/register", async (req, res) => {
   const { full_name, email, password, phone, country, organization } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ message: "Nom, email et mot de passe requis" });
@@ -1012,11 +1048,26 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const doneCount = new Set((doneGrades || []).map(g => g.lesson_id)).size;
   const progress = totalLessons ? Math.round((doneCount / totalLessons) * 100) : 0;
 
+  const wasCompleted = progress >= 100;
   await supabase.from("enrollments")
-    .update({ progress, status: progress >= 100 ? "completed" : "in_progress", completed_at: progress >= 100 ? new Date().toISOString() : null })
+    .update({ progress, status: wasCompleted ? "completed" : "in_progress", completed_at: wasCompleted ? new Date().toISOString() : null })
     .eq("student_id", sid).eq("course_id", course_id);
 
-  res.json({ progress, done: doneCount, total: totalLessons || 0 });
+  // Email automatique de fin de projet (idempotent : une seule fois par cours)
+  if (wasCompleted) {
+    const { data: stud } = await supabase.from("students").select("full_name, email, course_emails").eq("id", sid).single();
+    const { data: course } = await supabase.from("sms_courses").select("code, title").eq("id", course_id).single();
+    if (stud?.email && stud.course_emails !== false && course) {
+      const subject = `🏁 Projet terminé : ${course.title}`;
+      sendAcademyEmail({
+        studentId: sid, to: stud.email, type: "course_completed", subject,
+        html: courseCompletedEmailHtml(stud.full_name, course),
+        dedupeKey: `completed:${sid}:${course_id}`,
+      });
+    }
+  }
+
+  res.json({ progress, done: doneCount, total: totalLessons || 0, completed: wasCompleted });
 });
 
 // ── Demander une attestation ──
@@ -1044,6 +1095,19 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
     .insert({ student_id: sid, course_id, certificate_no: certNo, final_score: finalScore, status: "pending" })
     .select().single();
   if (error) return res.status(400).json({ message: error.message });
+
+  // Accusé de réception de la demande d'attestation
+  const { data: stud } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
+  const { data: course } = await supabase.from("sms_courses").select("code, title").eq("id", course_id).single();
+  if (stud?.email && course) {
+    sendAcademyEmail({
+      studentId: sid, to: stud.email, type: "attestation_requested",
+      subject: `📋 Demande d'attestation reçue — ${course.title}`,
+      html: attestationRequestedEmailHtml(stud.full_name, course, certNo, finalScore),
+      dedupeKey: `attest_req:${sid}:${course_id}`,
+    });
+  }
+
   res.status(201).json(data);
 });
 
@@ -1189,8 +1253,27 @@ app.put("/api/admin/academy/attestations/:id", requireAuth, async (req, res) => 
   const { status } = req.body;
   const update: any = { status };
   if (status === "issued") update.issued_at = new Date().toISOString();
-  const { data, error } = await supabase.from("attestations").update(update).eq("id", Number(req.params.id)).select().single();
+  const { data, error } = await supabase.from("attestations").update(update).eq("id", Number(req.params.id)).select("*, students(full_name, email), sms_courses(code, title)").single();
   if (error) return res.status(400).json({ message: error.message });
+
+  // Email automatique selon la décision admin
+  const stud = (data as any).students;
+  const course = (data as any).sms_courses;
+  if (stud?.email && course) {
+    if (status === "issued") {
+      sendAcademyEmail({
+        studentId: data.student_id, to: stud.email, type: "attestation_issued",
+        subject: `🎓 Votre attestation est prête — ${course.title}`,
+        html: attestationIssuedEmailHtml(stud.full_name, course, data.certificate_no, Number(data.final_score)),
+      });
+    } else if (status === "rejected") {
+      sendAcademyEmail({
+        studentId: data.student_id, to: stud.email, type: "attestation_rejected",
+        subject: `Attestation — complément requis (${course.title})`,
+        html: attestationRejectedEmailHtml(stud.full_name, course),
+      });
+    }
+  }
   res.json(data);
 });
 
@@ -1248,54 +1331,39 @@ function campaignEmailHtml(name: string | undefined, subject: string, content: s
 
 
 // ══════════════ Templates email Academy ══════════════
-// ── Layout email dédié DataMEAL Academy (branding propre) ──
-function academyEmailLayout(content: string) {
-  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<style>
-  body{margin:0;padding:0;background:#eef2f1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif}
-  .wrap{max-width:600px;margin:24px auto;padding:0 16px}
-  .card{background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 32px rgba(13,148,136,.12)}
-  .hd{background:linear-gradient(135deg,#0d9488,#0f766e);padding:36px 32px;text-align:center}
-  .hd .logo{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.15);padding:8px 16px;border-radius:100px;margin-bottom:16px}
-  .hd .logo span{color:#fff;font-size:13px;font-weight:600;letter-spacing:.5px}
-  .hd h1{color:#fff;font-size:23px;margin:0;font-weight:800;line-height:1.2}
-  .hd .sub{color:rgba(255,255,255,.85);font-size:14px;margin:8px 0 0}
-  .bd{padding:32px}
-  .bd p{color:#374151;font-size:15px;line-height:1.7;margin:0 0 16px}
-  .badge{display:inline-block;background:#ccfbf1;color:#0d9488;padding:5px 14px;border-radius:100px;font-size:12px;font-weight:700;margin-bottom:18px}
-  .btn{display:inline-block;background:#0d9488;color:#fff!important;text-decoration:none;padding:15px 36px;border-radius:12px;font-weight:700;font-size:15px;margin:8px 0}
-  .btn:hover{background:#0f766e}
-  .code{background:#f0fdfa;border:1px dashed #5eead4;border-radius:14px;padding:20px;margin:20px 0;text-align:center}
-  .code .lbl{margin:0 0 8px;font-size:13px;color:#6b7280}
-  .code .val{font-size:32px;font-weight:800;letter-spacing:8px;color:#0d9488;margin:0;font-family:monospace}
-  .info{background:#f9fafb;border:1px solid #e5e7eb;border-radius:14px;padding:18px;margin:16px 0}
-  .info h3{color:#111;font-size:16px;margin:0 0 6px}
-  .info p{color:#6b7280;font-size:14px;margin:0}
-  .steps{margin:20px 0;padding:0;list-style:none}
-  .steps li{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;color:#374151;font-size:14px}
-  .steps .n{flex-shrink:0;width:26px;height:26px;border-radius:50%;background:#ccfbf1;color:#0d9488;font-weight:700;font-size:13px;display:inline-flex;align-items:center;justify-content:center}
-  .muted{font-size:13px;color:#9ca3af;line-height:1.6}
-  .ft{padding:24px 32px;text-align:center;background:#f9fafb;border-top:1px solid #eef2f1}
-  .ft .name{color:#0d9488;font-weight:700;font-size:14px;margin:0 0 4px}
-  .ft p{color:#9ca3af;font-size:12px;margin:0 0 4px}
-  .ft a{color:#0d9488;text-decoration:none}
-</style></head><body><div class="wrap"><div class="card">${content}
-  <div class="ft"><p class="name">🎓 DataMEAL Academy</p><p>Formation gratuite par projets · KoboCollect · Python · QGIS</p><p>Afrique de l'Ouest · <a href="${SITE_URL}/academy/login">Mon espace étudiant</a></p><p style="margin-top:12px;font-size:11px;color:#d1d5db">Vous recevez cet email car vous avez un compte sur DataMEAL Academy.</p></div>
-</div></div></body></html>`;
-}
-
 function verifyEmailHtml(name: string, url: string, code?: string) {
-  const codeBlock = code ? `<div class="code"><p class="lbl">Ou entrez ce code dans l'application :</p><p class="val">${code}</p></div>` : "";
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Bienvenue, ${name.split(" ")[0]} !</h1><p class="sub">Plus qu'une étape pour activer votre compte</p></div><div class="bd"><span class="badge">✨ Confirmation requise</span><p>Bonjour ${name},</p><p>Merci de rejoindre <strong>DataMEAL Academy</strong> — la formation gratuite par projets pour devenir expert MEAL en Afrique de l'Ouest.</p><p>Confirmez votre adresse email pour activer votre compte :</p><p style="text-align:center"><a href="${url}" class="btn">Confirmer mon email</a></p>${codeBlock}<ul class="steps"><li><span class="n">1</span><span>Confirmez votre email (vous y êtes presque)</span></li><li><span class="n">2</span><span>Passez le test d'aptitude (30 questions)</span></li><li><span class="n">3</span><span>Accédez à vos 3 projets : KoboCollect, QGIS, Reporting MEAL</span></li></ul><p class="muted">Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, ignorez simplement cet email.</p></div>`);
+  const codeBlock = code ? `<div class="cd" style="text-align:center"><p style="margin:0 0 8px;font-size:13px">Ou entrez ce code dans l'application :</p><p style="font-size:28px;font-weight:700;letter-spacing:6px;color:#16a34a;margin:0">${code}</p></div>` : "";
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Confirmez votre inscription</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">🎓 Bienvenue</span><p>Bonjour ${name},</p><p>Merci de rejoindre <strong>DataMEAL Academy</strong>, la formation gratuite par projets en MEAL (KoboCollect, Python, QGIS) pour l'Afrique de l'Ouest.</p><p>Pour activer votre compte et passer le test d'aptitude, confirmez votre adresse email :</p><p style="text-align:center"><a href="${url}" class="cta">Confirmer mon email</a></p>${codeBlock}<p style="font-size:13px;color:#9ca3af">Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, ignorez cet email.</p><p>À très vite en cours,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
 }
 
 function resetEmailHtml(name: string, url: string) {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Réinitialisation du mot de passe</h1><p class="sub">Demande reçue le ${new Date().toLocaleDateString("fr-FR")}</p></div><div class="bd"><span class="badge">🔑 Sécurité</span><p>Bonjour ${name},</p><p>Vous avez demandé à réinitialiser le mot de passe de votre compte DataMEAL Academy. Cliquez ci-dessous pour en choisir un nouveau :</p><p style="text-align:center"><a href="${url}" class="btn">Réinitialiser mon mot de passe</a></p><p class="muted">Ce lien expire dans <strong>1 heure</strong>. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe restera inchangé et votre compte est en sécurité.</p></div>`);
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Réinitialisation du mot de passe</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">🔑 Sécurité</span><p>Bonjour ${name},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en choisir un nouveau :</p><p style="text-align:center"><a href="${url}" class="cta">Réinitialiser mon mot de passe</a></p><p style="font-size:13px;color:#9ca3af">Ce lien expire dans 1 heure. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe reste inchangé.</p><p>Cordialement,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
 }
 
 function newCourseEmailHtml(name: string | undefined, course: { code: string; title: string; description?: string }) {
   const g = name ? `Bonjour ${name},` : "Bonjour,";
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Nouveau cours disponible</h1><p class="sub">Continuez votre parcours MEAL</p></div><div class="bd"><span class="badge">📚 Nouveau cours</span><p>${g}</p><p>Un nouveau cours vient d'être ajouté à votre académie. Il vous attend dans votre espace :</p><div class="info"><h3>${course.title}</h3>${course.description ? `<p>${course.description}</p>` : ""}<p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">Code : ${course.code}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Découvrir le cours</a></p><p class="muted">Vous pouvez gérer vos préférences de notification depuis votre profil étudiant.</p></div>`);
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Nouveau cours disponible</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">📚 Nouveau cours</span><p>${g}</p><p>Un nouveau cours vient d'être ajouté à votre académie :</p><div class="cd"><h3>${course.title}</h3>${course.description ? `<p>${course.description}</p>` : ""}<p style="margin-top:8px;font-size:12px;color:#16a34a;font-weight:600">Code : ${course.code}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="cta">Découvrir le cours</a></p><p>Bonne formation,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
+}
+
+
+// ── Email : projet terminé (100%) ──
+function courseCompletedEmailHtml(name: string, course: { code: string; title: string }) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Bravo, ${name.split(" ")[0]} ! 🏁</h1><p class="sub">Vous avez terminé un projet complet</p></div><div class="bd"><span class="badge">✅ Projet terminé</span><p>Félicitations ${name},</p><p>Vous venez de compléter <strong>100%</strong> du projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code} · Terminé</p></div><p>C'est une vraie compétence terrain, directement applicable dans les contextes humanitaires et de développement en Afrique de l'Ouest.</p><p><strong>Prochaine étape :</strong> demandez votre attestation de compétence, ou enchaînez sur le projet suivant pour progresser vers le statut de Super-Expert MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Demander mon attestation</a></p><p class="muted">Continuez sur cette lancée — chaque projet vous rapproche de la maîtrise complète du cycle MEAL.</p></div>`);
+}
+
+// ── Email : demande d'attestation reçue (accusé) ──
+function attestationRequestedEmailHtml(name: string, course: { code: string; title: string }, certNo: string, score: number) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Demande reçue 📋</h1><p class="sub">Votre attestation est en cours de validation</p></div><div class="bd"><span class="badge">⏳ En traitement</span><p>Bonjour ${name},</p><p>Nous avons bien reçu votre demande d'attestation pour le projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:6px">Score final : <strong style="color:#0d9488">${score}%</strong></p><p style="margin-top:6px;font-size:12px;color:#6b7280">N° de certificat : <span style="font-family:monospace">${certNo}</span></p></div><p>Notre équipe vérifie votre parcours et validera votre attestation sous <strong>24 à 48 heures</strong>. Vous recevrez un email dès qu'elle sera émise.</p><p class="muted">Aucune action n'est requise de votre part pour le moment. Merci de votre patience.</p></div>`);
+}
+
+// ── Email : attestation émise (validée par l'admin) ──
+function attestationIssuedEmailHtml(name: string, course: { code: string; title: string }, certNo: string, score: number) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Attestation délivrée ! 🎉</h1><p class="sub">Félicitations pour votre réussite</p></div><div class="bd"><span class="badge">🏆 Certifié</span><p>Bravo ${name},</p><p>Votre attestation de compétence est officiellement délivrée :</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><h3 style="color:#0d9488">${course.title}</h3><p style="margin-top:8px">Score final : <strong style="font-size:18px;color:#0d9488">${score}%</strong></p><p style="margin-top:10px;font-size:12px;color:#6b7280">Certificat N° <span style="font-family:monospace;font-weight:700">${certNo}</span></p></div><p>Vous pouvez désormais valoriser cette compétence dans votre CV, sur LinkedIn et auprès de vos employeurs. Ce certificat atteste de votre maîtrise pratique des outils MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mon attestation</a></p><p class="muted">Conservez votre numéro de certificat — il permet de vérifier l'authenticité de votre attestation.</p></div>`);
+}
+
+// ── Email : attestation refusée (complément requis) ──
+function attestationRejectedEmailHtml(name: string, course: { code: string; title: string }) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Complément requis</h1><p class="sub">Votre attestation nécessite une vérification</p></div><div class="bd"><span class="badge">📝 À compléter</span><p>Bonjour ${name},</p><p>Après examen de votre demande d'attestation pour <strong>${course.title}</strong>, notre équipe a besoin que vous complétiez ou révisiez certains éléments du projet avant de pouvoir délivrer le certificat.</p><p>Reconnectez-vous à votre espace pour revoir le projet et le finaliser. Vous pourrez ensuite soumettre à nouveau votre demande.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Revoir mon projet</a></p><p class="muted">Besoin d'aide ? Répondez simplement à cet email, nous vous accompagnerons.</p></div>`);
 }
 
 export default app;
