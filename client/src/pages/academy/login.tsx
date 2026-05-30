@@ -68,7 +68,7 @@ export default function AcademyLogin() {
       </Button>
 
       <p className="text-center text-sm text-muted-foreground mt-4">
-        Pas encore de compte ? <button onClick={() => navigate("/elearning")} className="text-primary hover:underline">Passer le test de sélection</button>
+        Pas encore de compte ? <button onClick={() => navigate("/academy/register")} className="text-primary hover:underline">Créer un compte</button>
       </p>
     </div>
   );
