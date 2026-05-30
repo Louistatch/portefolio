@@ -1,3 +1,4 @@
+// academy login
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { SEO } from "@/components/seo";
