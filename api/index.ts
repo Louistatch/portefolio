@@ -680,13 +680,14 @@ app.post("/api/academy/register", async (req, res) => {
 
   const hash = await bcrypt.hash(password, 10);
   const verifyToken = crypto.randomBytes(32).toString("hex");
+  const verifyCode = String(Math.floor(100000 + Math.random() * 900000)); // code 6 chiffres
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
 
   const { data, error } = await supabase.from("students")
     .insert({
       full_name, email, password_hash: hash, phone, country, organization,
       entry_score: 0, status: "pending_test",
-      email_verified: false, verify_token: verifyToken, verify_expires: verifyExpires,
+      email_verified: false, verify_token: verifyToken, verify_code: verifyCode, verify_expires: verifyExpires,
     })
     .select("id, full_name, email, status, email_verified").single();
   if (error) return res.status(400).json({ message: error.message });
@@ -697,7 +698,7 @@ app.post("/api/academy/register", async (req, res) => {
     resend.emails.send({
       from: FROM_EMAIL, to: email,
       subject: "Confirmez votre inscription — DataMEAL Academy",
-      html: verifyEmailHtml(full_name, verifyUrl),
+      html: verifyEmailHtml(full_name, verifyUrl, verifyCode),
     }).then(() => logAcademyEmail(data.id, "verify", email, "Confirmez votre inscription"))
       .catch((e: any) => console.error("Verify email error:", e));
   }
@@ -767,10 +768,41 @@ app.post("/api/academy/verify", async (req, res) => {
     return res.status(400).json({ message: "Lien expiré. Demandez un nouvel email de validation." });
 
   await supabase.from("students")
-    .update({ email_verified: true, verify_token: null, verify_expires: null })
+    .update({ email_verified: true, verify_token: null, verify_code: null, verify_expires: null })
     .eq("id", data.id);
   res.json({ message: "Email vérifié avec succès", verified: true });
 });
+
+// ── Vérifier l'email via le code à 6 chiffres (Supabase) ──
+app.post("/api/academy/verify-code", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { code } = req.body;
+  if (!code) return res.status(400).json({ message: "Code requis" });
+  const { data } = await supabase.from("students")
+    .select("verify_code, verify_expires, email_verified").eq("id", sid).single();
+  if (!data) return res.status(404).json({ message: "Compte introuvable" });
+  if (data.email_verified) return res.json({ message: "Email déjà vérifié", verified: true });
+  if (data.verify_expires && new Date(data.verify_expires) < new Date())
+    return res.status(400).json({ message: "Code expiré. Demandez-en un nouveau." });
+  if (String(data.verify_code) !== String(code).trim())
+    return res.status(400).json({ message: "Code incorrect" });
+  await supabase.from("students")
+    .update({ email_verified: true, verify_token: null, verify_code: null, verify_expires: null })
+    .eq("id", sid);
+  res.json({ message: "Email vérifié avec succès", verified: true });
+});
+
+// ── Récupérer le code de vérification courant (étudiant connecté, si email non reçu) ──
+app.get("/api/academy/my-verify-code", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data } = await supabase.from("students").select("verify_code, email_verified, verify_expires").eq("id", sid).single();
+  res.json({
+    email_verified: data?.email_verified ?? false,
+    has_code: !!data?.verify_code,
+    expires: data?.verify_expires ?? null,
+  });
+});
+
 
 // ── Renvoyer l'email de validation ──
 app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
@@ -780,18 +812,19 @@ app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
   if (data.email_verified) return res.json({ message: "Email déjà vérifié" });
 
   const verifyToken = crypto.randomBytes(32).toString("hex");
+  const verifyCode = String(Math.floor(100000 + Math.random() * 900000));
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
-  await supabase.from("students").update({ verify_token: verifyToken, verify_expires: verifyExpires }).eq("id", sid);
+  await supabase.from("students").update({ verify_token: verifyToken, verify_code: verifyCode, verify_expires: verifyExpires }).eq("id", sid);
 
   if (resend) {
     const verifyUrl = `${SITE_URL}/academy/verify?token=${verifyToken}`;
     resend.emails.send({
       from: FROM_EMAIL, to: data.email,
       subject: "Confirmez votre inscription — DataMEAL Academy",
-      html: verifyEmailHtml(data.full_name, verifyUrl),
+      html: verifyEmailHtml(data.full_name, verifyUrl, verifyCode),
     }).then(() => logAcademyEmail(sid, "verify", data.email, "Confirmez votre inscription")).catch(() => {});
   }
-  res.json({ message: "Email de validation renvoyé" });
+  res.json({ message: "Email de validation renvoyé", emailSent: !!resend });
 });
 
 // ── Mot de passe oublié — demande ──
@@ -946,6 +979,15 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { course_id, lesson_id, score } = req.body;
   if (!course_id || !lesson_id) return res.status(400).json({ message: "course_id et lesson_id requis" });
+
+  // Vérifier que l'étudiant est inscrit (sinon créer l'inscription si le test est réussi)
+  const { data: enr } = await supabase.from("enrollments")
+    .select("id").eq("student_id", sid).eq("course_id", course_id).maybeSingle();
+  if (!enr) {
+    const { data: stud } = await supabase.from("students").select("entry_score").eq("id", sid).single();
+    if ((stud?.entry_score ?? 0) < 21) return res.status(403).json({ message: "Réussissez le test d'aptitude pour accéder aux cours." });
+    await supabase.from("enrollments").insert({ student_id: sid, course_id });
+  }
 
   // Récup la leçon pour le titre + points
   const { data: lesson } = await supabase.from("sms_lessons").select("title, points").eq("id", lesson_id).single();
@@ -1206,8 +1248,9 @@ function campaignEmailHtml(name: string | undefined, subject: string, content: s
 
 
 // ══════════════ Templates email Academy ══════════════
-function verifyEmailHtml(name: string, url: string) {
-  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Confirmez votre inscription</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">🎓 Bienvenue</span><p>Bonjour ${name},</p><p>Merci de rejoindre <strong>DataMEAL Academy</strong>, la formation gratuite par projets en MEAL (KoboCollect, Python, QGIS) pour l'Afrique de l'Ouest.</p><p>Pour activer votre compte et passer le test d'aptitude, confirmez votre adresse email :</p><p style="text-align:center"><a href="${url}" class="cta">Confirmer mon email</a></p><p style="font-size:13px;color:#9ca3af">Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, ignorez cet email.</p><p>À très vite en cours,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
+function verifyEmailHtml(name: string, url: string, code?: string) {
+  const codeBlock = code ? `<div class="cd" style="text-align:center"><p style="margin:0 0 8px;font-size:13px">Ou entrez ce code dans l'application :</p><p style="font-size:28px;font-weight:700;letter-spacing:6px;color:#16a34a;margin:0">${code}</p></div>` : "";
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Confirmez votre inscription</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">🎓 Bienvenue</span><p>Bonjour ${name},</p><p>Merci de rejoindre <strong>DataMEAL Academy</strong>, la formation gratuite par projets en MEAL (KoboCollect, Python, QGIS) pour l'Afrique de l'Ouest.</p><p>Pour activer votre compte et passer le test d'aptitude, confirmez votre adresse email :</p><p style="text-align:center"><a href="${url}" class="cta">Confirmer mon email</a></p>${codeBlock}<p style="font-size:13px;color:#9ca3af">Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, ignorez cet email.</p><p>À très vite en cours,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
 }
 
 function resetEmailHtml(name: string, url: string) {
