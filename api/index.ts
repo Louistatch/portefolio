@@ -744,51 +744,142 @@ app.post("/api/academy/register", async (req, res) => {
 });
 
 // ── Soumettre le test d'aptitude (étudiant authentifié) ──
+const ADMISSION_MONTHS = 3;
+const RETRY_DAYS = 7;
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// Génère le planning hebdomadaire des leçons depuis la date d'admission (modèle WQU)
+async function generateLessonSchedule(sid: number, admittedAt: Date) {
+  const { data: courses } = await supabase.from("sms_courses")
+    .select("id").eq("is_published", true).order("order_index");
+  if (!courses?.length) return;
+
+  let week = 0;
+  const rows: any[] = [];
+  for (const co of courses) {
+    const { data: lessons } = await supabase.from("sms_lessons")
+      .select("id").eq("course_id", co.id).order("order_index");
+    for (const les of (lessons || [])) {
+      const unlock = new Date(admittedAt.getTime() + week * WEEK_MS);
+      const due = new Date(unlock.getTime() + WEEK_MS);
+      rows.push({
+        student_id: sid, course_id: co.id, lesson_id: les.id,
+        week_index: week + 1, unlock_at: unlock.toISOString(), due_at: due.toISOString(),
+        status: week === 0 ? "available" : "locked",
+      });
+      week++;
+    }
+  }
+  // Insert (ignore conflits si déjà généré)
+  for (let i = 0; i < rows.length; i += 100) {
+    await supabase.from("lesson_progress").upsert(rows.slice(i, i + 100), { onConflict: "student_id,lesson_id", ignoreDuplicates: true }).then(() => {}, () => {});
+  }
+}
+
+// Met à jour les statuts de déblocage selon l'heure courante (locked→available, available→missed si dépassé)
+async function refreshLessonStates(sid: number) {
+  const now = new Date();
+  const { data: lps } = await supabase.from("lesson_progress")
+    .select("id, unlock_at, due_at, status").eq("student_id", sid);
+  if (!lps) return;
+  for (const lp of lps) {
+    if (lp.status === "completed" || lp.status === "missed") continue;
+    const unlock = new Date(lp.unlock_at), due = new Date(lp.due_at);
+    let ns = lp.status;
+    if (now >= unlock && now <= due) ns = "available";
+    else if (now > due) ns = "missed";              // fenêtre dépassée → recalé
+    else ns = "locked";
+    if (ns !== lp.status) await supabase.from("lesson_progress").update({ status: ns }).eq("id", lp.id);
+  }
+}
+
 app.post("/api/academy/submit-test", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { score } = req.body;
   if (score == null) return res.status(400).json({ message: "Score requis" });
+
+  // Vérifier le délai de re-tentative (1 semaine après échec)
+  const { data: stud } = await supabase.from("students")
+    .select("admitted_at, next_test_allowed, test_attempts, status").eq("id", sid).single();
+  if (stud?.admitted_at) {
+    return res.status(403).json({ message: "Vous êtes déjà admis(e). Le test ne peut pas être repassé.", alreadyAdmitted: true });
+  }
+  if (stud?.next_test_allowed && new Date(stud.next_test_allowed) > new Date()) {
+    return res.status(403).json({ message: "Vous devez attendre avant de repasser le test.", nextAllowed: stud.next_test_allowed });
+  }
+
   const passed = score >= 21;
+  const now = new Date();
+  const attempts = (stud?.test_attempts ?? 0) + 1;
 
-  await supabase.from("students")
-    .update({ entry_score: score, status: passed ? "active" : "pending_test" })
-    .eq("id", sid);
+  const update: any = {
+    entry_score: score, test_attempts: attempts, last_test_at: now.toISOString(),
+    status: passed ? "active" : "pending_test",
+  };
+  if (passed) {
+    update.admitted_at = now.toISOString();
+    update.admission_expires = new Date(now.getFullYear(), now.getMonth() + ADMISSION_MONTHS, now.getDate()).toISOString();
+    update.next_test_allowed = null;
+  } else {
+    update.next_test_allowed = new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  }
+  await supabase.from("students").update(update).eq("id", sid);
 
+  // Note du test
   const { data: existingTest } = await supabase.from("grades")
     .select("id").eq("student_id", sid).eq("type", "entry_test").maybeSingle();
   if (existingTest) {
-    await supabase.from("grades").update({ score, graded_at: new Date().toISOString() }).eq("id", existingTest.id);
+    await supabase.from("grades").update({ score, graded_at: now.toISOString() }).eq("id", existingTest.id);
   } else {
-    await supabase.from("grades").insert({
-      student_id: sid, title: "Test de sélection MEAL", score, max_score: 30, type: "entry_test",
-    });
+    await supabase.from("grades").insert({ student_id: sid, title: "Test d'admission MEAL", score, max_score: 30, type: "entry_test" });
   }
 
-  // Si réussi : inscrire à TOUS les cours publiés (pas seulement le premier)
   if (passed) {
+    // Inscrire à tous les cours + générer un certificat d'admission + planning hebdo
     const { data: courses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
     if (courses?.length) {
       const { data: existing } = await supabase.from("enrollments").select("course_id").eq("student_id", sid);
       const already = new Set((existing || []).map((e: any) => e.course_id));
-      const toAdd = courses.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: sid, course_id: co.id }));
+      const toAdd = courses.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: sid, course_id: co.id, started_at: now.toISOString() }));
       if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
     }
+    await generateLessonSchedule(sid, now);
+
+    // Certificat d'admission (expire à 3 mois)
+    const certNo = `DMA-ADM-${sid}-${Date.now().toString(36).toUpperCase()}`;
+    await supabase.from("attestations").insert({
+      student_id: sid, course_id: courses?.[0]?.id ?? null, cert_type: "admission",
+      certificate_no: certNo, final_score: Math.round(score / 30 * 100),
+      status: "issued", issued_at: now.toISOString(), expires_at: update.admission_expires,
+    }).then(() => {}, () => {});
   }
 
-  res.json({ passed, score, status: passed ? "active" : "pending_test" });
+  res.json({
+    passed, score,
+    status: passed ? "active" : "pending_test",
+    admissionExpires: passed ? update.admission_expires : null,
+    nextTestAllowed: passed ? null : update.next_test_allowed,
+  });
 });
 
-// ── Statut du test pour l'étudiant connecté ──
+// ── Statut du test / admission pour l'étudiant connecté ──
 app.get("/api/academy/test-status", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const { data } = await supabase.from("students").select("entry_score, status").eq("id", sid).single();
+  const { data } = await supabase.from("students")
+    .select("entry_score, status, admitted_at, admission_expires, next_test_allowed, test_attempts").eq("id", sid).single();
   const { data: test } = await supabase.from("grades")
     .select("score, graded_at").eq("student_id", sid).eq("type", "entry_test").maybeSingle();
+  const canRetry = !data?.next_test_allowed || new Date(data.next_test_allowed) <= new Date();
   res.json({
     hasTaken: !!test,
     score: data?.entry_score ?? 0,
-    passed: (data?.entry_score ?? 0) >= 21,
+    passed: !!data?.admitted_at,
     status: data?.status ?? "pending_test",
+    admittedAt: data?.admitted_at ?? null,
+    admissionExpires: data?.admission_expires ?? null,
+    nextTestAllowed: data?.next_test_allowed ?? null,
+    canRetry,
+    attempts: data?.test_attempts ?? 0,
   });
 });
 
@@ -1016,13 +1107,26 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const { course_id, lesson_id, score } = req.body;
   if (!course_id || !lesson_id) return res.status(400).json({ message: "course_id et lesson_id requis" });
 
-  // Vérifier que l'étudiant est inscrit (sinon créer l'inscription si le test est réussi)
+  // Vérifier l'admission
+  const { data: stud } = await supabase.from("students").select("admitted_at, admission_expires").eq("id", sid).single();
+  if (!stud?.admitted_at) return res.status(403).json({ message: "Vous devez réussir le test d'admission pour accéder aux cours." });
+  if (stud.admission_expires && new Date(stud.admission_expires) < new Date())
+    return res.status(403).json({ message: "Votre période d'admission (3 mois) a expiré. Repassez le test d'admission." });
+
+  // Vérifier l'inscription
   const { data: enr } = await supabase.from("enrollments")
     .select("id").eq("student_id", sid).eq("course_id", course_id).maybeSingle();
-  if (!enr) {
-    const { data: stud } = await supabase.from("students").select("entry_score").eq("id", sid).single();
-    if ((stud?.entry_score ?? 0) < 21) return res.status(403).json({ message: "Réussissez le test d'aptitude pour accéder aux cours." });
-    await supabase.from("enrollments").insert({ student_id: sid, course_id });
+  if (!enr) await supabase.from("enrollments").insert({ student_id: sid, course_id, started_at: new Date().toISOString() });
+
+  // GATING WQU : la leçon doit être 'available' (débloquée cette semaine, fenêtre non dépassée)
+  await refreshLessonStates(sid);
+  const { data: lp } = await supabase.from("lesson_progress")
+    .select("status, unlock_at, due_at").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
+  if (lp) {
+    if (lp.status === "locked")
+      return res.status(403).json({ message: "Cette leçon n'est pas encore débloquée.", unlockAt: lp.unlock_at, locked: true });
+    if (lp.status === "missed")
+      return res.status(403).json({ message: "La fenêtre d'une semaine pour cette leçon est dépassée. Vous avez été recalé(e) sur cette leçon.", missed: true });
   }
 
   // Récup la leçon pour le titre + points
@@ -1039,6 +1143,10 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
       title: lesson?.title || "Leçon", score: finalScore, max_score: maxScore, type: "lesson",
     });
   }
+  // Marquer la leçon comme complétée dans le planning hebdo
+  await supabase.from("lesson_progress")
+    .update({ status: "completed", completed_at: new Date().toISOString(), score: finalScore })
+    .eq("student_id", sid).eq("lesson_id", lesson_id).then(() => {}, () => {});
 
   // Recalcul progression
   const { count: totalLessons } = await supabase.from("sms_lessons")
@@ -1067,7 +1175,73 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
     }
   }
 
-  res.json({ progress, done: doneCount, total: totalLessons || 0, completed: wasCompleted });
+  // Vérifier si les 3 cours sont terminés → certificat FINAL
+  let finalCert = null;
+  if (wasCompleted) {
+    const { data: allCourses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
+    const { data: doneEnr } = await supabase.from("enrollments")
+      .select("course_id").eq("student_id", sid).eq("status", "completed");
+    const doneIds = new Set((doneEnr || []).map((e: any) => e.course_id));
+    const allDone = (allCourses || []).length > 0 && (allCourses || []).every((co: any) => doneIds.has(co.id));
+    if (allDone) {
+      const { data: existingFinal } = await supabase.from("students").select("final_certificate_no").eq("id", sid).single();
+      if (!existingFinal?.final_certificate_no) {
+        const certNo = `DMA-FINAL-${sid}-${Date.now().toString(36).toUpperCase()}`;
+        const nowIso = new Date().toISOString();
+        // Moyenne générale
+        const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
+        const ga = allGrades || [];
+        const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
+        await supabase.from("students").update({ final_certificate_no: certNo, final_certified_at: nowIso }).eq("id", sid);
+        await supabase.from("attestations").insert({
+          student_id: sid, course_id: course_id, cert_type: "final",
+          certificate_no: certNo, final_score: avg, status: "issued", issued_at: nowIso,
+        }).then(() => {}, () => {});
+        finalCert = { certificate_no: certNo, average: avg };
+        const { data: st2 } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
+        if (st2?.email) sendAcademyEmail({
+          studentId: sid, to: st2.email, type: "final_certificate",
+          subject: "🎓 Certificat Super-Expert MEAL délivré !",
+          html: finalCertEmailHtml(st2.full_name, certNo, avg),
+          dedupeKey: `final:${sid}`,
+        });
+      }
+    }
+  }
+
+  res.json({ progress, done: doneCount, total: totalLessons || 0, completed: wasCompleted, finalCertificate: finalCert });
+});
+
+// ── Planning hebdomadaire des leçons (modèle WQU) ──
+app.get("/api/academy/lesson-schedule", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  await refreshLessonStates(sid);
+  const { data, error } = await supabase.from("lesson_progress")
+    .select("*, sms_lessons(title, order_index), sms_courses(code, title)")
+    .eq("student_id", sid).order("week_index");
+  if (error) return res.status(500).json({ message: error.message });
+  res.json(data || []);
+});
+
+// ── Relevé de notes complet (transcript WQU) ──
+app.get("/api/academy/transcript", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data: grades } = await supabase.from("grades")
+    .select("*, sms_courses(code, title)").eq("student_id", sid).order("graded_at", { ascending: true });
+  const { data: stud } = await supabase.from("students")
+    .select("full_name, entry_score, admitted_at, admission_expires, final_certificate_no, final_certified_at").eq("id", sid).single();
+  const arr = grades || [];
+  // GPA / moyenne par cours
+  const byCourse: Record<string, { sum: number; n: number; code: string; title: string }> = {};
+  for (const g of arr) {
+    const code = (g as any).sms_courses?.code || "ADMISSION";
+    if (!byCourse[code]) byCourse[code] = { sum: 0, n: 0, code, title: (g as any).sms_courses?.title || "Test d'admission" };
+    byCourse[code].sum += Number(g.score) / Number(g.max_score) * 100;
+    byCourse[code].n++;
+  }
+  const courseAverages = Object.values(byCourse).map(v => ({ code: v.code, title: v.title, average: Math.round(v.sum / v.n) }));
+  const overall = arr.length ? Math.round(arr.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / arr.length) : 0;
+  res.json({ student: stud, grades: arr, courseAverages, overall, totalGrades: arr.length });
 });
 
 // ── Demander une attestation ──
@@ -1399,6 +1573,127 @@ function attestationIssuedEmailHtml(name: string, course: { code: string; title:
 // ── Email : attestation refusée (complément requis) ──
 function attestationRejectedEmailHtml(name: string, course: { code: string; title: string }) {
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Complément requis</h1><p class="sub">Votre attestation nécessite une vérification</p></div><div class="bd"><span class="badge">📝 À compléter</span><p>Bonjour ${name},</p><p>Après examen de votre demande d'attestation pour <strong>${course.title}</strong>, notre équipe a besoin que vous complétiez ou révisiez certains éléments du projet avant de pouvoir délivrer le certificat.</p><p>Reconnectez-vous à votre espace pour revoir le projet et le finaliser. Vous pourrez ensuite soumettre à nouveau votre demande.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Revoir mon projet</a></p><p class="muted">Besoin d'aide ? Répondez simplement à cet email, nous vous accompagnerons.</p></div>`);
+}
+
+
+// ══════════════ Certificats téléchargeables (A4 paysage, signés) ══════════════
+const SIGNATURE_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAH0AAACQCAYAAAAlWmR5AAABCGlDQ1BJQ0MgUHJvZmlsZQAAeJxjYGA8wQAELAYMDLl5JUVB7k4KEZFRCuwPGBiBEAwSk4sLGHADoKpv1yBqL+viUYcLcKakFicD6Q9ArFIEtBxopAiQLZIOYWuA2EkQtg2IXV5SUAJkB4DYRSFBzkB2CpCtkY7ETkJiJxcUgdT3ANk2uTmlyQh3M/Ck5oUGA2kOIJZhKGYIYnBncAL5H6IkfxEDg8VXBgbmCQixpJkMDNtbGRgkbiHEVBYwMPC3MDBsO48QQ4RJQWJRIliIBYiZ0tIYGD4tZ2DgjWRgEL7AwMAVDQsIHG5TALvNnSEfCNMZchhSgSKeDHkMyQx6QJYRgwGDIYMZAKbWPz9HbOBQAABDBUlEQVR4nO29d7xlxXXn+62qvU+8qXPfzpEmNBkEiCiEhAJIFgrGkiwh2X6WbFnzmfF4PB7L4zf2OMkjz8jpOTxbthWMbSWDEAgJUABBIwRNpqFpOtPp3r7xhB1qzR9Ve599bnfDRVya7g+9Pp9z7zn77LN37VpVq9b6rVBKRDhBry3Sr3YDTtDRpxNMfw3SCaa/BukE01+DdILpr0E6wfTXIAXTO836V+cnRzL0VH6eJ9Ggitc5wjgT3HnZ/ynXEf87NeUnU8/UxXOmNlJZEH+20giauPB7DYSAksJVVdbezll5E7Hu+bDu2rhrFp9SdV392KCXwPTYv3cPlnJoZ1uJwcaUjHFHRLl+QYPpDByV/aLIFAtWUrRSYLJ7uhMEReo7zZCNDYsFUt/JxQcyZIwjZ3IaR5jQQNr2/V+ilYa0Soo2SApUQPUCJSwkLcfQoOKYqCw2jlGlKq1ICIOEQCv/SBZ0DCog9X2jfDuM+OdQWS+9+jRNpmvyBvuZqwR0YdpFsaUcGrRRCBaVCmgDWnsmaWzhoTWFSY2gjEKLwdoYnVjQ2t/SojAYOoNMKM67bIY5sv6aRgG2M7NNWKLVmKRSrYExjDThsS275K4HnkCCCnPmzmfZ4Dw5ZflsFvZrVTI1tIDRoAWsFRIUgUCppNCERO1JSmEZksS1t0sOHbukpo3IZaflojebiQo3a91gEAvZJbUBay1JKhhtEH+qPeTSKWnapmxKbpJn9xMg8YwLS6A0qcqaYlFYd75vhpNAbhjksyx1EkraMaO2hO0t8dBW5P/7+y+wfMVSzj55JSpusnfPfjY9t4Onduzn1DPO5CM/czkr+qDSRvWVyO9rrWCUYPBi3UZgDEjo21DoXIp9Nc35dRRoWkwvzizHlBgkAlK/phlQISSGBIUJwBYGvc4ugpsUsbUobQkCjVY2v4NGo1CkSYKyBm0CUL4nVeLEi/IjJxt0Xb1sSAtrrlslEkCTaM0k8I0Ne+Wb37+fn3rXtZy7BnpwYh2gAbIngZtv38att9zMVRedxyc+cCE1hWrHEAZQU2CwkGqUhtHxA9LXN6CQwElAYiABKQPaDXSOLRkwbaZnK3oJwHqmS+qvoiEVCCqIDkmBKIU0deKxHPglPVN4JBtGFqy4E/1MRjRoQwq53hC3LL0VC9IGW9AFlHZiVSmv6LmlJPs+Ve4aLeAAyObt8Kef/XN+/398ggU9UAVVwt3IWjAhjESILsGohX/44t3s2vk8H/rAezltGZRABRbqGqJmRLlSIlU2VzKdvtEEiR3TVTmXEJkucizQtJieAol/X8aCTd0MyjVhHANMSERATC700QJRDKUSIK5zlTiJmIlyixszmW6XAi0LqSChQRmgCgQk7sS8ycozvWAhZIs6kCho42bwOPAbv3sjH3znm7nsjNmqAkg7RWxCtVIu9Ih71pEEaRq4e+MY//TFL/LBd7+dt160TFVwQqfipXWMW4FK2gtw23RHJQQdkqgAi7cKXpwfR4VewkJjC2uUcg/lGeVemrY3gdLsJ6nrg5ZF7tv4HEOTDYaGx5iYbGGlRLXWT0+9n1K1xtxZs+nvUywehIGqkxB+sEkFVBtICFCmqBnTbU0qQFvPOKdFG9wM/fGPdsqa+XWuPGO2Um1LOUwh9MaVjZz00RqSFkGUMLc2S7UVvOnsPlmz6ON8+tN/jGq9Rd76htNVNXDMTv2ArpYyhrqlxK3vtmBCHFs0bfGe+p4NnA3mO9rNMtFuRrX8uW2LbHp8G489+CBECQuWrKBn8TIiU0GZAEtAq2UZGW8wNHyQ8fFJhoaG2LVjOweH9tHXW2X50oWsXL6IVSuWMLhgIeuWd2ajt6dVCNQO0Skt6A7Ts6Xpt//gb+Sn3/tuzlozR5nEEkjkfhiUCg+auqVLKVAlLCFN5STGjmGR3/+9P+SGD/4sF569RKUWytoJvErgpRAxpKFvZOoUT8JjTrxPa6YrQIvOR661TthrUyICxmPQIbQEueXWh3n80Y1cefEFfOiD71I1L8MzCZCJfUdVYA7QWb8PNpGtO8Z4Ztsunt26i6/f9F127x/CVsssWb6K159/KRec3cNgHQktSIqqG6A96TQtCSHRKP9kbYHdz++VuHmAdavmqBgg0FipECpQVtwarDUoA6aca+EClH0nLZut1G//1m/Ir/2X/07t139NTl7dS1NQPQFuggepW+5U93KTWyPHEE3fZLOZHSbEaYIyJbdepogxqHs37pfPf/FGTjvtND5+w5WUQSVNJ6rjVptSqXvddAhWB+JpRzGmVMd29N98AjdAfvjoOE89u40Hf/woB/YNsWbZMq689ALOP30B83td5wdA0nb6Q2QhEtABfPnrN0uSwPXvuVblwJ9fh40Fo+0Us6+DHWYg4UhDpFRTauPmcfnMZ/+U//Mnv0k9hD5QJQFN2/+q7NG+7FGPPURumkz3yptSoJwgi/yrDfLPX72P73z3e/zyxz7Ouaf2kToNV1Xw2n42bSCfAaI6S3EHpPGgjYBYwXhzLbVuAjdTp5EfbCB33P80N3/7XoYmYemyVZxx2lp+5q0L6cFJ6P7QyaWRSSt//Cd/ygc/+CHWrJytMqUKgZICSSxhl7zrLAtT8YRGColBvvi1e3ns8U38/qduoAaqJNZdE+sHTlAYNLYjAY4Rxk8fhlUJEqdQ6qGZgjXQAvnuPTvYcP8DfOq//hoL52lCUFXtmK1wY0XnM9uDFIXFLRsLcQxB4H6k3XoCkoCybiaOteit9zjEp6zVtVeeJFdfeRJbRmHDA2Pcv+FebvrKl3j32y7mnW+5AO2WUiaNZvu+JiuXz1YlILZOSVTZ4BNBMHmTMt00A3iKbArdGFTvvPYi2fzsdm7+1mO85+r1WJWZkZqOjCr88lhZzDMSkWm8YkTGaU7sl0SECRGGRLjrKZHrPvln8uBekf0iMiZCU1Ka0iKRGCtCOxGsFaykiLT8tVLESueVCtafF4vQFqEpQkOEcSs04iaSjiPJBHE7YSIRxkQYle7/j+9pymdu/IFc/Suflf964xNy+5jI5zaL/D9/dru0RZD2OGkSkfh7tEVoxEIighX3P/b/RQSxEZKMI8k4SXOC7Nl3pyJPjIq8+5N/JE8MRzLmr2Vt1leR/33Wf+k0+/novKYp3hMkbqDCGhNxgA1h3xjyyf/8GT71336Vk1egyoBKWpRNG4OQWoM2vaTAZAt6KmByiCfDY7vFnSiH5GXiNTP9AqAUjYEpga4QKWjHkCYpfaUEbRzg00rLtAPDM8PIX954H09sH2Lx2lM4eX7Ab127TFXiMQiqoEIiD+8XlxUoruWJU/Csb7Mu046AcpkIaAjytVvuZ+eOrXzy4++j7q2JkncDOSguyJexYwmZn94iIwEq6AMJCAJoRchf/f//wk+/7xpOWgFpjFSAmlEYUSAakwpJ3CYFKpUMijXuBTjPVNL1UsQomxDYhNBaKtZSFbdUSKkPMRVS5a5VDaG3atDGr5UiVAJLKYGTZqM+9UsX8tZLzuCpjQ9QLvUynCJJ2OdZYynZNoGkzpSyDoNQWIy4djhFI0RMH2L6QBkUlhKuPVWFevc1r2PrziF+9OgQER7AEu9ckBhUnA2BY4oO4/44DCmnXGWQ5p3ff5x6tcI7rlqnKqD6Q5QkHrMTv76FIWFosN6rqPI1r6jQZBqeh2FUitbiXsqiFSixZLpQggNErHU6tvE4oU0FdAmbplSDGN1O6QOuv2YplbTB7d/8GgdH3XqeyzVjyNS1OGrR5USSrHVBbmoKQqkcooB2M6WE09N//sMf4guf/2daDiT2WLu/lkcsjw31rUNaipCWTHlRYImC2GvON916Bx//6DsJE+ixULLOeZIqQ2IqpKbqtVWhCpQOWUEyxhv/coLRvfyxTNv1Nq9WEIpzmRqtUAUQV5uAmBAxFUgT6iWNAdWagAEzycXrl7PtiYeRdhsFJEnHno6ihHKl1mmTMv7lcPwQ72DxDqZ2lFCrGEop1AXOWF5XK5cs5Ot372AMZCL1kksFJG2LyVztM825l0FFB5gjmXrAOsb7tfYLN97GNe+4lpJBlXNnl7NsUzQJAQkmd0I4X6u/lKLw9PrFX9n5yuLmeXLEWWPxTiGtUUpQwP7nW1xw1sn80kffyEXnnalqVYcVJEmS30OpIjumtoFc7BfJ+CXGCPSV4W1XX8ktt93BBKBNgAjE7YigXHVXzYz9Y4T0NIQ74Dp154FUNj35GG+6fCVlb145DcW9yUwc142eY12MfmVJBGf74Vwejz/1JLP6+6gZqFXcOWmaUip1oNduph+JNEqVEAtaa79UCWnkeu+0dbPVnL4aP9qwy80BVSEMyyAWSbzIP4amemHiHIn9Op9Ft337e7zxDVdQdgKw29tFUWBPna12Zh76Ra5hwEFwbgCqkZERli1ZhPXevSiKUEqhtXtsa23+/oXJPZnSIWGgSeIYbIIpaxJx337wPddx5223eXlkfDsssY07YXbHCOkuvmfMmdK5FhhLkQ0bn+Sat5znglEyp5QI4v3gCifyjL+0+ICGmZNsU3uvI4YlA4GMcQE3ILuf38uypYupKJTREIZhzuQ4jhGRaTIdrC3cixgCB1hlU2X9qoCk2WTzjlgSIGn7eMFymAdSHCukD+3IQ2d8Cjz5TETf7AWUDaoego3baCzWKGwmIjtBMPnvnJpokelYCS/UzCnTZerVAtNZVlKco2XPnn30VDpDIxPlIoIxBmPc8EzTFzeqlM7cD5Yw1M6pjmD9TK+AuuR15/HdH2wgBoJSGdKU1MaFEM9jg6Zw3BZeHf5Z4N4HHuGii68gsW4ml4MOfJIzILNRC1eb2ZneTVJovgKiOMlNS6UgCEMWzHHtTRPHbKBLxEPn+AvciDyg1YqzP8XSTloueAfnjbvi9Rfy8GObGYlwmqTWfrgfSyzPmZ6p4Z4KIj5j2hNPbeass+ZS0qCJMTqlHU86f3XRc1L8z5E1hZ+0uZnu2BEoTjXWQCkMUDqgZeFgAyZbbUIvI1y4XWemiwhJkpCmKUHwwi4IUS46xj1QkjufSkGAASK3kLNsIUqZEjufh1YCaENgAuTYZDrEiVuorU1A0q5ZPtZAjBJ6exwkqkQQUiphSEpK8ALL4szBjy+89to07oRVa9h7EJavWIUDQ7v92koplFIEQZCL+Be9e3Z7Y3JvTRaZVQ2grNx9rrj0Mh548HE3EXSZtIAoHCvUeRa/ZiqlEG+Tpzi/9L59DZYtXkANz0ClUH6l1P6d+3H3/6OptGolKJ8AYYGJphBWKgRAIDMw8PILFEGHjuQxGtpNOP+8JTzyyCOkgcM2FOrYnem5vepUYOfDxsGeO3Zs49TVi8lDwTphj4SAFAMkp3gUc1P+ZTb0cN2WHxPbcZX618hEk0q13mnOTPR7Pqg1EKDRXaByEMDgbEiSFjv3e1gWMAXX7bFAGvyqqBy+rDz+JNqraQb27tnD2uWzCfG5BwSIzexh65IKlCWLTytqCi42rNg1L5ecc+RQXcEtSBnTW+2EICz72PfYo3o/OXWpjD7WP8u8MYBYS9nlO3Dm+nU8uWUbTekKzj1mSGcBm0op5/eloyRlES0HDuxj+YIeSjiQw5liHieXToBRFiqdGUAqC6KEV0SFt1M/+U5OQQjKxHHsM2DSGbp/BjIZEDfoVbZ0+ByvENSpp67i4ac20VL+rseYzVZYjhUo5ddEnbsEU6A52WBub0mViDHGM1Xj/OEWMjZn7Hefkg7uPrMq/GEoC0mSfND29pUZH58shCb/5I1QuaaQXSPIb5vf0K8vAbBu9UIefmITAkTRT3zbV4y6ZK7yXSTeBMoeUWmhpCMUTUwhyMGd0HnyYlaK+2HmppwZ0S5HeO8OSNfx/lkwPDrSWb9eNmVPPeVZPNPFw09KEgZqKF2psa/h4vuONcpwRfB6eNHHlHmcy+Wyk+teW836MAWnDKgsf8x2O138dzNPtqAzFlywhXsP1KE1Plmw5V8edZ478x4WvsCBzmIjSsr14RlnnsmPN+6lUqGTHnSMUMe1mikn1hKSujRdnOAMyhVE10EqhPhoUoAAJAh8NIrCYCmR+JAhp+ECM+JpU0KhWIDNFag8gVKHuU1cBjWrAmlr0rtbyzM0+NwinWPpqvAihahN5qBas3o1u3fscMCNz2maGq7wQq8OFZeVmaHunhA/Y0TyMNmWhbBc9et04Jwq2engk/DdZQziu8V6ZnirYEbVV9ctHWniHsN6B0/WvooCG7Vdd6ngkEd96bdVZAyF7Oa24DZNKJc6gvOkVbN4etOTmMBl6v5ketwrszZ0448ieU9mqcatJj6ypJu6+Zh1qH2hk44KZZ0b4lyp4GDX6fnNXyoVBlKWC4cbdIsGYHj/vikqzZTQaDg03e0o9FkHu1De6FIuBi0L9mhHuIAAcLaudGMwuQfrcFEvrwJlvhPF9LxnM0ZKEcedxVsDSxYP8szWEZk2DtvVZ3bK/5kjDS7s2EV8uIOiCua1QJzagljrqEaZiO0glEXGv7pkIXekzOQsn/pkHRS+80021NadtIYtz23LV+Us9EphO/3WpRdM544vn/Th1lvts/8soA00m+0CyuD/Z4rV4bWPznmvgCJyOMrMzYy/7RTq9frM3Xka4yYMXRhWmrg6FEsHF7B3aIRjzVTPtXenlYpzDqhOKGC5BOMTrYL6lNGUCNqMZOo4OHqMLzSBZhN6enpIXilz6ZDZ6SScIJSNsxWWLl7Art17aeerTLEPfJ8cceJMWS5nkA4JjJy6DoYGWq2WR+h0N+Ol8GvfYDlkXXolwyi6KfNmCS4+slqtMjPLeqfjD3G2FSi1KRpFSYECtXRRha07d2EN08ojOlrk1nT/IbUpIh1MTXBVFnbv3p2jbYl4nCbjZXroVOqe1/ao6XSZiNfA6CgYY6iWefHImJd6H/GDu3BZsRatDRYXN1fBFSuo9g4wOpGdNEXbF3E60mFiE9OCEJhpVK9LbhhtvPIjRWgFrTUjDRfd7pQ87TivbKHQn6Op7VOHPfrKUdZvcUxXqPMrcZMO4y1KZ/5E5272gRuqVu9jaOQwqU1KdRQQTzIFSn6lqMvdrDButliLlo7xNWugj+f3juUlNR3g4X9qPRijOlq/dF3+1dHmG4029XodmFntPRvAhxvGUpA0WhxWMGfBQrbvGXLdlGVoSnd/5Mz2/Zd4iD/X+mdYVOrDfXCSpjPbTzppDU89sxWLKwzgMo782amLCi36q48FT+L4+Dh9fX2v6D2KjBc0sXXzWWMxNiYElixdyY7dez1yV4hBKXR9Z7L4WAbpvn7RhJ4J0tmf3F3hgHgUNj9+9pnreeiRJ3HRc3n1OHJm+4IDU3V0e6glf1RIgNHRUQYGBmass+RIEuswwRnKO6cVsGDxIrbu3uPaoQCtCmI8g4670RvrLaDxyZhme+aDrbTuMrcyOMsxM3NqrFzZw54Dw+wbA2OceZ5m6aiBouBs9Q/TdQsnzuSVFfEy5f7j4+P09/e/MhJHpjyj/2B0qeO29HbR7LmwZ+9Q18+VUlgkb3M2WRIRL96dm/bgwVEZGZuYcc1fF1ufr32pC4DI9JSyRq1eewoPPPR85k5BG+W1T4Fc4z/MSvcKM/tI1Gg08jV9RkmmvM0/T9XMLVjo64OxiQlaqYucznUeUYhVpMXBWojLF2BkbJSxiUlXWHEGSaM8spZPVl14EIuN3Yx/3evO4+FHH6GZIq3YhyVZW3A0ZM4Gi8vi8pE3ChKlaSlo4PLbW7j3k/7VgDypv1tmWFzJTW8WTlklcpFZsKG1P95OYky50rnOTJECVAFG9WLfpqnD+23qIvV8pcg+BURNWm2kVWiG8tfR1pUwdgPBJYGGKovoTWi0bQ6TzxQFfpnxGYkABsJq/jA9ITSB80/v4XP/+Az7D7yZ1QsUEVAJKiAtQJF6L7uRNknUhnIfEa5aJBp2T8DjT+xj0+OP8Py+vRycaFOu1Dn//PN5wyWrmFOC/gClxOWhhxpIfA0rm0LQ79okHZs2y2TJHAhGWyRpUwqqbN6+lXcuvNx9lyYu2+FlWBG5N0yB5AFlHesk015c6VpDRIBVbnlcMb+fXfsm6V9Rd6ZbkriYewRUCqnFmpK/T0zJWnYMpVLtm8vBydaUifDyKUAdzk3aFfuJwWnxl116IbffcQcfff9VYrwKY1QJEaEVJVQCBdEkQaVKU1whAzR8+baHuf3Oe1l/xlmsP/M8zq/XmWhF7DlwkCefeopbbvkG73/X27j0vDUyqwelPSON0k51Ndnd8Cig8+Jl3W7BbQ4goLwpGSUxQTbRZ9Dm6VjS2dzTnVt4eS/K5FF5FVB91VAOjk7Qpk4JOskhaeIjiB0iog0OYDAh23duZ/7Ktewb3TnjIPa0Sor5WhHqbVedJ//pNz/DW99+FWv73fHI13mvlUFJQpYqbGOLhJqdB+D+H/6AP/l/P0F/rThhQqBO8sYlMjx+Ff/4pW/yvbvv5nc/dYMAanxSZHa9pCTRBFldGZLDGgP5EFUalBAJJFFMXzU7/gr70g9DBcFAX18f+w7sJ7ELBI3SnskimWVfaJ+PBNq5cydrz1qLtXbGa9ZMS94pHKw4r45auXodd939KACtRGjbDNgBiSMIXMGOMNQECu648y4uvfgS5tVQpRR0AjWgDxgAZoFa0ov62C++jfNe93o+/Iu/x/4WUqkrFQNJEDCe6MM+eB49Q0EJ1YbxCStGuyKkOZD0SimUU8ZT1o7ssAbq9SrDI6OHxlTq7oqxUQqEFVCaiYkJQoVK7AxrcUyT6RofF2fhfdddw513fY/hNhIbhTa+bLc4PzE6dEuoF9H3P7CRK686C4Orkz5goGIFk7RQaZMgbqPalh5Q73jzSXzs47/M7/z+X3OwjTRwxRBMUFjTvAJ0pJamaA4Mj9Hf09O9l8vLpRe7To67dDNdgEqlwthEI1cyMztc52FcUxA6lZVIgWazOSPNL9K0Z7oGKhpOXQyze6v86zd/REs5Yy33qxtXPleHru7K/uFYBFPIHcebMm1IfTF8nVArOcxRCVxw1gBnnn4a37jthyhgvN3ZEiBvzBFmbWaE7D0wzIL5cw+p+DgT9EILhZUswKQDbFnxTB+f7HhQswGkM6jNtTIwTg9qpiDKxSI1Wk0sM+ulm1afCC6dKQB6Qb3vmjdy6z0bea4JTYuUNKTtNohgU19+QMG+A8OsWLXGwbdAM8anGIkruS1Zpgj0a5itUP2gPnDdJTz04wd4bldTesuozD2ao2JFNLNAFicZ9g+PsWj+POf0eIFB8pPSkRjv7OxD2VOr1RgdbxxeGROnSWdSvC3w/L5R6e3tdUJNqRnV3OElTASlgRTK1nLFuStUywbcfOfuPOfNhCFojTaKVtsd23/gINWq06YUruAjOosHDsBUEOPSIo1YTKtNBeg3qPdf/z6++pWvk+JmAGSzPZ9Dh7RRcEwfa7SY3VdHsgd8Jb3ZRXBLskOS65tGOW/fRKPZAbYKvZ4WAhAszh+zdfd+BgYGiCxSrVZnPPJm2kxPcQEVNA9SBq5/33X8+y3fZLgN4ylu4Y0iREFQdmK5EbtEiawQFeBGj66QBmUSbUizkSwRpRKUxFIGzj11oRoZGWHXvlQ6pf0UqbU+lx7SxOWkJ75iQFYccPuO5xmcN8dtyNNBcF4eHeYSxbhCBLTPdS+eqgQqYYlGs92JW0gLil4QuBIm/kAEPLt9N4ODg5Q1amRsrJNnMEM0/ZkONJsJlCtEzYirLuxndk+Ff/q3H5EapJEA5QpJ4jqjVEY149TVdsGVBQxxnZSqDvrWWauVW+/jdr4WX3311XzttrvoOHkUWoduFyc4pEhQKi6Dbmh0nIHemhtsM2WtTYVfXQvc5y4zUnV1qlKunYktmHGq+3vlsRK/OMjOPfuZPXs2GlcQaaZp2kzXAuVyALqMFcVcUD/9lov55l138+BOkLBzuTT1QQPKgE0IcLXflbjR7p2xKLLkD+vWXR2SbdingQsvWMWPn3iWoaQQtYNGKVd+NGO60h3IJAX2DR9k4bwewrxFr4R4P/JocrmA7kkMrp1xmuZm52GLCXqgMQF27dnH3LkVpYC4/Spq70ZlEHtApRaiW3DdlStZsGABn//KXUyCjFtQAZSMe6a+3iqTrazRsdPWC9d0drYFsUSJw6sJQmJL1mFq7Smn8cDGg3nYkACpZGLUVXkw2n0W5bD8ZitiTr9TQ2YeljmCuSiHvAH/jEZDnEonhVvkkFONb+hoDGKCvGRK8gpEdr4k8d5up7Sd84j+iqUX1Dve+iZ+/PDD3PHIJE3jXCMaUAkM9FaYnJx0+eIF90QG7bpcNNeJxtd/U1qT+lGfWuSaN13C3d/7NuB0iixeTPvarZL6IgXe77P/INT6+51oz0SKfiVm+uHJOUzT7ryAgjw/Uodnew5u295m6YrVeZw8MvO1qaavyFkIy8Z71wBJsYlw2QXzWLxokC/c9B32Q74nW28As2ohY+PjvopilujYYXix5qoxJlfIgsBVbKpo1CmLoLF/F/v2R84gUnTt8ZoHJHjAY9uuBouWLHM6vkoR8Sj4y6lEIVP+H44OI1Lyn4lgTFg45VA0PVMLHnviSU45bT1J7D2Gkr46TBeg0XaGg3P9OX9xOVAMluAdV1/OEzuHuOmeCZogWlzR7AUDFUbGxnM3aqLKuHTmxDNcO5GuApCEkDh/ePH36gV12RmreehH97kGq6md2R118tzWbaxYscK11SiUPZqpTcUPne2ERQQTBgWAyo/QAuOz0PNHHnuCFSvmU/Lb3qXeZTuTNO2ZXquWiJOUQHlxpUOSOKEO6urXL2T2wBy+9o3vMJlCrNx+qbP6a2pkotllZ7rY+czjnvmiLGkUgQlzk7rkgnLRbcuVl17Ag48/Tcs32KTOFLLWgjf5MnF6YP9+5sydRwxEaCaCMg2CTv1o39nCoeVSijMwLR7vClHuFCjrQgtEcr+/8tVxRTxgJBal86193HniNvC24sy0Ruo8c7t27aDfh/alAjZJp8+kadJLuJ4lDEy+9giaShhQp8kig7rhHW9jbP8YN970KGMgYzakBQwuWcnzu7NtM2MmxaFzAMQNsA6ONeUaqdJ5tqzG1WYrhbBk6QL12N6YfRahDSptQBqhjaGNW1K0grQNe3fuYvnyOTRBHtwZyR//6+OyB4fjJykudDuOsFhiYNz6kuGC89sTOwSSjpXh2O+KFblBorskkiP3LAqFInAVo71p2kgs1Xp/Z3fKIIVkQkgmiZULKklKcPdDw3LyuuX0he68tgVJhGCG/YTTZHqmTNi8OEBnJqTUgLdcELJ8do3b79nI1kkwpYAWyMpVa9i6dZ9HxuK8fAlop9aSuuQvOlEz2azVhXsPrlrHk1u9E2+KyM40exPCjue2snCBu9a3f/gw/3zbBh7eDRFIx6wvsKvLqLZe5ZyaoGHzV0cWTEEFRTyaoCjuE58CcWKplsKOH1v8Vbx9nuK2Onv06e2cc9Zp+XmhcUvDTJVJymhaTLd0Cg+QxmDdiHd10pw3a7FB/coH38L2fZN84eZnSHG7FvcP9LJz9x7HUAlyJS5JEmfHFzak7HKV0v3m3LPW89ADG/3TO8gXca1KgdTAnmFk9qx+6v5n23bthqDErd9+lkwJBO1tzwRNQrangyPvGRJLyUI57+opXrDC+2693CAE/l46DwVvtVrM6ylTIXPCCARlhdKU/LEmcP9Dj3DWqWsJQZG6DGefNj6jy/pPsFzYHB/LHBxK3J6nl5zeoy57/UX84L4HeWpPW9ogp52ygk1PPk4EpD5a1JUm80a9mHy/0+KTdQaAa+L6dfN5+onHiDW4kBidKz8Z5v7Ik1s4/bR1RKmfgyakd/YC7rn/QYaahdIvCsQ6pgcU3K/5hnkpWWCjkwm+ZZKjZu48KbRTaVClQjk1nUkvmZiYZNHsChU/zLUuO0tGhZC2CIHRMWjHCQv6K9RIqRl3V6/5HH0vW44sQa7QBHhYFQerIpZe4LqrzqQ1Ocy3H9jCKLB0MQzv3cV47NScQNwmvUq5eJzYumCsokjPO7LwpEvmQNQc5cAYIgZQ2tVr9983QZ7YvJ2T16yi15c9U0GVbbv3YYMaT29L/W5K/gdWXOFDEnS+XBRkjW07ZYtMD7f56LCFy+TlxlQAJnQbCuATWXDtGBkZYeXC2YRpdsyALpMmAqIIgIcfG+e0M06nJ0BViFC0kQRMWKIxwx6X6SNyFEe0IpBOwSEBiARj4ewV8OaLzuCmOzawx7pzliyYw5NbRokAsSlIjNbabwgU+ipV3XZ7Zx11Taz762zeNkRbOVFtAjcXMomz8anNnLpuZSeXrFzBVOu0VYn7H3uWRiajChAu0BVoIWiKRYnyWd350E3itRs1JaPXt74FDA0NsW7lIBXty5ATkBBgTcUpIsD3v3sH5599hu9Tp+dYsZTKddrxzC7qLwGRy6Awv5OSTTAOV3ed7hG1wQD1S9dfzNBYyje+J4TAWaev554HNtICMRonOpXxmmyG0zs4NreMvLKTebFKoNavW83jz27Lt7LVSmO9ordtGEYnmyxe4PQ8BQRhmf55g+wZbXD/k1sZTTt+a4eSuQ2GpMBkm8UJeRHcMcnct5lEyg9KViTRr+GSgSquje0ERkYOsmzh7DxOxuL0oTTQJEqzZeekjB3cz2lryt6KcLJEG00qcLjCES+Hpr+m+9IindHssHTju0VKbs00acziGuqjH/gZbvnGTYxHcP5F5/PI01tpA1msdeZh66yRkC+a2fsCBcCqZYPs3HOAZm4Rk+/O9uQzBzn1tNMpgar7+ru1Wo3RsQkq/fN5+vlRJmxH31bKKacxmlR3r9lO/9DudZgO6+KBQFeefgdCdl6/BJqNRr5xUIZOZBsUH4yRxzZtZe2yBSyooQKFXyrKiIbxZqtTa36GaNpMz9JyVfaQyhfZtRrjO8sqQIWUgHddUWNFH3znO8+yYAFMxopte7NdCp2WnHVomlIwY7ohygyDDoCT1y7hiWe25ILfacrOZXPfffdx8esvxCaujSVg9qx+2nGCBBUaVNjwKBCCbTaxGFIclpB6Lracn4Dn9rflD//mJplQ0Coqee2kI4mAqbujazrhzXHqjOt77tnEeeedQyf6x81+g+uLdgBfveU7fOA912JbvptViUh8xV2Z+YoGL0l77+RjC93qjCO//x5GYJbAB95+KXfe8W2eH4dzL7iY79/3qFvXTYm2F8Fp6rxyL9bIAOivoEwQsmfU3Xmi3SYBDkawZ+cOTl5RoRqA8mJ8oLdCuVIiFoUN6/zo8U0OyKn1kCQdTNv6R6pU3D6q9z2yie89uo0Hnuso7hBidSlvTzt1Zll7ogmJJY4i2u3YQQ9AWHJ7y995551ccenF2dLN6EQqoQ/0bIL8y9cfYf6ipQzOUWqg7ECY1O9tlwLK6FeP6bmyk6nXmeHrgyKcdm/zWTPPoN509mx12smr+YcvfperrlrNPffdz0jaccECU2aOLohKd+1MnGosiYW1J69j0+YJBAjKZdogDz6ynSULZjHY79pRCqBHoWrGInHE4OAgqQp4dNMWxmMEpRHt8sjy/kxi0M7M2n2wyXNjmge2OJeuFWinGimFpLk5CBMRlPtmQ1glLJeolENajSbiodW9IzA6Ms7ShV6sK6j3GNUWZCxC9u1v86MHHuLDH7qOnhIE3imUACg307XWzHQcxUua6ZmTX3KB28l/dIxJQSUoBSULvQY++v43MbJ/F5uemqSnb4BHnm0QabcmpylUzFQhmV2wg8nlfndg/fr1PLVpU14gIQK+def3uOZNl1MG1W5JporRV1YoiVm6dAH1ep3RsUn2jUAjhUCXCHFBnM7FK/nzqNoszMAyntg+TAwiCtLAKV9jjVgsMBYjt353g+wdbUk7hrFxFwNXqVaxyiFs/37bD3jr29/mwCPbye8zCjU2NsYf/eHvcf1172DZ/KygR5rvTZsxJjCKpP1SuPTiND2mF6S5U0IC3ObZYY6VIxaNQvlo9XbLubEX1FGf/Lnr+eZX/4VTTjmNL339WzT8JVvN1MXC5mpZB3uSAgqosMRRm7KGxQsH2Lx5c47EbR2DAyNjnH/GfKpAraKIo4gQy+CsHmqBwQicdfJa4naLJ7dO0hAELCViStan+QQBOBxcxpqWhqrzzK7hHH+fABmOkJ7eUFlcfOfjzz3ProNN0pKm1ltlcrKNWNeuBnDbd+/h4svXO41duS58ZNMB+exf3yh/97m/51c/8THecO4s1SMuh89K0e3sd8UymmSGZ/q00poc+bAVL3ZEh7nIdzPFKXbam15hyWmuYQinLDLqhuvfK//n775EK9XcvwkuWYvM7jEKSUga4wS13i61ONMYlP8UlkokwPKlMHTgQP79zd+6j4suuZyaQqUTLYJ6xdWaSRsM1GtI0qIxPsbVb+zjye8mPPD401x1/tleGW1R1+XcHMM7UpqRpWENI5PtHGC5894dPLFpE//5hqtcKJ+GfZMxjzyznTUrZ5EmUKuXUeIyVb7/4EHOPP9SwhJs2tJg68b7ZMMP72Hh2tO5+LI3cM4pCwhB9YjXiUuA97mLBaMtGk05DLDxzG7/M22HS6ZZZ8t5A2grv+OiJGhp4gSgcz2KgVbkvGvSFi48vZcPf/jDjEXC3//zVzEaGs0URAiyGOduC7hwbydqmm1n98+fP5dntwxLyyIbH9/E5W9YTwCUTVpgYMJAHcTGpO0mp62CBXMHeOzprd6CsJBGgjTJFq1MHzHlCjqs0IwtrdR9u3t4nIeffM5dXsMY0EhDtu8dJcHpKIl1wR/awFe+cTvPbN/DH3/mq9y/4QHWrl3NZ/7Xb6lf+MWf4pRTFgCgrMUkzhuXAUwI6LRFQOxQT6NpNSeny89p0fRmekHbMljvgDmcSe0BW+s0sFrdKYD9ZcU4qCvPrsj4DR/kC1/4PF+74xl++o1raWKolEN/G1/gRKUElLvQsDhJqJUVTeDM09ezafcYu5uaBb19LK8Crdgt5LYN2hDHKZUKqr9aFt0cZQ4LWLtkDhsffYY9TVhQLbmebkwKlX6FMkQeAHS121tMNkaZmICBfmgkIaORct46UAcn4GAjYVzcsRqoVgSqAt/duE9G9u/lIx/5CJef08ts4wJDU+sKPAT+GhWtYWIMqjWSNHAQhliXCOqxOVGayXaGw7oGHk6ZPwS/kcMddDRN8a7zSVgsmaWyuymNosfdSSnQphPS5DX7WgSlEuo9F9UkTN7FP990E61yj7zp4kHmKKiDqpGibNP1TgAqDWinilJZY1UVBVQsauWyQfne4/vYd++D/OwVF7PIopS2bokJhQiLrcxiEmRwziwmRnczl5N46wXrue/hp9m4GdafrgkkVJR0/gziZ1zJWErSoFyBXbvGWNzfR1vVaUtPNthl2x6YsJpxq902m0Bahk0gf/GVu7j+rZfwnnN7VcVLw2I3pgX/Ir09AD5y10J7AsohpIrUQKV/HqOtKHdtuzjbzjzLeJvD5ILHOvQRGf8StHenTWc36N7gLrOk/XBQU0wxgZJE1CzIJLzj0vmce+55/NU/3sjnb36SfUADpEkZTN1lS4iAUZTLOk/uD3BJkCefNJt7Nm7iYEtx6dnzlUp9E5TxHjdxeADQ39uDaU/SC6xaPItKtcq25w86EZ8GTiNTisSDRRoIA40iQSRlop263WhSzfDBEXYMdZIqAUpas+uAD7pQ8NXvHODZ5/fzgWvPUXWxMNmEViuHawMccJSXSFDZoPPass50pwyFdxLocKDcoUiJP/oidv1MR+IcnpR1MU62zfw6KhqD/3D9WZy8dJBbv3kbv/E7/8pje2EE5EASSqLrjE22QDsMYGKsQaASWqMjKKC/DrWy4dKLznednwK6TKIrRFSwlHIteOGCBUy2XG3bZYthcHCQTZufoYVDvlBlhIAkQxWBUlhB0MSp5mDDOli2PcLywTls2jxJExgabjCvJ+CCk1by6IYHGAbZ1kL+/Ws3ccN73u2N7RamXqWlKrkT54U7XDsHjHdqgbPTW63Wkc4+FBaeBh0dpks2giOiyTYL+1BV4JMfvZ7B/lm8+aq38r//7Ct89h8eYDKAYRDVN0AbTSTQ31eDVoN6rxOve0egMTnGkkU9DpcuQaKhoUMiAsQV9sAASwYX0W40cuhz/alr2b51C80UsWEJtO44YfxvymEIVpGKYbTpkhRsPME5Z61l735XMnV4aIhFc2fx+vULGd5zgBT4gz+9iXoY8t63DFINAGISBbrS3dXdThu8yPZHTZB7WCyuvu34+Lg/U+dxOarw6nJFd6Ndh6Wjw3RwSIxR1Os6U/fU+iXwkZ96J3d8+Sv8z//xbnrmzONn/+M/8L9vfITN48gYSKIgSZtQroINSIG/+9zXGBjoY/Oz20GTR/FkYZYKlRU8UosXKCSOaE+6e553+hImR4fYN1yMgXPrrs+IUQ7KTQDFeMPvVacmmD8/JKxElIH2RIvl85czvwd1/pkX8BufvofndqVc+4bLmY0HqoyhaRuuWqw6NGlB0b0228w0KETEDQwMMDQ0dMjvDok9AO+p1ORZukdg/lES7xoxZdABCksZSyWGHlBXXTBLveONl/HZP76Ft799OX/46RsYXL6O3/yDf+L3/uLrPPLs89IyVcYlZG+K3Lc5ll1jMR/9hWt46KEHcxNK0VkrQxIqvvTRknlQDxVR01XJOnk5zO2rsHnLNgc0WWcyBT4wJLBQ0eJ9dzDaiGgD482IWbNmsW71cvYPw/CePZy8ZhkA5543S33whosJw5D3v3MZIag4VQglSrqUeyKLK3NBz82dSs63oZ1uksHZ88sc2LfPeyN1fp18s4C8nGNh1X+R2X5UmJ6iaeoyLSpgy6Rj41RVTCW11DRce/UqFs2dw9/86Q/o1XDFhWX+/Pc/xCVvuJx/+dYGPvDrfyt/ddcB2TACn77xLq647n2sWAxDIwc52HD9U5WUHprUGaXCBIo2xsLS2TCvx9AYHUYDcwJYv2Y5T295riAZQEnqlKsUasYSSoJBMd6MaAI7d7dZsmQRJ6/sYcvjT2PSJqtWOxh4JEH+7cbv8omPXkOlDT04R0lMiSRSlAiOoFw5RmU+9tyVTsfJMn8uDA3vJxKIrXSHbIr/lUxhePb1EfhxVJie+cwtgIKgUgMiaAxJGUtdo/7jz1+oFg0Y/uC3/4nJYdewc06dxSd/6af4T7/xC+wdafHffvsLDO3fz+5d+3jmeVh/1lk8u89yIEIi5YIS3a5NTo1T1jFgdlUzMjbmcG9g9apl7B0eow2SbyKZQb7ism2UMlilmYxcosaOvaPMm+fAprg5yUkrFlF3eLzcdc9jpM29XHYqzCmjdOoUr8km1ENDmuXzqWKn207neLKQFwrMgjF6A2hOjJNYJLWu4GDumMpKgGQwXrZDFkdmOLwkGPYnJ79XWu5pMqUQJQbqZUWaUtMWk2p+9YbXq3+5vSp/8D8/yymnv47LLrkIIxETYyPYHQ/xsbeczTnnncat37+bL/3t99m2Z5jRkUmuu/oSLlqHlCWkrEKVY9eB26Nt3YqFsnvvASyrEODUU0/iG3fczSRZxg4YpYhioATNRJFoQ9MGRGEfd90HcxfNJ8QZCm9/89kqARlpw+13bubee3/M7/z3DxNat8RkJcJqVcC2CErZPJ4CpWY18egwqxQYEEF7oEMBgwvns33HQdavmOWlgXU4SJI6+E+sj2g6ErMtxfl9VJiuxAVECuTbs5rMPvUxZmUToyjznjefrc47+2zZ+Nhz3PGNmwmJOOv0dfzKh69lcI5Tcda//xKGQR45AL/ya38BwN/92QZWLehhzbrVctr6U1izcjEDvqTYouVreG7vVg4KUlHOdBtuWvamUDfOa5ACNvSVK8Masa4gQZ2hRsKjm/Zw3jnn5CxLQL5569384L4HGFi4jk/88ofpNdCjrMr2lw0VdCLW9aEyVQoz3UuAbF13CRMdbKKvt87IRJOYWU6JK24sqKwDs3RnQHWz+FAL/6gwPX8oAZP4zyZBPN6duj0fSVKhbODkeajVl6/kvW9YmYctS+IVraRF2WgiW+KsuXDBSYv59Y9dwmBwCcN7W9z78CP869dvY8e+CdppyKKFqxFtaLZGeP0BWDLgsmYGFq1i815YvAiiGKmHqBRkTGAsDZFKL6heth0YY9Ojz3Luz7yNfXvgrgc286Mf3sbcAeEXP/Jelq9YjAJ6aKkKLQfCK+NrKhuwlY6aXtjpyj2UE83KM158H7nvvIIJzJ01i/1Do8QsyqOSi0mcLlwo7Apt6TC+yPRsCTsau4vIlJcGtCXFkngXqvi21wKH78dxjFBCByqvMZu2oZdxKCtSakyg+fOvPCz1Wi83vGWVCgUi7dyjbWD3OGx6JmHH7v185dbbWLFoLnuf3MDKk0/jqbEK8+bN4c2nzmFJj8YYQ6V3FlKexQ827edvv/0Uo0nIrJ4yA8lB1qhhTppf44wzT+Hcs9dy0qCDW1o4kV5jwmv83vBLPcKOyW2rjBm5V1Jwn5Sm7ZlYsqB8yFiqAsaAL/37BknTlPdf93qqHqsrCZC2XGJ7kkBY9jpNR3g4cy7JvaMZ04/OTIeOOAuKvnLdyVMHJBBiK4jW6LDspl4UEYQl2griEBLdi/H5ZgJcdumZ/OPnbsG8ZRVlTQZzqqZFVlfh1HMC1TxnUO66p5ef+4VrOWf+tWzfC7c9McnGjRsJbMS2Z7eiTZnhiSbjaZXH98fUKrOIkwCiBovmVPjLT11PtQ3lWm4honGKXQmLEbdLpTO1LEolOZScRdt2CdrcG9iBahSZiW7duo7j6fy5c3j48afyoMogOzkj/UI1N+QQ8+3oiXcNKJuP9mwH50y0NRoTVGs1lNaMNdpUTJlqGbQRIMEmAZUAWmlERScYZSlRZuFcaDea7NuLLJ2DEgXlwOW2a68/jDVh3eoVPPdsg0vm19TJC+CxvXXZ1Vfh+mvPpo+zlU9RZBzki9/ZT98u4QcPPo6OxrjiwsuYbVA9NQcCNS1CiiqFbparJAYpgVYkBkATanHPqxyi112JxgeAFjgknps2FZd15Vy/SFBi7pwB9hwYziOI85y/rHbuFH2he00/lI6SnQ6R0rS9SWWwGIlR1pf1tpZapQdJNaTQXytTLoMlIbaWOImoJg3qktCj2wSqhUrGpIpzwLzpqqu4/a4NRLglVYC4OYbEE2igv4o6Ze1qNj+ykRoucWJxP4StUXpByWSTKs7CqAKje7ayYl6NVQt7GOxRnH/KLMqAisfRUUqfRlV8/rgD2gzoFqhOImZKiChNivFm5JRZKHgzq3NUWZDExRiQxojPK5g7bzb79w0RZz8jM3+LRrnOo4QPpe6jRw2G7XiEdOGIf+hCbwRe0Y2jpvPc65AgCClXDOnkKHkWAQpFQhXUBecM8MMHHmYszvJGoVIto0OFpC7A7KTVs9i1cxs6dUvhsvkwMbwbBdTrZQLbcRe3m+OcsqSHy0+Zy/lLq7xuma+OFQaUlPOU5VKzYHKhOrs9O8Y4EVdE3zqkuxwrYeCSeJUrAABBiA4CQgVzBjTDEw1a/hqZeBYVMPXih3fCdLP5qIh3TScFKvc1ZWZHodN04VClVPVhi9mACTE9IdgYJASjlRBQAubUYeGqNfz46RZXnFUhisWlNANaUirAiiUwOj7GgVFk9gCqV0PUmiDG5a+aOMWUDQ1g1569/NQ8eNcZK6nalaoXfGBmSBi6rNRyJlXzP847lmEEL+xT8yNbTBezAFRg3BOLOycE6gbVu2CZPL0dli2DoN1AyjVSpQhSIYviBfIB2eH6oVFJR2WmZzZnd1JyNtIzf/LhfqfJdmt2IlM7hmcvOvufXXnVFdx82zeddhwqGrEveaQcPlcFTl27gkeffo4IJ8qVWIfK4TpbibPTh0cmWDoLBkD1qQQVtbw0CrqeJ5/pCrI92ovfKTrFC4ovsj4oaNRH+i47Xu/vZ7LtdcOSypU655UrytBMgvpLHWb/nKPnZXsZ1CWudDZQnMMhswDPXKcZP7CT4UlXuMyEdSAAXcJa6AN1zsnL+PGjm2j4QsaStPP0YSRBBPYMgy6VmFXJQjIOX6n5aNPgwgUc2LefdmQhy4HPvrSHX8mPRMcF02HKzDLkozsTpXVQl15wBt+56/68zEdKCMoQaldj/qy1i3hmyw4S5bTwSs0VVJAkAqWxGn70412ccZoLtEyjhrt5WDqsJDpapIBliwbZumUzQei8cF3N0br78zHjT38ZlPFZU9jYx4da47+rAJdfeAb3/PBeIpBJnw/fFue8rJBw6rJ+Zco1tgzDgQTqA3MdyqcElKaZwoZ77+UNl5zrlg0tM74R3k9CGli+eCFbNj/jCnAUNQaRXBk8LK8VTC2ndlww3VFny7C8Zo3f3SjAbfazZulstXL1Sr7+rUcIQmdNpX5bcGlNEACXXn4Zt3x7My0FbcIcGo80PPncpKhogjNXeC05cKnKibz6jF+6sMTo8H4iIJaOrib2CNM6P3yo6D8+mC54hcR9zG1UpQnEQZJJNIECrnn71dz7ww0MNdxMFyBCUGEFAS5+/VKeffZZ7tsIQc9cv2Q4rf3uH23kTRefRT+oEpYse/EV2FHjJZECFs5ymvy+ISup6gAwymg62yB0M/hV9afPCHW0Fv8x6HwUKJVd8u/KhWW1fNkiNmzYykTqNXMMqakQAb1lWLJoAf/21W+xePVJrpwXAQcj5NEnnubaN55F2YIhpdl0+WlT6hMeddI4naRWCdg35JIr4kL0lRxmk/gXGqfHD9M9GdzmdSkdnBuJvV6nCYAP/vTb+fdv3MzoWGc5aEIeFn31FWcxtH83a06aTRNXY+7vPv8dbvjZn6FPo8qqDUTUqrWuzn21yAMy6qRVK3hu1x4iXGauwinuKiyR5/fTWfOPRMcd0zO7tfOIKZCgVMDY5ISUgAU9qJ/78M/yR3/0lxwYSWQicmbcaOQ2D/nyF/+N/iBmy6Z9tIH7nzkoixbOZ/nCChUDJC2ImgLWVa58lSlD4RbNn8O2nXvoqLBTaJrL0NFxrc4EZc1UruRwhK9Jl7oKNGLKxAV4YlyQ7TtjPvfXf8LlV1zK0pNOIyj18uUvfhnCKpe981p+9w8/w6qVi6kH8B8+fD2r56AqAqTjrqojIVFaR5sisHT0KStXcvfG5+Ufv3or/+t3PkofWQ1971uX2DcwzJM2ugMxO/P7+GE6eMYnoDRJhn75sl+pKrstR/CeNR8Ql7SRW2+/g6e37maiEXHFhZdx+eVrVQJy14O7eWLbLt5z7fmsDFA1AZIEpWMwMWBoJTWCQL2qTHeyDHaMIj//a5/mb//qv7BIo2r+ewXktfTVizP9GBBeL4EUIM6NZlSmxTstK0qc08ImESYInDJmNFJGvfvaN7qyIzgFyEZQL6GuPmcR55+zSKqAauOiE4KAxCaoOMWEIWHwKqIynjIX9Px+VFCpyc69sGiw830eM/cSrndckBTfiHOAaBISNBEBYeAwiDRNQRJqYYyxMRMTIpn2W8btLddT8u9x+LptuYgdxG3rqUwFFVaxM5gT/nLISTT3f9WatWx6dm9+HHA17/OgjBeHZI8bph9CEqNIiXBZo4DfDqsKNoVoVAId0dfjalOWsKjGOGVckGbSbhPYNn1YBitWoRJILFHkfOIJJXftRFwI2qv3pO7ZvGNu/elnsunpzY69nr9KqRx1m85ifRwxPXvCw3+bj3prnecpCBRJ6mu5AHGbUrVEoNwO3eVy6PZWmRwWJbHbzTgMKHl1PUoTNAHlQOX7wr1q5KWbFVixfCF79uwBOqCRzjJdJXMBZ7P98Ow9btb0XBHJgwaca7VMJ9bSiWZ/nu4F7R2zGtDl/FrlMmQ+8Ep9wHnGy+QuSAPUs/3Mi/d8tUhZN61twCmrYNfubQwdRJYPoJTfzoDUeAy+7dIGw7rHLpQraFOg42imFygPvOhg74dGirhc+Y6f+nDuUU2X61R1Ln8EF/+rR6kLJa0ASxfO5fkDE26DgLiNpAm27euk6IDAKNJ25MKwlXLlsQp0fDL9tUZ+z7owcEw/8+TVbNj4OE3ABjUwdaRep6XLpJTROsR4iRdFEVP3hTjB9OOBFC4sHCCFS84/kw0PPeaqWivNmA3YfABphvjgSeNsPEkQkUMqVpxg+nFAQkdp6zWo9ct7VDOxPDviyrbc9ePN8tuf/QeGBYmAKLUuc4SUcrl8iEZ/gunHC2lIEqGC00JOWncK37tvB5PA/U/v5f6nd9HSfqZnsfD5DrWHXOoEHS+kPQCTJHDxhedy/wM/Zj+weTimZ3AVDaApiMlsTElJ4kNrjJ5g+nFAmQe5FCoQTTmA00+usmP7Frbsgy0H2oy2YsYmXWi2Ar99lcvRmxoHf4LpxwulzrEvylWm7DNwyXlncst3djDUcGXXemoFhS0ogSiUOhSKOcH044RMoEmiGIvLAgoFdcVFZ3P/jx5idLxBraTpUS4HwAFKnVyYqRHSJ5h+XJCDVrO6AwYXCPq602ej0oieaomBUkoPfgetFIqslSlcP8H044YU2hi0T3gtaQfUXH3ZRfRIk/l1lSdhKp8BnWblTY7HDJcTpF1lKescKsZrZRa4+qLFqIM7WDW3SiVLrvLxclb85sNm6tVO0DFPAmgTuK1KbQw2ppGkBKBOWQznrJzHOWsXE+L97j6CThmXvozuRuSOr3Cp1ygJDnQJBVdYV2uGVR0bOPfZxo17WbLAsHpwjgqtgjiCskIwxKnGmO58wBNMPw5IgPEopa9kIBoDY2iZOqMpUjfkm/yFJCirXUxY2e2h1441YXiC6ccl5Snnfr+bVAV5AKTK/3cKCGY13/Mg4sK1TjD9NUgnFLnXIJ1g+muQTjD9NUgnmP4apBNMfw3SCaa/Bun/AhGSeKj1uRM0AAAAAElFTkSuQmCC";
+
+function certificateHtml(opts: {
+  name: string; type: "admission" | "final"; certNo: string;
+  score?: number; issuedAt: string; expiresAt?: string | null;
+}) {
+  const isFinal = opts.type === "final";
+  const title = isFinal ? "Certificat de Réussite" : "Attestation d'Admission";
+  const subtitle = isFinal
+    ? "a complété avec succès l'intégralité du programme MEAL"
+    : "est admis(e) au programme de formation MEAL";
+  const detail = isFinal
+    ? "Les trois projets — KoboCollect, QGIS et Reporting automatisé — ont été menés à terme avec succès, conférant le statut de Super-Expert MEAL."
+    : "Après réussite du test d'admission, l'étudiant(e) est autorisé(e) à suivre la formation par projets DataMEAL Academy.";
+  const issued = new Date(opts.issuedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const expires = opts.expiresAt ? new Date(opts.expiresAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : null;
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${title} — ${opts.name}</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family: Georgia, 'Times New Roman', serif; background:#e5e7eb; }
+  .sheet { width:297mm; height:210mm; background:#fff; margin:0 auto; position:relative; overflow:hidden; }
+  .border-outer { position:absolute; inset:10mm; border:2px solid #0d9488; }
+  .border-inner { position:absolute; inset:13mm; border:1px solid #5eead4; }
+  .corner { position:absolute; width:22mm; height:22mm; border:3px solid #0d9488; }
+  .c-tl{ top:10mm; left:10mm; border-right:0; border-bottom:0;}
+  .c-tr{ top:10mm; right:10mm; border-left:0; border-bottom:0;}
+  .c-bl{ bottom:10mm; left:10mm; border-right:0; border-top:0;}
+  .c-br{ bottom:10mm; right:10mm; border-left:0; border-top:0;}
+  .content { position:absolute; inset:13mm; display:flex; flex-direction:column; align-items:center; text-align:center; padding:10mm 20mm 8mm; }
+  .logo { display:inline-flex; align-items:center; gap:8px; color:#0d9488; font-weight:bold; font-size:15px; letter-spacing:2px; text-transform:uppercase; }
+  .logo-dot { width:10px; height:10px; border-radius:50%; background:#0d9488; }
+  .ttl { font-size:38px; color:#0f766e; margin-top:8mm; font-weight:normal; letter-spacing:1px; }
+  .rule { width:60mm; height:2px; background:#0d9488; margin:6mm 0; }
+  .pre { font-size:15px; color:#555; font-style:italic; }
+  .name { font-size:34px; color:#1e293b; margin:5mm 0; font-weight:bold; border-bottom:1px solid #cbd5e1; padding-bottom:3mm; min-width:120mm; }
+  .sub { font-size:16px; color:#333; margin-bottom:4mm; }
+  .detail { font-size:12px; color:#666; max-width:200mm; line-height:1.7; }
+  .score-badge { margin-top:5mm; display:inline-block; background:#f0fdfa; border:1px solid #5eead4; border-radius:30px; padding:3mm 10mm; color:#0d9488; font-size:14px; font-weight:bold; }
+  .footer { margin-top:auto; width:100%; display:flex; justify-content:space-between; align-items:flex-end; padding:0 6mm; }
+  .sig-block { text-align:center; }
+  .sig-img { height:22mm; margin-bottom:-4mm; }
+  .sig-line { width:60mm; border-top:1px solid #333; padding-top:2mm; font-size:13px; color:#1e293b; font-weight:bold; }
+  .sig-role { font-size:10px; color:#777; font-style:italic; }
+  .meta { text-align:center; font-size:10px; color:#999; }
+  .meta strong { color:#0d9488; font-family:monospace; }
+  .seal { width:30mm; height:30mm; border:2px solid #0d9488; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#0d9488; font-size:9px; text-align:center; line-height:1.3; transform:rotate(-12deg); }
+  @media print { body{background:#fff;} .no-print{display:none;} }
+  .no-print { position:fixed; top:10px; right:10px; }
+  .btn { background:#0d9488; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-size:14px; cursor:pointer; font-family:sans-serif; }
+</style></head><body>
+<div class="no-print"><button class="btn" onclick="window.print()">⬇ Télécharger / Imprimer (PDF)</button></div>
+<div class="sheet">
+  <div class="border-outer"></div><div class="border-inner"></div>
+  <div class="corner c-tl"></div><div class="corner c-tr"></div><div class="corner c-bl"></div><div class="corner c-br"></div>
+  <div class="content">
+    <div class="logo"><span class="logo-dot"></span> DataMEAL Academy</div>
+    <h1 class="ttl">${title}</h1>
+    <div class="rule"></div>
+    <p class="pre">Ce certificat atteste que</p>
+    <div class="name">${opts.name}</div>
+    <p class="sub">${subtitle}</p>
+    <p class="detail">${detail}</p>
+    ${opts.score != null ? `<div class="score-badge">Score : ${opts.score}%</div>` : ""}
+    <div class="footer">
+      <div class="sig-block">
+        <img class="sig-img" src="${SIGNATURE_B64}" alt="signature"/>
+        <div class="sig-line">TATCHIDA Issodo Louis</div>
+        <div class="sig-role">Directeur — DataMEAL Academy</div>
+      </div>
+      <div class="meta">
+        <p>Délivré le ${issued}</p>
+        ${expires ? `<p style="color:#d97706">Valable jusqu'au ${expires}</p>` : ""}
+        <p style="margin-top:3mm">Certificat N° <strong>${opts.certNo}</strong></p>
+      </div>
+      <div class="seal">DATAMEAL<br/>ACADEMY<br/>★ TOGO ★</div>
+    </div>
+  </div>
+</div>
+</body></html>`;
+}
+
+// Certificat d'admission (HTML téléchargeable)
+app.get("/api/academy/certificate/admission", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data: stud } = await supabase.from("students")
+    .select("full_name, admitted_at, admission_expires, entry_score").eq("id", sid).single();
+  if (!stud?.admitted_at) return res.status(403).send("Vous n'êtes pas encore admis(e).");
+  const { data: cert } = await supabase.from("attestations")
+    .select("certificate_no").eq("student_id", sid).eq("cert_type", "admission").maybeSingle();
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(certificateHtml({
+    name: stud.full_name, type: "admission",
+    certNo: cert?.certificate_no || `DMA-ADM-${sid}`,
+    score: Math.round((stud.entry_score ?? 0) / 30 * 100),
+    issuedAt: stud.admitted_at, expiresAt: stud.admission_expires,
+  }));
+});
+
+// Certificat final (HTML téléchargeable)
+app.get("/api/academy/certificate/final", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data: stud } = await supabase.from("students")
+    .select("full_name, final_certificate_no, final_certified_at").eq("id", sid).single();
+  if (!stud?.final_certificate_no) return res.status(403).send("Vous devez terminer les 3 cours pour obtenir le certificat final.");
+  const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
+  const ga = allGrades || [];
+  const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(certificateHtml({
+    name: stud.full_name, type: "final",
+    certNo: stud.final_certificate_no, score: avg, issuedAt: stud.final_certified_at,
+  }));
+});
+
+function finalCertEmailHtml(name: string, certNo: string, avg: number) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Super-Expert MEAL ! 🎓</h1><p class="sub">Vous avez terminé les 3 projets</p></div><div class="bd"><span class="badge">🏆 Certificat final</span><p>Félicitations ${name},</p><p>Vous avez complété l'intégralité du programme DataMEAL Academy — KoboCollect, QGIS et Reporting automatisé. Vous êtes désormais <strong>Super-Expert MEAL</strong>.</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0">Moyenne générale : <strong style="font-size:20px;color:#0d9488">${avg}%</strong></p><p style="margin-top:8px;font-size:12px;color:#6b7280">Certificat N° <span style="font-family:monospace;font-weight:700">${certNo}</span></p></div><p style="text-align:center"><a href="${SITE_URL}/academy/profile" class="btn">Télécharger mon certificat</a></p><p class="muted">Votre certificat A4 est téléchargeable depuis votre profil, signé et prêt à valoriser.</p></div>`);
 }
 
 export default app;
