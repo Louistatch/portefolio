@@ -4,7 +4,7 @@ import { SEO } from "@/components/seo";
 import { Button } from "@/components/ui/button";
 import {
   User, Loader2, Save, Lock, Mail, CheckCircle2, AlertCircle,
-  ArrowLeft, Bell, BellOff,
+  ArrowLeft, Bell, BellOff, Award, Download, FileText, TrendingUp,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn, setStudent, getStudent } from "@/lib/student";
 
@@ -21,11 +21,20 @@ export default function AcademyProfile() {
   const [pwdMsg, setPwdMsg] = useState("");
   const [code, setCode] = useState("");
   const [codeMsg, setCodeMsg] = useState("");
+  const [transcript, setTranscript] = useState<any>(null);
+  const [testStatus, setTestStatus] = useState<any>(null);
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
     (async () => {
-      try { const data = await studentFetch("/api/academy/me").then(r => r.json()); setP(data); }
+      try {
+        const [data, tr, ts] = await Promise.all([
+          studentFetch("/api/academy/me").then(r => r.json()),
+          studentFetch("/api/academy/transcript").then(r => r.json()).catch(() => null),
+          studentFetch("/api/academy/test-status").then(r => r.json()).catch(() => null),
+        ]);
+        setP(data); setTranscript(tr); setTestStatus(ts);
+      }
       finally { setLoading(false); }
     })();
   }, []);
@@ -197,6 +206,74 @@ export default function AcademyProfile() {
       <Button className="gap-2 mb-8" size="lg" onClick={save} disabled={saving}>
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Enregistrer mon profil
       </Button>
+
+      {/* Certificats téléchargeables */}
+      {testStatus?.passed && (
+        <section className="bg-card rounded-2xl border border-border/50 p-6 mb-5">
+          <h2 className="font-semibold mb-4 flex items-center gap-2"><Award className="w-4 h-4 text-primary" /> Mes certificats</h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="border border-border/50 rounded-xl p-4 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium">Attestation d'admission</p>
+                <p className="text-xs text-muted-foreground">{testStatus.admissionExpires ? `Valable jusqu'au ${new Date(testStatus.admissionExpires).toLocaleDateString("fr-FR")}` : "Valable 3 mois"}</p>
+              </div>
+              <a href="/api/academy/certificate/admission" target="_blank" rel="noopener noreferrer">
+                <Button size="sm" variant="outline" className="gap-1.5"><Download className="w-3.5 h-3.5" /> A4</Button>
+              </a>
+            </div>
+            <div className={`border rounded-xl p-4 flex items-center justify-between ${p.final_certificate_no ? "border-primary/40 bg-primary/5" : "border-border/50 opacity-60"}`}>
+              <div>
+                <p className="text-sm font-medium">Certificat final (Super-Expert)</p>
+                <p className="text-xs text-muted-foreground">{p.final_certificate_no ? "Les 3 cours terminés ✓" : "Terminez les 3 cours"}</p>
+              </div>
+              {p.final_certificate_no ? (
+                <a href="/api/academy/certificate/final" target="_blank" rel="noopener noreferrer">
+                  <Button size="sm" className="gap-1.5"><Download className="w-3.5 h-3.5" /> A4</Button>
+                </a>
+              ) : <Button size="sm" variant="outline" disabled><Lock className="w-3.5 h-3.5" /></Button>}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Relevé de notes (transcript) */}
+      {transcript && transcript.grades?.length > 0 && (
+        <section className="bg-card rounded-2xl border border-border/50 p-6 mb-5">
+          <h2 className="font-semibold mb-4 flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> Relevé de notes</h2>
+          <div className="flex items-center gap-4 mb-4 flex-wrap">
+            <div className="bg-primary/10 rounded-xl px-4 py-2">
+              <p className="text-xs text-muted-foreground">Moyenne générale</p>
+              <p className="text-xl font-bold text-primary">{transcript.overall}%</p>
+            </div>
+            {transcript.courseAverages?.map((ca: any) => (
+              <div key={ca.code} className="bg-muted rounded-xl px-3 py-2">
+                <p className="text-xs text-muted-foreground">{ca.code}</p>
+                <p className="text-sm font-bold">{ca.average}%</p>
+              </div>
+            ))}
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-muted-foreground text-xs border-b border-border/50">
+                <tr><th className="text-left py-2">Évaluation</th><th className="text-left py-2 hidden sm:table-cell">Cours</th><th className="text-left py-2">Type</th><th className="text-right py-2">Note</th></tr>
+              </thead>
+              <tbody>
+                {transcript.grades.map((g: any) => {
+                  const pct = Math.round(Number(g.score) / Number(g.max_score) * 100);
+                  return (
+                    <tr key={g.id} className="border-b border-border/30">
+                      <td className="py-2">{g.title}</td>
+                      <td className="py-2 hidden sm:table-cell text-muted-foreground text-xs">{g.sms_courses?.code || "—"}</td>
+                      <td className="py-2"><span className="text-xs bg-muted px-2 py-0.5 rounded-full">{g.type}</span></td>
+                      <td className={`py-2 text-right font-medium ${pct >= 70 ? "text-primary" : pct >= 50 ? "text-amber-600 dark:text-amber-400" : "text-destructive"}`}>{g.score}/{g.max_score} ({pct}%)</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {/* Changement mot de passe */}
       <section className="bg-card rounded-2xl border border-border/50 p-6">
