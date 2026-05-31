@@ -7,6 +7,7 @@ import {
   ArrowRight, Terminal, FileCode2, Layers, ClipboardCheck,
   Star, Cpu, Globe, BarChart3, Download, Send, X, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { SocialShare } from "@/components/social-share";
 import { isStudentLoggedIn, getStudent, studentFetch, getStudentToken } from "@/lib/student";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -283,13 +284,18 @@ export default function ELearning() {
           <p className="text-xl text-muted-foreground font-serif max-w-2xl mb-8 leading-relaxed">
             Une formation gratuite et intensive par projets sur KoboCollect, Python et QGIS pour construire des systèmes de Suivi-Évaluation dans les contextes humanitaires et de développement.
           </p>
-          <div className="flex flex-wrap gap-4">
+          <div className="flex flex-wrap items-center gap-4">
             <Button size="lg" className="gap-2" onClick={startTest}>
               <PlayCircle className="w-5 h-5" /> Passer le test de sélection
             </Button>
             <Button size="lg" variant="outline" className="gap-2" onClick={() => document.getElementById("how")?.scrollIntoView({ behavior: "smooth" })}>
               Comment ça marche <ChevronRight className="w-4 h-4" />
             </Button>
+            <SocialShare
+              url="/elearning"
+              title="Formation MEAL gratuite par projets (KoboCollect, Python, QGIS) — DataMEAL Academy"
+              description="Apprends à construire des systèmes de Suivi-Évaluation pour l'humanitaire et le développement. Formation gratuite, par projets, certifiante. Inscris-toi sur DataMEAL Academy !"
+            />
           </div>
         </div>
 
