@@ -652,9 +652,11 @@ function generateStudentToken(id: number, email: string): string {
 
 function requireStudent(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
-  if (!header?.startsWith("Bearer ")) return res.status(401).json({ message: "Connexion requise" });
+  // Token via header (Bearer) OU via query param (?token=) pour les téléchargements navigateur
+  let token = header?.startsWith("Bearer ") ? header.slice(7) : (req.query.token as string | undefined);
+  if (!token) return res.status(401).json({ message: "Connexion requise" });
   try {
-    const decoded = jwt.verify(header.slice(7), JWT_SECRET) as any;
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
     if (decoded.role !== "student") return res.status(403).json({ message: "Accès réservé aux étudiants" });
     (req as any).student = decoded;
     next();
@@ -852,6 +854,19 @@ app.post("/api/academy/submit-test", requireStudent, async (req, res) => {
       certificate_no: certNo, final_score: Math.round(score / 30 * 100),
       status: "issued", issued_at: now.toISOString(), expires_at: update.admission_expires,
     }).then(() => {}, () => {});
+
+    // Email de félicitations + lien de téléchargement de l'attestation
+    const { data: stAdm } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
+    if (stAdm?.email) {
+      const dlToken = generateStudentToken(sid, stAdm.email);
+      const certUrl = `${SITE_URL}/api/academy/certificate/admission?token=${dlToken}`;
+      sendAcademyEmail({
+        studentId: sid, to: stAdm.email, type: "admission_passed",
+        subject: "🎉 Félicitations — Vous êtes admis(e) à DataMEAL Academy !",
+        html: admissionPassedEmailHtml(stAdm.full_name, Math.round(score / 30 * 100), update.admission_expires, certUrl),
+        dedupeKey: `admission:${sid}`,
+      });
+    }
   }
 
   res.json({
@@ -1694,6 +1709,13 @@ app.get("/api/academy/certificate/final", requireStudent, async (req, res) => {
 
 function finalCertEmailHtml(name: string, certNo: string, avg: number) {
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Super-Expert MEAL ! 🎓</h1><p class="sub">Vous avez terminé les 3 projets</p></div><div class="bd"><span class="badge">🏆 Certificat final</span><p>Félicitations ${name},</p><p>Vous avez complété l'intégralité du programme DataMEAL Academy — KoboCollect, QGIS et Reporting automatisé. Vous êtes désormais <strong>Super-Expert MEAL</strong>.</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0">Moyenne générale : <strong style="font-size:20px;color:#0d9488">${avg}%</strong></p><p style="margin-top:8px;font-size:12px;color:#6b7280">Certificat N° <span style="font-family:monospace;font-weight:700">${certNo}</span></p></div><p style="text-align:center"><a href="${SITE_URL}/academy/profile" class="btn">Télécharger mon certificat</a></p><p class="muted">Votre certificat A4 est téléchargeable depuis votre profil, signé et prêt à valoriser.</p></div>`);
+}
+
+
+// ── Email : admission réussie (félicitations + lien attestation) ──
+function admissionPassedEmailHtml(name: string, scorePct: number, expiresIso: string, certUrl: string) {
+  const expires = new Date(expiresIso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Félicitations, ${name.split(" ")[0]} ! 🎉</h1><p class="sub">Vous êtes officiellement admis(e)</p></div><div class="bd"><span class="badge">✅ Admission confirmée</span><p>Bonjour ${name},</p><p>Excellente nouvelle : vous avez réussi le test d'admission avec un score de <strong style="color:#0d9488">${scorePct}%</strong> et êtes désormais admis(e) au programme <strong>DataMEAL Academy</strong> !</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0;font-size:14px">Votre attestation d'admission est prête</p><p style="margin-top:6px;font-size:12px;color:#6b7280">Valable jusqu'au ${expires}</p></div><p style="text-align:center"><a href="${certUrl}" class="btn">📄 Télécharger mon attestation (A4)</a></p><ul class="steps"><li><span class="n">1</span><span>Une leçon se débloque chaque semaine, dès aujourd'hui</span></li><li><span class="n">2</span><span>Vous avez une semaine par leçon (sinon recalé)</span></li><li><span class="n">3</span><span>Terminez les 3 projets pour décrocher le certificat final de Super-Expert MEAL</span></li></ul><p class="muted">Votre attestation est aussi téléchargeable à tout moment depuis votre profil. Bonne formation !</p></div>`);
 }
 
 export default app;
