@@ -297,11 +297,18 @@ function CredentialCard({ cred }: { cred: Cred }) {
           {cred.score != null && <p className="text-xs font-semibold" style={{ color: cred.color }}>Score {cred.score}%</p>}
           <p className="text-[10px] text-muted-foreground truncate">{issued}</p>
         </div>
-        {cred.download_url && (
-          <a href={`${cred.download_url}`} target="_blank" rel="noopener noreferrer">
-            <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs"><Download className="w-3.5 h-3.5" /> PDF</Button>
-          </a>
-        )}
+        <div className="flex gap-1.5">
+          {cred.certificate_no && (
+            <a href={`/academy/verify-certificate/${cred.certificate_no}`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="ghost" className="gap-1.5 h-8 text-xs px-2" title="Page de vérification publique"><ShieldCheck className="w-3.5 h-3.5" /></Button>
+            </a>
+          )}
+          {cred.download_url && (
+            <a href={`${cred.download_url}`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs"><Download className="w-3.5 h-3.5" /> PDF</Button>
+            </a>
+          )}
+        </div>
       </div>
       {cred.certificate_no && (
         <div className="px-5 pb-3"><p className="text-[9px] font-mono text-muted-foreground/60">N° {cred.certificate_no}</p></div>
