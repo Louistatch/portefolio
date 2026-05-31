@@ -721,13 +721,22 @@ app.post("/api/academy/register", async (req, res) => {
   const verifyCode = String(Math.floor(100000 + Math.random() * 900000)); // code 6 chiffres
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
 
-  const { data, error } = await supabase.from("students")
+  let { data, error } = await supabase.from("students")
     .insert({
       full_name, email, password_hash: hash, phone, country, organization,
       entry_score: 0, status: "pending_test",
       email_verified: false, verify_token: verifyToken, verify_code: verifyCode, verify_expires: verifyExpires,
     })
     .select("id, full_name, email, status, email_verified").single();
+
+  // Fallback : si la migration des colonnes de vérification n'est pas encore appliquée,
+  // on crée le compte sans ces colonnes (le compte n'est pas bloqué).
+  if (error && /verify_|email_verified|column/i.test(error.message)) {
+    const retry = await supabase.from("students")
+      .insert({ full_name, email, password_hash: hash, phone, country, organization, entry_score: 0, status: "pending_test" })
+      .select("id, full_name, email, status").single();
+    data = retry.data as any; error = retry.error;
+  }
   if (error) return res.status(400).json({ message: error.message });
 
   // Email de validation
@@ -802,7 +811,9 @@ app.post("/api/academy/submit-test", requireStudent, async (req, res) => {
 
   // Vérifier le délai de re-tentative (1 semaine après échec)
   const { data: stud } = await supabase.from("students")
-    .select("admitted_at, next_test_allowed, test_attempts, status").eq("id", sid).single();
+    .select("admitted_at, next_test_allowed, test_attempts, status, email_verified").eq("id", sid).single();
+  if (stud && stud.email_verified === false)
+    return res.status(403).json({ message: "Vérifiez votre adresse email avant de passer le test.", needVerification: true });
   if (stud?.admitted_at) {
     return res.status(403).json({ message: "Vous êtes déjà admis(e). Le test ne peut pas être repassé.", alreadyAdmitted: true });
   }
@@ -881,7 +892,7 @@ app.post("/api/academy/submit-test", requireStudent, async (req, res) => {
 app.get("/api/academy/test-status", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data } = await supabase.from("students")
-    .select("entry_score, status, admitted_at, admission_expires, next_test_allowed, test_attempts").eq("id", sid).single();
+    .select("entry_score, status, admitted_at, admission_expires, next_test_allowed, test_attempts, email_verified").eq("id", sid).single();
   const { data: test } = await supabase.from("grades")
     .select("score, graded_at").eq("student_id", sid).eq("type", "entry_test").maybeSingle();
   const canRetry = !data?.next_test_allowed || new Date(data.next_test_allowed) <= new Date();
@@ -895,6 +906,7 @@ app.get("/api/academy/test-status", requireStudent, async (req, res) => {
     nextTestAllowed: data?.next_test_allowed ?? null,
     canRetry,
     attempts: data?.test_attempts ?? 0,
+    emailVerified: data?.email_verified !== false,
   });
 });
 
@@ -1122,8 +1134,9 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const { course_id, lesson_id, score } = req.body;
   if (!course_id || !lesson_id) return res.status(400).json({ message: "course_id et lesson_id requis" });
 
-  // Vérifier l'admission
-  const { data: stud } = await supabase.from("students").select("admitted_at, admission_expires").eq("id", sid).single();
+  // Vérifier l'email + l'admission
+  const { data: stud } = await supabase.from("students").select("admitted_at, admission_expires, email_verified").eq("id", sid).single();
+  if (stud && stud.email_verified === false) return res.status(403).json({ message: "Vérifiez votre adresse email pour accéder aux cours.", needVerification: true });
   if (!stud?.admitted_at) return res.status(403).json({ message: "Vous devez réussir le test d'admission pour accéder aux cours." });
   if (stud.admission_expires && new Date(stud.admission_expires) < new Date())
     return res.status(403).json({ message: "Votre période d'admission (3 mois) a expiré. Repassez le test d'admission." });
@@ -1307,6 +1320,79 @@ app.get("/api/academy/my-attestations", requireStudent, async (req, res) => {
     .select("*, sms_courses(code, title)").eq("student_id", sid).order("requested_at", { ascending: false });
   if (error) return res.status(500).json({ message: error.message });
   res.json(data);
+});
+
+// ── Portefeuille de credentials (style Credly) : toutes les attestations stockées ──
+app.get("/api/academy/my-credentials", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data: stud } = await supabase.from("students")
+    .select("full_name, admitted_at, admission_expires, final_certificate_no, final_certified_at, entry_score").eq("id", sid).single();
+  const { data: atts } = await supabase.from("attestations")
+    .select("*, sms_courses(code, title)").eq("student_id", sid);
+
+  const dlToken = generateStudentToken(sid, (req as any).student.email);
+  const credentials: any[] = [];
+
+  // Attestation d'admission
+  if (stud?.admitted_at) {
+    const adm = (atts || []).find((a: any) => a.cert_type === "admission");
+    const expired = stud.admission_expires && new Date(stud.admission_expires) < new Date();
+    credentials.push({
+      id: "admission",
+      type: "admission",
+      title: "Attestation d'admission",
+      subtitle: "Programme MEAL — DataMEAL Academy",
+      issued_at: stud.admitted_at,
+      expires_at: stud.admission_expires,
+      status: expired ? "expired" : "active",
+      certificate_no: adm?.certificate_no || null,
+      score: Math.round((stud.entry_score ?? 0) / 30 * 100),
+      download_url: `/api/academy/certificate/admission?token=${dlToken}`,
+      skills: ["MEAL", "Collecte de données", "Méthodologie"],
+      color: "#0d9488",
+    });
+  }
+
+  // Certificat final (Super-Expert)
+  if (stud?.final_certificate_no) {
+    const fin = (atts || []).find((a: any) => a.cert_type === "final");
+    credentials.push({
+      id: "final",
+      type: "final",
+      title: "Certificat Super-Expert MEAL",
+      subtitle: "Les 3 projets complétés — KoboCollect · QGIS · Pipeline",
+      issued_at: stud.final_certified_at,
+      expires_at: null,
+      status: "active",
+      certificate_no: stud.final_certificate_no,
+      score: fin?.final_score ?? null,
+      download_url: `/api/academy/certificate/final?token=${dlToken}`,
+      skills: ["KoboCollect", "QGIS", "Python", "Automatisation", "Reporting MEAL"],
+      color: "#7c3aed",
+    });
+  }
+
+  // Attestations par cours (si émises)
+  for (const a of (atts || [])) {
+    if (a.cert_type === "course" && a.status === "issued") {
+      credentials.push({
+        id: `course-${a.id}`,
+        type: "course",
+        title: `Attestation — ${a.sms_courses?.title || "Cours"}`,
+        subtitle: a.sms_courses?.code || "",
+        issued_at: a.issued_at,
+        expires_at: a.expires_at,
+        status: "active",
+        certificate_no: a.certificate_no,
+        score: a.final_score ?? null,
+        download_url: null,
+        skills: [],
+        color: "#2563eb",
+      });
+    }
+  }
+
+  res.json({ holder: stud?.full_name || "", credentials });
 });
 
 
