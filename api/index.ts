@@ -1701,74 +1701,132 @@ function certificateHtml(opts: {
 }) {
   const isFinal = opts.type === "final";
   const title = isFinal ? "Certificat de Réussite" : "Attestation d'Admission";
+  const kicker = isFinal ? "SUPER-EXPERT MEAL" : "PROGRAMME MEAL · ADMISSION";
   const subtitle = isFinal
-    ? "a complété avec succès l'intégralité du programme MEAL"
-    : "est admis(e) au programme de formation MEAL";
-  const detail = isFinal
-    ? "Les trois projets — KoboCollect, QGIS et Reporting automatisé — ont été menés à terme avec succès, conférant le statut de Super-Expert MEAL."
-    : "Après réussite du test d'admission, l'étudiant(e) est autorisé(e) à suivre la formation par projets DataMEAL Academy.";
+    ? "a complété avec succès l'intégralité du parcours par projets et démontré sa maîtrise opérationnelle du cycle MEAL."
+    : "est admis(e) au programme de formation MEAL par projets de DataMEAL Academy.";
   const issued = new Date(opts.issuedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const expires = opts.expiresAt ? new Date(opts.expiresAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : null;
+
+  // Les 3 projets + ce qu'ils permettent de faire
+  const courses = [
+    { code: "01", t: "KoboCollect", v: "Concevoir & déployer des enquêtes terrain" },
+    { code: "02", t: "QGIS", v: "Cartographier & analyser les données spatiales" },
+    { code: "03", t: "Pipeline MEAL", v: "Automatiser le reporting de bout en bout" },
+  ];
+  const coursesHtml = courses.map(c => `
+    <div class="course">
+      <div class="course-num">${c.code}</div>
+      <div class="course-txt"><strong>${c.t}</strong><span>${c.v}</span></div>
+    </div>`).join("");
+  const skillsLine = isFinal
+    ? "Compétences certifiées : collecte numérique de données, cartographie SIG, analyse Python, automatisation et reporting pour le suivi-évaluation humanitaire et de développement."
+    : "Parcours couvrant la collecte de données (KoboCollect), la cartographie (QGIS) et l'automatisation du reporting MEAL.";
+
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${title} — ${opts.name}</title>
 <style>
   @page { size: A4 landscape; margin: 0; }
   * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family: Georgia, 'Times New Roman', serif; background:#e5e7eb; }
+  body { font-family: 'Helvetica Neue', Arial, sans-serif; background:#cbd5e1; }
   .sheet { width:297mm; height:210mm; background:#fff; margin:0 auto; position:relative; overflow:hidden; }
-  .border-outer { position:absolute; inset:10mm; border:2px solid #0d9488; }
-  .border-inner { position:absolute; inset:13mm; border:1px solid #5eead4; }
-  .corner { position:absolute; width:22mm; height:22mm; border:3px solid #0d9488; }
-  .c-tl{ top:10mm; left:10mm; border-right:0; border-bottom:0;}
-  .c-tr{ top:10mm; right:10mm; border-left:0; border-bottom:0;}
-  .c-bl{ bottom:10mm; left:10mm; border-right:0; border-top:0;}
-  .c-br{ bottom:10mm; right:10mm; border-left:0; border-top:0;}
-  .content { position:absolute; inset:13mm; display:flex; flex-direction:column; align-items:center; text-align:center; padding:10mm 20mm 8mm; }
-  .logo { display:inline-flex; align-items:center; gap:8px; color:#0d9488; font-weight:bold; font-size:15px; letter-spacing:2px; text-transform:uppercase; }
-  .logo-dot { width:10px; height:10px; border-radius:50%; background:#0d9488; }
-  .ttl { font-size:38px; color:#0f766e; margin-top:8mm; font-weight:normal; letter-spacing:1px; }
-  .rule { width:60mm; height:2px; background:#0d9488; margin:6mm 0; }
-  .pre { font-size:15px; color:#555; font-style:italic; }
-  .name { font-size:34px; color:#1e293b; margin:5mm 0; font-weight:bold; border-bottom:1px solid #cbd5e1; padding-bottom:3mm; min-width:120mm; }
-  .sub { font-size:16px; color:#333; margin-bottom:4mm; }
-  .detail { font-size:12px; color:#666; max-width:200mm; line-height:1.7; }
-  .score-badge { margin-top:5mm; display:inline-block; background:#f0fdfa; border:1px solid #5eead4; border-radius:30px; padding:3mm 10mm; color:#0d9488; font-size:14px; font-weight:bold; }
-  .footer { margin-top:auto; width:100%; display:flex; justify-content:space-between; align-items:flex-end; padding:0 6mm; }
-  .sig-block { text-align:center; }
-  .sig-img { height:22mm; margin-bottom:-4mm; }
-  .sig-line { width:60mm; border-top:1px solid #333; padding-top:2mm; font-size:13px; color:#1e293b; font-weight:bold; }
-  .sig-role { font-size:10px; color:#777; font-style:italic; }
-  .meta { text-align:center; font-size:10px; color:#999; }
-  .meta strong { color:#0d9488; font-family:monospace; }
-  .seal { width:30mm; height:30mm; border:2px solid #0d9488; border-radius:50%; display:flex; align-items:center; justify-content:center; color:#0d9488; font-size:9px; text-align:center; line-height:1.3; transform:rotate(-12deg); }
+  /* fond SVG moderne */
+  .bg { position:absolute; inset:0; z-index:0; }
+  .frame { position:absolute; inset:7mm; border:1.5px solid rgba(13,148,136,.25); border-radius:4mm; z-index:1; }
+  .content { position:absolute; inset:7mm; z-index:2; display:flex; flex-direction:column; padding:13mm 16mm 10mm; }
+  .top { display:flex; justify-content:space-between; align-items:flex-start; }
+  .brand { display:flex; align-items:center; gap:9px; }
+  .brand-logo { width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#0d9488,#0f766e); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:17px; }
+  .brand-txt b { font-size:15px; color:#0f172a; letter-spacing:.5px; display:block; }
+  .brand-txt span { font-size:9px; color:#64748b; letter-spacing:2px; }
+  .kicker { font-size:9px; font-weight:700; letter-spacing:3px; color:#0d9488; background:#f0fdfa; border:1px solid #99f6e4; padding:4px 11px; border-radius:20px; }
+  .head { margin-top:9mm; }
+  .ttl { font-size:42px; font-weight:800; color:#0f172a; letter-spacing:-.5px; line-height:1; }
+  .ttl em { color:#0d9488; font-style:normal; }
+  .pre { font-size:12px; color:#64748b; margin-top:5mm; letter-spacing:.5px; }
+  .name { font-family:Georgia,serif; font-size:38px; color:#0f766e; font-weight:bold; margin-top:2mm; }
+  .name-rule { width:78mm; height:2px; background:linear-gradient(90deg,#0d9488,transparent); margin-top:2.5mm; }
+  .sub { font-size:13px; color:#334155; margin-top:4mm; max-width:165mm; line-height:1.6; }
+  /* 3 cours */
+  .courses { display:flex; gap:5mm; margin-top:6mm; }
+  .course { flex:1; display:flex; align-items:center; gap:7px; background:#f8fafc; border:1px solid #e2e8f0; border-left:3px solid #0d9488; border-radius:7px; padding:7px 9px; }
+  .course-num { font-size:15px; font-weight:800; color:#0d9488; opacity:.5; }
+  .course-txt { display:flex; flex-direction:column; }
+  .course-txt strong { font-size:12px; color:#0f172a; }
+  .course-txt span { font-size:8.5px; color:#64748b; line-height:1.3; }
+  .skills { font-size:9.5px; color:#94a3b8; margin-top:4mm; max-width:200mm; line-height:1.5; font-style:italic; }
+  /* footer */
+  .footer { margin-top:auto; display:flex; justify-content:space-between; align-items:flex-end; }
+  .sig { text-align:center; }
+  .sig img { height:19mm; margin-bottom:-3mm; }
+  .sig-name { border-top:1.5px solid #0f172a; padding-top:2mm; font-size:12px; font-weight:700; color:#0f172a; min-width:62mm; }
+  .sig-role { font-size:9px; color:#64748b; margin-top:1px; }
+  .sig-role b { color:#0d9488; }
+  .meta { text-align:center; font-size:9px; color:#94a3b8; line-height:1.7; }
+  .meta .valid { color:#d97706; font-weight:600; }
+  .meta .no { font-family:monospace; color:#0d9488; font-weight:700; }
+  .meta .site { color:#0d9488; font-weight:600; }
+  .badge-seal { width:30mm; height:30mm; position:relative; }
+  ${opts.score != null ? '.score { position:absolute; top:13mm; right:16mm; text-align:center; z-index:3; }\n  .score-ring { width:20mm; height:20mm; border-radius:50%; border:2.5px solid #0d9488; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f0fdfa; }\n  .score-ring b { font-size:17px; color:#0d9488; font-weight:800; line-height:1; }\n  .score-ring span { font-size:7px; color:#64748b; letter-spacing:1px; }' : ''}
   @media print { body{background:#fff;} .no-print{display:none;} }
-  .no-print { position:fixed; top:10px; right:10px; }
-  .btn { background:#0d9488; color:#fff; border:none; padding:10px 20px; border-radius:8px; font-size:14px; cursor:pointer; font-family:sans-serif; }
+  .no-print { position:fixed; top:12px; right:12px; z-index:99; }
+  .btn { background:#0d9488; color:#fff; border:none; padding:11px 22px; border-radius:9px; font-size:14px; cursor:pointer; font-weight:600; box-shadow:0 4px 14px rgba(13,148,136,.4); }
 </style></head><body>
-<div class="no-print"><button class="btn" onclick="window.print()">⬇ Télécharger / Imprimer (PDF)</button></div>
+<div class="no-print"><button class="btn" onclick="window.print()">⬇ Télécharger en PDF</button></div>
 <div class="sheet">
-  <div class="border-outer"></div><div class="border-inner"></div>
-  <div class="corner c-tl"></div><div class="corner c-tr"></div><div class="corner c-bl"></div><div class="corner c-br"></div>
+  <svg class="bg" viewBox="0 0 297 210" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#0d9488" stop-opacity="0.06"/><stop offset="1" stop-color="#0d9488" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="g2" x1="0" y1="1" x2="1" y2="0">
+        <stop offset="0" stop-color="#7c3aed" stop-opacity="${isFinal ? '0.07' : '0'}"/><stop offset="1" stop-color="#0d9488" stop-opacity="0.05"/>
+      </linearGradient>
+    </defs>
+    <rect width="297" height="210" fill="#ffffff"/>
+    <path d="M0 0 L120 0 L0 95 Z" fill="url(#g1)"/>
+    <path d="M297 210 L180 210 L297 110 Z" fill="url(#g2)"/>
+    <circle cx="268" cy="34" r="55" fill="none" stroke="#0d9488" stroke-opacity="0.05" stroke-width="14"/>
+    <path d="M0 170 Q75 150 150 175 T297 168" fill="none" stroke="#0d9488" stroke-opacity="0.08" stroke-width="1"/>
+  </svg>
+  <div class="frame"></div>
+  ${opts.score != null ? `<div class="score"><div class="score-ring"><b>${opts.score}%</b><span>SCORE</span></div></div>` : ""}
   <div class="content">
-    <div class="logo"><span class="logo-dot"></span> DataMEAL Academy</div>
-    <h1 class="ttl">${title}</h1>
-    <div class="rule"></div>
-    <p class="pre">Ce certificat atteste que</p>
-    <div class="name">${opts.name}</div>
-    <p class="sub">${subtitle}</p>
-    <p class="detail">${detail}</p>
-    ${opts.score != null ? `<div class="score-badge">Score : ${opts.score}%</div>` : ""}
+    <div class="top">
+      <div class="brand">
+        <div class="brand-logo">D</div>
+        <div class="brand-txt"><b>DataMEAL Academy</b><span>FORMATION MEAL · AFRIQUE DE L'OUEST</span></div>
+      </div>
+      <div class="kicker">${kicker}</div>
+    </div>
+    <div class="head">
+      <div class="ttl">${isFinal ? '<em>Certificat</em> de Réussite' : "<em>Attestation</em> d'Admission"}</div>
+      <p class="pre">CE DOCUMENT CERTIFIE QUE</p>
+      <div class="name">${opts.name}</div>
+      <div class="name-rule"></div>
+      <p class="sub">${subtitle}</p>
+    </div>
+    <div class="courses">${coursesHtml}</div>
+    <p class="skills">${skillsLine}</p>
     <div class="footer">
-      <div class="sig-block">
-        <img class="sig-img" src="${SIGNATURE_B64}" alt="signature"/>
-        <div class="sig-line">TATCHIDA Issodo Louis</div>
-        <div class="sig-role">Directeur — DataMEAL Academy</div>
+      <div class="sig">
+        <img src="${SIGNATURE_B64}" alt="signature"/>
+        <div class="sig-name">TATCHIDA Issodo Louis</div>
+        <div class="sig-role"><b>Ingénieur Agritech &amp; Data Science</b> · Finance agricole · Consultant</div>
       </div>
       <div class="meta">
         <p>Délivré le ${issued}</p>
-        ${expires ? `<p style="color:#d97706">Valable jusqu'au ${expires}</p>` : ""}
-        <p style="margin-top:3mm">Certificat N° <strong>${opts.certNo}</strong></p>
+        ${expires ? `<p class="valid">Valable jusqu'au ${expires}</p>` : `<p class="valid">Certification permanente</p>`}
+        <p>Certificat N° <span class="no">${opts.certNo}</span></p>
+        <p class="site">louisfarm.com/academy</p>
       </div>
-      <div class="seal">DATAMEAL<br/>ACADEMY<br/>★ TOGO ★</div>
+      <svg class="badge-seal" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="50" cy="50" r="46" fill="none" stroke="#0d9488" stroke-width="2"/>
+        <circle cx="50" cy="50" r="38" fill="none" stroke="#0d9488" stroke-width="0.8" stroke-dasharray="2 2"/>
+        <circle cx="50" cy="50" r="30" fill="#0d9488"/>
+        <text x="50" y="46" font-size="9" font-weight="bold" fill="#fff" text-anchor="middle" font-family="Arial">DATAMEAL</text>
+        <text x="50" y="57" font-size="7" fill="#fff" text-anchor="middle" font-family="Arial">★ TOGO ★</text>
+        <text x="50" y="14" font-size="6" fill="#0d9488" text-anchor="middle" font-family="Arial" font-weight="bold">CERTIFIÉ</text>
+      </svg>
     </div>
   </div>
 </div>
