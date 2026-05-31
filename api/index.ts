@@ -1567,10 +1567,49 @@ app.post("/api/admin/academy/test-email", requireAuth, async (req, res) => {
 
 app.get("/api/admin/academy/students", requireAuth, async (_req, res) => {
   const { data, error } = await supabase.from("students")
-    .select("id, full_name, email, phone, country, organization, entry_score, status, created_at")
+    .select("id, full_name, email, phone, country, organization, entry_score, status, created_at, email_verified, admitted_at, admission_expires, final_certificate_no, test_attempts, last_login")
     .order("created_at", { ascending: false });
   if (error) return res.status(500).json({ message: error.message });
   res.json(data);
+});
+
+// ── Action de gestion sur un étudiant (admin) ──
+app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { action } = req.body;
+  const now = new Date();
+  try {
+    if (action === "verify_email") {
+      await supabase.from("students").update({ email_verified: true, verify_token: null, verify_code: null }).eq("id", id);
+    } else if (action === "admit") {
+      // Admission manuelle : génère admission + planning hebdo + inscription
+      const expires = new Date(now.getFullYear(), now.getMonth() + 3, now.getDate()).toISOString();
+      await supabase.from("students").update({ admitted_at: now.toISOString(), admission_expires: expires, status: "active", email_verified: true, next_test_allowed: null }).eq("id", id);
+      const { data: courses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
+      if (courses?.length) {
+        const { data: existing } = await supabase.from("enrollments").select("course_id").eq("student_id", id);
+        const already = new Set((existing || []).map((e: any) => e.course_id));
+        const toAdd = courses.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: id, course_id: co.id, started_at: now.toISOString() }));
+        if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
+      }
+      const certNo = `DMA-ADM-${id}-${Date.now().toString(36).toUpperCase()}`;
+      await supabase.from("attestations").insert({ student_id: id, course_id: courses?.[0]?.id ?? null, cert_type: "admission", certificate_no: certNo, status: "issued", issued_at: now.toISOString(), expires_at: expires }).then(() => {}, () => {});
+      await generateLessonSchedule(id, now);
+    } else if (action === "reset_test") {
+      // Réinitialise le test (permet de repasser immédiatement)
+      await supabase.from("students").update({ next_test_allowed: null, last_test_at: null }).eq("id", id);
+    } else if (action === "revoke_admission") {
+      await supabase.from("students").update({ admitted_at: null, admission_expires: null, status: "pending_test" }).eq("id", id);
+      await supabase.from("lesson_progress").delete().eq("student_id", id).then(() => {}, () => {});
+    } else if (action === "delete") {
+      await supabase.from("students").delete().eq("id", id);
+    } else {
+      return res.status(400).json({ message: "Action inconnue" });
+    }
+    res.json({ message: "Action effectuée", action });
+  } catch (e: any) {
+    res.status(500).json({ message: e?.message || "Erreur" });
+  }
 });
 
 app.get("/api/admin/academy/students/:id", requireAuth, async (req, res) => {
