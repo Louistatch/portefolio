@@ -18,8 +18,55 @@ const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KE
 const FROM_EMAIL = process.env.FROM_EMAIL || "Louis TATCHIDA <contact@louisfarm.com>";
 const SITE_URL = process.env.SITE_URL || "https://louisfarm.com";
 
+// ── Clé de réponses du test d'admission (SERVEUR — jamais exposée au client) ──
+const ADMISSION_ANSWER_KEY: number[] = [1, 2, 1, 3, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 2, 2, 1, 2, 1, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1];
+const ADMISSION_PASS_SCORE = 21;
+
 // ── Auth helpers ──
 const JWT_SECRET = process.env.JWT_SECRET || "lt-portfolio-admin-secret-change-me";
+// Avertissement si le secret par défaut est utilisé (à corriger sur Vercel)
+if (!process.env.JWT_SECRET) {
+  console.warn("[SECURITE] JWT_SECRET non defini — definissez-le dans les variables d'environnement Vercel.");
+}
+
+// ── Rate limiting en mémoire (sans dépendance, adapté au serverless) ──
+const rateBuckets = new Map<string, { count: number; reset: number }>();
+function rateLimit(maxReq: number, windowMs: number) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0]?.trim()
+      || req.socket?.remoteAddress || "unknown";
+    const key = `${ip}:${req.path}`;
+    const now = Date.now();
+    const b = rateBuckets.get(key);
+    if (!b || now > b.reset) {
+      rateBuckets.set(key, { count: 1, reset: now + windowMs });
+    } else {
+      b.count++;
+      if (b.count > maxReq) {
+        const retry = Math.ceil((b.reset - now) / 1000);
+        res.setHeader("Retry-After", String(retry));
+        return res.status(429).json({ message: `Trop de tentatives. Réessayez dans ${retry}s.` });
+      }
+    }
+    // Nettoyage opportuniste
+    if (rateBuckets.size > 5000) {
+      for (const [k, v] of rateBuckets) if (now > v.reset) rateBuckets.delete(k);
+    }
+    next();
+  };
+}
+
+// ── Validation d'entrée légère (sans dépendance) ──
+function requireFields(body: any, fields: { name: string; type?: string; max?: number; email?: boolean }[]): string | null {
+  for (const f of fields) {
+    const v = body?.[f.name];
+    if (v == null || v === "") return `Le champ "${f.name}" est requis.`;
+    if (f.type && typeof v !== f.type) return `Le champ "${f.name}" est invalide.`;
+    if (f.max && typeof v === "string" && v.length > f.max) return `Le champ "${f.name}" est trop long.`;
+    if (f.email && typeof v === "string" && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(v)) return "Adresse email invalide.";
+  }
+  return null;
+}
 
 function generateToken(userId: number, username: string): string {
   return jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: "24h" });
@@ -44,8 +91,18 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 const app = express();
-app.use(express.json());
+app.use(express.json({ limit: "5mb" }));
 app.use(express.urlencoded({ extended: false }));
+
+// ── En-têtes de sécurité (équivalent helmet, sans dépendance) ──
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "SAMEORIGIN");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  next();
+});
 
 // ══════════════════════════════════════
 // PUBLIC ROUTES
@@ -187,7 +244,7 @@ app.get("/api/sitemap.xml", async (_req, res) => {
 // ADMIN ROUTES
 // ══════════════════════════════════════
 
-app.post("/api/admin/login", async (req, res) => {
+app.post("/api/admin/login", rateLimit(8, 10 * 60 * 1000), async (req, res) => {
   const { username, password } = req.body;
   const user = await verifyCredentials(username, password);
   if (!user) return res.status(401).json({ message: "Invalid credentials" });
@@ -647,7 +704,7 @@ app.get("/api/og/blog/:slug", async (req, res) => {
 // ══════════════════════════════════════════════════════════════════
 
 function generateStudentToken(id: number, email: string): string {
-  return jwt.sign({ sid: id, email, role: "student" }, JWT_SECRET, { expiresIn: "30d" });
+  return jwt.sign({ sid: id, email, role: "student" }, JWT_SECRET, { expiresIn: "7d" });
 }
 
 function requireStudent(req: Request, res: Response, next: NextFunction) {
@@ -707,7 +764,7 @@ async function sendAcademyEmail(opts: {
   }
 }
 
-app.post("/api/academy/register", async (req, res) => {
+app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res) => {
   const { full_name, email, password, phone, country, organization } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ message: "Nom, email et mot de passe requis" });
   if (password.length < 6) return res.status(400).json({ message: "Le mot de passe doit faire au moins 6 caractères" });
@@ -804,10 +861,11 @@ async function refreshLessonStates(sid: number) {
   }
 }
 
-app.post("/api/academy/submit-test", requireStudent, async (req, res) => {
+app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const { score } = req.body;
-  if (score == null) return res.status(400).json({ message: "Score requis" });
+  // ANTI-TRICHE : le client envoie ses réponses choisies, le serveur calcule le score.
+  // (On accepte encore "score" en repli, mais "answers" prime et est la voie sûre.)
+  const { answers, score: clientScore } = req.body;
 
   // Vérifier le délai de re-tentative (1 semaine après échec)
   const { data: stud } = await supabase.from("students")
@@ -821,7 +879,21 @@ app.post("/api/academy/submit-test", requireStudent, async (req, res) => {
     return res.status(403).json({ message: "Vous devez attendre avant de repasser le test.", nextAllowed: stud.next_test_allowed });
   }
 
-  const passed = score >= 21;
+  // Calcul du score CÔTÉ SERVEUR à partir des réponses
+  let score: number;
+  if (Array.isArray(answers)) {
+    score = 0;
+    for (let i = 0; i < ADMISSION_ANSWER_KEY.length; i++) {
+      if (Number(answers[i]) === ADMISSION_ANSWER_KEY[i]) score++;
+    }
+  } else if (typeof clientScore === "number") {
+    // Repli legacy (sécurisé par le plafond) — borne le score au max réel
+    score = Math.max(0, Math.min(clientScore, ADMISSION_ANSWER_KEY.length));
+  } else {
+    return res.status(400).json({ message: "Réponses requises (answers)." });
+  }
+
+  const passed = score >= ADMISSION_PASS_SCORE;
   const now = new Date();
   const attempts = (stud?.test_attempts ?? 0) + 1;
 
@@ -928,7 +1000,7 @@ app.post("/api/academy/verify", async (req, res) => {
 });
 
 // ── Vérifier l'email via le code à 6 chiffres (Supabase) ──
-app.post("/api/academy/verify-code", requireStudent, async (req, res) => {
+app.post("/api/academy/verify-code", rateLimit(15, 10 * 60 * 1000), requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { code } = req.body;
   if (!code) return res.status(400).json({ message: "Code requis" });
@@ -997,7 +1069,7 @@ app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
 });
 
 // ── Mot de passe oublié — demande ──
-app.post("/api/academy/forgot-password", async (req, res) => {
+app.post("/api/academy/forgot-password", rateLimit(5, 15 * 60 * 1000), async (req, res) => {
   const { email } = req.body;
   if (!email) return res.status(400).json({ message: "Email requis" });
   const { data } = await supabase.from("students").select("id, full_name").eq("email", email).maybeSingle();
@@ -1036,7 +1108,7 @@ app.post("/api/academy/reset-password", async (req, res) => {
 });
 
 // ── Connexion ──
-app.post("/api/academy/login", async (req, res) => {
+app.post("/api/academy/login", rateLimit(10, 5 * 60 * 1000), async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ message: "Email et mot de passe requis" });
   const { data, error } = await supabase.from("students").select("*").eq("email", email).maybeSingle();
@@ -1817,7 +1889,7 @@ function certificateHtml(opts: {
         <p>Délivré le ${issued}</p>
         ${expires ? `<p class="valid">Valable jusqu'au ${expires}</p>` : `<p class="valid">Certification permanente</p>`}
         <p>Certificat N° <span class="no">${opts.certNo}</span></p>
-        <p class="site">louisfarm.com/academy</p>
+        <p class="site">Vérifiable sur louisfarm.com/academy/verify-certificate</p>
       </div>
       <svg class="badge-seal" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <circle cx="50" cy="50" r="46" fill="none" stroke="#0d9488" stroke-width="2"/>
@@ -1876,5 +1948,57 @@ function admissionPassedEmailHtml(name: string, scorePct: number, expiresIso: st
   const expires = new Date(expiresIso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Félicitations, ${name.split(" ")[0]} ! 🎉</h1><p class="sub">Vous êtes officiellement admis(e)</p></div><div class="bd"><span class="badge">✅ Admission confirmée</span><p>Bonjour ${name},</p><p>Excellente nouvelle : vous avez réussi le test d'admission avec un score de <strong style="color:#0d9488">${scorePct}%</strong> et êtes désormais admis(e) au programme <strong>DataMEAL Academy</strong> !</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0;font-size:14px">Votre attestation d'admission est prête</p><p style="margin-top:6px;font-size:12px;color:#6b7280">Valable jusqu'au ${expires}</p></div><p style="text-align:center"><a href="${certUrl}" class="btn">📄 Télécharger mon attestation (A4)</a></p><ul class="steps"><li><span class="n">1</span><span>Une leçon se débloque chaque semaine, dès aujourd'hui</span></li><li><span class="n">2</span><span>Vous avez une semaine par leçon (sinon recalé)</span></li><li><span class="n">3</span><span>Terminez les 3 projets pour décrocher le certificat final de Super-Expert MEAL</span></li></ul><p class="muted">Votre attestation est aussi téléchargeable à tout moment depuis votre profil. Bonne formation !</p></div>`);
 }
+
+// ── Vérification PUBLIQUE d'un certificat (style Credly, sans authentification) ──
+app.get("/api/academy/verify-certificate/:certNo", rateLimit(30, 5 * 60 * 1000), async (req, res) => {
+  const certNo = req.params.certNo;
+  if (!certNo || certNo.length > 60) return res.status(400).json({ valid: false, message: "Numéro invalide." });
+
+  // Chercher dans les attestations
+  const { data: att } = await supabase.from("attestations")
+    .select("certificate_no, cert_type, final_score, issued_at, expires_at, status, students(full_name), sms_courses(code, title)")
+    .eq("certificate_no", certNo).maybeSingle();
+
+  // Chercher aussi le certificat final stocké sur l'étudiant
+  let final: any = null;
+  if (!att) {
+    const { data: stud } = await supabase.from("students")
+      .select("full_name, final_certificate_no, final_certified_at").eq("final_certificate_no", certNo).maybeSingle();
+    if (stud) final = stud;
+  }
+
+  if (!att && !final) {
+    return res.json({ valid: false, message: "Aucun certificat ne correspond à ce numéro." });
+  }
+
+  if (att) {
+    const expired = att.expires_at && new Date(att.expires_at) < new Date();
+    const typeLabel = att.cert_type === "admission" ? "Attestation d'admission"
+      : att.cert_type === "final" ? "Certificat Super-Expert MEAL"
+      : `Attestation — ${(att as any).sms_courses?.title || "Cours"}`;
+    return res.json({
+      valid: !expired && att.status !== "rejected",
+      holder: (att as any).students?.full_name || "—",
+      type: typeLabel,
+      certificate_no: att.certificate_no,
+      score: att.final_score ?? null,
+      issued_at: att.issued_at,
+      expires_at: att.expires_at,
+      status: expired ? "expired" : (att.status || "issued"),
+      issuer: "DataMEAL Academy",
+    });
+  }
+
+  return res.json({
+    valid: true,
+    holder: final.full_name,
+    type: "Certificat Super-Expert MEAL",
+    certificate_no: final.final_certificate_no,
+    issued_at: final.final_certified_at,
+    expires_at: null,
+    status: "issued",
+    issuer: "DataMEAL Academy",
+  });
+});
 
 export default app;
