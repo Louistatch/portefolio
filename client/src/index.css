@@ -120,3 +120,31 @@
     transform: translateY(0);
   }
 }
+
+/* ──────────────────────────────────────────────
+   Correctif anti-artefacts GPU (bandes/résidus de
+   rendu sur certains navigateurs mobiles Android)
+   Force une composition de couches propre pour les
+   éléments à dégradé, flou ou coins arrondis.
+   ────────────────────────────────────────────── */
+.bg-gradient-to-br,
+.bg-gradient-to-r,
+.backdrop-blur,
+[class*="backdrop-blur"] {
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  transform: translateZ(0);
+}
+
+/* Évite que les conteneurs arrondis laissent des résidus de rendu */
+.rounded-3xl,
+.rounded-2xl {
+  -webkit-transform: translateZ(0);
+}
+
+/* Lissage des polices, réduit le "texte brouillé" résiduel */
+html {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
