@@ -5,8 +5,9 @@ import type {
   ToastProps,
 } from "@/components/ui/toast"
 
-const TOAST_LIMIT = 1
-const TOAST_REMOVE_DELAY = 1000000
+const TOAST_LIMIT = 3
+const TOAST_REMOVE_DELAY = 400          // délai d'animation de sortie
+const TOAST_AUTO_DISMISS = 4000         // disparition automatique après 4 s
 
 type ToasterToast = ToastProps & {
   id: string
@@ -54,6 +55,7 @@ interface State {
 }
 
 const toastTimeouts = new Map<string, ReturnType<typeof setTimeout>>()
+const autoDismissTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
 const addToRemoveQueue = (toastId: string) => {
   if (toastTimeouts.has(toastId)) {
@@ -69,6 +71,22 @@ const addToRemoveQueue = (toastId: string) => {
   }, TOAST_REMOVE_DELAY)
 
   toastTimeouts.set(toastId, timeout)
+}
+
+// Programme la disparition automatique d'un toast après TOAST_AUTO_DISMISS
+const scheduleAutoDismiss = (toastId: string, ms = TOAST_AUTO_DISMISS) => {
+  if (autoDismissTimers.has(toastId)) return
+  const t = setTimeout(() => {
+    autoDismissTimers.delete(toastId)
+    dispatch({ type: "DISMISS_TOAST", toastId })
+  }, ms)
+  autoDismissTimers.set(toastId, t)
+}
+
+// Annule le minuteur (ex : si l'utilisateur ferme manuellement)
+const clearAutoDismiss = (toastId: string) => {
+  const t = autoDismissTimers.get(toastId)
+  if (t) { clearTimeout(t); autoDismissTimers.delete(toastId) }
 }
 
 export const reducer = (state: State, action: Action): State => {
@@ -93,9 +111,11 @@ export const reducer = (state: State, action: Action): State => {
       // ! Side effects ! - This could be extracted into a dismissToast() action,
       // but I'll keep it here for simplicity
       if (toastId) {
+        clearAutoDismiss(toastId)
         addToRemoveQueue(toastId)
       } else {
         state.toasts.forEach((toast) => {
+          clearAutoDismiss(toast.id)
           addToRemoveQueue(toast.id)
         })
       }
@@ -160,6 +180,10 @@ function toast({ ...props }: Toast) {
       },
     },
   })
+
+  // Disparition automatique après quelques secondes (durée personnalisable via props.duration)
+  const ms = typeof (props as any).duration === "number" ? (props as any).duration : TOAST_AUTO_DISMISS
+  scheduleAutoDismiss(id, ms)
 
   return {
     id: id,
