@@ -267,6 +267,29 @@ export default function AdminStudents() {
                   </div>
                 )}
 
+                {/* Diplômes téléchargeables */}
+                {detail.certificates?.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5"><Award className="w-4 h-4 text-primary" /> Diplômes téléchargeables</h3>
+                    <div className="space-y-2">
+                      {detail.certificates.map((cert: any) => (
+                        <div key={cert.type} className={`flex items-center justify-between gap-2 rounded-xl border p-3 ${cert.type === "final" ? "border-purple-300 bg-purple-50 dark:bg-purple-900/15 dark:border-purple-900/40" : "border-primary/30 bg-primary/5"}`}>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            {cert.type === "final" ? <Trophy className="w-5 h-5 text-purple-500 shrink-0" /> : <Award className="w-5 h-5 text-primary shrink-0" />}
+                            <div className="min-w-0">
+                              <p className="text-sm font-medium truncate">{cert.label}</p>
+                              {cert.expires_at && <p className="text-[11px] text-muted-foreground">Valable jusqu'au {new Date(cert.expires_at).toLocaleDateString("fr-FR")}</p>}
+                            </div>
+                          </div>
+                          <a href={cert.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
+                            <Button size="sm" className="gap-1.5 h-8"><Download className="w-3.5 h-3.5" /> Ouvrir</Button>
+                          </a>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Relevé de notes */}
                 <div>
                   <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5"><BookOpen className="w-4 h-4 text-primary" /> Relevé de notes ({studentGrades.length})</h3>
