@@ -5,8 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   GraduationCap, User, Award, BookOpen, Loader2, CheckCircle2, Clock,
   Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
-  Sparkles, TrendingUp, Calendar, AlertCircle,
-} from "lucide-react";
+  Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
 
 interface Cred { id: string; type: string; title: string; subtitle: string; issued_at: string; expires_at: string | null; status: string; certificate_no: string | null; score: number | null; download_url: string | null; skills: string[]; color: string; }
@@ -20,24 +19,26 @@ export default function AcademyDashboard() {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [transcript, setTranscript] = useState<any>(null);
   const [creds, setCreds] = useState<Cred[]>([]);
+  const [meetings, setMeetings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
     (async () => {
       try {
-        const [e, ts, ac, sch, tr, cr] = await Promise.all([
+        const [e, ts, ac, sch, tr, cr, mt] = await Promise.all([
           studentFetch("/api/academy/my-enrollments").then(r => r.json()).catch(() => []),
           studentFetch("/api/academy/test-status").then(r => r.json()).catch(() => null),
           fetch("/api/academy/courses").then(r => r.json()).catch(() => []),
           studentFetch("/api/academy/lesson-schedule").then(r => r.json()).catch(() => []),
           studentFetch("/api/academy/transcript").then(r => r.json()).catch(() => null),
           studentFetch("/api/academy/my-credentials").then(r => r.json()).catch(() => null),
+          studentFetch("/api/academy/meetings").then(r => r.json()).catch(() => null),
         ]);
         setEnrollments(Array.isArray(e) ? e : []);
         setTestStatus(ts); setAllCourses(Array.isArray(ac) ? ac : []);
         setSchedule(Array.isArray(sch) ? sch : []); setTranscript(tr);
-        setCreds(cr?.credentials || []);
+        setCreds(cr?.credentials || []); setMeetings(mt?.meetings || []);
       } finally { setLoading(false); }
     })();
   }, []);
@@ -116,6 +117,42 @@ export default function AcademyDashboard() {
           </div>
         ))}
       </div>
+
+      {/* ───── Rencontres en ligne à venir ───── */}
+      {meetings.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-4"><Video className="w-5 h-5 text-primary" /> Rencontres en ligne</h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {meetings.map((m: any) => {
+              const start = new Date(m.starts_at);
+              const isWebinar = m.kind === "webinar";
+              const isLive = m.status === "live";
+              const soon = start.getTime() - Date.now() < 15 * 60 * 1000 && start.getTime() - Date.now() > -m.duration_min * 60 * 1000;
+              const canJoin = isLive || soon;
+              return (
+                <div key={m.id} className={`bg-card rounded-2xl border p-4 ${isLive ? "border-primary/50 ring-1 ring-primary/20" : "border-border/50"}`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isWebinar ? "bg-purple-500/10 text-purple-600" : "bg-primary/10 text-primary"}`}>
+                      {isWebinar ? <Radio className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{m.title}</p>
+                        {isLive && <span className="text-[9px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded animate-pulse shrink-0">● LIVE</span>}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">{start.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} · {start.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {isWebinar ? "Webinaire" : "Interactive"}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" className="w-full mt-3 gap-1.5" variant={canJoin ? "default" : "outline"}
+                    onClick={() => navigate(`/academy/live/${m.id}`)}>
+                    <Video className="w-3.5 h-3.5" /> {canJoin ? "Rejoindre maintenant" : "Voir les détails"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ───── Portefeuille de credentials (style Credly) ───── */}
       {creds.length > 0 && (
