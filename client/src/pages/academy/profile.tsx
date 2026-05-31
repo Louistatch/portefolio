@@ -21,6 +21,7 @@ export default function AcademyProfile() {
   const [pwdMsg, setPwdMsg] = useState("");
   const [code, setCode] = useState("");
   const [codeMsg, setCodeMsg] = useState("");
+  const [fallbackCode, setFallbackCode] = useState<string | null>(null);
   const [transcript, setTranscript] = useState<any>(null);
   const [testStatus, setTestStatus] = useState<any>(null);
 
@@ -34,6 +35,10 @@ export default function AcademyProfile() {
           studentFetch("/api/academy/test-status").then(r => r.json()).catch(() => null),
         ]);
         setP(data); setTranscript(tr); setTestStatus(ts);
+        if (data && data.email_verified === false) {
+          studentFetch("/api/academy/my-verify-code").then(r => r.json())
+            .then(vc => { if (vc?.code) setFallbackCode(vc.code); }).catch(() => {});
+        }
       }
       finally { setLoading(false); }
     })();
@@ -81,9 +86,19 @@ export default function AcademyProfile() {
   }
 
   async function resendVerify() {
-    await studentFetch("/api/academy/resend-verify", { method: "POST" });
-    setMsg("Email de validation renvoyé ✓");
-    setTimeout(() => setMsg(""), 3000);
+    setCodeMsg("");
+    try {
+      const res = await studentFetch("/api/academy/resend-verify", { method: "POST" });
+      const data = await res.json();
+      if (data.emailSent) {
+        setCodeMsg("Email de validation envoyé ✓ (vérifiez vos spams)");
+        setFallbackCode(null);
+      } else {
+        // Email indisponible : on affiche le code directement
+        setFallbackCode(data.fallbackCode || null);
+        setCodeMsg("L'email n'a pas pu être envoyé. Utilisez le code affiché ci-dessous.");
+      }
+    } catch { setCodeMsg("Erreur, réessayez."); }
   }
 
   async function verifyCode() {
@@ -133,6 +148,13 @@ export default function AcademyProfile() {
             <p className="text-sm font-medium text-amber-700 dark:text-amber-300">Votre email n'est pas encore vérifié</p>
           </div>
           <p className="text-sm text-amber-700/80 dark:text-amber-400/70 mb-3">Entrez le code à 6 chiffres reçu par email, ou cliquez sur le lien dans l'email.</p>
+          {fallbackCode && (
+            <div className="bg-white dark:bg-slate-900/40 border border-amber-300 dark:border-amber-800 rounded-xl p-3 mb-3 text-center">
+              <p className="text-xs text-muted-foreground mb-1">📩 L'email n'arrive pas ? Voici votre code :</p>
+              <p className="text-2xl font-bold font-mono tracking-[0.3em] text-primary">{fallbackCode}</p>
+              <button onClick={() => setCode(fallbackCode!)} className="text-xs text-primary hover:underline mt-1">Remplir automatiquement</button>
+            </div>
+          )}
           <div className="flex gap-2 flex-wrap">
             <input value={code} onChange={e => setCode(e.target.value)} placeholder="123456" maxLength={6}
               className="w-32 px-3 py-2 rounded-xl border border-amber-300 dark:border-amber-800 bg-background text-sm font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-amber-400/30" />
