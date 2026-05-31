@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { SEO } from "@/components/seo";
 import { Button } from "@/components/ui/button";
+import { SocialShare } from "@/components/social-share";
 import {
   GraduationCap, User, Award, BookOpen, Loader2, CheckCircle2, Clock,
   Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
@@ -241,13 +242,20 @@ export default function AcademyDashboard() {
                         <p className="text-[11px] text-muted-foreground mt-1">{prog}% complété</p>
                       </div>
                     )}
-                    <Button size="sm" variant={enr ? "default" : "outline"} className="w-full gap-1.5"
-                      disabled={!testStatus?.passed}
-                      onClick={() => navigate(`/academy/classroom/${co.id}`)}>
-                      {!testStatus?.passed ? <><Lock className="w-3.5 h-3.5" /> Test requis</> :
-                       enr ? <>{prog > 0 ? "Continuer" : "Commencer"} <ChevronRight className="w-3.5 h-3.5" /></> :
-                       <>Ouvrir <ChevronRight className="w-3.5 h-3.5" /></>}
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button size="sm" variant={enr ? "default" : "outline"} className="flex-1 gap-1.5"
+                        disabled={!testStatus?.passed}
+                        onClick={() => navigate(`/academy/classroom/${co.id}`)}>
+                        {!testStatus?.passed ? <><Lock className="w-3.5 h-3.5" /> Test requis</> :
+                         enr ? <>{prog > 0 ? "Continuer" : "Commencer"} <ChevronRight className="w-3.5 h-3.5" /></> :
+                         <>Ouvrir <ChevronRight className="w-3.5 h-3.5" /></>}
+                      </Button>
+                      <SocialShare
+                        url="/elearning"
+                        title={`${co.title} — Formation MEAL gratuite | DataMEAL Academy`}
+                        description={`${co.description || "Formation par projets"} — Rejoins DataMEAL Academy, une formation MEAL gratuite et certifiante. Inscris-toi !`}
+                      />
+                    </div>
                   </div>
                 </div>
               );
