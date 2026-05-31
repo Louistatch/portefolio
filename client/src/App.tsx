@@ -27,6 +27,7 @@ import AcademyVerify from "@/pages/academy/verify";
 import AcademyForgotPassword from "@/pages/academy/forgot-password";
 import AcademyResetPassword from "@/pages/academy/reset-password";
 import AcademyProfile from "@/pages/academy/profile";
+import VerifyCertificate from "@/pages/academy/verify-certificate";
 
 // Admin
 import AdminLogin from "@/pages/admin/login";
@@ -86,6 +87,8 @@ function App() {
             <Route path="/academy/forgot-password">{() => <Layout><AcademyForgotPassword /></Layout>}</Route>
             <Route path="/academy/reset-password">{() => <Layout><AcademyResetPassword /></Layout>}</Route>
             <Route path="/academy/profile">{() => <Layout><AcademyProfile /></Layout>}</Route>
+            <Route path="/academy/verify-certificate/:certNo">{() => <Layout><VerifyCertificate /></Layout>}</Route>
+            <Route path="/academy/verify-certificate">{() => <Layout><VerifyCertificate /></Layout>}</Route>
 
             {/* Public routes */}
             <Route path="/">{() => <Layout><Home /></Layout>}</Route>
