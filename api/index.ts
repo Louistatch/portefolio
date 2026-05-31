@@ -953,7 +953,9 @@ app.get("/api/academy/my-verify-code", requireStudent, async (req, res) => {
   res.json({
     email_verified: data?.email_verified ?? false,
     has_code: !!data?.verify_code,
+    code: data?.email_verified ? null : (data?.verify_code ?? null),
     expires: data?.verify_expires ?? null,
+    resendConfigured: !!resend,
   });
 });
 
@@ -970,15 +972,28 @@ app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   await supabase.from("students").update({ verify_token: verifyToken, verify_code: verifyCode, verify_expires: verifyExpires }).eq("id", sid);
 
+  let emailSent = false, emailError: string | null = null;
   if (resend) {
     const verifyUrl = `${SITE_URL}/academy/verify?token=${verifyToken}`;
-    resend.emails.send({
-      from: FROM_EMAIL, to: data.email,
-      subject: "Confirmez votre inscription — DataMEAL Academy",
-      html: verifyEmailHtml(data.full_name, verifyUrl, verifyCode),
-    }).then(() => logAcademyEmail(sid, "verify", data.email, "Confirmez votre inscription")).catch(() => {});
+    try {
+      const r: any = await resend.emails.send({
+        from: FROM_EMAIL, to: data.email,
+        subject: "Confirmez votre inscription — DataMEAL Academy",
+        html: verifyEmailHtml(data.full_name, verifyUrl, verifyCode),
+      });
+      if (r?.error) { emailError = r.error?.message || String(r.error); }
+      else { emailSent = true; await logAcademyEmail(sid, "verify", data.email, "Confirmez votre inscription"); }
+    } catch (e: any) { emailError = e?.message || String(e); }
+  } else {
+    emailError = "Service email non configuré";
   }
-  res.json({ message: "Email de validation renvoyé", emailSent: !!resend });
+  // Filet de sécurité : si l'email n'est pas parti, on renvoie le code pour l'afficher dans l'app
+  res.json({
+    message: emailSent ? "Email de validation renvoyé" : "Email indisponible — utilisez le code ci-dessous",
+    emailSent,
+    fallbackCode: emailSent ? null : verifyCode,
+    emailError,
+  });
 });
 
 // ── Mot de passe oublié — demande ──
