@@ -1878,11 +1878,29 @@ function certificateHtml(opts: {
   .meta .site { color:#0d9488; font-weight:600; }
   .badge-seal { width:30mm; height:30mm; position:relative; }
   ${opts.score != null ? '.score { position:absolute; top:13mm; right:16mm; text-align:center; z-index:3; }\n  .score-ring { width:20mm; height:20mm; border-radius:50%; border:2.5px solid #0d9488; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f0fdfa; }\n  .score-ring b { font-size:17px; color:#0d9488; font-weight:800; line-height:1; }\n  .score-ring span { font-size:7px; color:#64748b; letter-spacing:1px; }' : ''}
-  @media print { body{background:#fff;} .no-print{display:none;} }
-  .no-print { position:fixed; top:12px; right:12px; z-index:99; }
-  .btn { background:#0d9488; color:#fff; border:none; padding:11px 22px; border-radius:9px; font-size:14px; cursor:pointer; font-weight:600; box-shadow:0 4px 14px rgba(13,148,136,.4); }
+  @media print { body{background:#fff;} .no-print{display:none;} .sheet{box-shadow:none;} }
+  .no-print { position:fixed; top:0; left:0; right:0; z-index:99; background:#0f172a; color:#fff; padding:12px 16px; display:flex; align-items:center; justify-content:center; gap:16px; flex-wrap:wrap; box-shadow:0 2px 12px rgba(0,0,0,.2); font-family:system-ui,sans-serif; }
+  .no-print .hint { font-size:13px; color:#cbd5e1; }
+  .no-print .hint b { color:#5eead4; }
+  .btn { background:#0d9488; color:#fff; border:none; padding:12px 26px; border-radius:10px; font-size:15px; cursor:pointer; font-weight:700; box-shadow:0 4px 14px rgba(13,148,136,.5); display:inline-flex; align-items:center; gap:8px; }
+  .btn:hover { background:#0f766e; }
+  body { padding-top:56px; }
+  @media print { body { padding-top:0; } }
 </style></head><body>
-<div class="no-print"><button class="btn" onclick="window.print()">⬇ Télécharger en PDF</button></div>
+<div class="no-print">
+  <span class="hint">Pour enregistrer votre attestation, cliquez sur le bouton et choisissez <b>« Enregistrer au format PDF »</b></span>
+  <button class="btn" onclick="window.print()">⬇ Télécharger / Imprimer en PDF</button>
+</div>
+<script>
+  // Empêche le "Ctrl+S / Enregistrer la page" qui produit un fichier .mht inutilisable :
+  // on intercepte et on lance l'impression PDF à la place.
+  document.addEventListener('keydown', function(e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') {
+      e.preventDefault();
+      window.print();
+    }
+  });
+</script>
 <div class="sheet">
   <svg class="bg" viewBox="0 0 297 210" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
