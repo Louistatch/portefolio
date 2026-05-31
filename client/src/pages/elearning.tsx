@@ -203,6 +203,9 @@ export default function ELearning() {
 
   // ── SUBMIT TEST (étudiant authentifié — score enregistré sur son compte)
   async function submitTest() {
+    // Le score est calculé CÔTÉ SERVEUR (anti-triche). On envoie les réponses choisies.
+    const answerArray = QUESTIONS.map((_, i) => (answers[i] ?? -1));
+    // Estimation locale provisoire (affichée en attendant la réponse serveur)
     let s = 0;
     QUESTIONS.forEach((q, i) => { if (answers[i] === q.ans) s++; });
     setScore(s);
@@ -210,11 +213,11 @@ export default function ELearning() {
     try {
       const res = await studentFetch("/api/academy/submit-test", {
         method: "POST",
-        body: JSON.stringify({ score: s }),
+        body: JSON.stringify({ answers: answerArray }),
       });
       const data = await res.json();
       setSubmitResult(data);
-      // rafraîchir le statut
+      if (typeof data.score === "number") setScore(data.score); // score officiel serveur
       studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
     } catch (e) { /* géré par studentFetch */ }
   }
