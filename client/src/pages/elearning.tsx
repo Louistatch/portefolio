@@ -7,7 +7,7 @@ import {
   ArrowRight, Terminal, FileCode2, Layers, ClipboardCheck,
   Star, Cpu, Globe, BarChart3, Download, Send, X, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { isStudentLoggedIn, getStudent, studentFetch } from "@/lib/student";
+import { isStudentLoggedIn, getStudent, studentFetch, getStudentToken } from "@/lib/student";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type View = "landing" | "test" | "test-result" | "dashboard" | "notebook" | "cert";
@@ -493,7 +493,7 @@ export default function ELearning() {
           {passed
             ? <>
                 <Button size="lg" className="gap-2" onClick={() => navigate("/academy/dashboard")}><GraduationCap className="w-4 h-4" /> Accéder à mes cours</Button>
-                <a href="/api/academy/certificate/admission" target="_blank" rel="noopener noreferrer">
+                <a href={`/api/academy/certificate/admission?token=${getStudentToken()}`} target="_blank" rel="noopener noreferrer">
                   <Button size="lg" variant="outline" className="gap-2"><Download className="w-4 h-4" /> Mon attestation</Button>
                 </a>
               </>
