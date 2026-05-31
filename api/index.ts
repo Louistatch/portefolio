@@ -2040,4 +2040,98 @@ app.get("/api/academy/verify-certificate/:certNo", rateLimit(30, 5 * 60 * 1000),
   });
 });
 
+function meetingEmailHtml(name: string, title: string, startsAt: string, kind: string) {
+  const when = new Date(startsAt).toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" });
+  const label = kind === "webinar" ? "webinaire" : "rencontre interactive";
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>📅 DATAMEAL ACADEMY</span></div><h1>Rencontre en ligne planifiée</h1><p class="sub">${label}</p></div><div class="bd"><p>Bonjour ${name},</p><p>Une nouvelle ${label} est programmée :</p><div class="info" style="border-color:#5eead4;background:#f0fdfa"><p style="margin:0;font-size:15px;font-weight:700;color:#0d9488">${title}</p><p style="margin-top:8px;font-size:13px;color:#334155">🕒 ${when}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mes rencontres</a></p><p class="muted">Connectez-vous à votre tableau de bord pour rejoindre la session le moment venu. Aucun logiciel à installer — tout se passe dans le navigateur.</p></div>`);
+}
+
+// ══════════════ Rencontres en ligne (Jitsi Meet) ══════════════
+// Salle Jitsi : on génère un room_name unique et imprévisible (sécurité par obscurité + admission requise)
+
+// ── Liste des sessions à venir / en cours (étudiant admis) ──
+app.get("/api/academy/meetings", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  // Seuls les admis voient les rencontres
+  const { data: stud } = await supabase.from("students").select("admitted_at").eq("id", sid).single();
+  if (!stud?.admitted_at) return res.json({ meetings: [], admitted: false });
+  const { data } = await supabase.from("academy_meetings")
+    .select("*, sms_courses(code, title)")
+    .neq("status", "cancelled")
+    .gte("starts_at", new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString()) // garde celles des 6 dernières heures
+    .order("starts_at", { ascending: true });
+  res.json({ meetings: data || [], admitted: true });
+});
+
+// ── Détail d'une session + jeton de salle (étudiant admis) ──
+app.get("/api/academy/meetings/:id", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data: stud } = await supabase.from("students").select("admitted_at, full_name").eq("id", sid).single();
+  if (!stud?.admitted_at) return res.status(403).json({ message: "Réservé aux étudiants admis." });
+  const { data: m } = await supabase.from("academy_meetings").select("*").eq("id", Number(req.params.id)).maybeSingle();
+  if (!m) return res.status(404).json({ message: "Session introuvable." });
+  if (m.status === "cancelled") return res.status(410).json({ message: "Cette session a été annulée." });
+  res.json({ meeting: m, displayName: stud.full_name, moderator: false });
+});
+
+// ── Admin : lister toutes les sessions ──
+app.get("/api/admin/academy/meetings", requireAuth, async (_req, res) => {
+  const { data, error } = await supabase.from("academy_meetings")
+    .select("*, sms_courses(code, title)").order("starts_at", { ascending: false });
+  if (error) return res.status(500).json({ message: error.message });
+  res.json(data || []);
+});
+
+// ── Admin : créer une session ──
+app.post("/api/admin/academy/meetings", requireAuth, async (req, res) => {
+  const { title, description, kind, starts_at, duration_min, course_id } = req.body;
+  if (!title || !starts_at) return res.status(400).json({ message: "Titre et date requis." });
+  // room_name unique et difficile à deviner
+  const slug = String(title).toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30);
+  const room_name = `datameal-${slug}-${crypto.randomBytes(4).toString("hex")}`;
+  const { data, error } = await supabase.from("academy_meetings")
+    .insert({ title, description, kind: kind || "meeting", starts_at, duration_min: duration_min || 60, course_id: course_id || null, room_name, status: "scheduled" })
+    .select().single();
+  if (error) return res.status(400).json({ message: error.message });
+
+  // Notifier les étudiants admis qui acceptent les emails
+  try {
+    const { data: students } = await supabase.from("students")
+      .select("email, full_name, course_emails").not("admitted_at", "is", null);
+    const recipients = (students || []).filter((s: any) => s.course_emails !== false && s.email);
+    for (const s of recipients) {
+      sendAcademyEmail({
+        to: s.email, type: "meeting_scheduled",
+        subject: `📅 Nouvelle rencontre en ligne : ${title}`,
+        html: meetingEmailHtml(s.full_name, title, starts_at, kind || "meeting"),
+        dedupeKey: `meeting:${data.id}:${s.email}`,
+      });
+    }
+  } catch { /* notification best-effort */ }
+
+  res.status(201).json(data);
+});
+
+// ── Admin : modifier le statut (live/ended/cancelled) ──
+app.put("/api/admin/academy/meetings/:id", requireAuth, async (req, res) => {
+  const { status, title, description, starts_at, duration_min, kind } = req.body;
+  const update: any = {};
+  if (status) update.status = status;
+  if (title) update.title = title;
+  if (description !== undefined) update.description = description;
+  if (starts_at) update.starts_at = starts_at;
+  if (duration_min) update.duration_min = duration_min;
+  if (kind) update.kind = kind;
+  const { data, error } = await supabase.from("academy_meetings").update(update).eq("id", Number(req.params.id)).select().single();
+  if (error) return res.status(400).json({ message: error.message });
+  res.json(data);
+});
+
+// ── Admin : supprimer une session ──
+app.delete("/api/admin/academy/meetings/:id", requireAuth, async (req, res) => {
+  const { error } = await supabase.from("academy_meetings").delete().eq("id", Number(req.params.id));
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ message: "Supprimée" });
+});
+
 export default app;
