@@ -59,12 +59,12 @@ export default function AcademyDashboard() {
       <SEO title="Mon espace — DataMEAL Academy" description="Tableau de bord étudiant." />
 
       {/* ───── Hero header ───── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-teal-700 p-6 sm:p-8 mb-6 text-white">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-teal-700 p-6 sm:p-8 mb-6 text-white" style={{ transform: "translateZ(0)", isolation: "isolate", WebkitBackfaceVisibility: "hidden" }}>
         <div className="absolute -right-8 -top-8 w-44 h-44 rounded-full bg-white/10" />
         <div className="absolute -right-16 top-12 w-56 h-56 rounded-full bg-white/5" />
         <div className="relative flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl font-bold border border-white/30">
+            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-2xl font-bold border border-white/30">
               {initials}
             </div>
             <div>
@@ -104,7 +104,7 @@ export default function AcademyDashboard() {
       )}
 
       {/* ───── Stats cards ───── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" style={{ isolation: "isolate" }}>
         {[
           { label: "Moyenne générale", value: `${overall}%`, icon: TrendingUp, tint: "text-primary bg-primary/10" },
           { label: "Cours terminés", value: `${completedCourses}/${allCourses.length || 3}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
@@ -172,7 +172,7 @@ export default function AcademyDashboard() {
 
       {/* ───── Bannière test (non admis) ───── */}
       {testStatus && !testStatus.passed && emailVerified && (
-        <div className="bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 rounded-2xl p-5 mb-6 flex items-center justify-between flex-wrap gap-4">
+        <div className="bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 rounded-2xl p-5 mb-6 flex items-center justify-between flex-wrap gap-4" style={{ transform: "translateZ(0)" }}>
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center"><Target className="w-5 h-5 text-primary" /></div>
             <div>
@@ -310,7 +310,7 @@ function CredentialCard({ cred }: { cred: Cred }) {
   return (
     <div className={`group relative bg-card rounded-2xl border overflow-hidden transition-all hover:shadow-lg ${expired ? "border-border/50 opacity-75" : "border-border/50 hover:border-primary/30"}`}>
       {/* Badge médaillon */}
-      <div className="relative p-5 pb-4" style={{ background: `linear-gradient(135deg, ${cred.color}18, transparent)` }}>
+      <div className="relative p-5 pb-4" style={{ background: `linear-gradient(135deg, ${cred.color}18, transparent)`, transform: "translateZ(0)" }}>
         <div className="flex items-start justify-between">
           <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: cred.color }}>
             {isFinal ? <Trophy className="w-7 h-7 text-white" /> : <Award className="w-7 h-7 text-white" />}
