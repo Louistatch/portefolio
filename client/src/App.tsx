@@ -28,6 +28,7 @@ import AcademyForgotPassword from "@/pages/academy/forgot-password";
 import AcademyResetPassword from "@/pages/academy/reset-password";
 import AcademyProfile from "@/pages/academy/profile";
 import VerifyCertificate from "@/pages/academy/verify-certificate";
+import AcademyLive from "@/pages/academy/live";
 
 // Admin
 import AdminLogin from "@/pages/admin/login";
@@ -42,6 +43,7 @@ import AdminProfile from "@/pages/admin/profile-admin";
 import AdminNewsletter from "@/pages/admin/newsletter-admin";
 import AdminTestimonials from "@/pages/admin/testimonials-admin";
 import AdminStudents from "@/pages/admin/students-admin";
+import AdminMeetings from "@/pages/admin/meetings-admin";
 import Stats from "@/pages/stats";
 import { getToken } from "@/lib/admin";
 import { useEffect } from "react";
@@ -77,6 +79,7 @@ function App() {
             <Route path="/admin/newsletter">{() => <RequireAuth><AdminNewsletter /></RequireAuth>}</Route>
             <Route path="/admin/testimonials">{() => <RequireAuth><AdminTestimonials /></RequireAuth>}</Route>
             <Route path="/admin/students">{() => <RequireAuth><AdminStudents /></RequireAuth>}</Route>
+            <Route path="/admin/meetings">{() => <RequireAuth><AdminMeetings /></RequireAuth>}</Route>
 
             {/* DataMEAL Academy — espace étudiant (pas de Layout admin) */}
             <Route path="/academy/register">{() => <Layout><AcademyRegister /></Layout>}</Route>
@@ -89,6 +92,7 @@ function App() {
             <Route path="/academy/profile">{() => <Layout><AcademyProfile /></Layout>}</Route>
             <Route path="/academy/verify-certificate/:certNo">{() => <Layout><VerifyCertificate /></Layout>}</Route>
             <Route path="/academy/verify-certificate">{() => <Layout><VerifyCertificate /></Layout>}</Route>
+            <Route path="/academy/live/:id">{() => <Layout><AcademyLive /></Layout>}</Route>
 
             {/* Public routes */}
             <Route path="/">{() => <Layout><Home /></Layout>}</Route>
