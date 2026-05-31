@@ -3,305 +3,308 @@ import { useLocation } from "wouter";
 import { SEO } from "@/components/seo";
 import { Button } from "@/components/ui/button";
 import {
-  GraduationCap, LogOut, User, TrendingUp, Award, BookOpen, Loader2,
-  CheckCircle2, Clock, Trophy, ChevronRight, Target, Lock, X } from "lucide-react";
-import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar,
-} from "recharts";
-import { getStudent, clearStudentSession, studentFetch, isStudentLoggedIn } from "@/lib/student";
+  GraduationCap, User, Award, BookOpen, Loader2, CheckCircle2, Clock,
+  Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
+  Sparkles, TrendingUp, Calendar, AlertCircle,
+} from "lucide-react";
+import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
 
-interface Grade { id: number; title: string; score: number; max_score: number; type: string; graded_at: string; sms_courses?: { code: string; title: string }; }
-interface Enrollment { id: number; course_id: number; status: string; progress: number; sms_courses?: { id: number; code: string; title: string; description: string; tools: string[]; level: string; total_lessons: number }; }
+interface Cred { id: string; type: string; title: string; subtitle: string; issued_at: string; expires_at: string | null; status: string; certificate_no: string | null; score: number | null; download_url: string | null; skills: string[]; color: string; }
 
 export default function AcademyDashboard() {
   const [, navigate] = useLocation();
   const student = getStudent();
-  const [grades, setGrades] = useState<Grade[]>([]);
-  const [average, setAverage] = useState(0);
-  const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
-  const [attestations, setAttestations] = useState<any[]>([]);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
   const [testStatus, setTestStatus] = useState<any>(null);
   const [allCourses, setAllCourses] = useState<any[]>([]);
   const [schedule, setSchedule] = useState<any[]>([]);
+  const [transcript, setTranscript] = useState<any>(null);
+  const [creds, setCreds] = useState<Cred[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
     (async () => {
       try {
-        const [g, e, a, ts, ac, sch] = await Promise.all([
-          studentFetch("/api/academy/my-grades").then(r => r.json()),
-          studentFetch("/api/academy/my-enrollments").then(r => r.json()),
-          studentFetch("/api/academy/my-attestations").then(r => r.json()),
+        const [e, ts, ac, sch, tr, cr] = await Promise.all([
+          studentFetch("/api/academy/my-enrollments").then(r => r.json()).catch(() => []),
           studentFetch("/api/academy/test-status").then(r => r.json()).catch(() => null),
           fetch("/api/academy/courses").then(r => r.json()).catch(() => []),
           studentFetch("/api/academy/lesson-schedule").then(r => r.json()).catch(() => []),
+          studentFetch("/api/academy/transcript").then(r => r.json()).catch(() => null),
+          studentFetch("/api/academy/my-credentials").then(r => r.json()).catch(() => null),
         ]);
-        setGrades(g.grades || []); setAverage(g.average || 0);
-        setEnrollments(e || []); setAttestations(a || []);
-        setTestStatus(ts); setAllCourses(Array.isArray(ac) ? ac : []); setSchedule(Array.isArray(sch) ? sch : []);
-      } catch (err) { /* handled by studentFetch */ } finally { setLoading(false); }
+        setEnrollments(Array.isArray(e) ? e : []);
+        setTestStatus(ts); setAllCourses(Array.isArray(ac) ? ac : []);
+        setSchedule(Array.isArray(sch) ? sch : []); setTranscript(tr);
+        setCreds(cr?.credentials || []);
+      } finally { setLoading(false); }
     })();
   }, []);
-
-  function logout() { clearStudentSession(); navigate("/academy/login"); }
-
-  // Données du graphique d'évolution (note en % par évaluation, ordre chronologique)
-  const chartData = grades.map((g, i) => ({
-    name: g.sms_courses?.code ? `${g.sms_courses.code}` : `Éval ${i + 1}`,
-    label: g.title.length > 18 ? g.title.slice(0, 18) + "…" : g.title,
-    pct: Math.round((Number(g.score) / Number(g.max_score)) * 100),
-  }));
-
-  // Moyenne par cours
-  const byCourse: Record<string, { sum: number; n: number }> = {};
-  grades.forEach(g => {
-    const code = g.sms_courses?.code || "Test";
-    if (!byCourse[code]) byCourse[code] = { sum: 0, n: 0 };
-    byCourse[code].sum += (Number(g.score) / Number(g.max_score)) * 100;
-    byCourse[code].n++;
-  });
-  const courseAvg = Object.entries(byCourse).map(([code, v]) => ({ code, moyenne: Math.round(v.sum / v.n) }));
 
   if (loading) return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   const completedCourses = enrollments.filter(e => e.status === "completed").length;
+  const nextLesson = schedule.find((s: any) => s.status === "available");
+  const overall = transcript?.overall ?? 0;
+  const firstName = student?.full_name?.split(" ")[0] || "étudiant";
+  const emailVerified = testStatus ? testStatus.emailVerified !== false : true;
+
+  const initials = student?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "ET";
 
   return (
-    <div className="max-w-5xl mx-auto px-6 py-10">
+    <div className="max-w-6xl mx-auto px-5 sm:px-6 py-8">
       <SEO title="Mon espace — DataMEAL Academy" description="Tableau de bord étudiant." />
 
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8 flex-wrap gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary">
-            {student?.full_name?.split(" ").map(n => n[0]).slice(0, 2).join("") || "ET"}
-          </div>
-          <div>
-            <h1 className="text-xl font-bold">Bonjour, {student?.full_name?.split(" ")[0] || "Étudiant"}</h1>
-            <p className="text-sm text-muted-foreground">{student?.email}</p>
-          </div>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="gap-2" onClick={() => navigate("/academy/profile")}><User className="w-4 h-4" /> Mon profil</Button>
-          <Button variant="outline" size="sm" className="gap-2" onClick={logout}><LogOut className="w-4 h-4" /> Déconnexion</Button>
-        </div>
-      </div>
-
-      {/* Metric cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {[
-          { label: "Moyenne générale", value: `${average}%`, icon: Target, color: "text-primary" },
-          { label: "Cours inscrits", value: enrollments.length, icon: BookOpen, color: "text-blue-600 dark:text-blue-400" },
-          { label: "Cours terminés", value: completedCourses, icon: CheckCircle2, color: "text-primary" },
-          { label: "Attestations", value: attestations.length, icon: Award, color: "text-amber-600 dark:text-amber-400" },
-        ].map(m => (
-          <div key={m.label} className="bg-card rounded-2xl p-5 border border-border/50">
-            <m.icon className={`w-5 h-5 ${m.color} mb-2`} />
-            <div className="text-2xl font-bold">{m.value}</div>
-            <div className="text-xs text-muted-foreground">{m.label}</div>
-          </div>
-        ))}
-      </div>
-
-      {/* Evolution chart */}
-      <div className="bg-card rounded-3xl p-6 border border-border/50 mb-6">
-        <div className="flex items-center gap-2 mb-5">
-          <TrendingUp className="w-5 h-5 text-primary" />
-          <h2 className="font-semibold">Évolution de mes notes</h2>
-        </div>
-        {chartData.length > 0 ? (
-          <ResponsiveContainer width="100%" height={240}>
-            <LineChart data={chartData} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="name" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-              <Tooltip
-                contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 13 }}
-                formatter={(v: any) => [`${v}%`, "Note"]}
-                labelFormatter={(_l, p: any) => p?.[0]?.payload?.label || ""}
-              />
-              <Line type="monotone" dataKey="pct" stroke="hsl(var(--primary))" strokeWidth={2.5} dot={{ r: 4, fill: "hsl(var(--primary))" }} activeDot={{ r: 6 }} />
-            </LineChart>
-          </ResponsiveContainer>
-        ) : (
-          <p className="text-sm text-muted-foreground py-12 text-center">Aucune note pour le moment. Complétez des leçons pour voir votre évolution.</p>
-        )}
-      </div>
-
-      {/* Course averages bar chart */}
-      {courseAvg.length > 0 && (
-        <div className="bg-card rounded-3xl p-6 border border-border/50 mb-8">
-          <h2 className="font-semibold mb-5">Moyenne par cours</h2>
-          <ResponsiveContainer width="100%" height={180}>
-            <BarChart data={courseAvg} margin={{ top: 5, right: 10, left: -20, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-              <XAxis dataKey="code" tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-              <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: "hsl(var(--muted-foreground))" }} />
-              <Tooltip contentStyle={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))", borderRadius: 12, fontSize: 13 }} formatter={(v: any) => [`${v}%`, "Moyenne"]} />
-              <Bar dataKey="moyenne" fill="hsl(var(--primary))" radius={[6, 6, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      )}
-
-      {/* My courses */}
-      {testStatus && !testStatus.passed && (
-        <div className="bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-2xl p-5 mb-8 flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-primary/15 flex items-center justify-center"><Target className="w-5 h-5 text-primary" /></div>
+      {/* ───── Hero header ───── */}
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-teal-700 p-6 sm:p-8 mb-6 text-white">
+        <div className="absolute -right-8 -top-8 w-44 h-44 rounded-full bg-white/10" />
+        <div className="absolute -right-16 top-12 w-56 h-56 rounded-full bg-white/5" />
+        <div className="relative flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center text-2xl font-bold border border-white/30">
+              {initials}
+            </div>
             <div>
-              <p className="font-medium text-sm">{testStatus.hasTaken ? `Test passe : ${testStatus.score}/30` : "Passez le test d'aptitude"}</p>
-              <p className="text-xs text-muted-foreground">{testStatus.hasTaken ? "Score requis : 21/30. Vous pouvez le repasser." : "Reussissez le test (21/30) pour debloquer vos cours."}</p>
+              <p className="text-white/70 text-sm">Bon retour,</p>
+              <h1 className="text-2xl sm:text-3xl font-bold">{firstName} 👋</h1>
+              {testStatus?.passed && (
+                <span className="inline-flex items-center gap-1.5 mt-1.5 text-xs bg-white/15 px-2.5 py-1 rounded-full">
+                  <ShieldCheck className="w-3.5 h-3.5" /> Admis(e) · {creds.length} credential{creds.length > 1 ? "s" : ""}
+                </span>
+              )}
             </div>
           </div>
-          <Button onClick={() => navigate("/elearning")} className="gap-2">{testStatus.hasTaken ? "Repasser le test" : "Passer le test"} <ChevronRight className="w-4 h-4" /></Button>
+          {nextLesson ? (
+            <button onClick={() => navigate(`/academy/classroom/${nextLesson.course_id}`)}
+              className="bg-white text-primary rounded-2xl px-5 py-3 text-left hover:bg-white/95 transition-colors shadow-lg">
+              <p className="text-[11px] uppercase tracking-wide text-primary/60 font-semibold">Cette semaine</p>
+              <p className="font-bold text-sm max-w-[200px] truncate">{nextLesson.sms_lessons?.title || "Leçon disponible"}</p>
+              <span className="text-xs flex items-center gap-1 mt-0.5">Continuer <ChevronRight className="w-3 h-3" /></span>
+            </button>
+          ) : !testStatus?.passed ? (
+            <Button onClick={() => navigate("/elearning")} className="bg-white text-primary hover:bg-white/95 gap-2 shadow-lg">
+              <Target className="w-4 h-4" /> Passer le test d'admission
+            </Button>
+          ) : null}
         </div>
-      )}
-
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold">Mes cours</h2>
-        {enrollments.length > 0 && <span className="text-xs text-muted-foreground">{enrollments.length} cours · {completedCourses} termine(s)</span>}
       </div>
 
-      {enrollments.length === 0 && (
-        <div className="bg-card rounded-2xl border border-dashed border-border p-10 text-center mb-8">
-          <BookOpen className="w-10 h-10 text-muted-foreground/40 mx-auto mb-3" />
-          <p className="font-medium mb-1">Aucun cours pour le moment</p>
-          <p className="text-sm text-muted-foreground mb-5">{testStatus?.passed ? "Explorez le catalogue ci-dessous pour commencer." : "Reussissez d'abord le test d'aptitude pour debloquer l'acces aux cours."}</p>
-          {!testStatus?.passed && <Button onClick={() => navigate("/elearning")} className="gap-2">Passer le test <ChevronRight className="w-4 h-4" /></Button>}
+      {/* ───── Alerte vérification email ───── */}
+      {!emailVerified && (
+        <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 mb-6 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5">
+            <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+            <p className="text-sm text-amber-700 dark:text-amber-300">Vérifiez votre email pour débloquer le test et les cours.</p>
+          </div>
+          <Button size="sm" variant="outline" onClick={() => navigate("/academy/profile")}>Vérifier maintenant</Button>
         </div>
       )}
 
-      <div className="grid lg:grid-cols-2 gap-4 mb-8">
-        {enrollments.map(e => (
-          <div key={e.id} className="group bg-card rounded-2xl p-5 border border-border/50 hover:border-primary/30 transition-colors cursor-pointer"
-            onClick={() => navigate(`/academy/classroom/${e.course_id}`)}>
-            <div className="flex items-start justify-between mb-3">
-              <span className="text-xs font-mono text-muted-foreground">{e.sms_courses?.code}</span>
-              {e.status === "completed"
-                ? <span className="flex items-center gap-1 text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full"><CheckCircle2 className="w-3 h-3" /> Terminé</span>
-                : <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2 py-0.5 rounded-full"><Clock className="w-3 h-3" /> En cours</span>}
-            </div>
-            <h3 className="font-semibold mb-2 leading-snug group-hover:text-primary transition-colors">{e.sms_courses?.title}</h3>
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {e.sms_courses?.tools?.map(t => <span key={t} className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-mono">{t}</span>)}
-            </div>
-            <div className="h-1.5 bg-muted rounded-full mb-1">
-              <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${e.progress}%` }} />
-            </div>
-            <div className="flex justify-between items-center mb-3">
-              <span className="text-xs text-muted-foreground">{e.progress}% complété</span>
-            </div>
-            <Button size="sm" className="w-full gap-1.5"><BookOpen className="w-3.5 h-3.5" /> {e.progress > 0 ? "Continuer le cours" : "Commencer le cours"}</Button>
+      {/* ───── Stats cards ───── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        {[
+          { label: "Moyenne générale", value: `${overall}%`, icon: TrendingUp, tint: "text-primary bg-primary/10" },
+          { label: "Cours terminés", value: `${completedCourses}/${allCourses.length || 3}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
+          { label: "Credentials", value: creds.length, icon: Award, tint: "text-purple-600 bg-purple-500/10" },
+          { label: "Évaluations", value: transcript?.totalGrades ?? 0, icon: CheckCircle2, tint: "text-emerald-600 bg-emerald-500/10" },
+        ].map((s) => (
+          <div key={s.label} className="bg-card rounded-2xl border border-border/50 p-4">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${s.tint}`}><s.icon className="w-4.5 h-4.5" /></div>
+            <p className="text-2xl font-bold">{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* Planning hebdomadaire (modèle WQU) */}
-      {testStatus?.passed && schedule.length > 0 && (
-        <div className="mb-8">
+      {/* ───── Portefeuille de credentials (style Credly) ───── */}
+      {creds.length > 0 && (
+        <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold">Mon planning hebdomadaire</h2>
-            <span className="text-xs text-muted-foreground">1 leçon débloquée par semaine</span>
+            <h2 className="text-lg font-bold flex items-center gap-2"><Award className="w-5 h-5 text-primary" /> Mon portefeuille de credentials</h2>
+            <span className="text-xs text-muted-foreground">Vérifiables · Téléchargeables</span>
           </div>
-          <div className="space-y-2">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {creds.map((cr) => (
+              <CredentialCard key={cr.id} cred={cr} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* ───── Bannière test (non admis) ───── */}
+      {testStatus && !testStatus.passed && emailVerified && (
+        <div className="bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 rounded-2xl p-5 mb-6 flex items-center justify-between flex-wrap gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center"><Target className="w-5 h-5 text-primary" /></div>
+            <div>
+              <p className="font-semibold text-sm">{testStatus.hasTaken ? `Dernier score : ${testStatus.score}/30` : "Passez le test d'admission"}</p>
+              <p className="text-xs text-muted-foreground">{testStatus.canRetry ? "Réussissez (21/30) pour débloquer vos cours." : "Patientez avant de réessayer."}</p>
+            </div>
+          </div>
+          {testStatus.canRetry && <Button onClick={() => navigate("/elearning")} className="gap-2">{testStatus.hasTaken ? "Repasser" : "Commencer"} <ChevronRight className="w-4 h-4" /></Button>}
+        </div>
+      )}
+
+      {/* ───── Planning hebdomadaire ───── */}
+      {testStatus?.passed && schedule.length > 0 && (
+        <section className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Mon planning</h2>
+            <span className="text-xs text-muted-foreground">1 leçon / semaine</span>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/50 divide-y divide-border/40 overflow-hidden">
             {schedule.map((s: any) => {
-              const isDone = s.status === "completed";
-              const isAvail = s.status === "available";
+              const isDone = s.status === "completed", isAvail = s.status === "available";
               const isMissed = s.status === "missed";
-              const isLocked = s.status === "locked";
               return (
-                <div key={s.id} className={`flex items-center gap-3 p-3 rounded-xl border ${
-                  isAvail ? "border-primary/40 bg-primary/5" :
-                  isDone ? "border-border/50 bg-card" :
-                  isMissed ? "border-destructive/30 bg-destructive/5" :
-                  "border-border/40 bg-muted/30 opacity-70"
-                }`}>
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold shrink-0 ${
-                    isDone ? "bg-primary text-primary-foreground" :
-                    isAvail ? "bg-primary/15 text-primary" :
-                    isMissed ? "bg-destructive/15 text-destructive" :
-                    "bg-muted text-muted-foreground"
-                  }`}>S{s.week_index}</div>
+                <div key={s.id} className={`flex items-center gap-3 p-3.5 ${isAvail ? "bg-primary/5" : ""}`}>
+                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
+                    isDone ? "bg-primary text-white" : isAvail ? "bg-primary/15 text-primary" :
+                    isMissed ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground"}`}>
+                    {isDone ? <CheckCircle2 className="w-4 h-4" /> : isMissed ? <X className="w-4 h-4" /> : isAvail ? `S${s.week_index}` : <Lock className="w-3.5 h-3.5" />}
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{s.sms_lessons?.title || "Leçon"}</p>
                     <p className="text-xs text-muted-foreground">
-                      {s.sms_courses?.code} · {
-                        isDone ? "Complétée ✓" :
-                        isAvail ? `À faire avant le ${new Date(s.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}` :
-                        isMissed ? "Recalé(e) — fenêtre dépassée" :
-                        `Débloque le ${new Date(s.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`
-                      }
+                      {s.sms_courses?.code} · {isDone ? "Complétée ✓" : isAvail ? `Avant le ${new Date(s.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}` :
+                      isMissed ? "Recalé(e)" : `Débloque le ${new Date(s.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
                     </p>
                   </div>
                   {isAvail && <Button size="sm" onClick={() => navigate(`/academy/classroom/${s.course_id}`)} className="shrink-0">Commencer</Button>}
-                  {isDone && <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />}
-                  {isLocked && <Lock className="w-4 h-4 text-muted-foreground shrink-0" />}
-                  {isMissed && <X className="w-4 h-4 text-destructive shrink-0" />}
                 </div>
               );
             })}
           </div>
-        </div>
+        </section>
       )}
 
+      {/* ───── Catalogue ───── */}
       {allCourses.length > 0 && (
-        <div id="catalogue" className="mb-8">
-          <h2 className="text-lg font-bold mb-4">Catalogue des cours</h2>
-          <div className="grid lg:grid-cols-3 gap-4">
-            {allCourses.map((co: any) => {
-              const enrolled = enrollments.some(e => e.course_id === co.id);
+        <section className="mb-8">
+          <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><BookOpen className="w-5 h-5 text-primary" /> Mes projets</h2>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {allCourses.map((co: any, i: number) => {
+              const enr = enrollments.find(e => e.course_id === co.id);
+              const prog = enr?.progress || 0;
+              const palette = ["from-teal-500/15 to-teal-600/5", "from-blue-500/15 to-blue-600/5", "from-purple-500/15 to-purple-600/5"];
               return (
-                <div key={co.id} className="bg-card rounded-2xl p-5 border border-border/50">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-mono text-primary">{co.code}</span>
-                    <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground capitalize">{co.level}</span>
+                <div key={co.id} className="bg-card rounded-2xl border border-border/50 overflow-hidden flex flex-col">
+                  <div className={`h-2 bg-gradient-to-r ${palette[i % 3]}`} />
+                  <div className="p-5 flex flex-col flex-1">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-mono text-primary font-semibold">{co.code}</span>
+                      <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground capitalize">{co.level}</span>
+                    </div>
+                    <h3 className="font-semibold text-sm mb-2 leading-snug">{co.title}</h3>
+                    <p className="text-xs text-muted-foreground mb-4 line-clamp-2 flex-1">{co.description}</p>
+                    {enr && (
+                      <div className="mb-3">
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${prog}%` }} /></div>
+                        <p className="text-[11px] text-muted-foreground mt-1">{prog}% complété</p>
+                      </div>
+                    )}
+                    <Button size="sm" variant={enr ? "default" : "outline"} className="w-full gap-1.5"
+                      disabled={!testStatus?.passed}
+                      onClick={() => navigate(`/academy/classroom/${co.id}`)}>
+                      {!testStatus?.passed ? <><Lock className="w-3.5 h-3.5" /> Test requis</> :
+                       enr ? <>{prog > 0 ? "Continuer" : "Commencer"} <ChevronRight className="w-3.5 h-3.5" /></> :
+                       <>Ouvrir <ChevronRight className="w-3.5 h-3.5" /></>}
+                    </Button>
                   </div>
-                  <h3 className="font-semibold text-sm mb-2 leading-snug">{co.title}</h3>
-                  <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{co.description}</p>
-                  {enrolled
-                    ? <Button size="sm" variant="outline" className="w-full gap-1.5" onClick={() => navigate(`/academy/classroom/${co.id}`)}><CheckCircle2 className="w-3.5 h-3.5 text-primary" /> Inscrit — Ouvrir</Button>
-                    : <Button size="sm" variant="outline" className="w-full gap-1.5" disabled={!testStatus?.passed} onClick={() => navigate(`/academy/classroom/${co.id}`)}>{testStatus?.passed ? "Ouvrir" : "Test requis"}</Button>}
                 </div>
               );
             })}
           </div>
+        </section>
+      )}
+
+      {/* ───── Relevé de notes condensé ───── */}
+      {transcript && transcript.grades?.length > 0 && (
+        <section className="mb-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> Mon relevé de notes</h2>
+            <button onClick={() => navigate("/academy/profile")} className="text-xs text-primary hover:underline flex items-center gap-1">Détail complet <ChevronRight className="w-3 h-3" /></button>
+          </div>
+          <div className="bg-card rounded-2xl border border-border/50 p-5">
+            <div className="flex gap-3 flex-wrap mb-4">
+              <div className="bg-primary/10 rounded-xl px-4 py-2.5">
+                <p className="text-[11px] text-muted-foreground">Moyenne générale</p>
+                <p className="text-xl font-bold text-primary">{transcript.overall}%</p>
+              </div>
+              {transcript.courseAverages?.map((ca: any) => (
+                <div key={ca.code} className="bg-muted rounded-xl px-3 py-2.5">
+                  <p className="text-[11px] text-muted-foreground">{ca.code}</p>
+                  <p className="text-base font-bold">{ca.average}%</p>
+                </div>
+              ))}
+            </div>
+            <div className="space-y-1.5">
+              {transcript.grades.slice(-4).reverse().map((g: any) => {
+                const pct = Math.round(Number(g.score) / Number(g.max_score) * 100);
+                return (
+                  <div key={g.id} className="flex items-center justify-between text-sm py-1.5">
+                    <span className="truncate flex-1 text-muted-foreground">{g.title}</span>
+                    <span className={`font-semibold ml-3 ${pct >= 70 ? "text-primary" : pct >= 50 ? "text-amber-600" : "text-destructive"}`}>{pct}%</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// ───── Carte de credential (style Credly) ─────
+function CredentialCard({ cred }: { cred: Cred }) {
+  const expired = cred.status === "expired";
+  const issued = cred.issued_at ? new Date(cred.issued_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "";
+  const isFinal = cred.type === "final";
+  return (
+    <div className={`group relative bg-card rounded-2xl border overflow-hidden transition-all hover:shadow-lg ${expired ? "border-border/50 opacity-75" : "border-border/50 hover:border-primary/30"}`}>
+      {/* Badge médaillon */}
+      <div className="relative p-5 pb-4" style={{ background: `linear-gradient(135deg, ${cred.color}18, transparent)` }}>
+        <div className="flex items-start justify-between">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: cred.color }}>
+            {isFinal ? <Trophy className="w-7 h-7 text-white" /> : <Award className="w-7 h-7 text-white" />}
+          </div>
+          {expired ? (
+            <span className="text-[10px] font-semibold bg-muted text-muted-foreground px-2 py-1 rounded-full">Expiré</span>
+          ) : (
+            <span className="text-[10px] font-semibold px-2 py-1 rounded-full flex items-center gap-1" style={{ background: `${cred.color}18`, color: cred.color }}>
+              <ShieldCheck className="w-3 h-3" /> Vérifié
+            </span>
+          )}
+        </div>
+        <h3 className="font-bold text-sm mt-3 leading-snug">{cred.title}</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">{cred.subtitle}</p>
+      </div>
+
+      {/* Skills */}
+      {cred.skills.length > 0 && (
+        <div className="px-5 pb-3 flex flex-wrap gap-1.5">
+          {cred.skills.slice(0, 4).map((sk) => (
+            <span key={sk} className="text-[10px] bg-muted px-2 py-0.5 rounded-md text-muted-foreground">{sk}</span>
+          ))}
         </div>
       )}
 
-      {/* Recent grades table */}
-      {grades.length > 0 && (
-        <>
-          <h2 className="text-lg font-bold mb-4">Relevé de notes</h2>
-          <div className="bg-card rounded-2xl border border-border/50 overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-muted/50 text-muted-foreground">
-                <tr>
-                  <th className="text-left px-4 py-2.5 font-medium">Évaluation</th>
-                  <th className="text-left px-4 py-2.5 font-medium hidden sm:table-cell">Type</th>
-                  <th className="text-right px-4 py-2.5 font-medium">Note</th>
-                  <th className="text-right px-4 py-2.5 font-medium">%</th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...grades].reverse().map(g => {
-                  const pct = Math.round((Number(g.score) / Number(g.max_score)) * 100);
-                  return (
-                    <tr key={g.id} className="border-t border-border/40">
-                      <td className="px-4 py-2.5">{g.title}</td>
-                      <td className="px-4 py-2.5 hidden sm:table-cell">
-                        <span className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground">{g.type}</span>
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-mono">{g.score}/{g.max_score}</td>
-                      <td className={`px-4 py-2.5 text-right font-medium ${pct >= 70 ? "text-primary" : pct >= 50 ? "text-amber-600 dark:text-amber-400" : "text-destructive"}`}>{pct}%</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
+      {/* Footer */}
+      <div className="px-5 py-3 border-t border-border/40 flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          {cred.score != null && <p className="text-xs font-semibold" style={{ color: cred.color }}>Score {cred.score}%</p>}
+          <p className="text-[10px] text-muted-foreground truncate">{issued}</p>
+        </div>
+        {cred.download_url && (
+          <a href={`${cred.download_url}`} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs"><Download className="w-3.5 h-3.5" /> PDF</Button>
+          </a>
+        )}
+      </div>
+      {cred.certificate_no && (
+        <div className="px-5 pb-3"><p className="text-[9px] font-mono text-muted-foreground/60">N° {cred.certificate_no}</p></div>
       )}
     </div>
   );
