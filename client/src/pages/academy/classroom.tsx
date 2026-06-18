@@ -8,6 +8,7 @@ import {
   AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn } from "@/lib/student";
+import DOMPurify from "dompurify";
 
 interface Cell { type: string; content?: string; lang?: string; code?: string; output?: string; variant?: string; title?: string; url?: string; provider?: string; desc?: string; question?: string; opts?: string[]; ans?: number; svg?: string; caption?: string; }
 interface Lesson { id: number; title: string; content: { cells: Cell[] }; points: number; order_index: number; }
@@ -261,7 +262,7 @@ export default function AcademyClassroom() {
                     if (line.startsWith("- ")) return <div key={li} className="ml-3 text-muted-foreground my-0.5">• {line.slice(2).replace(/\*\*(.+?)\*\*/g, "$1")}</div>;
                     if (line.startsWith("```")) return null;
                     if (line.trim() === "") return <div key={li} className="h-1" />;
-                    return <p key={li} className="text-muted-foreground my-1" dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, "<strong class='text-foreground'>$1</strong>").replace(/`(.+?)`/g, "<code class='font-mono text-xs bg-muted px-1.5 py-0.5 rounded'>$1</code>") }} />;
+                    return <p key={li} className="text-muted-foreground my-1" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(line.replace(/\*\*(.+?)\*\*/g, "<strong class='text-foreground'>$1</strong>").replace(/`(.+?)`/g, "<code class='font-mono text-xs bg-muted px-1.5 py-0.5 rounded'>$1</code>")) }} />;
                   })}
                 </div>
               );
@@ -296,7 +297,7 @@ export default function AcademyClassroom() {
                       <span className="text-xs font-medium text-foreground">{cell.title}</span>
                     </div>
                   )}
-                  <div className="p-4 bg-white dark:bg-slate-900/40 flex justify-center overflow-x-auto" dangerouslySetInnerHTML={{ __html: cell.svg || "" }} />
+                  <div className="p-4 bg-white dark:bg-slate-900/40 flex justify-center overflow-x-auto" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cell.svg || "", { USE_PROFILES: { svg: true, svgFilters: true } }) }} />
                   {cell.caption && (
                     <div className="px-4 py-2.5 bg-muted/20 border-t border-border/50">
                       <p className="text-xs text-muted-foreground leading-relaxed">{cell.caption}</p>

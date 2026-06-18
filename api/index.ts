@@ -10,8 +10,9 @@ import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
 
 // ── Supabase client ──
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://gcfcdkzmfybiigbnlwvb.supabase.co";
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjZmNka3ptZnliaWlnYm5sd3ZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNTU3OTQsImV4cCI6MjA4ODYzMTc5NH0.61Xs-82V1fW6ZoDq-Te44f31BDivuXvRQkO9SS-MpTc";
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseKey) throw new Error("VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY doivent être définis dans les variables d'environnement.");
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ── Email (Resend) ──
@@ -24,10 +25,9 @@ const ADMISSION_ANSWER_KEY: number[] = [1, 2, 1, 3, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1
 const ADMISSION_PASS_SCORE = 21;
 
 // ── Auth helpers ──
-const JWT_SECRET = process.env.JWT_SECRET || "lt-portfolio-admin-secret-change-me";
-// Avertissement si le secret par défaut est utilisé (à corriger sur Vercel)
-if (!process.env.JWT_SECRET) {
-  console.warn("[SECURITE] JWT_SECRET non defini — definissez-le dans les variables d'environnement Vercel.");
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("[SECURITE] JWT_SECRET non défini — définissez-le dans les variables d'environnement Vercel.");
 }
 
 // ── Rate limiting en mémoire (sans dépendance, adapté au serverless) ──
@@ -84,7 +84,9 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ message: "Unauthorized" });
   try {
-    (req as any).admin = jwt.verify(header.slice(7), JWT_SECRET);
+    const decoded = jwt.verify(header.slice(7), JWT_SECRET) as any;
+    if (decoded.role === "student") return res.status(403).json({ message: "Admin access required" });
+    (req as any).admin = decoded;
     next();
   } catch {
     return res.status(401).json({ message: "Invalid token" });
@@ -101,7 +103,7 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(self), camera=(self)");
   next();
 });
 
@@ -768,7 +770,7 @@ async function sendAcademyEmail(opts: {
 app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res) => {
   const { full_name, email, password, phone, country, organization } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ message: "Nom, email et mot de passe requis" });
-  if (password.length < 6) return res.status(400).json({ message: "Le mot de passe doit faire au moins 6 caractères" });
+  if (password.length < 8) return res.status(400).json({ message: "Le mot de passe doit faire au moins 8 caractères" });
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ message: "Email invalide" });
 
   const { data: existing } = await supabase.from("students").select("id").eq("email", email).maybeSingle();
@@ -887,9 +889,6 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
     for (let i = 0; i < ADMISSION_ANSWER_KEY.length; i++) {
       if (Number(answers[i]) === ADMISSION_ANSWER_KEY[i]) score++;
     }
-  } else if (typeof clientScore === "number") {
-    // Repli legacy (sécurisé par le plafond) — borne le score au max réel
-    score = Math.max(0, Math.min(clientScore, ADMISSION_ANSWER_KEY.length));
   } else {
     return res.status(400).json({ message: "Réponses requises (answers)." });
   }
@@ -1019,18 +1018,7 @@ app.post("/api/academy/verify-code", rateLimit(15, 10 * 60 * 1000), requireStude
   res.json({ message: "Email vérifié avec succès", verified: true });
 });
 
-// ── Récupérer le code de vérification courant (étudiant connecté, si email non reçu) ──
-app.get("/api/academy/my-verify-code", requireStudent, async (req, res) => {
-  const sid = (req as any).student.sid;
-  const { data } = await supabase.from("students").select("verify_code, email_verified, verify_expires").eq("id", sid).single();
-  res.json({
-    email_verified: data?.email_verified ?? false,
-    has_code: !!data?.verify_code,
-    code: data?.email_verified ? null : (data?.verify_code ?? null),
-    expires: data?.verify_expires ?? null,
-    resendConfigured: !!resend,
-  });
-});
+// (endpoint my-verify-code supprimé — faille de sécurité, le code ne doit jamais être exposé au client)
 
 
 // ── Renvoyer l'email de validation ──
@@ -1095,7 +1083,7 @@ app.post("/api/academy/forgot-password", rateLimit(5, 15 * 60 * 1000), async (re
 app.post("/api/academy/reset-password", async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ message: "Token et nouveau mot de passe requis" });
-  if (password.length < 6) return res.status(400).json({ message: "Le mot de passe doit faire au moins 6 caractères" });
+  if (password.length < 8) return res.status(400).json({ message: "Le mot de passe doit faire au moins 8 caractères" });
   const { data } = await supabase.from("students").select("id, reset_expires").eq("reset_token", token).maybeSingle();
   if (!data) return res.status(400).json({ message: "Lien de réinitialisation invalide" });
   if (data.reset_expires && new Date(data.reset_expires) < new Date())
@@ -1154,7 +1142,7 @@ app.put("/api/academy/change-password", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { current_password, new_password } = req.body;
   if (!current_password || !new_password) return res.status(400).json({ message: "Mot de passe actuel et nouveau requis" });
-  if (new_password.length < 6) return res.status(400).json({ message: "Le nouveau mot de passe doit faire au moins 6 caractères" });
+  if (new_password.length < 8) return res.status(400).json({ message: "Le nouveau mot de passe doit faire au moins 8 caractères" });
   const { data } = await supabase.from("students").select("password_hash").eq("id", sid).single();
   if (!data) return res.status(404).json({ message: "Compte introuvable" });
   const valid = await bcrypt.compare(current_password, data.password_hash);
@@ -1219,7 +1207,7 @@ app.get("/api/academy/my-grades", requireStudent, async (req, res) => {
 // ── Compléter une leçon (auto-note + progression) ──
 app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const { course_id, lesson_id, score } = req.body;
+  const { course_id, lesson_id } = req.body;
   if (!course_id || !lesson_id) return res.status(400).json({ message: "course_id et lesson_id requis" });
 
   // Vérifier l'email + l'admission
@@ -1247,7 +1235,7 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
 
   // Récup la leçon pour le titre + points
   const { data: lesson } = await supabase.from("sms_lessons").select("title, points").eq("id", lesson_id).single();
-  const finalScore = score ?? (lesson?.points ?? 10);
+  const finalScore = lesson?.points ?? 10;
   const maxScore = lesson?.points ?? 10;
 
   // Eviter doublon de note
@@ -1616,7 +1604,7 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
 app.get("/api/admin/academy/students/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const [student, grades, enrollments, attestations] = await Promise.all([
-    supabase.from("students").select("*").eq("id", id).single(),
+    supabase.from("students").select("id, full_name, email, phone, country, organization, avatar_url, status, email_verified, admitted_at, admission_expires, entry_score, test_attempts, last_test_at, next_test_allowed, created_at").eq("id", id).single(),
     supabase.from("grades").select("*, sms_courses(code, title)").eq("student_id", id).order("graded_at", { ascending: true }),
     supabase.from("enrollments").select("*, sms_courses(code, title)").eq("student_id", id),
     supabase.from("attestations").select("*, sms_courses(code, title)").eq("student_id", id),

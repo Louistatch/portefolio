@@ -30,7 +30,7 @@ export default function AcademyRegister() {
   async function submit() {
     setError("");
     if (!form.full_name || !form.email || !form.password) { setError("Nom, email et mot de passe sont obligatoires."); return; }
-    if (form.password.length < 6) { setError("Le mot de passe doit faire au moins 6 caractères."); return; }
+    if (form.password.length < 8) { setError("Le mot de passe doit faire au moins 8 caractères."); return; }
     if (form.password !== form.confirm) { setError("Les mots de passe ne correspondent pas."); return; }
     setLoading(true);
     try {
