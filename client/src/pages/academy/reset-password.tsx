@@ -20,7 +20,7 @@ export default function AcademyResetPassword() {
 
   async function submit() {
     setError("");
-    if (password.length < 6) { setError("Le mot de passe doit faire au moins 6 caractères."); return; }
+    if (password.length < 8) { setError("Le mot de passe doit faire au moins 8 caractères."); return; }
     if (password !== confirm) { setError("Les mots de passe ne correspondent pas."); return; }
     setLoading(true);
     try {

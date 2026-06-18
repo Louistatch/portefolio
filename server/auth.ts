@@ -3,32 +3,16 @@ import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
 import { supabase } from "./supabase";
 
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("JWT_SECRET must be set in production");
-  }
-  console.warn("⚠️  JWT_SECRET not set — using insecure default for development only");
-}
-const jwtSecret = JWT_SECRET || "dev-only-insecure-secret";
-
-export async function ensureAdminExists() {
-  const { data } = await supabase.from("admin_users").select("id").limit(1);
-  if (!data || data.length === 0) {
-    const hash = await bcrypt.hash("admin", 10);
-    await supabase.from("admin_users").insert({ username: "admin", password_hash: hash });
-    console.log("Default admin created: admin / admin — CHANGE THIS PASSWORD");
-  }
-}
+const JWT_SECRET: string = process.env.JWT_SECRET ?? (() => { throw new Error("JWT_SECRET must be set in environment variables."); })();
 
 export function generateToken(userId: number, username: string): string {
-  return jwt.sign({ id: userId, username }, jwtSecret, { expiresIn: "24h" });
+  return jwt.sign({ id: userId, username }, JWT_SECRET, { expiresIn: "24h" });
 }
 
 export async function verifyCredentials(username: string, password: string) {
   const { data } = await supabase
     .from("admin_users")
-    .select("*")
+    .select("id, username, password_hash")
     .eq("username", username)
     .single();
   if (!data) return null;
@@ -43,7 +27,8 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
     return res.status(401).json({ message: "Unauthorized" });
   }
   try {
-    const decoded = jwt.verify(header.slice(7), jwtSecret) as any;
+    const decoded = jwt.verify(header.slice(7), JWT_SECRET) as any;
+    if (decoded.role === "student") return res.status(403).json({ message: "Admin access required" });
     (req as any).admin = decoded;
     next();
   } catch {

@@ -261,7 +261,7 @@ app.post("/api/admin/change-password", requireAuth, async (req, res) => {
   const admin = (req as any).admin;
   const user = await verifyCredentials(admin.username, currentPassword);
   if (!user) return res.status(400).json({ message: "Current password incorrect" });
-  const hash = await bcrypt.hash(newPassword, 10);
+  const hash = await bcrypt.hash(newPassword, 12);
   await supabase.from("admin_users").update({ password_hash: hash }).eq("id", admin.id);
   res.json({ message: "Password changed" });
 });
@@ -706,8 +706,8 @@ app.get("/api/og/blog/:slug", async (req, res) => {
 // DataMEAL ACADEMY — School Management System
 // ══════════════════════════════════════════════════════════════════
 
-function generateStudentToken(id: number, email: string): string {
-  return jwt.sign({ sid: id, email, role: "student" }, JWT_SECRET, { expiresIn: "7d" });
+function generateStudentToken(id: number): string {
+  return jwt.sign({ sid: id, role: "student" }, JWT_SECRET, { expiresIn: "7d" });
 }
 
 function requireStudent(req: Request, res: Response, next: NextFunction) {
@@ -776,9 +776,9 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
   const { data: existing } = await supabase.from("students").select("id").eq("email", email).maybeSingle();
   if (existing) return res.status(409).json({ message: "Un compte existe déjà avec cet email" });
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, 12);
   const verifyToken = crypto.randomBytes(32).toString("hex");
-  const verifyCode = String(Math.floor(100000 + Math.random() * 900000)); // code 6 chiffres
+  const verifyCode = String(crypto.randomInt(100000, 999999)); // code 6 chiffres
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
 
   let { data, error } = await supabase.from("students")
@@ -810,7 +810,7 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
       .catch((e: any) => console.error("Verify email error:", e));
   }
 
-  const token = generateStudentToken(data.id, data.email);
+  const token = generateStudentToken(data.id);
   res.status(201).json({ token, student: data, emailSent: !!resend });
 });
 
@@ -941,7 +941,7 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
     // Email de félicitations + lien de téléchargement de l'attestation
     const { data: stAdm } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
     if (stAdm?.email) {
-      const dlToken = generateStudentToken(sid, stAdm.email);
+      const dlToken = generateStudentToken(sid);
       const certUrl = `${SITE_URL}/api/academy/certificate/admission?token=${dlToken}`;
       sendAcademyEmail({
         studentId: sid, to: stAdm.email, type: "admission_passed",
@@ -1010,7 +1010,9 @@ app.post("/api/academy/verify-code", rateLimit(15, 10 * 60 * 1000), requireStude
   if (data.email_verified) return res.json({ message: "Email déjà vérifié", verified: true });
   if (data.verify_expires && new Date(data.verify_expires) < new Date())
     return res.status(400).json({ message: "Code expiré. Demandez-en un nouveau." });
-  if (String(data.verify_code) !== String(code).trim())
+  const codeA = String(data.verify_code).padEnd(6, "0");
+  const codeB = String(code).trim().padEnd(6, "0");
+  if (!crypto.timingSafeEqual(Buffer.from(codeA), Buffer.from(codeB)))
     return res.status(400).json({ message: "Code incorrect" });
   await supabase.from("students")
     .update({ email_verified: true, verify_token: null, verify_code: null, verify_expires: null })
@@ -1029,7 +1031,7 @@ app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
   if (data.email_verified) return res.json({ message: "Email déjà vérifié" });
 
   const verifyToken = crypto.randomBytes(32).toString("hex");
-  const verifyCode = String(Math.floor(100000 + Math.random() * 900000));
+  const verifyCode = String(crypto.randomInt(100000, 999999));
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   await supabase.from("students").update({ verify_token: verifyToken, verify_code: verifyCode, verify_expires: verifyExpires }).eq("id", sid);
 
@@ -1048,12 +1050,9 @@ app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
   } else {
     emailError = "Service email non configuré";
   }
-  // Filet de sécurité : si l'email n'est pas parti, on renvoie le code pour l'afficher dans l'app
   res.json({
-    message: emailSent ? "Email de validation renvoyé" : "Email indisponible — utilisez le code ci-dessous",
+    message: emailSent ? "Email de validation renvoyé" : "Service email temporairement indisponible. Réessayez plus tard.",
     emailSent,
-    fallbackCode: emailSent ? null : verifyCode,
-    emailError,
   });
 });
 
@@ -1080,7 +1079,7 @@ app.post("/api/academy/forgot-password", rateLimit(5, 15 * 60 * 1000), async (re
 });
 
 // ── Mot de passe oublié — réinitialisation ──
-app.post("/api/academy/reset-password", async (req, res) => {
+app.post("/api/academy/reset-password", rateLimit(5, 15 * 60 * 1000), async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ message: "Token et nouveau mot de passe requis" });
   if (password.length < 8) return res.status(400).json({ message: "Le mot de passe doit faire au moins 8 caractères" });
@@ -1089,7 +1088,7 @@ app.post("/api/academy/reset-password", async (req, res) => {
   if (data.reset_expires && new Date(data.reset_expires) < new Date())
     return res.status(400).json({ message: "Lien expiré. Refaites une demande." });
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, 12);
   await supabase.from("students")
     .update({ password_hash: hash, reset_token: null, reset_expires: null })
     .eq("id", data.id);
@@ -1106,7 +1105,7 @@ app.post("/api/academy/login", rateLimit(10, 5 * 60 * 1000), async (req, res) =>
   const valid = await bcrypt.compare(password, data.password_hash);
   if (!valid) return res.status(401).json({ message: "Identifiants invalides" });
   await supabase.from("students").update({ last_login: new Date().toISOString() }).eq("id", data.id);
-  const token = generateStudentToken(data.id, data.email);
+  const token = generateStudentToken(data.id);
   res.json({
     token,
     student: { id: data.id, full_name: data.full_name, email: data.email, avatar_url: data.avatar_url },
@@ -1128,8 +1127,15 @@ app.get("/api/academy/me", requireStudent, async (req, res) => {
 app.put("/api/academy/me", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const allowed = ["full_name", "phone", "country", "city", "organization", "profession", "bio", "gender", "birth_year", "linkedin", "experience_level", "interests", "avatar_url", "course_emails"];
+  const maxLengths: Record<string, number> = { full_name: 120, phone: 30, country: 60, city: 60, organization: 120, profession: 120, bio: 1000, gender: 20, linkedin: 200 };
   const update: any = {};
-  for (const k of allowed) if (k in req.body) update[k] = req.body[k];
+  for (const k of allowed) {
+    if (!(k in req.body)) continue;
+    const v = req.body[k];
+    if (typeof v === "string" && maxLengths[k] && v.length > maxLengths[k])
+      return res.status(400).json({ message: `${k} dépasse la longueur maximale (${maxLengths[k]})` });
+    update[k] = typeof v === "string" ? v.trim() : v;
+  }
   if (Object.keys(update).length === 0) return res.status(400).json({ message: "Aucun champ à mettre à jour" });
   const { data, error } = await supabase.from("students").update(update).eq("id", sid)
     .select("id, full_name, email, phone, country, city, organization, profession, bio, gender, birth_year, linkedin, experience_level, interests, avatar_url, course_emails").single();
@@ -1147,7 +1153,7 @@ app.put("/api/academy/change-password", requireStudent, async (req, res) => {
   if (!data) return res.status(404).json({ message: "Compte introuvable" });
   const valid = await bcrypt.compare(current_password, data.password_hash);
   if (!valid) return res.status(401).json({ message: "Mot de passe actuel incorrect" });
-  const hash = await bcrypt.hash(new_password, 10);
+  const hash = await bcrypt.hash(new_password, 12);
   await supabase.from("students").update({ password_hash: hash }).eq("id", sid);
   res.json({ message: "Mot de passe modifié" });
 });
@@ -1406,7 +1412,7 @@ app.get("/api/academy/my-credentials", requireStudent, async (req, res) => {
   const { data: atts } = await supabase.from("attestations")
     .select("*, sms_courses(code, title)").eq("student_id", sid);
 
-  const dlToken = generateStudentToken(sid, (req as any).student.email);
+  const dlToken = generateStudentToken(sid);
   const credentials: any[] = [];
 
   // Attestation d'admission
@@ -1615,11 +1621,11 @@ app.get("/api/admin/academy/students/:id", requireAuth, async (req, res) => {
   const st = student.data as any;
   const certificates: any[] = [];
   if (st.admitted_at) {
-    const tk = generateStudentToken(id, st.email);
+    const tk = generateStudentToken(id);
     certificates.push({ type: "admission", label: "Attestation d'admission", url: `/api/academy/certificate/admission?token=${tk}`, expires_at: st.admission_expires });
   }
   if (st.final_certificate_no) {
-    const tk = generateStudentToken(id, st.email);
+    const tk = generateStudentToken(id);
     certificates.push({ type: "final", label: "Certificat final (Super-Expert)", url: `/api/academy/certificate/final?token=${tk}` });
   }
 
