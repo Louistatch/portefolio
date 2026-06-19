@@ -1,12 +1,10 @@
 import type { Express } from "express";
 import { supabase } from "./supabase";
-import { requireAuth, verifyCredentials, generateToken, ensureAdminExists } from "./auth";
+import { requireAuth, verifyCredentials, generateToken } from "./auth";
 import bcrypt from "bcryptjs";
 import { sendPublicationNotification, sendCampaignEmail } from "./email";
 
 export function registerAdminRoutes(app: Express) {
-  // Ensure default admin exists on startup
-  ensureAdminExists();
 
   // ── Auth ──
   app.post("/api/admin/login", async (req, res) => {

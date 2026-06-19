@@ -18,7 +18,13 @@ export function setStudentToken(token: string) {
 
 export function getStudent(): Student | null {
   const raw = localStorage.getItem(STUDENT_INFO);
-  return raw ? JSON.parse(raw) : null;
+  if (!raw) return null;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    clearStudentSession();
+    return null;
+  }
 }
 
 export function setStudent(s: Student) {
@@ -31,7 +37,19 @@ export function clearStudentSession() {
 }
 
 export function isStudentLoggedIn(): boolean {
-  return !!getStudentToken();
+  const token = getStudentToken();
+  if (!token) return false;
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    if (payload.exp && payload.exp * 1000 < Date.now()) {
+      clearStudentSession();
+      return false;
+    }
+    return true;
+  } catch {
+    clearStudentSession();
+    return false;
+  }
 }
 
 export async function studentFetch(url: string, options: RequestInit = {}) {

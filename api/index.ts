@@ -10,8 +10,9 @@ import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
 
 // ── Supabase client ──
-const supabaseUrl = process.env.VITE_SUPABASE_URL || "https://gcfcdkzmfybiigbnlwvb.supabase.co";
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdjZmNka3ptZnliaWlnYm5sd3ZiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwNTU3OTQsImV4cCI6MjA4ODYzMTc5NH0.61Xs-82V1fW6ZoDq-Te44f31BDivuXvRQkO9SS-MpTc";
+const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseKey) throw new Error("VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY doivent être définis dans les variables d'environnement.");
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // ── Email (Resend) ──
@@ -24,10 +25,9 @@ const ADMISSION_ANSWER_KEY: number[] = [1, 2, 1, 3, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1
 const ADMISSION_PASS_SCORE = 21;
 
 // ── Auth helpers ──
-const JWT_SECRET = process.env.JWT_SECRET || "lt-portfolio-admin-secret-change-me";
-// Avertissement si le secret par défaut est utilisé (à corriger sur Vercel)
-if (!process.env.JWT_SECRET) {
-  console.warn("[SECURITE] JWT_SECRET non defini — definissez-le dans les variables d'environnement Vercel.");
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("[SECURITE] JWT_SECRET non défini — définissez-le dans les variables d'environnement Vercel.");
 }
 
 // ── Rate limiting en mémoire (sans dépendance, adapté au serverless) ──
@@ -84,7 +84,9 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization;
   if (!header?.startsWith("Bearer ")) return res.status(401).json({ message: "Unauthorized" });
   try {
-    (req as any).admin = jwt.verify(header.slice(7), JWT_SECRET);
+    const decoded = jwt.verify(header.slice(7), JWT_SECRET) as any;
+    if (decoded.role === "student") return res.status(403).json({ message: "Admin access required" });
+    (req as any).admin = decoded;
     next();
   } catch {
     return res.status(401).json({ message: "Invalid token" });
@@ -101,7 +103,7 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(self), camera=(self)");
   next();
 });
 
@@ -259,7 +261,7 @@ app.post("/api/admin/change-password", requireAuth, async (req, res) => {
   const admin = (req as any).admin;
   const user = await verifyCredentials(admin.username, currentPassword);
   if (!user) return res.status(400).json({ message: "Current password incorrect" });
-  const hash = await bcrypt.hash(newPassword, 10);
+  const hash = await bcrypt.hash(newPassword, 12);
   await supabase.from("admin_users").update({ password_hash: hash }).eq("id", admin.id);
   res.json({ message: "Password changed" });
 });
@@ -704,8 +706,8 @@ app.get("/api/og/blog/:slug", async (req, res) => {
 // DataMEAL ACADEMY — School Management System
 // ══════════════════════════════════════════════════════════════════
 
-function generateStudentToken(id: number, email: string): string {
-  return jwt.sign({ sid: id, email, role: "student" }, JWT_SECRET, { expiresIn: "7d" });
+function generateStudentToken(id: number): string {
+  return jwt.sign({ sid: id, role: "student" }, JWT_SECRET, { expiresIn: "7d" });
 }
 
 function requireStudent(req: Request, res: Response, next: NextFunction) {
@@ -768,15 +770,15 @@ async function sendAcademyEmail(opts: {
 app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res) => {
   const { full_name, email, password, phone, country, organization } = req.body;
   if (!full_name || !email || !password) return res.status(400).json({ message: "Nom, email et mot de passe requis" });
-  if (password.length < 6) return res.status(400).json({ message: "Le mot de passe doit faire au moins 6 caractères" });
+  if (password.length < 8) return res.status(400).json({ message: "Le mot de passe doit faire au moins 8 caractères" });
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ message: "Email invalide" });
 
   const { data: existing } = await supabase.from("students").select("id").eq("email", email).maybeSingle();
   if (existing) return res.status(409).json({ message: "Un compte existe déjà avec cet email" });
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, 12);
   const verifyToken = crypto.randomBytes(32).toString("hex");
-  const verifyCode = String(Math.floor(100000 + Math.random() * 900000)); // code 6 chiffres
+  const verifyCode = String(crypto.randomInt(100000, 999999)); // code 6 chiffres
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(); // 24h
 
   let { data, error } = await supabase.from("students")
@@ -808,7 +810,7 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
       .catch((e: any) => console.error("Verify email error:", e));
   }
 
-  const token = generateStudentToken(data.id, data.email);
+  const token = generateStudentToken(data.id);
   res.status(201).json({ token, student: data, emailSent: !!resend });
 });
 
@@ -887,9 +889,6 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
     for (let i = 0; i < ADMISSION_ANSWER_KEY.length; i++) {
       if (Number(answers[i]) === ADMISSION_ANSWER_KEY[i]) score++;
     }
-  } else if (typeof clientScore === "number") {
-    // Repli legacy (sécurisé par le plafond) — borne le score au max réel
-    score = Math.max(0, Math.min(clientScore, ADMISSION_ANSWER_KEY.length));
   } else {
     return res.status(400).json({ message: "Réponses requises (answers)." });
   }
@@ -942,7 +941,7 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
     // Email de félicitations + lien de téléchargement de l'attestation
     const { data: stAdm } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
     if (stAdm?.email) {
-      const dlToken = generateStudentToken(sid, stAdm.email);
+      const dlToken = generateStudentToken(sid);
       const certUrl = `${SITE_URL}/api/academy/certificate/admission?token=${dlToken}`;
       sendAcademyEmail({
         studentId: sid, to: stAdm.email, type: "admission_passed",
@@ -1011,7 +1010,9 @@ app.post("/api/academy/verify-code", rateLimit(15, 10 * 60 * 1000), requireStude
   if (data.email_verified) return res.json({ message: "Email déjà vérifié", verified: true });
   if (data.verify_expires && new Date(data.verify_expires) < new Date())
     return res.status(400).json({ message: "Code expiré. Demandez-en un nouveau." });
-  if (String(data.verify_code) !== String(code).trim())
+  const codeA = String(data.verify_code).padEnd(6, "0");
+  const codeB = String(code).trim().padEnd(6, "0");
+  if (!crypto.timingSafeEqual(Buffer.from(codeA), Buffer.from(codeB)))
     return res.status(400).json({ message: "Code incorrect" });
   await supabase.from("students")
     .update({ email_verified: true, verify_token: null, verify_code: null, verify_expires: null })
@@ -1019,18 +1020,7 @@ app.post("/api/academy/verify-code", rateLimit(15, 10 * 60 * 1000), requireStude
   res.json({ message: "Email vérifié avec succès", verified: true });
 });
 
-// ── Récupérer le code de vérification courant (étudiant connecté, si email non reçu) ──
-app.get("/api/academy/my-verify-code", requireStudent, async (req, res) => {
-  const sid = (req as any).student.sid;
-  const { data } = await supabase.from("students").select("verify_code, email_verified, verify_expires").eq("id", sid).single();
-  res.json({
-    email_verified: data?.email_verified ?? false,
-    has_code: !!data?.verify_code,
-    code: data?.email_verified ? null : (data?.verify_code ?? null),
-    expires: data?.verify_expires ?? null,
-    resendConfigured: !!resend,
-  });
-});
+// (endpoint my-verify-code supprimé — faille de sécurité, le code ne doit jamais être exposé au client)
 
 
 // ── Renvoyer l'email de validation ──
@@ -1041,7 +1031,7 @@ app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
   if (data.email_verified) return res.json({ message: "Email déjà vérifié" });
 
   const verifyToken = crypto.randomBytes(32).toString("hex");
-  const verifyCode = String(Math.floor(100000 + Math.random() * 900000));
+  const verifyCode = String(crypto.randomInt(100000, 999999));
   const verifyExpires = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
   await supabase.from("students").update({ verify_token: verifyToken, verify_code: verifyCode, verify_expires: verifyExpires }).eq("id", sid);
 
@@ -1060,12 +1050,9 @@ app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
   } else {
     emailError = "Service email non configuré";
   }
-  // Filet de sécurité : si l'email n'est pas parti, on renvoie le code pour l'afficher dans l'app
   res.json({
-    message: emailSent ? "Email de validation renvoyé" : "Email indisponible — utilisez le code ci-dessous",
+    message: emailSent ? "Email de validation renvoyé" : "Service email temporairement indisponible. Réessayez plus tard.",
     emailSent,
-    fallbackCode: emailSent ? null : verifyCode,
-    emailError,
   });
 });
 
@@ -1092,16 +1079,16 @@ app.post("/api/academy/forgot-password", rateLimit(5, 15 * 60 * 1000), async (re
 });
 
 // ── Mot de passe oublié — réinitialisation ──
-app.post("/api/academy/reset-password", async (req, res) => {
+app.post("/api/academy/reset-password", rateLimit(5, 15 * 60 * 1000), async (req, res) => {
   const { token, password } = req.body;
   if (!token || !password) return res.status(400).json({ message: "Token et nouveau mot de passe requis" });
-  if (password.length < 6) return res.status(400).json({ message: "Le mot de passe doit faire au moins 6 caractères" });
+  if (password.length < 8) return res.status(400).json({ message: "Le mot de passe doit faire au moins 8 caractères" });
   const { data } = await supabase.from("students").select("id, reset_expires").eq("reset_token", token).maybeSingle();
   if (!data) return res.status(400).json({ message: "Lien de réinitialisation invalide" });
   if (data.reset_expires && new Date(data.reset_expires) < new Date())
     return res.status(400).json({ message: "Lien expiré. Refaites une demande." });
 
-  const hash = await bcrypt.hash(password, 10);
+  const hash = await bcrypt.hash(password, 12);
   await supabase.from("students")
     .update({ password_hash: hash, reset_token: null, reset_expires: null })
     .eq("id", data.id);
@@ -1118,7 +1105,7 @@ app.post("/api/academy/login", rateLimit(10, 5 * 60 * 1000), async (req, res) =>
   const valid = await bcrypt.compare(password, data.password_hash);
   if (!valid) return res.status(401).json({ message: "Identifiants invalides" });
   await supabase.from("students").update({ last_login: new Date().toISOString() }).eq("id", data.id);
-  const token = generateStudentToken(data.id, data.email);
+  const token = generateStudentToken(data.id);
   res.json({
     token,
     student: { id: data.id, full_name: data.full_name, email: data.email, avatar_url: data.avatar_url },
@@ -1140,8 +1127,15 @@ app.get("/api/academy/me", requireStudent, async (req, res) => {
 app.put("/api/academy/me", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const allowed = ["full_name", "phone", "country", "city", "organization", "profession", "bio", "gender", "birth_year", "linkedin", "experience_level", "interests", "avatar_url", "course_emails"];
+  const maxLengths: Record<string, number> = { full_name: 120, phone: 30, country: 60, city: 60, organization: 120, profession: 120, bio: 1000, gender: 20, linkedin: 200 };
   const update: any = {};
-  for (const k of allowed) if (k in req.body) update[k] = req.body[k];
+  for (const k of allowed) {
+    if (!(k in req.body)) continue;
+    const v = req.body[k];
+    if (typeof v === "string" && maxLengths[k] && v.length > maxLengths[k])
+      return res.status(400).json({ message: `${k} dépasse la longueur maximale (${maxLengths[k]})` });
+    update[k] = typeof v === "string" ? v.trim() : v;
+  }
   if (Object.keys(update).length === 0) return res.status(400).json({ message: "Aucun champ à mettre à jour" });
   const { data, error } = await supabase.from("students").update(update).eq("id", sid)
     .select("id, full_name, email, phone, country, city, organization, profession, bio, gender, birth_year, linkedin, experience_level, interests, avatar_url, course_emails").single();
@@ -1154,12 +1148,12 @@ app.put("/api/academy/change-password", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { current_password, new_password } = req.body;
   if (!current_password || !new_password) return res.status(400).json({ message: "Mot de passe actuel et nouveau requis" });
-  if (new_password.length < 6) return res.status(400).json({ message: "Le nouveau mot de passe doit faire au moins 6 caractères" });
+  if (new_password.length < 8) return res.status(400).json({ message: "Le nouveau mot de passe doit faire au moins 8 caractères" });
   const { data } = await supabase.from("students").select("password_hash").eq("id", sid).single();
   if (!data) return res.status(404).json({ message: "Compte introuvable" });
   const valid = await bcrypt.compare(current_password, data.password_hash);
   if (!valid) return res.status(401).json({ message: "Mot de passe actuel incorrect" });
-  const hash = await bcrypt.hash(new_password, 10);
+  const hash = await bcrypt.hash(new_password, 12);
   await supabase.from("students").update({ password_hash: hash }).eq("id", sid);
   res.json({ message: "Mot de passe modifié" });
 });
@@ -1219,7 +1213,7 @@ app.get("/api/academy/my-grades", requireStudent, async (req, res) => {
 // ── Compléter une leçon (auto-note + progression) ──
 app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const { course_id, lesson_id, score } = req.body;
+  const { course_id, lesson_id } = req.body;
   if (!course_id || !lesson_id) return res.status(400).json({ message: "course_id et lesson_id requis" });
 
   // Vérifier l'email + l'admission
@@ -1247,7 +1241,7 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
 
   // Récup la leçon pour le titre + points
   const { data: lesson } = await supabase.from("sms_lessons").select("title, points").eq("id", lesson_id).single();
-  const finalScore = score ?? (lesson?.points ?? 10);
+  const finalScore = lesson?.points ?? 10;
   const maxScore = lesson?.points ?? 10;
 
   // Eviter doublon de note
@@ -1418,7 +1412,7 @@ app.get("/api/academy/my-credentials", requireStudent, async (req, res) => {
   const { data: atts } = await supabase.from("attestations")
     .select("*, sms_courses(code, title)").eq("student_id", sid);
 
-  const dlToken = generateStudentToken(sid, (req as any).student.email);
+  const dlToken = generateStudentToken(sid);
   const credentials: any[] = [];
 
   // Attestation d'admission
@@ -1616,7 +1610,7 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
 app.get("/api/admin/academy/students/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const [student, grades, enrollments, attestations] = await Promise.all([
-    supabase.from("students").select("*").eq("id", id).single(),
+    supabase.from("students").select("id, full_name, email, phone, country, organization, avatar_url, status, email_verified, admitted_at, admission_expires, entry_score, test_attempts, last_test_at, next_test_allowed, created_at").eq("id", id).single(),
     supabase.from("grades").select("*, sms_courses(code, title)").eq("student_id", id).order("graded_at", { ascending: true }),
     supabase.from("enrollments").select("*, sms_courses(code, title)").eq("student_id", id),
     supabase.from("attestations").select("*, sms_courses(code, title)").eq("student_id", id),
@@ -1627,11 +1621,11 @@ app.get("/api/admin/academy/students/:id", requireAuth, async (req, res) => {
   const st = student.data as any;
   const certificates: any[] = [];
   if (st.admitted_at) {
-    const tk = generateStudentToken(id, st.email);
+    const tk = generateStudentToken(id);
     certificates.push({ type: "admission", label: "Attestation d'admission", url: `/api/academy/certificate/admission?token=${tk}`, expires_at: st.admission_expires });
   }
   if (st.final_certificate_no) {
-    const tk = generateStudentToken(id, st.email);
+    const tk = generateStudentToken(id);
     certificates.push({ type: "final", label: "Certificat final (Super-Expert)", url: `/api/academy/certificate/final?token=${tk}` });
   }
 
