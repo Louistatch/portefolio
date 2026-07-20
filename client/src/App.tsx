@@ -50,22 +50,30 @@ import { isStudentLoggedIn } from "@/lib/student";
 import { useEffect } from "react";
 import { CookieConsent } from "@/components/cookie-consent";
 
-function RequireAuth({ children }: { children: React.ReactNode }) {
+function RequireGuard({ isAuthed, loginPath, children }: { isAuthed: () => unknown; loginPath: string; children: React.ReactNode }) {
   const [, navigate] = useLocation();
+  const authed = !!isAuthed();
   useEffect(() => {
-    if (!getToken()) navigate("/admin/login");
-  }, [navigate]);
-  if (!getToken()) return null;
-  return <AdminLayout>{children}</AdminLayout>;
+    if (!authed) navigate(loginPath);
+  }, [authed, navigate, loginPath]);
+  if (!authed) return null;
+  return <>{children}</>;
+}
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  return (
+    <RequireGuard isAuthed={getToken} loginPath="/admin/login">
+      <AdminLayout>{children}</AdminLayout>
+    </RequireGuard>
+  );
 }
 
 function RequireStudentAuth({ children }: { children: React.ReactNode }) {
-  const [, navigate] = useLocation();
-  useEffect(() => {
-    if (!isStudentLoggedIn()) navigate("/academy/login");
-  }, [navigate]);
-  if (!isStudentLoggedIn()) return null;
-  return <>{children}</>;
+  return (
+    <RequireGuard isAuthed={isStudentLoggedIn} loginPath="/academy/login">
+      {children}
+    </RequireGuard>
+  );
 }
 
 function App() {

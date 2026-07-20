@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, memo } from "react";
 import { useLocation, useRoute } from "wouter";
 import { SEO } from "@/components/seo";
 import { Button } from "@/components/ui/button";
@@ -48,6 +48,42 @@ function QuizCell({ cell }: { cell: any }) {
     </div>
   );
 }
+
+const MarkdownCell = memo(function MarkdownCell({ content }: { content: string }) {
+  return (
+    <div className="px-1 py-1 text-sm leading-relaxed">
+      {(content || "").split("\n").map((line, li) => {
+        if (line.startsWith("### ")) return <h4 key={li} className="font-semibold text-[15px] mt-4 mb-1.5">{line.slice(4)}</h4>;
+        if (line.startsWith("## ")) return <h3 key={li} className="font-bold text-lg mt-3 mb-2">{line.slice(3)}</h3>;
+        if (line.startsWith("| ")) return <div key={li} className="font-mono text-xs bg-muted/60 px-3 py-1 my-0.5 rounded overflow-x-auto whitespace-nowrap">{line.replace(/\|/g, " | ").replace(/---/g, "—")}</div>;
+        if (line.match(/^\d+\. /)) return <div key={li} className="ml-3 text-muted-foreground my-1">{line.replace(/\*\*(.+?)\*\*/g, "$1")}</div>;
+        if (line.startsWith("- ")) return <div key={li} className="ml-3 text-muted-foreground my-0.5">• {line.slice(2).replace(/\*\*(.+?)\*\*/g, "$1")}</div>;
+        if (line.startsWith("```")) return null;
+        if (line.trim() === "") return <div key={li} className="h-1" />;
+        return <p key={li} className="text-muted-foreground my-1" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(line.replace(/\*\*(.+?)\*\*/g, "<strong class='text-foreground'>$1</strong>").replace(/`(.+?)`/g, "<code class='font-mono text-xs bg-muted px-1.5 py-0.5 rounded'>$1</code>")) }} />;
+      })}
+    </div>
+  );
+});
+
+const FigureCell = memo(function FigureCell({ title, svg, caption }: { title?: string; svg?: string; caption?: string }) {
+  return (
+    <div className="bg-card rounded-2xl border border-border/50 overflow-hidden">
+      {title && (
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-muted/30">
+          <ImageIcon className="w-3.5 h-3.5 text-primary" />
+          <span className="text-xs font-medium text-foreground">{title}</span>
+        </div>
+      )}
+      <div className="p-4 bg-white dark:bg-slate-900/40 flex justify-center overflow-x-auto" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(svg || "", { USE_PROFILES: { svg: true, svgFilters: true } }) }} />
+      {caption && (
+        <div className="px-4 py-2.5 bg-muted/20 border-t border-border/50">
+          <p className="text-xs text-muted-foreground leading-relaxed">{caption}</p>
+        </div>
+      )}
+    </div>
+  );
+});
 
 export default function AcademyClassroom() {
   const [, navigate] = useLocation();
@@ -252,20 +288,7 @@ export default function AcademyClassroom() {
           {cells.map((cell, ci) => {
             // ── Markdown (avec tableaux simples) ──
             if (cell.type === "md") {
-              return (
-                <div key={ci} className="px-1 py-1 text-sm leading-relaxed">
-                  {(cell.content || "").split("\n").map((line, li) => {
-                    if (line.startsWith("### ")) return <h4 key={li} className="font-semibold text-[15px] mt-4 mb-1.5">{line.slice(4)}</h4>;
-                    if (line.startsWith("## ")) return <h3 key={li} className="font-bold text-lg mt-3 mb-2">{line.slice(3)}</h3>;
-                    if (line.startsWith("| ")) return <div key={li} className="font-mono text-xs bg-muted/60 px-3 py-1 my-0.5 rounded overflow-x-auto whitespace-nowrap">{line.replace(/\|/g, " | ").replace(/---/g, "—")}</div>;
-                    if (line.match(/^\d+\. /)) return <div key={li} className="ml-3 text-muted-foreground my-1">{line.replace(/\*\*(.+?)\*\*/g, "$1")}</div>;
-                    if (line.startsWith("- ")) return <div key={li} className="ml-3 text-muted-foreground my-0.5">• {line.slice(2).replace(/\*\*(.+?)\*\*/g, "$1")}</div>;
-                    if (line.startsWith("```")) return null;
-                    if (line.trim() === "") return <div key={li} className="h-1" />;
-                    return <p key={li} className="text-muted-foreground my-1" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(line.replace(/\*\*(.+?)\*\*/g, "<strong class='text-foreground'>$1</strong>").replace(/`(.+?)`/g, "<code class='font-mono text-xs bg-muted px-1.5 py-0.5 rounded'>$1</code>")) }} />;
-                  })}
-                </div>
-              );
+              return <MarkdownCell key={ci} content={cell.content || ""} />;
             }
 
             // ── Callout (situation réelle / astuce / attention) ──
@@ -289,22 +312,7 @@ export default function AcademyClassroom() {
 
             // ── Figure SVG (capture d'interface annotée) ──
             if (cell.type === "figure") {
-              return (
-                <div key={ci} className="bg-card rounded-2xl border border-border/50 overflow-hidden">
-                  {cell.title && (
-                    <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-muted/30">
-                      <ImageIcon className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-xs font-medium text-foreground">{cell.title}</span>
-                    </div>
-                  )}
-                  <div className="p-4 bg-white dark:bg-slate-900/40 flex justify-center overflow-x-auto" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(cell.svg || "", { USE_PROFILES: { svg: true, svgFilters: true } }) }} />
-                  {cell.caption && (
-                    <div className="px-4 py-2.5 bg-muted/20 border-t border-border/50">
-                      <p className="text-xs text-muted-foreground leading-relaxed">{cell.caption}</p>
-                    </div>
-                  )}
-                </div>
-              );
+              return <FigureCell key={ci} title={cell.title} svg={cell.svg} caption={cell.caption} />;
             }
 
             // ── Ressource externe open-source ──

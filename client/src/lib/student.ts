@@ -40,7 +40,8 @@ export function isStudentLoggedIn(): boolean {
   const token = getStudentToken();
   if (!token) return false;
   try {
-    const payload = JSON.parse(atob(token.split(".")[1]));
+    const b64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(b64));
     if (payload.exp && payload.exp * 1000 < Date.now()) {
       clearStudentSession();
       return false;

@@ -24,7 +24,7 @@ export function registerAdminRoutes(app: Express) {
     const admin = (req as any).admin;
     const user = await verifyCredentials(admin.username, currentPassword);
     if (!user) return res.status(400).json({ message: "Current password incorrect" });
-    const hash = await bcrypt.hash(newPassword, 10);
+    const hash = await bcrypt.hash(newPassword, 12);
     await supabase.from("admin_users").update({ password_hash: hash }).eq("id", admin.id);
     res.json({ message: "Password changed" });
   });

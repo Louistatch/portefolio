@@ -103,7 +103,7 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   res.setHeader("X-Frame-Options", "SAMEORIGIN");
   res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
   res.setHeader("X-XSS-Protection", "1; mode=block");
-  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(self), camera=(self)");
+  res.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
   next();
 });
 
@@ -1010,8 +1010,8 @@ app.post("/api/academy/verify-code", rateLimit(15, 10 * 60 * 1000), requireStude
   if (data.email_verified) return res.json({ message: "Email déjà vérifié", verified: true });
   if (data.verify_expires && new Date(data.verify_expires) < new Date())
     return res.status(400).json({ message: "Code expiré. Demandez-en un nouveau." });
-  const codeA = String(data.verify_code).padEnd(6, "0");
-  const codeB = String(code).trim().padEnd(6, "0");
+  const codeA = String(data.verify_code).padEnd(6, "0").slice(0, 6);
+  const codeB = String(code).trim().padEnd(6, "0").slice(0, 6);
   if (!crypto.timingSafeEqual(Buffer.from(codeA), Buffer.from(codeB)))
     return res.status(400).json({ message: "Code incorrect" });
   await supabase.from("students")
@@ -1610,7 +1610,7 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
 app.get("/api/admin/academy/students/:id", requireAuth, async (req, res) => {
   const id = Number(req.params.id);
   const [student, grades, enrollments, attestations] = await Promise.all([
-    supabase.from("students").select("id, full_name, email, phone, country, organization, avatar_url, status, email_verified, admitted_at, admission_expires, entry_score, test_attempts, last_test_at, next_test_allowed, created_at").eq("id", id).single(),
+    supabase.from("students").select("id, full_name, email, phone, country, organization, avatar_url, status, email_verified, admitted_at, admission_expires, entry_score, test_attempts, last_test_at, next_test_allowed, final_certificate_no, created_at").eq("id", id).single(),
     supabase.from("grades").select("*, sms_courses(code, title)").eq("student_id", id).order("graded_at", { ascending: true }),
     supabase.from("enrollments").select("*, sms_courses(code, title)").eq("student_id", id),
     supabase.from("attestations").select("*, sms_courses(code, title)").eq("student_id", id),
