@@ -8,7 +8,7 @@ import {
   Star, Cpu, Globe, BarChart3, Download, Send, X, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialShare } from "@/components/social-share";
-import { isStudentLoggedIn, getStudent, studentFetch, getStudentToken } from "@/lib/student";
+import { isStudentLoggedIn, getStudent, studentFetch, downloadStudentFile } from "@/lib/student";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 type View = "landing" | "test" | "test-result" | "dashboard" | "notebook" | "cert";
@@ -188,7 +188,7 @@ export default function ELearning() {
   const [openProject, setOpenProject] = useState(0);
   const topRef = useRef<HTMLDivElement>(null);
 
-  const passed = score !== null && score >= 21;
+  const passed = testStatus?.passed === true || (score !== null && score >= 21);
   const answeredCount = Object.keys(answers).length;
   const totalPython = CHAPTERS.reduce((s, ch) => s + ch.cells.filter(c => c.type === "code").length, 0);
   const ranCount = Object.keys(cells).length;
@@ -502,9 +502,9 @@ export default function ELearning() {
           {passed
             ? <>
                 <Button size="lg" className="gap-2" onClick={() => navigate("/academy/dashboard")}><GraduationCap className="w-4 h-4" /> Accéder à mes cours</Button>
-                <a href={`/api/academy/certificate/admission?token=${getStudentToken()}`} target="_blank" rel="noopener noreferrer">
-                  <Button size="lg" variant="outline" className="gap-2"><Download className="w-4 h-4" /> Mon attestation</Button>
-                </a>
+                <Button size="lg" variant="outline" className="gap-2" onClick={() => downloadStudentFile("/api/academy/certificate/admission", "attestation-admission").catch(() => alert("Téléchargement impossible, réessayez."))}>
+                  <Download className="w-4 h-4" /> Mon attestation
+                </Button>
               </>
             : <Button size="lg" className="gap-2" onClick={() => setView("landing")}>Retour a l'accueil</Button>}
           {passed && <Button variant="outline" onClick={() => setView("landing")}>Retour</Button>}

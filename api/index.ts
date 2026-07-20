@@ -1167,7 +1167,7 @@ app.get("/api/academy/courses", async (_req, res) => {
 
 // ── Détail d'un cours + leçons ──
 app.get("/api/academy/courses/:id", async (req, res) => {
-  const { data: course, error } = await supabase.from("sms_courses").select("*").eq("id", Number(req.params.id)).single();
+  const { data: course, error } = await supabase.from("sms_courses").select("*").eq("id", Number(req.params.id)).eq("is_published", true).single();
   if (error) return res.status(404).json({ message: "Cours introuvable" });
   const { data: lessons } = await supabase.from("sms_lessons").select("*").eq("course_id", course.id).order("order_index");
   res.json({ ...course, lessons: lessons || [] });
@@ -1180,7 +1180,19 @@ app.get("/api/academy/my-enrollments", requireStudent, async (req, res) => {
     .select("*, sms_courses(id, code, title, description, tools, level, total_lessons)")
     .eq("student_id", sid).order("enrolled_at", { ascending: false });
   if (error) return res.status(500).json({ message: error.message });
-  res.json(data);
+  // total_lessons (saisi par l'admin) peut diverger du nombre réel de leçons publiées :
+  // on l'aligne sur un COUNT réel pour rester cohérent avec le calcul de progression.
+  const courseIds = [...new Set((data || []).map((e: any) => e.course_id))];
+  const { data: lessonRows } = courseIds.length
+    ? await supabase.from("sms_lessons").select("course_id").in("course_id", courseIds)
+    : { data: [] as any[] };
+  const counts: Record<number, number> = {};
+  for (const l of lessonRows || []) counts[l.course_id] = (counts[l.course_id] || 0) + 1;
+  const enriched = (data || []).map((e: any) => ({
+    ...e,
+    sms_courses: e.sms_courses ? { ...e.sms_courses, total_lessons: counts[e.course_id] ?? e.sms_courses.total_lessons } : e.sms_courses,
+  }));
+  res.json(enriched);
 });
 
 // ── S'inscrire à un cours ──
@@ -1188,6 +1200,8 @@ app.post("/api/academy/enroll", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { course_id } = req.body;
   if (!course_id) return res.status(400).json({ message: "course_id requis" });
+  const { data: course } = await supabase.from("sms_courses").select("id").eq("id", course_id).eq("is_published", true).maybeSingle();
+  if (!course) return res.status(404).json({ message: "Cours introuvable" });
   const { data, error } = await supabase.from("enrollments")
     .insert({ student_id: sid, course_id }).select().single();
   if (error) {
@@ -1228,31 +1242,28 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
     .select("id").eq("student_id", sid).eq("course_id", course_id).maybeSingle();
   if (!enr) await supabase.from("enrollments").insert({ student_id: sid, course_id, started_at: new Date().toISOString() });
 
+  // Vérifier que la leçon existe bien dans le cours indiqué (empêche un lesson_id forgé/d'un autre cours)
+  const { data: lesson } = await supabase.from("sms_lessons").select("title, points").eq("id", lesson_id).eq("course_id", course_id).maybeSingle();
+  if (!lesson) return res.status(404).json({ message: "Leçon introuvable pour ce cours." });
+
   // GATING WQU : la leçon doit être 'available' (débloquée cette semaine, fenêtre non dépassée)
+  // Fail-closed : l'absence de ligne lesson_progress est traitée comme verrouillée, pas comme autorisée.
   await refreshLessonStates(sid);
   const { data: lp } = await supabase.from("lesson_progress")
     .select("status, unlock_at, due_at").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
-  if (lp) {
-    if (lp.status === "locked")
-      return res.status(403).json({ message: "Cette leçon n'est pas encore débloquée.", unlockAt: lp.unlock_at, locked: true });
-    if (lp.status === "missed")
-      return res.status(403).json({ message: "La fenêtre d'une semaine pour cette leçon est dépassée. Vous avez été recalé(e) sur cette leçon.", missed: true });
-  }
+  if (!lp || lp.status === "locked")
+    return res.status(403).json({ message: "Cette leçon n'est pas encore débloquée.", unlockAt: lp?.unlock_at, locked: true });
+  if (lp.status === "missed")
+    return res.status(403).json({ message: "La fenêtre d'une semaine pour cette leçon est dépassée. Vous avez été recalé(e) sur cette leçon.", missed: true });
 
-  // Récup la leçon pour le titre + points
-  const { data: lesson } = await supabase.from("sms_lessons").select("title, points").eq("id", lesson_id).single();
-  const finalScore = lesson?.points ?? 10;
-  const maxScore = lesson?.points ?? 10;
+  const finalScore = lesson.points ?? 10;
+  const maxScore = lesson.points ?? 10;
 
-  // Eviter doublon de note
-  const { data: existingGrade } = await supabase.from("grades")
-    .select("id").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
-  if (!existingGrade) {
-    await supabase.from("grades").insert({
-      student_id: sid, course_id, lesson_id,
-      title: lesson?.title || "Leçon", score: finalScore, max_score: maxScore, type: "lesson",
-    });
-  }
+  // Insertion idempotente (une seule note par élève/leçon, protégée par la contrainte UNIQUE(student_id, lesson_id))
+  await supabase.from("grades").upsert({
+    student_id: sid, course_id, lesson_id,
+    title: lesson.title || "Leçon", score: finalScore, max_score: maxScore, type: "lesson",
+  }, { onConflict: "student_id,lesson_id", ignoreDuplicates: true });
   // Marquer la leçon comme complétée dans le planning hebdo
   await supabase.from("lesson_progress")
     .update({ status: "completed", completed_at: new Date().toISOString(), score: finalScore })

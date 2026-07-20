@@ -70,3 +70,18 @@ export async function studentFetch(url: string, options: RequestInit = {}) {
   }
   return res;
 }
+
+export async function downloadStudentFile(url: string, baseFilename: string) {
+  const res = await studentFetch(url);
+  if (!res.ok) throw new Error("Téléchargement impossible");
+  const blob = await res.blob();
+  const ext = blob.type.includes("pdf") ? "pdf" : "html";
+  const objectUrl = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = objectUrl;
+  a.download = `${baseFilename}.${ext}`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(objectUrl);
+}

@@ -88,9 +88,10 @@ const FigureCell = memo(function FigureCell({ title, svg, caption }: { title?: s
 export default function AcademyClassroom() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/academy/classroom/:id");
-  const courseId = params?.id ? Number(params.id) : null;
+  const courseId = params?.id && /^\d+$/.test(params.id) ? Number(params.id) : null;
 
   const [course, setCourse] = useState<Course | null>(null);
+  const [loadError, setLoadError] = useState(false);
   const [activeLesson, setActiveLesson] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<Set<number>>(new Set());
   const [ranCells, setRanCells] = useState<Set<string>>(new Set());
@@ -103,7 +104,8 @@ export default function AcademyClassroom() {
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
-    if (!courseId) return;
+    if (!courseId) { setCourse(null); setLoading(false); return; }
+    setLoadError(false);
     (async () => {
       try {
         const [c, enr, g, ts, sched] = await Promise.all([
@@ -135,7 +137,7 @@ export default function AcademyClassroom() {
         const schedMap: Record<number, any> = {};
         (Array.isArray(sched) ? sched : []).forEach((s: any) => { schedMap[s.lesson_id] = s; });
         setSchedule(schedMap);
-      } catch (e) { setCourse(null); } finally { setLoading(false); }
+      } catch (e) { setCourse(null); setLoadError(true); } finally { setLoading(false); }
     })();
   }, [courseId]);
 
@@ -181,9 +183,11 @@ export default function AcademyClassroom() {
   if (!course) return (
     <div className="max-w-md mx-auto text-center py-32 px-6">
       <BookOpen className="w-12 h-12 text-muted-foreground/40 mx-auto mb-4" />
-      <h2 className="text-xl font-bold mb-2">Cours introuvable</h2>
-      <p className="text-muted-foreground mb-6">Ce cours n'existe pas ou n'est plus disponible.</p>
-      <Button onClick={() => navigate("/academy/dashboard")}>Retour au tableau de bord</Button>
+      <h2 className="text-xl font-bold mb-2">{loadError ? "Erreur de chargement" : "Cours introuvable"}</h2>
+      <p className="text-muted-foreground mb-6">{loadError ? "Une erreur réseau est survenue. Réessayez." : "Ce cours n'existe pas ou n'est plus disponible."}</p>
+      {loadError
+        ? <Button onClick={() => window.location.reload()}>Réessayer</Button>
+        : <Button onClick={() => navigate("/academy/dashboard")}>Retour au tableau de bord</Button>}
     </div>
   );
 

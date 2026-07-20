@@ -6,7 +6,7 @@ import {
   User, Loader2, Save, Lock, Mail, CheckCircle2, AlertCircle,
   ArrowLeft, Bell, BellOff, Award, Download, FileText, TrendingUp,
 } from "lucide-react";
-import { studentFetch, isStudentLoggedIn, setStudent, getStudent, getStudentToken } from "@/lib/student";
+import { studentFetch, isStudentLoggedIn, setStudent, getStudent, downloadStudentFile } from "@/lib/student";
 
 const INTERESTS = ["KoboCollect", "Python", "QGIS", "Analyse de données", "Cartographie", "Reporting", "Évaluation", "Nutrition", "WASH", "Sécurité alimentaire"];
 const LEVELS = [{ v: "debutant", l: "Débutant" }, { v: "intermediaire", l: "Intermédiaire" }, { v: "avance", l: "Avancé" }];
@@ -224,9 +224,9 @@ export default function AcademyProfile() {
                 <p className="text-sm font-medium">Attestation d'admission</p>
                 <p className="text-xs text-muted-foreground">{testStatus.admissionExpires ? `Valable jusqu'au ${new Date(testStatus.admissionExpires).toLocaleDateString("fr-FR")}` : "Valable 3 mois"}</p>
               </div>
-              <a href={`/api/academy/certificate/admission?token=${getStudentToken()}`} target="_blank" rel="noopener noreferrer">
-                <Button size="sm" variant="outline" className="gap-1.5"><Download className="w-3.5 h-3.5" /> A4</Button>
-              </a>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => downloadStudentFile("/api/academy/certificate/admission", "attestation-admission").catch(() => alert("Téléchargement impossible, réessayez."))}>
+                <Download className="w-3.5 h-3.5" /> A4
+              </Button>
             </div>
             <div className={`border rounded-xl p-4 flex items-center justify-between ${p.final_certificate_no ? "border-primary/40 bg-primary/5" : "border-border/50 opacity-60"}`}>
               <div>
@@ -234,9 +234,9 @@ export default function AcademyProfile() {
                 <p className="text-xs text-muted-foreground">{p.final_certificate_no ? "Les 3 cours terminés ✓" : "Terminez les 3 cours"}</p>
               </div>
               {p.final_certificate_no ? (
-                <a href={`/api/academy/certificate/final?token=${getStudentToken()}`} target="_blank" rel="noopener noreferrer">
-                  <Button size="sm" className="gap-1.5"><Download className="w-3.5 h-3.5" /> A4</Button>
-                </a>
+                <Button size="sm" className="gap-1.5" onClick={() => downloadStudentFile("/api/academy/certificate/final", "certificat-final").catch(() => alert("Téléchargement impossible, réessayez."))}>
+                  <Download className="w-3.5 h-3.5" /> A4
+                </Button>
               ) : <Button size="sm" variant="outline" disabled><Lock className="w-3.5 h-3.5" /></Button>}
             </div>
           </div>

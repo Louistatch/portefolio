@@ -14,6 +14,7 @@ export default function AcademyLogin() {
   const [loading, setLoading] = useState(false);
 
   async function submit() {
+    if (loading) return;
     setError(""); setLoading(true);
     try {
       const res = await fetch("/api/academy/login", {

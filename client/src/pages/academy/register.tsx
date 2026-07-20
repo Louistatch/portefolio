@@ -28,6 +28,7 @@ export default function AcademyRegister() {
   const strengthColor = ["bg-muted", "bg-destructive", "bg-amber-500", "bg-primary"][strength];
 
   async function submit() {
+    if (loading) return;
     setError("");
     if (!form.full_name || !form.email || !form.password) { setError("Nom, email et mot de passe sont obligatoires."); return; }
     if (form.password.length < 8) { setError("Le mot de passe doit faire au moins 8 caractères."); return; }
