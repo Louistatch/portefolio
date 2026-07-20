@@ -19,36 +19,36 @@ interface CellState { output: string; ran: boolean; error?: boolean; }
 
 // ─── QUIZ DATA (30 questions) ─────────────────────────────────────────────────
 const QUESTIONS = [
-  { domain: "KoboCollect / XLSForm", q: "Dans un formulaire XLSForm, quelle colonne définit le type de question ?", opts: ["name", "type", "label", "hint"], ans: 1 },
-  { domain: "KoboCollect / XLSForm", q: "Quel type de question XLSForm capture des coordonnées GPS ?", opts: ["text", "integer", "geopoint", "select_one"], ans: 2 },
-  { domain: "KoboCollect / XLSForm", q: "L'onglet 'choices' dans un XLSForm sert à :", opts: ["Définir les types de questions", "Lister les options de réponse pour les questions à choix", "Configurer les contraintes", "Ajouter des médias"], ans: 1 },
-  { domain: "KoboCollect / API", q: "Quelle méthode HTTP est utilisée pour soumettre des données via l'API KoboToolbox ?", opts: ["GET", "DELETE", "PUT", "POST"], ans: 3 },
-  { domain: "KoboCollect / XLSForm", q: "Quelle expression de contrainte XLSForm vérifie qu'une valeur est supérieure à 0 ?", opts: ["value > 0", ". > 0", "${value} > 0", "check(. > 0)"], ans: 1 },
-  { domain: "KoboCollect / Logique", q: "La colonne 'relevant' dans XLSForm permet de :", opts: ["Rendre une question obligatoire", "Afficher une question conditionnellement", "Valider la réponse", "Masquer l'identifiant"], ans: 1 },
-  { domain: "KoboCollect / Déploiement", q: "Avant de collecter avec KoboCollect sur Android, quelle étape est nécessaire ?", opts: ["Installer PostgreSQL", "Configurer le serveur URL KoboToolbox dans les paramètres", "Activer le Bluetooth", "Créer un compte Gmail"], ans: 1 },
-  { domain: "MEAL — Concepts", q: "L'acronyme MEAL signifie :", opts: ["Monitoring, Evaluation, Accountability, Learning", "Measure, Evaluate, Analyze, Link", "Monitor, Estimate, Audit, Log", "Manage, Evaluate, Account, Learn"], ans: 0 },
-  { domain: "MEAL — Indicateurs", q: "Un indicateur SMART doit être :", opts: ["Simple, Mesurable, Applicable, Réaliste, Temporel", "Spécifique, Mesurable, Atteignable, Réaliste, Temporel", "Statistique, Modifiable, Analytique, Réel, Tabulé", "Systémique, Mesurable, Ajusté, Réel, Temporaire"], ans: 1 },
-  { domain: "MEAL — Théorie du changement", q: "La théorie du changement décrit :", opts: ["Les budgets du projet", "La logique causale entre activités et impacts", "Le planning RH", "Les indicateurs financiers"], ans: 1 },
-  { domain: "MEAL — Cadre logique", q: "Dans un cadre logique, les 'outputs' correspondent à :", opts: ["Les ressources mobilisées", "Les résultats directs des activités", "L'impact à long terme", "Les bénéficiaires visés"], ans: 1 },
-  { domain: "MEAL — Redevabilité", q: "Le mécanisme de redevabilité vise principalement à :", opts: ["Auditer les finances", "Donner aux bénéficiaires un moyen de donner un retour", "Contrôler les équipes terrain", "Produire les rapports bailleurs"], ans: 1 },
-  { domain: "MEAL — Évaluation", q: "Une évaluation à mi-parcours est conduite :", opts: ["Avant le démarrage du projet", "Pendant la mise en œuvre pour ajuster le projet", "Après la clôture", "Annuellement sans lien avec la phase"], ans: 1 },
-  { domain: "Python — pandas", q: "Quelle commande pandas permet de lire un fichier CSV ?", opts: ["pd.open_csv()", "pd.read_csv()", "pd.load_file()", "pd.import_csv()"], ans: 1 },
-  { domain: "Python — pandas", q: "Pour afficher les 5 premières lignes d'un DataFrame df, on utilise :", opts: ["df.show(5)", "df.top(5)", "df.head()", "df.view(5)"], ans: 2 },
-  { domain: "Python — pandas", q: "Comment calculer la moyenne d'une colonne 'age' dans un DataFrame df ?", opts: ["df['age'].avg()", "df.mean('age')", "df['age'].mean()", "average(df, 'age')"], ans: 2 },
-  { domain: "Python — pandas", q: "Quelle méthode permet de supprimer les valeurs manquantes (NaN) d'un DataFrame ?", opts: ["df.remove_na()", "df.dropna()", "df.fillna(None)", "df.clean()"], ans: 1 },
-  { domain: "Python — visualisation", q: "Quelle bibliothèque Python est couramment utilisée pour créer des graphiques ?", opts: ["numpy", "scipy", "matplotlib", "requests"], ans: 2 },
-  { domain: "Python — pandas", q: "Pour filtrer un DataFrame où 'statut' vaut 'actif', on écrit :", opts: ["df.filter(statut='actif')", "df[df['statut'] == 'actif']", "df.where('statut', 'actif')", "df.select(statut='actif')"], ans: 1 },
-  { domain: "Python — MEAL", q: "Dans un contexte MEAL, que permet pandas.groupby() ?", opts: ["Créer une boucle", "Agréger des données par catégorie (ex: district, sexe)", "Visualiser des cartes", "Envoyer des emails"], ans: 1 },
-  { domain: "QGIS — Bases", q: "QGIS est :", opts: ["Un logiciel payant de statistiques", "Un SIG open-source de cartographie", "Une base de données spatiale", "Un langage de programmation"], ans: 1 },
-  { domain: "QGIS — Données", q: "Quel format vectoriel remplace le Shapefile dans QGIS ?", opts: [".geotiff", ".kml", ".gpkg (GeoPackage)", ".csv"], ans: 2 },
-  { domain: "QGIS — Analyse spatiale", q: "La jointure spatiale permet de :", opts: ["Fusionner deux tableaux par un ID", "Associer des attributs selon la position des entités", "Découper une couche", "Changer le système de projection"], ans: 1 },
-  { domain: "QGIS — Projections", q: "Le système WGS84 (EPSG:4326) utilise des coordonnées en :", opts: ["Mètres", "Kilomètres", "Degrés (latitude/longitude)", "Pieds"], ans: 2 },
-  { domain: "QGIS — PyQGIS", q: "En PyQGIS, quelle ligne permet de charger une couche vectorielle ?", opts: ["layer = openFile('path.gpkg')", "layer = QgsVectorLayer('path.gpkg', 'nom', 'ogr')", "layer = QGIS.load('path.gpkg')", "layer = addLayer('path.gpkg')"], ans: 1 },
-  { domain: "QGIS — Atlas", q: "La fonctionnalité Atlas dans QGIS permet de :", opts: ["Télécharger des données OSM", "Générer automatiquement des cartes en série par entité", "Analyser des rasters", "Éditer des attributs en masse"], ans: 1 },
-  { domain: "QGIS — Données terrain", q: "Pour importer des données GPS KoboCollect dans QGIS, on peut utiliser :", opts: ["Un fichier XLSForm directement", "Un CSV avec colonnes latitude/longitude ou un GeoJSON", "Un fichier .docx", "Une connexion Bluetooth"], ans: 1 },
-  { domain: "MEAL — Terrain", q: "Le MUAC < 115 mm chez un enfant de 6-59 mois indique :", opts: ["Une obésité", "Une malnutrition aiguë sévère (MAS)", "Un développement normal", "Une malnutrition chronique"], ans: 1 },
-  { domain: "MEAL — Échantillonnage", q: "L'échantillonnage LQAS est utilisé pour :", opts: ["Analyser des données financières", "Évaluer rapidement si un programme atteint un seuil de couverture", "Former les équipes terrain", "Cartographier les bénéficiaires"], ans: 1 },
-  { domain: "MEAL — Restitution", q: "Un 'learning review' dans le MEAL a pour objectif de :", opts: ["Publier un rapport final", "Capitaliser sur les enseignements pour améliorer la pratique", "Contrôler les agents terrain", "Auditer le budget"], ans: 1 },
+  { domain: "KoboCollect / XLSForm", q: "Dans un formulaire XLSForm, quelle colonne définit le type de question ?", opts: ["name", "type", "label", "hint"] },
+  { domain: "KoboCollect / XLSForm", q: "Quel type de question XLSForm capture des coordonnées GPS ?", opts: ["text", "integer", "geopoint", "select_one"] },
+  { domain: "KoboCollect / XLSForm", q: "L'onglet 'choices' dans un XLSForm sert à :", opts: ["Définir les types de questions", "Lister les options de réponse pour les questions à choix", "Configurer les contraintes", "Ajouter des médias"] },
+  { domain: "KoboCollect / API", q: "Quelle méthode HTTP est utilisée pour soumettre des données via l'API KoboToolbox ?", opts: ["GET", "DELETE", "PUT", "POST"] },
+  { domain: "KoboCollect / XLSForm", q: "Quelle expression de contrainte XLSForm vérifie qu'une valeur est supérieure à 0 ?", opts: ["value > 0", ". > 0", "${value} > 0", "check(. > 0)"] },
+  { domain: "KoboCollect / Logique", q: "La colonne 'relevant' dans XLSForm permet de :", opts: ["Rendre une question obligatoire", "Afficher une question conditionnellement", "Valider la réponse", "Masquer l'identifiant"] },
+  { domain: "KoboCollect / Déploiement", q: "Avant de collecter avec KoboCollect sur Android, quelle étape est nécessaire ?", opts: ["Installer PostgreSQL", "Configurer le serveur URL KoboToolbox dans les paramètres", "Activer le Bluetooth", "Créer un compte Gmail"] },
+  { domain: "MEAL — Concepts", q: "L'acronyme MEAL signifie :", opts: ["Monitoring, Evaluation, Accountability, Learning", "Measure, Evaluate, Analyze, Link", "Monitor, Estimate, Audit, Log", "Manage, Evaluate, Account, Learn"] },
+  { domain: "MEAL — Indicateurs", q: "Un indicateur SMART doit être :", opts: ["Simple, Mesurable, Applicable, Réaliste, Temporel", "Spécifique, Mesurable, Atteignable, Réaliste, Temporel", "Statistique, Modifiable, Analytique, Réel, Tabulé", "Systémique, Mesurable, Ajusté, Réel, Temporaire"] },
+  { domain: "MEAL — Théorie du changement", q: "La théorie du changement décrit :", opts: ["Les budgets du projet", "La logique causale entre activités et impacts", "Le planning RH", "Les indicateurs financiers"] },
+  { domain: "MEAL — Cadre logique", q: "Dans un cadre logique, les 'outputs' correspondent à :", opts: ["Les ressources mobilisées", "Les résultats directs des activités", "L'impact à long terme", "Les bénéficiaires visés"] },
+  { domain: "MEAL — Redevabilité", q: "Le mécanisme de redevabilité vise principalement à :", opts: ["Auditer les finances", "Donner aux bénéficiaires un moyen de donner un retour", "Contrôler les équipes terrain", "Produire les rapports bailleurs"] },
+  { domain: "MEAL — Évaluation", q: "Une évaluation à mi-parcours est conduite :", opts: ["Avant le démarrage du projet", "Pendant la mise en œuvre pour ajuster le projet", "Après la clôture", "Annuellement sans lien avec la phase"] },
+  { domain: "Python — pandas", q: "Quelle commande pandas permet de lire un fichier CSV ?", opts: ["pd.open_csv()", "pd.read_csv()", "pd.load_file()", "pd.import_csv()"] },
+  { domain: "Python — pandas", q: "Pour afficher les 5 premières lignes d'un DataFrame df, on utilise :", opts: ["df.show(5)", "df.top(5)", "df.head()", "df.view(5)"] },
+  { domain: "Python — pandas", q: "Comment calculer la moyenne d'une colonne 'age' dans un DataFrame df ?", opts: ["df['age'].avg()", "df.mean('age')", "df['age'].mean()", "average(df, 'age')"] },
+  { domain: "Python — pandas", q: "Quelle méthode permet de supprimer les valeurs manquantes (NaN) d'un DataFrame ?", opts: ["df.remove_na()", "df.dropna()", "df.fillna(None)", "df.clean()"] },
+  { domain: "Python — visualisation", q: "Quelle bibliothèque Python est couramment utilisée pour créer des graphiques ?", opts: ["numpy", "scipy", "matplotlib", "requests"] },
+  { domain: "Python — pandas", q: "Pour filtrer un DataFrame où 'statut' vaut 'actif', on écrit :", opts: ["df.filter(statut='actif')", "df[df['statut'] == 'actif']", "df.where('statut', 'actif')", "df.select(statut='actif')"] },
+  { domain: "Python — MEAL", q: "Dans un contexte MEAL, que permet pandas.groupby() ?", opts: ["Créer une boucle", "Agréger des données par catégorie (ex: district, sexe)", "Visualiser des cartes", "Envoyer des emails"] },
+  { domain: "QGIS — Bases", q: "QGIS est :", opts: ["Un logiciel payant de statistiques", "Un SIG open-source de cartographie", "Une base de données spatiale", "Un langage de programmation"] },
+  { domain: "QGIS — Données", q: "Quel format vectoriel remplace le Shapefile dans QGIS ?", opts: [".geotiff", ".kml", ".gpkg (GeoPackage)", ".csv"] },
+  { domain: "QGIS — Analyse spatiale", q: "La jointure spatiale permet de :", opts: ["Fusionner deux tableaux par un ID", "Associer des attributs selon la position des entités", "Découper une couche", "Changer le système de projection"] },
+  { domain: "QGIS — Projections", q: "Le système WGS84 (EPSG:4326) utilise des coordonnées en :", opts: ["Mètres", "Kilomètres", "Degrés (latitude/longitude)", "Pieds"] },
+  { domain: "QGIS — PyQGIS", q: "En PyQGIS, quelle ligne permet de charger une couche vectorielle ?", opts: ["layer = openFile('path.gpkg')", "layer = QgsVectorLayer('path.gpkg', 'nom', 'ogr')", "layer = QGIS.load('path.gpkg')", "layer = addLayer('path.gpkg')"] },
+  { domain: "QGIS — Atlas", q: "La fonctionnalité Atlas dans QGIS permet de :", opts: ["Télécharger des données OSM", "Générer automatiquement des cartes en série par entité", "Analyser des rasters", "Éditer des attributs en masse"] },
+  { domain: "QGIS — Données terrain", q: "Pour importer des données GPS KoboCollect dans QGIS, on peut utiliser :", opts: ["Un fichier XLSForm directement", "Un CSV avec colonnes latitude/longitude ou un GeoJSON", "Un fichier .docx", "Une connexion Bluetooth"] },
+  { domain: "MEAL — Terrain", q: "Le MUAC < 115 mm chez un enfant de 6-59 mois indique :", opts: ["Une obésité", "Une malnutrition aiguë sévère (MAS)", "Un développement normal", "Une malnutrition chronique"] },
+  { domain: "MEAL — Échantillonnage", q: "L'échantillonnage LQAS est utilisé pour :", opts: ["Analyser des données financières", "Évaluer rapidement si un programme atteint un seuil de couverture", "Former les équipes terrain", "Cartographier les bénéficiaires"] },
+  { domain: "MEAL — Restitution", q: "Un 'learning review' dans le MEAL a pour objectif de :", opts: ["Publier un rapport final", "Capitaliser sur les enseignements pour améliorer la pratique", "Contrôler les agents terrain", "Auditer le budget"] },
 ];
 
 // ─── PROJECTS DATA ────────────────────────────────────────────────────────────
@@ -186,6 +186,8 @@ export default function ELearning() {
   const [certOrg, setCertOrg] = useState("");
   const [certSent, setCertSent] = useState(false);
   const [openProject, setOpenProject] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
 
   const passed = testStatus?.passed === true || (score !== null && score >= 21);
@@ -204,12 +206,11 @@ export default function ELearning() {
 
   // ── SUBMIT TEST (étudiant authentifié — score enregistré sur son compte)
   async function submitTest() {
-    // Le score est calculé CÔTÉ SERVEUR (anti-triche). On envoie les réponses choisies.
+    // Le score est calculé et vérifié CÔTÉ SERVEUR uniquement (le client n'a pas le corrigé) : on envoie
+    // les réponses choisies et on attend le score officiel avant d'afficher un résultat.
     const answerArray = QUESTIONS.map((_, i) => (answers[i] ?? -1));
-    // Estimation locale provisoire (affichée en attendant la réponse serveur)
-    let s = 0;
-    QUESTIONS.forEach((q, i) => { if (answers[i] === q.ans) s++; });
-    setScore(s);
+    setSubmitError(false);
+    setSubmitting(true);
     setView("test-result");
     try {
       const res = await studentFetch("/api/academy/submit-test", {
@@ -218,9 +219,14 @@ export default function ELearning() {
       });
       const data = await res.json();
       setSubmitResult(data);
-      if (typeof data.score === "number") setScore(data.score); // score officiel serveur
+      if (typeof data.score === "number") setScore(data.score);
+      else setSubmitError(true);
       studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
-    } catch (e) { /* géré par studentFetch */ }
+    } catch (e) {
+      setSubmitError(true);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   // ── Vérifie l'authentification avant de démarrer le test
@@ -471,6 +477,23 @@ export default function ELearning() {
   }
 
   function renderTestResult() {
+    if (submitting) {
+      return (
+        <div className="max-w-md mx-auto text-center py-32 px-6">
+          <div className="w-12 h-12 rounded-full border-4 border-primary/20 border-t-primary animate-spin mx-auto mb-6" />
+          <p className="text-muted-foreground">Calcul de votre score…</p>
+        </div>
+      );
+    }
+    if (submitError) {
+      return (
+        <div className="max-w-md mx-auto text-center py-32 px-6">
+          <h2 className="text-xl font-bold mb-2">Une erreur est survenue</h2>
+          <p className="text-muted-foreground mb-6">Impossible de récupérer votre score. Réessayez.</p>
+          <Button onClick={submitTest}>Réessayer</Button>
+        </div>
+      );
+    }
     if (score === null && testStatus && !testStatus.canRetry && testStatus.nextTestAllowed) {
       const when = new Date(testStatus.nextTestAllowed).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
       return (
@@ -516,7 +539,7 @@ export default function ELearning() {
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">Détail des réponses</p>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
             {QUESTIONS.map((q, i) => {
-              const ok = answers[i] === q.ans;
+              const ok = !!submitResult?.correct?.[i];
               return (
                 <div key={i} className="flex items-start gap-3 text-sm py-1.5 border-b border-border/30 last:border-0">
                   <span className={`mt-0.5 shrink-0 ${ok ? "text-primary" : "text-destructive"}`}>

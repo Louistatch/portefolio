@@ -727,8 +727,8 @@ function requireStudent(req: Request, res: Response, next: NextFunction) {
 
 // ── Inscription (après réussite du test, score >= 21/30) ──
 // Helper: enregistrer un email envoyé
-async function logAcademyEmail(student_id: number | null, type: string, email: string, subject: string) {
-  await supabase.from("academy_emails").insert({ student_id, type, email, subject }).then(() => {}, () => {});
+async function logAcademyEmail(student_id: number | null, type: string, email: string, subject: string, dedupeKey?: string) {
+  await supabase.from("academy_emails").insert({ student_id, type, email, subject, dedupe_key: dedupeKey ?? null }).then(() => {}, () => {});
 }
 
 /**
@@ -748,15 +748,14 @@ async function sendAcademyEmail(opts: {
   if (!resend) return { sent: false, reason: "resend_not_configured" };
   if (!opts.to) return { sent: false, reason: "no_recipient" };
   try {
-    // Idempotence : si un email de ce type+clé a déjà été envoyé, on ne renvoie pas
+    // Idempotence : si un email avec cette dedupeKey a déjà été envoyé, on ne renvoie pas
     if (opts.dedupeKey) {
       const { data: prior } = await supabase.from("academy_emails")
-        .select("id").eq("student_id", opts.studentId).eq("type", opts.type)
-        .eq("subject", opts.subject).limit(1).maybeSingle();
+        .select("id").eq("dedupe_key", opts.dedupeKey).limit(1).maybeSingle();
       if (prior) return { sent: false, reason: "already_sent" };
     }
     await resend.emails.send({ from: FROM_EMAIL, to: opts.to, subject: opts.subject, html: opts.html });
-    await logAcademyEmail(opts.studentId, opts.type, opts.to, opts.subject);
+    await logAcademyEmail(opts.studentId, opts.type, opts.to, opts.subject, opts.dedupeKey);
     return { sent: true };
   } catch (e: any) {
     console.error(`Academy email error [${opts.type}]:`, e?.message || e);
@@ -765,6 +764,30 @@ async function sendAcademyEmail(opts: {
       .then(() => {}, () => {});
     return { sent: false, reason: "send_failed" };
   }
+}
+
+// Notifie par batch les étudiants actifs/vérifiés d'un nouveau cours, en excluant ceux déjà notifiés (dedupeKey par étudiant).
+async function notifyNewCourseEmails(course: { id: number; code?: string; title: string; description?: string }): Promise<number> {
+  if (!resend) return 0;
+  const { data: students } = await supabase.from("students")
+    .select("id, full_name, email").eq("status", "active").eq("course_emails", true).eq("email_verified", true);
+  if (!students?.length) return 0;
+  const keyFor = (sid: number) => `new_course:${course.id}:${sid}`;
+  const { data: already } = await supabase.from("academy_emails")
+    .select("dedupe_key").in("dedupe_key", students.map((s: any) => keyFor(s.id)));
+  const sentSet = new Set((already || []).map((r: any) => r.dedupe_key));
+  const toNotify = students.filter((s: any) => !sentSet.has(keyFor(s.id)));
+  if (!toNotify.length) return 0;
+  const batch = toNotify.map((s: any) => ({
+    from: FROM_EMAIL, to: s.email,
+    subject: `Nouveau cours : ${course.title} — DataMEAL Academy`,
+    html: newCourseEmailHtml(s.full_name, course),
+  }));
+  for (let i = 0; i < batch.length; i += 100) {
+    await resend.batch.send(batch.slice(i, i + 100)).catch((e: any) => console.error("New course email error:", e));
+  }
+  toNotify.forEach((s: any) => logAcademyEmail(s.id, "new_course", s.email, `Nouveau cours : ${course.title}`, keyFor(s.id)));
+  return toNotify.length;
 }
 
 app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res) => {
@@ -864,18 +887,88 @@ async function refreshLessonStates(sid: number) {
   }
 }
 
+// Recalcule la progression d'un cours à partir des notes de type "lesson" actuellement en base,
+// met à jour l'inscription, et déclenche les emails/certificats de fin de cours si nécessaire.
+// Appelé après tout changement de note (complétion de leçon, ajout/suppression admin) pour que
+// enrollments.progress/status et les certificats restent cohérents avec les notes réelles.
+async function recalcCourseProgress(sid: number, course_id: number) {
+  const { count: totalLessons } = await supabase.from("sms_lessons")
+    .select("id", { count: "exact", head: true }).eq("course_id", course_id);
+  const { data: doneGrades } = await supabase.from("grades")
+    .select("lesson_id").eq("student_id", sid).eq("course_id", course_id).eq("type", "lesson");
+  const doneCount = new Set((doneGrades || []).map(g => g.lesson_id)).size;
+  const progress = totalLessons ? Math.round((doneCount / totalLessons) * 100) : 0;
+
+  const wasCompleted = progress >= 100;
+  await supabase.from("enrollments")
+    .update({ progress, status: wasCompleted ? "completed" : "in_progress", completed_at: wasCompleted ? new Date().toISOString() : null })
+    .eq("student_id", sid).eq("course_id", course_id);
+
+  // Email automatique de fin de projet (idempotent : une seule fois par cours)
+  if (wasCompleted) {
+    const { data: stud } = await supabase.from("students").select("full_name, email, course_emails").eq("id", sid).single();
+    const { data: course } = await supabase.from("sms_courses").select("code, title").eq("id", course_id).single();
+    if (stud?.email && stud.course_emails !== false && course) {
+      const subject = `🏁 Projet terminé : ${course.title}`;
+      sendAcademyEmail({
+        studentId: sid, to: stud.email, type: "course_completed", subject,
+        html: courseCompletedEmailHtml(stud.full_name, course),
+        dedupeKey: `completed:${sid}:${course_id}`,
+      });
+    }
+  }
+
+  // Vérifier si les 3 cours sont terminés → certificat FINAL
+  let finalCert = null;
+  if (wasCompleted) {
+    const { data: allCourses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
+    const { data: doneEnr } = await supabase.from("enrollments")
+      .select("course_id").eq("student_id", sid).eq("status", "completed");
+    const doneIds = new Set((doneEnr || []).map((e: any) => e.course_id));
+    const allDone = (allCourses || []).length > 0 && (allCourses || []).every((co: any) => doneIds.has(co.id));
+    if (allDone) {
+      const { data: existingFinal } = await supabase.from("students").select("final_certificate_no").eq("id", sid).single();
+      if (!existingFinal?.final_certificate_no) {
+        const certNo = `DMA-FINAL-${sid}-${Date.now().toString(36).toUpperCase()}`;
+        const nowIso = new Date().toISOString();
+        // Moyenne générale
+        const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
+        const ga = allGrades || [];
+        const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
+        await supabase.from("students").update({ final_certificate_no: certNo, final_certified_at: nowIso }).eq("id", sid);
+        await supabase.from("attestations").insert({
+          student_id: sid, course_id: course_id, cert_type: "final",
+          certificate_no: certNo, final_score: avg, status: "issued", issued_at: nowIso,
+        }).then(() => {}, () => {});
+        finalCert = { certificate_no: certNo, average: avg };
+        const { data: st2 } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
+        if (st2?.email) sendAcademyEmail({
+          studentId: sid, to: st2.email, type: "final_certificate",
+          subject: "🎓 Certificat Super-Expert MEAL délivré !",
+          html: finalCertEmailHtml(st2.full_name, certNo, avg),
+          dedupeKey: `final:${sid}`,
+        });
+      }
+    }
+  }
+
+  return { progress, done: doneCount, total: totalLessons || 0, completed: wasCompleted, finalCertificate: finalCert };
+}
+
 app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   // ANTI-TRICHE : le client envoie ses réponses choisies, le serveur calcule le score.
-  // (On accepte encore "score" en repli, mais "answers" prime et est la voie sûre.)
-  const { answers, score: clientScore } = req.body;
+  const { answers } = req.body;
 
   // Vérifier le délai de re-tentative (1 semaine après échec)
   const { data: stud } = await supabase.from("students")
-    .select("admitted_at, next_test_allowed, test_attempts, status, email_verified").eq("id", sid).single();
+    .select("admitted_at, admission_expires, next_test_allowed, test_attempts, status, email_verified").eq("id", sid).single();
   if (stud && stud.email_verified === false)
     return res.status(403).json({ message: "Vérifiez votre adresse email avant de passer le test.", needVerification: true });
-  if (stud?.admitted_at) {
+  // Une admission expirée peut être repassée (sinon un étudiant dont les 3 mois sont écoulés
+  // resterait bloqué pour toujours puisqu'admitted_at reste défini).
+  const admissionExpired = !!stud?.admission_expires && new Date(stud.admission_expires) < new Date();
+  if (stud?.admitted_at && !admissionExpired) {
     return res.status(403).json({ message: "Vous êtes déjà admis(e). Le test ne peut pas être repassé.", alreadyAdmitted: true });
   }
   if (stud?.next_test_allowed && new Date(stud.next_test_allowed) > new Date()) {
@@ -884,10 +977,13 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
 
   // Calcul du score CÔTÉ SERVEUR à partir des réponses
   let score: number;
+  const correct: boolean[] = [];
   if (Array.isArray(answers)) {
     score = 0;
     for (let i = 0; i < ADMISSION_ANSWER_KEY.length; i++) {
-      if (Number(answers[i]) === ADMISSION_ANSWER_KEY[i]) score++;
+      const isCorrect = Number(answers[i]) === ADMISSION_ANSWER_KEY[i];
+      correct.push(isCorrect);
+      if (isCorrect) score++;
     }
   } else {
     return res.status(400).json({ message: "Réponses requises (answers)." });
@@ -901,11 +997,7 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
     entry_score: score, test_attempts: attempts, last_test_at: now.toISOString(),
     status: passed ? "active" : "pending_test",
   };
-  if (passed) {
-    update.admitted_at = now.toISOString();
-    update.admission_expires = new Date(now.getFullYear(), now.getMonth() + ADMISSION_MONTHS, now.getDate()).toISOString();
-    update.next_test_allowed = null;
-  } else {
+  if (!passed) {
     update.next_test_allowed = new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
   }
   await supabase.from("students").update(update).eq("id", sid);
@@ -919,43 +1011,59 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
     await supabase.from("grades").insert({ student_id: sid, title: "Test d'admission MEAL", score, max_score: 30, type: "entry_test" });
   }
 
+  let admissionExpires: string | null = null;
   if (passed) {
-    // Inscrire à tous les cours + générer un certificat d'admission + planning hebdo
-    const { data: courses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
-    if (courses?.length) {
-      const { data: existing } = await supabase.from("enrollments").select("course_id").eq("student_id", sid);
-      const already = new Set((existing || []).map((e: any) => e.course_id));
-      const toAdd = courses.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: sid, course_id: co.id, started_at: now.toISOString() }));
-      if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
-    }
-    await generateLessonSchedule(sid, now);
+    admissionExpires = new Date(now.getFullYear(), now.getMonth() + ADMISSION_MONTHS, now.getDate()).toISOString();
+    // Verrou optimiste : n'octroie l'admission qu'une seule fois même si deux requêtes concurrentes
+    // (double-clic, retry réseau) passent toutes les deux le contrôle "pas encore admis" ci-dessus.
+    const { data: claimed } = await supabase.from("students")
+      .update({ admitted_at: now.toISOString(), admission_expires: admissionExpires, next_test_allowed: null })
+      .eq("id", sid)
+      .or(`admitted_at.is.null,admission_expires.lt.${now.toISOString()}`)
+      .select("id").maybeSingle();
 
-    // Certificat d'admission (expire à 3 mois)
-    const certNo = `DMA-ADM-${sid}-${Date.now().toString(36).toUpperCase()}`;
-    await supabase.from("attestations").insert({
-      student_id: sid, course_id: courses?.[0]?.id ?? null, cert_type: "admission",
-      certificate_no: certNo, final_score: Math.round(score / 30 * 100),
-      status: "issued", issued_at: now.toISOString(), expires_at: update.admission_expires,
-    }).then(() => {}, () => {});
+    if (claimed) {
+      // Ré-admission après expiration : repartir d'un planning et d'une attestation propres.
+      await supabase.from("attestations").delete().eq("student_id", sid).eq("cert_type", "admission").then(() => {}, () => {});
+      await supabase.from("lesson_progress").delete().eq("student_id", sid).then(() => {}, () => {});
 
-    // Email de félicitations + lien de téléchargement de l'attestation
-    const { data: stAdm } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
-    if (stAdm?.email) {
-      const dlToken = generateStudentToken(sid);
-      const certUrl = `${SITE_URL}/api/academy/certificate/admission?token=${dlToken}`;
-      sendAcademyEmail({
-        studentId: sid, to: stAdm.email, type: "admission_passed",
-        subject: "🎉 Félicitations — Vous êtes admis(e) à DataMEAL Academy !",
-        html: admissionPassedEmailHtml(stAdm.full_name, Math.round(score / 30 * 100), update.admission_expires, certUrl),
-        dedupeKey: `admission:${sid}`,
-      });
+      // Inscrire à tous les cours + générer un certificat d'admission + planning hebdo
+      const { data: courses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
+      if (courses?.length) {
+        const { data: existing } = await supabase.from("enrollments").select("course_id").eq("student_id", sid);
+        const already = new Set((existing || []).map((e: any) => e.course_id));
+        const toAdd = courses.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: sid, course_id: co.id, started_at: now.toISOString() }));
+        if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
+      }
+      await generateLessonSchedule(sid, now);
+
+      // Certificat d'admission (expire à 3 mois)
+      const certNo = `DMA-ADM-${sid}-${Date.now().toString(36).toUpperCase()}`;
+      await supabase.from("attestations").insert({
+        student_id: sid, course_id: courses?.[0]?.id ?? null, cert_type: "admission",
+        certificate_no: certNo, final_score: Math.round(score / 30 * 100),
+        status: "issued", issued_at: now.toISOString(), expires_at: admissionExpires,
+      }).then(() => {}, () => {});
+
+      // Email de félicitations + lien de téléchargement de l'attestation
+      const { data: stAdm } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
+      if (stAdm?.email) {
+        const dlToken = generateStudentToken(sid);
+        const certUrl = `${SITE_URL}/api/academy/certificate/admission?token=${dlToken}`;
+        sendAcademyEmail({
+          studentId: sid, to: stAdm.email, type: "admission_passed",
+          subject: "🎉 Félicitations — Vous êtes admis(e) à DataMEAL Academy !",
+          html: admissionPassedEmailHtml(stAdm.full_name, Math.round(score / 30 * 100), admissionExpires, certUrl),
+          dedupeKey: `admission:${sid}:${admissionExpires}`,
+        });
+      }
     }
   }
 
   res.json({
-    passed, score,
+    passed, score, correct,
     status: passed ? "active" : "pending_test",
-    admissionExpires: passed ? update.admission_expires : null,
+    admissionExpires: passed ? admissionExpires : null,
     nextTestAllowed: passed ? null : update.next_test_allowed,
   });
 });
@@ -1024,7 +1132,7 @@ app.post("/api/academy/verify-code", rateLimit(15, 10 * 60 * 1000), requireStude
 
 
 // ── Renvoyer l'email de validation ──
-app.post("/api/academy/resend-verify", requireStudent, async (req, res) => {
+app.post("/api/academy/resend-verify", rateLimit(5, 15 * 60 * 1000), requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data } = await supabase.from("students").select("full_name, email, email_verified").eq("id", sid).single();
   if (!data) return res.status(404).json({ message: "Compte introuvable" });
@@ -1248,6 +1356,8 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
 
   // GATING WQU : la leçon doit être 'available' (débloquée cette semaine, fenêtre non dépassée)
   // Fail-closed : l'absence de ligne lesson_progress est traitée comme verrouillée, pas comme autorisée.
+  // On régénère d'abord le planning (idempotent) pour rattraper une leçon ajoutée après l'admission.
+  await generateLessonSchedule(sid, new Date(stud.admitted_at));
   await refreshLessonStates(sid);
   const { data: lp } = await supabase.from("lesson_progress")
     .select("status, unlock_at, due_at").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
@@ -1269,73 +1379,15 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
     .update({ status: "completed", completed_at: new Date().toISOString(), score: finalScore })
     .eq("student_id", sid).eq("lesson_id", lesson_id).then(() => {}, () => {});
 
-  // Recalcul progression
-  const { count: totalLessons } = await supabase.from("sms_lessons")
-    .select("id", { count: "exact", head: true }).eq("course_id", course_id);
-  const { data: doneGrades } = await supabase.from("grades")
-    .select("lesson_id").eq("student_id", sid).eq("course_id", course_id).eq("type", "lesson");
-  const doneCount = new Set((doneGrades || []).map(g => g.lesson_id)).size;
-  const progress = totalLessons ? Math.round((doneCount / totalLessons) * 100) : 0;
-
-  const wasCompleted = progress >= 100;
-  await supabase.from("enrollments")
-    .update({ progress, status: wasCompleted ? "completed" : "in_progress", completed_at: wasCompleted ? new Date().toISOString() : null })
-    .eq("student_id", sid).eq("course_id", course_id);
-
-  // Email automatique de fin de projet (idempotent : une seule fois par cours)
-  if (wasCompleted) {
-    const { data: stud } = await supabase.from("students").select("full_name, email, course_emails").eq("id", sid).single();
-    const { data: course } = await supabase.from("sms_courses").select("code, title").eq("id", course_id).single();
-    if (stud?.email && stud.course_emails !== false && course) {
-      const subject = `🏁 Projet terminé : ${course.title}`;
-      sendAcademyEmail({
-        studentId: sid, to: stud.email, type: "course_completed", subject,
-        html: courseCompletedEmailHtml(stud.full_name, course),
-        dedupeKey: `completed:${sid}:${course_id}`,
-      });
-    }
-  }
-
-  // Vérifier si les 3 cours sont terminés → certificat FINAL
-  let finalCert = null;
-  if (wasCompleted) {
-    const { data: allCourses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
-    const { data: doneEnr } = await supabase.from("enrollments")
-      .select("course_id").eq("student_id", sid).eq("status", "completed");
-    const doneIds = new Set((doneEnr || []).map((e: any) => e.course_id));
-    const allDone = (allCourses || []).length > 0 && (allCourses || []).every((co: any) => doneIds.has(co.id));
-    if (allDone) {
-      const { data: existingFinal } = await supabase.from("students").select("final_certificate_no").eq("id", sid).single();
-      if (!existingFinal?.final_certificate_no) {
-        const certNo = `DMA-FINAL-${sid}-${Date.now().toString(36).toUpperCase()}`;
-        const nowIso = new Date().toISOString();
-        // Moyenne générale
-        const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
-        const ga = allGrades || [];
-        const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
-        await supabase.from("students").update({ final_certificate_no: certNo, final_certified_at: nowIso }).eq("id", sid);
-        await supabase.from("attestations").insert({
-          student_id: sid, course_id: course_id, cert_type: "final",
-          certificate_no: certNo, final_score: avg, status: "issued", issued_at: nowIso,
-        }).then(() => {}, () => {});
-        finalCert = { certificate_no: certNo, average: avg };
-        const { data: st2 } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
-        if (st2?.email) sendAcademyEmail({
-          studentId: sid, to: st2.email, type: "final_certificate",
-          subject: "🎓 Certificat Super-Expert MEAL délivré !",
-          html: finalCertEmailHtml(st2.full_name, certNo, avg),
-          dedupeKey: `final:${sid}`,
-        });
-      }
-    }
-  }
-
-  res.json({ progress, done: doneCount, total: totalLessons || 0, completed: wasCompleted, finalCertificate: finalCert });
+  const result = await recalcCourseProgress(sid, course_id);
+  res.json(result);
 });
 
 // ── Planning hebdomadaire des leçons (modèle WQU) ──
 app.get("/api/academy/lesson-schedule", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
+  const { data: stud } = await supabase.from("students").select("admitted_at").eq("id", sid).maybeSingle();
+  if (stud?.admitted_at) await generateLessonSchedule(sid, new Date(stud.admitted_at));
   await refreshLessonStates(sid);
   const { data, error } = await supabase.from("lesson_progress")
     .select("*, sms_lessons(title, order_index), sms_courses(code, title)")
@@ -1377,7 +1429,9 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
 
   const { data: existing } = await supabase.from("attestations")
     .select("id, status").eq("student_id", sid).eq("course_id", course_id).maybeSingle();
-  if (existing) return res.status(409).json({ message: "Attestation déjà demandée", status: existing.status });
+  if (existing && existing.status !== "rejected") return res.status(409).json({ message: "Attestation déjà demandée", status: existing.status });
+  // Une demande rejetée peut être refaite : on remplace l'ancienne ligne par une nouvelle demande "pending".
+  if (existing) await supabase.from("attestations").delete().eq("id", existing.id);
 
   // Score final = moyenne des notes du cours
   const { data: courseGrades } = await supabase.from("grades")
@@ -1499,23 +1553,9 @@ app.post("/api/admin/academy/courses", requireAuth, async (req, res) => {
     .select().single();
   if (error) return res.status(400).json({ message: error.message });
 
-  // Notifier tous les étudiants actifs ayant accepté les emails de cours
-  if (notify && resend) {
-    const { data: students } = await supabase.from("students")
-      .select("id, full_name, email").eq("status", "active").eq("course_emails", true).eq("email_verified", true);
-    if (students?.length) {
-      const batch = students.map((s: any) => ({
-        from: FROM_EMAIL, to: s.email,
-        subject: `Nouveau cours : ${title} — DataMEAL Academy`,
-        html: newCourseEmailHtml(s.full_name, { code, title, description }),
-      }));
-      for (let i = 0; i < batch.length; i += 100) {
-        resend.batch.send(batch.slice(i, i + 100)).catch((e: any) => console.error("New course email error:", e));
-      }
-      students.forEach((s: any) => logAcademyEmail(s.id, "new_course", s.email, `Nouveau cours : ${title}`));
-    }
-  }
-  res.status(201).json({ course: data, notified: !!notify });
+  // Notifier tous les étudiants actifs ayant accepté les emails de cours (idempotent par étudiant/cours)
+  const notified = notify ? await notifyNewCourseEmails({ id: data.id, code, title, description }) : 0;
+  res.status(201).json({ course: data, notified: !!notify, notifiedCount: notified });
 });
 
 // ── ADMIN : notifier manuellement d'un cours existant ──
@@ -1523,21 +1563,7 @@ app.post("/api/admin/academy/notify-course/:id", requireAuth, async (req, res) =
   const { data: course } = await supabase.from("sms_courses").select("*").eq("id", Number(req.params.id)).single();
   if (!course) return res.status(404).json({ message: "Cours introuvable" });
   if (!resend) return res.status(400).json({ message: "Email non configuré (RESEND_API_KEY manquant)" });
-  const { data: students } = await supabase.from("students")
-    .select("id, full_name, email").eq("status", "active").eq("course_emails", true).eq("email_verified", true);
-  let count = 0;
-  if (students?.length) {
-    const batch = students.map((s: any) => ({
-      from: FROM_EMAIL, to: s.email,
-      subject: `Nouveau cours : ${course.title} — DataMEAL Academy`,
-      html: newCourseEmailHtml(s.full_name, course),
-    }));
-    for (let i = 0; i < batch.length; i += 100) {
-      resend.batch.send(batch.slice(i, i + 100)).catch(() => {});
-    }
-    students.forEach((s: any) => logAcademyEmail(s.id, "new_course", s.email, `Nouveau cours : ${course.title}`));
-    count = students.length;
-  }
+  const count = await notifyNewCourseEmails(course);
   res.json({ message: `Notification envoyée à ${count} étudiant(s)`, count });
 });
 
@@ -1598,6 +1624,9 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
         const toAdd = courses.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: id, course_id: co.id, started_at: now.toISOString() }));
         if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
       }
+      // Remplace toute attestation d'admission existante (évite les doublons si "admit" est cliqué
+      // plusieurs fois ou après un revoke_admission — verify-certificate suppose une seule ligne par étudiant).
+      await supabase.from("attestations").delete().eq("student_id", id).eq("cert_type", "admission").then(() => {}, () => {});
       const certNo = `DMA-ADM-${id}-${Date.now().toString(36).toUpperCase()}`;
       await supabase.from("attestations").insert({ student_id: id, course_id: courses?.[0]?.id ?? null, cert_type: "admission", certificate_no: certNo, status: "issued", issued_at: now.toISOString(), expires_at: expires }).then(() => {}, () => {});
       await generateLessonSchedule(id, now);
@@ -1607,6 +1636,7 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
     } else if (action === "revoke_admission") {
       await supabase.from("students").update({ admitted_at: null, admission_expires: null, status: "pending_test" }).eq("id", id);
       await supabase.from("lesson_progress").delete().eq("student_id", id).then(() => {}, () => {});
+      await supabase.from("attestations").delete().eq("student_id", id).eq("cert_type", "admission").then(() => {}, () => {});
     } else if (action === "delete") {
       await supabase.from("students").delete().eq("id", id);
     } else {
@@ -1651,12 +1681,16 @@ app.post("/api/admin/academy/grades", requireAuth, async (req, res) => {
     .insert({ student_id, course_id, lesson_id, title, score, max_score: max_score || 100, type: type || "exam", feedback })
     .select().single();
   if (error) return res.status(400).json({ message: error.message });
+  // Garder enrollments.progress/status (et les certificats qui en dépendent) cohérents avec les notes réelles.
+  if ((type || "exam") === "lesson" && course_id) await recalcCourseProgress(student_id, course_id);
   res.status(201).json(data);
 });
 
 app.delete("/api/admin/academy/grades/:id", requireAuth, async (req, res) => {
+  const { data: grade } = await supabase.from("grades").select("student_id, course_id, type").eq("id", Number(req.params.id)).maybeSingle();
   const { error } = await supabase.from("grades").delete().eq("id", Number(req.params.id));
   if (error) return res.status(400).json({ message: error.message });
+  if (grade?.type === "lesson" && grade.course_id) await recalcCourseProgress(grade.student_id, grade.course_id);
   res.json({ message: "Supprimé" });
 });
 
@@ -1685,12 +1719,14 @@ app.put("/api/admin/academy/attestations/:id", requireAuth, async (req, res) => 
         studentId: data.student_id, to: stud.email, type: "attestation_issued",
         subject: `🎓 Votre attestation est prête — ${course.title}`,
         html: attestationIssuedEmailHtml(stud.full_name, course, data.certificate_no, Number(data.final_score)),
+        dedupeKey: `attestation:${data.id}:issued`,
       });
     } else if (status === "rejected") {
       sendAcademyEmail({
         studentId: data.student_id, to: stud.email, type: "attestation_rejected",
         subject: `Attestation — complément requis (${course.title})`,
         html: attestationRejectedEmailHtml(stud.full_name, course),
+        dedupeKey: `attestation:${data.id}:rejected`,
       });
     }
   }
@@ -2259,11 +2295,11 @@ app.post("/api/admin/academy/meetings", requireAuth, async (req, res) => {
   // Notifier les étudiants admis qui acceptent les emails
   try {
     const { data: students } = await supabase.from("students")
-      .select("email, full_name, course_emails").not("admitted_at", "is", null);
+      .select("id, email, full_name, course_emails").not("admitted_at", "is", null);
     const recipients = (students || []).filter((s: any) => s.course_emails !== false && s.email);
     for (const s of recipients) {
       sendAcademyEmail({
-        to: s.email, type: "meeting_scheduled",
+        studentId: s.id, to: s.email, type: "meeting_scheduled",
         subject: `📅 Nouvelle rencontre en ligne : ${title}`,
         html: meetingEmailHtml(s.full_name, title, starts_at, kind || "meeting"),
         dedupeKey: `meeting:${data.id}:${s.email}`,
