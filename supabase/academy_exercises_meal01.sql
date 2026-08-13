@@ -40,8 +40,12 @@ UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells'
    "answer":1,
    "explain":"Un indicateur se mesure avec une valeur, une population et une désagrégation. « Améliorer », « sensibiliser », « renforcer » décrivent des intentions : rien dans votre formulaire ne pourra les chiffrer."}
 ]'::jsonb)
-WHERE course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
-  AND title = 'Comprendre la collecte de données terrain'
+WHERE id = (
+  SELECT l.id FROM sms_lessons l
+  WHERE l.course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
+    AND l.title ILIKE '%collecte de données terrain%'
+  ORDER BY l.order_index LIMIT 1
+)
   AND NOT (content->'cells') @> '[{"type":"exercise"}]'::jsonb;
 
 -- ── Leçon 2 — Le constructeur de formulaire : ajouter une question ──
@@ -64,8 +68,12 @@ UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells'
    "answer":1,
    "explain":"Le formulaire fonctionnera très bien — c''est le piège. Mais « 24 » arrivera comme du texte : impossible de filtrer les 6-59 mois ni de calculer une moyenne sans nettoyage. Le type se choisit en pensant à l''analyse."}
 ]'::jsonb)
-WHERE course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
-  AND title = 'Le constructeur de formulaire : ajouter une question'
+WHERE id = (
+  SELECT l.id FROM sms_lessons l
+  WHERE l.course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
+    AND (l.title ILIKE '%ajouter une question%' OR l.title ILIKE '%les bases%')
+  ORDER BY l.order_index LIMIT 1
+)
   AND NOT (content->'cells') @> '[{"type":"exercise"}]'::jsonb;
 
 -- ── Leçon 3 — Choisir le bon type de réponse ──
@@ -91,8 +99,12 @@ UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells'
    "answer":1,
    "explain":"**image** ouvre l''appareil photo du téléphone et attache le cliché à la soumission. *note* n''enregistre rien : c''est une simple consigne affichée à l''enquêteur."}
 ]'::jsonb)
-WHERE course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
-  AND title = 'Choisir le bon type de réponse'
+WHERE id = (
+  SELECT l.id FROM sms_lessons l
+  WHERE l.course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
+    AND l.title ILIKE '%type de réponse%'
+  ORDER BY l.order_index LIMIT 1
+)
   AND NOT (content->'cells') @> '[{"type":"exercise"}]'::jsonb;
 
 -- ── Leçon 4 — Rendre le formulaire intelligent (validation & logique) ──
@@ -119,8 +131,12 @@ UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells'
    "answer":0,
    "explain":"**constraint_message** affiche le texte que lit l''enquêteur quand sa saisie est refusée, par exemple « Le MUAC doit être compris entre 60 et 200 mm — vérifiez la virgule ». Une contrainte muette est vécue comme un bug."}
 ]'::jsonb)
-WHERE course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
-  AND title = 'Rendre le formulaire intelligent (validation & logique)'
+WHERE id = (
+  SELECT l.id FROM sms_lessons l
+  WHERE l.course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
+    AND l.title ILIKE '%validation%'
+  ORDER BY l.order_index LIMIT 1
+)
   AND NOT (content->'cells') @> '[{"type":"exercise"}]'::jsonb;
 
 -- ── Leçon 5 — Déployer le formulaire et lancer la collecte ──
@@ -143,8 +159,12 @@ UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells'
    "answer":1,
    "explain":"Les soumissions déjà envoyées ne bougent pas. En revanche chaque enquêteur doit re-télécharger le formulaire, sinon vous vous retrouvez avec deux versions sur le terrain — cause classique de colonnes en double à l''analyse."}
 ]'::jsonb)
-WHERE course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
-  AND title = 'Déployer le formulaire et lancer la collecte'
+WHERE id = (
+  SELECT l.id FROM sms_lessons l
+  WHERE l.course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
+    AND (l.title ILIKE '%déployer%' OR l.title ILIKE '%lancer la collecte%')
+  ORDER BY l.order_index LIMIT 1
+)
   AND NOT (content->'cells') @> '[{"type":"exercise"}]'::jsonb;
 
 -- ── Leçon 6 — Collecter sur le terrain avec KoboCollect ──
@@ -167,8 +187,12 @@ UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells'
    "hint":"Une contrainte valide la plausibilité d''une valeur, pas l''honnêteté ni le soin de la mesure.",
    "explain":"Douze valeurs identiques pile sur le seuil, c''est le signal classique d''un bracelet mal lu ou d''une saisie inventée. Aucune contrainte ne peut l''attraper : seul le suivi quotidien le peut, et il faut agir tant que l''équipe est encore sur zone."}
 ]'::jsonb)
-WHERE course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
-  AND title = 'Collecter sur le terrain avec KoboCollect'
+WHERE id = (
+  SELECT l.id FROM sms_lessons l
+  WHERE l.course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
+    AND l.title ILIKE '%avec kobocollect%'
+  ORDER BY l.order_index LIMIT 1
+)
   AND NOT (content->'cells') @> '[{"type":"exercise"}]'::jsonb;
 
 -- ── Leçon 7 — Récupérer et analyser les données (capstone) ──
@@ -193,11 +217,24 @@ UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells'
    "answer":"groupby","accept":["groupby","group by","df.groupby","groupby()"],
    "explain":"**groupby** : `df.groupby(''district'')[''statut''].value_counts()`. La moyenne nationale cache toujours des écarts entre districts — et c''est sur ces écarts que se décide où envoyer les équipes."}
 ]'::jsonb)
-WHERE course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
-  AND title = 'Récupérer et analyser les données (capstone)'
+WHERE id = (
+  SELECT l.id FROM sms_lessons l
+  WHERE l.course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01')
+    AND (l.title ILIKE '%analyser les données%' OR l.title ILIKE '%indicateurs nutritionnels%')
+  ORDER BY l.order_index LIMIT 1
+)
   AND NOT (content->'cells') @> '[{"type":"exercise"}]'::jsonb;
 
--- ── Vérification ──
--- Nombre d'exercices ajoutés par leçon :
---   SELECT title, jsonb_array_length(jsonb_path_query_array(content->'cells', '$[*] ? (@.type == "exercise")')) AS exercices
---   FROM sms_lessons WHERE course_id = (SELECT id FROM sms_courses WHERE code = 'MEAL-01') ORDER BY order_index;
+-- ── Rapport ──
+-- Un UPDATE qui ne touche aucune ligne affiche « Success. No rows returned », exactement
+-- comme un UPDATE réussi : ce SELECT final rend le résultat visible. La colonne
+-- « exercices » doit être > 0 sur chaque leçon.
+SELECT l.order_index AS lecon,
+       l.title,
+       jsonb_array_length(
+         jsonb_path_query_array(l.content->'cells', '$[*] ? (@.type == "exercise")')
+       ) AS exercices
+FROM sms_lessons l
+JOIN sms_courses c ON c.id = l.course_id
+WHERE c.code = 'MEAL-01'
+ORDER BY l.order_index;
