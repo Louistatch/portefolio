@@ -73,7 +73,8 @@ for (const file of files) {
     // Le corrigé ne doit jamais partir vers le navigateur.
     const sent = JSON.stringify(stripExerciseAnswers(lesson));
     check(`${where} : corrigé absent de la réponse HTTP`,
-      !sent.includes('"answer"') && !sent.includes('"accept"') && !sent.includes('"tolerance"'));
+      !sent.includes('"answer"') && !sent.includes('"accept"')
+      && !sent.includes('"tolerance"') && !sent.includes('"explain"'));
     const kept = stripExerciseAnswers(lesson).cells.filter((c: any) => c.type === "exercise");
     check(`${where} : énoncés et options conservés`,
       kept.every((c: any) => c.prompt && (c.kind !== "choice" || Array.isArray(c.opts))));

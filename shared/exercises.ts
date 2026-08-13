@@ -42,14 +42,22 @@ export function exerciseId(ex: ExerciseCell, index: number): string {
   return ex.id || `ex${index + 1}`;
 }
 
-/** Retire le corrigé des cellules d'exercice avant d'envoyer un cours au navigateur. */
+/**
+ * Retire le corrigé des cellules d'exercice avant d'envoyer un cours au navigateur.
+ *
+ * `explain` en fait partie : la correction pédagogique énonce la bonne réponse en toutes
+ * lettres (« C'est la colonne label »), donc la laisser dans le contenu revient à publier
+ * le corrigé sous une autre forme. Elle est renvoyée par gradeLessonExercises au moment de
+ * la correction, ce qui est le seul instant où l'étudiant doit la voir.
+ * `hint` reste servi : l'indice est une aide destinée à être lue avant de répondre.
+ */
 export function stripExerciseAnswers(content: any) {
   if (!Array.isArray(content?.cells)) return content;
   return {
     ...content,
     cells: content.cells.map((c: any) => {
       if (c?.type !== "exercise") return c;
-      const { answer, accept, tolerance, ...safe } = c;
+      const { answer, accept, tolerance, explain, ...safe } = c;
       return safe;
     }),
   };
