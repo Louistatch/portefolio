@@ -931,7 +931,10 @@ async function recalcCourseProgress(sid: number, course_id: number) {
     .select("id", { count: "exact", head: true }).eq("course_id", course_id);
   const { data: doneGrades } = await supabase.from("grades")
     .select("lesson_id").eq("student_id", sid).eq("course_id", course_id).eq("type", "lesson");
-  const doneCount = new Set((doneGrades || []).map(g => g.lesson_id)).size;
+  // Les notes dont la leçon a été supprimée (remplacement de contenu → lesson_id NULL) ne
+  // désignent plus rien : sans ce filtre, tous les NULL se fondaient en une seule entrée de
+  // Set et créditaient l'étudiant d'une leçon fantôme.
+  const doneCount = new Set((doneGrades || []).map(g => g.lesson_id).filter(id => id != null)).size;
   const progress = totalLessons ? Math.round((doneCount / totalLessons) * 100) : 0;
 
   const wasCompleted = progress >= 100;
