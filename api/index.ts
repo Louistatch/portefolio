@@ -841,18 +841,25 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
 const ADMISSION_MONTHS = 3;
 const RETRY_DAYS = 7;
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+// Le certificat final "Super-Expert MEAL" atteste des projets du cursus MEAL uniquement.
+// Les autres cours publiés (ex. TOF-FIN-01, formation de formateurs) restent accessibles
+// mais ne conditionnent pas sa délivrance.
+const MEAL_PROGRAM_PREFIX = "MEAL-";
 
 // Génère le planning hebdomadaire des leçons depuis la date d'admission (modèle WQU)
+// Les cours avancent EN PARALLÈLE : la semaine 1 débloque la 1re leçon de chaque cours.
+// (Un compteur cumulé sur tous les cours étalerait le programme sur plus de semaines qu'il
+// n'y en a dans la fenêtre d'admission de 3 mois, rendant la fin du cursus inatteignable.)
 async function generateLessonSchedule(sid: number, admittedAt: Date) {
   const { data: courses } = await supabase.from("sms_courses")
     .select("id").eq("is_published", true).order("order_index");
   if (!courses?.length) return;
 
-  let week = 0;
   const rows: any[] = [];
   for (const co of courses) {
     const { data: lessons } = await supabase.from("sms_lessons")
       .select("id").eq("course_id", co.id).order("order_index");
+    let week = 0;
     for (const les of (lessons || [])) {
       const unlock = new Date(admittedAt.getTime() + week * WEEK_MS);
       const due = new Date(unlock.getTime() + WEEK_MS);
@@ -867,6 +874,27 @@ async function generateLessonSchedule(sid: number, admittedAt: Date) {
   // Insert (ignore conflits si déjà généré)
   for (let i = 0; i < rows.length; i += 100) {
     await supabase.from("lesson_progress").upsert(rows.slice(i, i + 100), { onConflict: "student_id,lesson_id", ignoreDuplicates: true }).then(() => {}, () => {});
+  }
+
+  // Réalignement des lignes déjà en base : l'upsert ci-dessus ignore les conflits, donc un planning
+  // généré avec un calendrier différent (cours en série au lieu d'en parallèle, ou leçon réordonnée)
+  // garderait à vie ses anciennes dates. On recale les leçons non terminées sur le calendrier courant.
+  const { data: current } = await supabase.from("lesson_progress")
+    .select("id, lesson_id, week_index, unlock_at, due_at, status").eq("student_id", sid);
+  const now = Date.now();
+  for (const row of current || []) {
+    if (row.status === "completed") continue;
+    const want = rows.find(r => r.lesson_id === row.lesson_id);
+    if (!want) continue;
+    const sameWeek = row.week_index === want.week_index;
+    const sameUnlock = new Date(row.unlock_at).getTime() === new Date(want.unlock_at).getTime();
+    if (sameWeek && sameUnlock) continue;
+    // Ne jamais recaler une leçon sur une fenêtre déjà écoulée : l'étudiant serait recalé
+    // rétroactivement sur une échéance qu'il n'a jamais pu voir. Il garde son ancienne date.
+    if (new Date(want.due_at).getTime() <= now) continue;
+    await supabase.from("lesson_progress")
+      .update({ week_index: want.week_index, unlock_at: want.unlock_at, due_at: want.due_at })
+      .eq("id", row.id).then(() => {}, () => {});
   }
 }
 
@@ -918,10 +946,11 @@ async function recalcCourseProgress(sid: number, course_id: number) {
     }
   }
 
-  // Vérifier si les 3 cours sont terminés → certificat FINAL
+  // Vérifier si les cours du cursus MEAL sont terminés → certificat FINAL
   let finalCert = null;
   if (wasCompleted) {
-    const { data: allCourses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
+    const { data: allCourses } = await supabase.from("sms_courses")
+      .select("id, code").eq("is_published", true).like("code", `${MEAL_PROGRAM_PREFIX}%`);
     const { data: doneEnr } = await supabase.from("enrollments")
       .select("course_id").eq("student_id", sid).eq("status", "completed");
     const doneIds = new Set((doneEnr || []).map((e: any) => e.course_id));
@@ -1427,8 +1456,12 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
     .select("progress, status").eq("student_id", sid).eq("course_id", course_id).maybeSingle();
   if (!enr || enr.progress < 100) return res.status(403).json({ message: "Vous devez compléter 100% du cours avant de demander l'attestation." });
 
-  const { data: existing } = await supabase.from("attestations")
-    .select("id, status").eq("student_id", sid).eq("course_id", course_id).maybeSingle();
+  // Ne regarder que les attestations DE COURS : l'attestation d'admission et le certificat final
+  // sont rattachés au même course_id et feraient croire, à tort, à une demande déjà déposée.
+  const { data: priorRows } = await supabase.from("attestations")
+    .select("id, status").eq("student_id", sid).eq("course_id", course_id).eq("cert_type", "course")
+    .order("id", { ascending: false });
+  const existing = (priorRows || [])[0];
   if (existing && existing.status !== "rejected") return res.status(409).json({ message: "Attestation déjà demandée", status: existing.status });
   // Une demande rejetée peut être refaite : on remplace l'ancienne ligne par une nouvelle demande "pending".
   if (existing) await supabase.from("attestations").delete().eq("id", existing.id);
@@ -1441,7 +1474,7 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   const certNo = `DMA-${course_id}-${sid}-${Date.now().toString(36).toUpperCase()}`;
 
   const { data, error } = await supabase.from("attestations")
-    .insert({ student_id: sid, course_id, certificate_no: certNo, final_score: finalScore, status: "pending" })
+    .insert({ student_id: sid, course_id, cert_type: "course", certificate_no: certNo, final_score: finalScore, status: "pending" })
     .select().single();
   if (error) return res.status(400).json({ message: error.message });
 
@@ -1629,6 +1662,9 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
       await supabase.from("attestations").delete().eq("student_id", id).eq("cert_type", "admission").then(() => {}, () => {});
       const certNo = `DMA-ADM-${id}-${Date.now().toString(36).toUpperCase()}`;
       await supabase.from("attestations").insert({ student_id: id, course_id: courses?.[0]?.id ?? null, cert_type: "admission", certificate_no: certNo, status: "issued", issued_at: now.toISOString(), expires_at: expires }).then(() => {}, () => {});
+      // Planning reparti de zéro à la date d'admission : c'est aussi le moyen pour l'admin de
+      // débloquer un étudiant dont le calendrier avait été généré sur un ancien rythme.
+      await supabase.from("lesson_progress").delete().eq("student_id", id).then(() => {}, () => {});
       await generateLessonSchedule(id, now);
     } else if (action === "reset_test") {
       // Réinitialise le test (permet de repasser immédiatement)

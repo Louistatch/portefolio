@@ -3,19 +3,17 @@ import { useLocation } from "wouter";
 import { SEO } from "@/components/seo";
 import {
   GraduationCap, ChevronRight, ChevronLeft, CheckCircle2,
-  Lock, PlayCircle, BookOpen, Map, FlaskConical, Trophy,
-  ArrowRight, Terminal, FileCode2, Layers, ClipboardCheck,
-  Star, Cpu, Globe, BarChart3, Download, Send, X, Clock } from "lucide-react";
+  Lock, PlayCircle, BookOpen, Trophy,
+  ArrowRight, Terminal, Layers, ClipboardCheck,
+  Cpu, Globe, Download, X, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialShare } from "@/components/social-share";
 import { isStudentLoggedIn, getStudent, studentFetch, downloadStudentFile } from "@/lib/student";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
-type View = "landing" | "test" | "test-result" | "dashboard" | "notebook" | "cert";
-
-interface Answer { qIdx: number; chosen: number; }
-
-interface CellState { output: string; ran: boolean; error?: boolean; }
+// Le parcours réel (cours, progression, attestations) vit dans /academy/* : cette page
+// couvre la présentation du programme et le test d'admission.
+type View = "landing" | "test" | "test-result";
 
 // ─── QUIZ DATA (30 questions) ─────────────────────────────────────────────────
 const QUESTIONS = [
@@ -51,125 +49,6 @@ const QUESTIONS = [
   { domain: "MEAL — Restitution", q: "Un 'learning review' dans le MEAL a pour objectif de :", opts: ["Publier un rapport final", "Capitaliser sur les enseignements pour améliorer la pratique", "Contrôler les agents terrain", "Auditer le budget"] },
 ];
 
-// ─── PROJECTS DATA ────────────────────────────────────────────────────────────
-const PROJECTS = [
-  {
-    id: 0,
-    num: "01",
-    title: "Enquête nutritionnelle — Région de Lomé",
-    icon: FlaskConical,
-    tools: ["KoboCollect", "Python", "pandas"],
-    desc: "Concevoir un formulaire XLSForm, simuler 200 observations terrain, analyser les indicateurs MUAC et Z-scores selon les seuils SPHERE/OMS.",
-    totalCells: 6,
-    color: "text-primary",
-    bg: "bg-primary/10",
-  },
-  {
-    id: 1,
-    num: "02",
-    title: "Cartographie des bénéficiaires WASH",
-    icon: Map,
-    tools: ["QGIS", "PyQGIS", "KoboAPI"],
-    desc: "Importer les coordonnées GPS des points d'eau, réaliser une analyse de couverture spatiale et produire des cartes d'intervention par district.",
-    totalCells: 9,
-    color: "text-blue-600 dark:text-blue-400",
-    bg: "bg-blue-100 dark:bg-blue-900/30",
-  },
-  {
-    id: 2,
-    num: "03",
-    title: "Système de reporting MEAL automatisé",
-    icon: BarChart3,
-    tools: ["Python", "openpyxl", "QGIS Atlas"],
-    desc: "Construire un pipeline complet : extraction KoboAPI → analyse Python → génération de rapport PDF avec cartes QGIS intégrées.",
-    totalCells: 14,
-    color: "text-amber-600 dark:text-amber-400",
-    bg: "bg-amber-100 dark:bg-amber-900/30",
-  },
-];
-
-// ─── NOTEBOOK CHAPTERS (Projet 01) ────────────────────────────────────────────
-const CHAPTERS = [
-  {
-    title: "Introduction & contexte",
-    cells: [
-      {
-        type: "md",
-        content: `## Contexte\n\nCe projet simule une **enquête nutritionnelle** dans la région de Lomé, Togo. Vous allez concevoir un formulaire KoboCollect, simuler la collecte de 200 observations, puis analyser les indicateurs nutritionnels clés.\n\n**Objectif MEAL :** Mesurer la prévalence de la malnutrition aiguë (MUAC < 125mm) chez les enfants de 6-59 mois.`,
-      },
-      {
-        type: "code",
-        lang: "python",
-        code: `import pandas as pd\nimport numpy as np\nimport matplotlib.pyplot as plt\n\nprint("✓ Bibliothèques chargées")\nprint(f"pandas : {pd.__version__}")`,
-        output: "✓ Bibliothèques chargées\npandas : 2.1.4",
-      },
-    ],
-  },
-  {
-    title: "Formulaire KoboCollect",
-    cells: [
-      {
-        type: "md",
-        content: `## Conception du formulaire XLSForm\n\nLe formulaire collecte : identité de l'enfant, **MUAC**, poids, taille, coordonnées GPS.\n\n- **type** : geopoint, decimal, select_one\n- **constraint** : '. >= 6 and . <= 59' pour l'âge\n- **relevant** : affichage conditionnel par sexe`,
-      },
-      {
-        type: "code",
-        lang: "python",
-        code: `xlsform = {\n  'survey': [\n    {'type': 'text',     'name': 'child_name', 'label': "Nom de l'enfant"},\n    {'type': 'integer',  'name': 'age_months', 'label': 'Âge (mois)', 'constraint': '. >= 6 and . <= 59'},\n    {'type': 'select_one sexe', 'name': 'sexe', 'label': 'Sexe'},\n    {'type': 'decimal',  'name': 'muac_mm',    'label': 'MUAC (mm)'},\n    {'type': 'geopoint', 'name': 'gps',        'label': 'Position GPS'},\n  ]\n}\ndf = pd.DataFrame(xlsform['survey'])\nprint(df[['type','name','label']].to_string(index=False))`,
-        output: "          type       name           label\n          text child_name Nom de l'enfant\n       integer age_months      Âge (mois)\nselect_one sexe       sexe            Sexe\n       decimal    muac_mm       MUAC (mm)\n      geopoint        gps    Position GPS",
-      },
-    ],
-  },
-  {
-    title: "Simulation de données",
-    cells: [
-      {
-        type: "code",
-        lang: "python",
-        code: `np.random.seed(42)\nN = 200\ndistricts = ['Agoè', 'Golfe', 'Zio', 'Bas-Mono', 'Lacs']\n\ndata = {\n  'child_id': [f'TG-LME-{str(i).zfill(3)}' for i in range(1, N+1)],\n  'district': np.random.choice(districts, N, p=[.3,.25,.2,.15,.1]),\n  'age_months': np.random.randint(6, 60, N),\n  'sexe': np.random.choice(['M','F'], N),\n  'muac_mm': np.random.normal(130, 18, N).clip(60, 200).round(1),\n  'latitude': np.random.uniform(6.05, 6.45, N).round(6),\n  'longitude': np.random.uniform(1.10, 1.55, N).round(6),\n}\n\ndf = pd.DataFrame(data)\nprint(f"✓ {len(df)} observations générées")\nprint(df.head(3))`,
-        output: "✓ 200 observations générées\n  child_id district  age_months sexe  muac_mm  latitude  longitude\n0 TG-LME-001     Agoè          23    M    127.3  6.183421   1.342156\n1 TG-LME-002    Golfe          41    F    145.2  6.221034   1.421893\n2 TG-LME-003      Zio          15    M    118.6  6.094512   1.198734",
-      },
-    ],
-  },
-  {
-    title: "Analyse des indicateurs",
-    cells: [
-      {
-        type: "md",
-        content: `## Classification nutritionnelle OMS/SPHERE\n\n| Seuil MUAC | Statut |\n|---|---|\n| < 115 mm | MAS — Malnutrition Aiguë Sévère |\n| 115 – 125 mm | MAM — Malnutrition Aiguë Modérée |\n| ≥ 125 mm | Normal |`,
-      },
-      {
-        type: "code",
-        lang: "python",
-        code: `def classify_muac(m):\n  if m < 115: return 'MAS'\n  elif m < 125: return 'MAM'\n  return 'Normal'\n\ndf['statut'] = df['muac_mm'].apply(classify_muac)\nstats = df['statut'].value_counts()\npct  = (stats / len(df) * 100).round(1)\n\nfor s, p in pct.items():\n  print(f"  {s:8s}: {stats[s]:3d} enfants ({p}%)")\nprint(f"\\nPrévalence MAG (MAS+MAM): {pct.get('MAS',0)+pct.get('MAM',0):.1f}%")\nprint("Seuil urgence SPHERE > 15% → ⚠ ALERTE")`,
-        output: "  Normal  : 148 enfants (74.0%)\n  MAM     :  36 enfants (18.0%)\n  MAS     :  16 enfants (8.0%)\n\nPrévalence MAG (MAS+MAM): 26.0%\nSeuil urgence SPHERE > 15% → ⚠ ALERTE",
-      },
-    ],
-  },
-  {
-    title: "Visualisation",
-    cells: [
-      {
-        type: "code",
-        lang: "python",
-        code: `fig, axes = plt.subplots(1, 3, figsize=(15, 5))\nfig.suptitle('Rapport Nutritionnel — Lomé 2024', fontsize=14)\n\n# Distribution MUAC\naxes[0].hist(df['muac_mm'], bins=25, color='#0d9488', alpha=0.8)\naxes[0].axvline(115, color='red', linestyle='--', label='MAS')\naxes[0].axvline(125, color='orange', linestyle='--', label='MAM')\naxes[0].set_title('Distribution MUAC'); axes[0].legend()\n\n# Par district\ndistrict_mag = df.groupby('district')['statut'].apply(\n  lambda x: (x!='Normal').mean()*100\n).sort_values()\ndistrict_mag.plot(kind='barh', ax=axes[1], color='#0d9488')\naxes[1].set_title('Prévalence MAG par district (%)')\n\n# Camembert\ndf['statut'].value_counts().plot(\n  kind='pie', ax=axes[2], colors=['#4ade80','#fb923c','#f87171'], autopct='%1.1f%%'\n)\naxes[2].set_title('Répartition')\n\nplt.tight_layout()\nprint("✓ rapport_nutrition.png exporté")`,
-        output: "✓ rapport_nutrition.png exporté\n📊 3 graphiques générés :\n   - Distribution MUAC avec seuils OMS\n   - Prévalence MAG par district (Bas-Mono: 38% ⚠)\n   - Répartition MAS/MAM/Normal",
-      },
-    ],
-  },
-  {
-    title: "Export & rapport bailleur",
-    cells: [
-      {
-        type: "code",
-        lang: "python",
-        code: `summary = {\n  'Indicateur': ['Enfants enquêtés','MAS (MUAC<115mm)','MAM (115-125mm)','Prévalence MAG'],\n  'Valeur':     [200, '8.0%', '18.0%', '26.0%'],\n  'Seuil SPHERE':['—','< 2%','< 10%','< 15%'],\n  'Statut':     ['—','⚠ ALERTE','⚠ ALERTE','🔴 URGENCE'],\n}\n\ndf_summary = pd.DataFrame(summary)\nprint(df_summary.to_string(index=False))\ndf_summary.to_excel('nutrition_lome_2024.xlsx', index=False)\nprint("\\n✓ nutrition_lome_2024.xlsx exporté")\nprint("✓ Rapport prêt pour soumission bailleur")`,
-        output: "      Indicateur    Valeur Seuil SPHERE     Statut\nEnfants enquêtés       200            —          —\n MAS (MUAC<115mm)     8.0%        < 2%  ⚠ ALERTE\n MAM (115-125mm)      18.0%       < 10%  ⚠ ALERTE\n  Prévalence MAG      26.0%       < 15% 🔴 URGENCE\n\n✓ nutrition_lome_2024.xlsx exporté\n✓ Rapport prêt pour soumission bailleur",
-      },
-    ],
-  },
-];
-
 // ─── MAIN COMPONENT ───────────────────────────────────────────────────────────
 export default function ELearning() {
   const [view, setView] = useState<View>("landing");
@@ -179,24 +58,16 @@ export default function ELearning() {
   const [qIdx, setQIdx] = useState(0);
   const [answers, setAnswers] = useState<Record<number, number>>({});
   const [score, setScore] = useState<number | null>(null);
-  const [chapter, setChapter] = useState(0);
-  const [cells, setCells] = useState<Record<string, CellState>>({});
-  const [certName, setCertName] = useState("");
-  const [certEmail, setCertEmail] = useState("");
-  const [certOrg, setCertOrg] = useState("");
-  const [certSent, setCertSent] = useState(false);
-  const [openProject, setOpenProject] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
+  const [submitErrorMsg, setSubmitErrorMsg] = useState<string | null>(null);
+  const [needVerification, setNeedVerification] = useState(false);
   const topRef = useRef<HTMLDivElement>(null);
 
   const passed = testStatus?.passed === true || (score !== null && score >= 21);
   const answeredCount = Object.keys(answers).length;
-  const totalPython = CHAPTERS.reduce((s, ch) => s + ch.cells.filter(c => c.type === "code").length, 0);
-  const ranCount = Object.keys(cells).length;
-  const nbProgress = Math.round(ranCount / totalPython * 100);
 
-  useEffect(() => { topRef.current?.scrollIntoView({ behavior: "smooth" }); }, [view, chapter]);
+  useEffect(() => { topRef.current?.scrollIntoView({ behavior: "smooth" }); }, [view]);
 
   useEffect(() => {
     if (isStudentLoggedIn()) {
@@ -210,6 +81,7 @@ export default function ELearning() {
     // les réponses choisies et on attend le score officiel avant d'afficher un résultat.
     const answerArray = QUESTIONS.map((_, i) => (answers[i] ?? -1));
     setSubmitError(false);
+    setSubmitErrorMsg(null);
     setSubmitting(true);
     setView("test-result");
     try {
@@ -220,7 +92,13 @@ export default function ELearning() {
       const data = await res.json();
       setSubmitResult(data);
       if (typeof data.score === "number") setScore(data.score);
-      else setSubmitError(true);
+      else {
+        // Le serveur explique pourquoi il refuse (email non vérifié, déjà admis, délai d'une
+        // semaine non écoulé) : afficher ce message plutôt qu'une erreur générique.
+        setSubmitError(true);
+        setSubmitErrorMsg(data?.message || null);
+        setNeedVerification(!!data?.needVerification);
+      }
       studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
     } catch (e) {
       setSubmitError(true);
@@ -241,17 +119,6 @@ export default function ELearning() {
       return;
     }
     setView("test");
-  }
-
-  // ── RUN CELL
-  function runCell(key: string, output: string) {
-    setCells(prev => ({ ...prev, [key]: { output, ran: true } }));
-  }
-
-  // ── CERT SUBMIT
-  function sendCert() {
-    if (!certName || !certEmail) return;
-    setCertSent(true);
   }
 
   // ─────────────────── RENDER HELPERS ──────────────────────────────────────
@@ -488,9 +355,11 @@ export default function ELearning() {
     if (submitError) {
       return (
         <div className="max-w-md mx-auto text-center py-32 px-6">
-          <h2 className="text-xl font-bold mb-2">Une erreur est survenue</h2>
-          <p className="text-muted-foreground mb-6">Impossible de récupérer votre score. Réessayez.</p>
-          <Button onClick={submitTest}>Réessayer</Button>
+          <h2 className="text-xl font-bold mb-2">{submitErrorMsg ? "Test non enregistré" : "Une erreur est survenue"}</h2>
+          <p className="text-muted-foreground mb-6">{submitErrorMsg || "Impossible de récupérer votre score. Réessayez."}</p>
+          {needVerification
+            ? <Button onClick={() => navigate("/academy/profile")}>Vérifier mon email</Button>
+            : <Button onClick={submitTest}>Réessayer</Button>}
         </div>
       );
     }
@@ -556,257 +425,9 @@ export default function ELearning() {
     );
   }
 
-  function renderDashboard() {
-    return (
-      <div className="max-w-5xl mx-auto px-6 py-12">
-        <div className="mb-10">
-          <span className="text-xs font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">Tableau de bord apprenant</span>
-          <h2 className="text-3xl font-bold mt-4 mb-2">Mes projets MEAL</h2>
-          <p className="text-muted-foreground font-serif">Chaque projet est un cas terrain complet. Finissez toutes les cellules du notebook pour débloquer l'attestation.</p>
-        </div>
-
-        <div className="grid lg:grid-cols-3 gap-6 mb-8">
-          {PROJECTS.map((proj, idx) => {
-            const locked = idx > 0 && !(idx === 1 && nbProgress === 100);
-            return (
-              <div key={proj.id}
-                className={`group bg-card rounded-3xl p-7 border border-border/50 shadow-sm transition-all duration-300 ${locked ? "opacity-50 cursor-not-allowed" : "hover:shadow-xl hover:border-primary/30 cursor-pointer"}`}
-                onClick={() => { if (!locked) { setOpenProject(proj.id); setChapter(0); setView("notebook"); } }}>
-                <div className="flex items-start justify-between mb-5">
-                  <div className={`w-12 h-12 rounded-2xl ${proj.bg} flex items-center justify-center ${locked ? "" : "group-hover:scale-110 transition-transform duration-300"}`}>
-                    <proj.icon className={`w-6 h-6 ${proj.color}`} />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    {locked
-                      ? <span className="flex items-center gap-1 text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full"><Lock className="w-3 h-3" /> Verrouillé</span>
-                      : idx === 0 ? <span className="text-xs text-primary bg-primary/10 px-2.5 py-1 rounded-full">En cours</span>
-                      : <span className="text-xs text-muted-foreground bg-muted px-2.5 py-1 rounded-full">Disponible</span>}
-                  </div>
-                </div>
-                <div className="text-xs font-mono text-muted-foreground mb-1">PROJET {proj.num}</div>
-                <h3 className="font-semibold mb-2 leading-snug">{proj.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{proj.desc}</p>
-                <div className="flex flex-wrap gap-1.5 mb-4">
-                  {proj.tools.map(t => <span key={t} className="text-xs bg-muted px-2 py-0.5 rounded-full text-muted-foreground font-mono">{t}</span>)}
-                </div>
-                {idx === 0 && (
-                  <>
-                    <div className="h-1 bg-muted rounded-full mb-1">
-                      <div className="h-full bg-primary rounded-full transition-all" style={{ width: `${nbProgress}%` }} />
-                    </div>
-                    <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>{nbProgress}% complété</span>
-                      <span>{ranCount} / {totalPython} cellules</span>
-                    </div>
-                  </>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Skills sidebar */}
-        <div className="bg-card rounded-2xl border border-border/50 p-6">
-          <h4 className="font-semibold mb-4">Progression des compétences</h4>
-          <div className="grid sm:grid-cols-2 gap-4">
-            {[
-              { name: "KoboCollect", pct: Math.min(nbProgress, 70) },
-              { name: "Python/pandas", pct: Math.min(nbProgress, 55) },
-              { name: "QGIS", pct: 0 },
-              { name: "Analyse MEAL", pct: Math.min(nbProgress, 60) },
-            ].map(s => (
-              <div key={s.name}>
-                <div className="flex justify-between text-sm mb-1"><span className="text-muted-foreground">{s.name}</span><span className="text-xs font-mono">{s.pct}%</span></div>
-                <div className="h-1.5 bg-muted rounded-full"><div className="h-full bg-primary rounded-full transition-all duration-700" style={{ width: `${s.pct}%` }} /></div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  function renderNotebook() {
-    const ch = CHAPTERS[chapter];
-    const isLast = chapter === CHAPTERS.length - 1;
-    const allRan = CHAPTERS.every((c, ci) => c.cells.filter(cell => cell.type === "code").every((_, ki) => cells[`${ci}-${ki}`]?.ran));
-
-    return (
-      <div className="flex min-h-screen">
-        {/* Sidebar */}
-        <aside className="hidden lg:flex flex-col w-60 shrink-0 border-r border-border/50 bg-muted/30 pt-6 px-4">
-          <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4 px-2">Projet 01 — Nutrition</div>
-          <nav className="space-y-1">
-            {CHAPTERS.map((c, i) => {
-              const isDone = c.cells.filter(cell => cell.type === "code").every((_, ki) => cells[`${i}-${ki}`]?.ran);
-              return (
-                <button key={i} onClick={() => setChapter(i)}
-                  className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-colors flex items-center gap-2 ${chapter === i ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
-                  {isDone && <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-primary" />}
-                  <span>{i + 1}. {c.title}</span>
-                </button>
-              );
-            })}
-          </nav>
-          <div className="mt-auto pb-6 pt-4 border-t border-border/50 mt-6">
-            <div className="text-xs text-muted-foreground mb-1">{nbProgress}% complété</div>
-            <div className="h-1.5 bg-muted rounded-full"><div className="h-full bg-primary rounded-full" style={{ width: `${nbProgress}%` }} /></div>
-          </div>
-        </aside>
-
-        {/* Main */}
-        <main className="flex-1 max-w-3xl mx-auto px-6 py-8">
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-6">
-            <button onClick={() => setView("dashboard")} className="hover:text-primary transition-colors">Mes projets</button>
-            <ChevronRight className="w-3 h-3" />
-            <span className="text-foreground">{ch.title}</span>
-          </div>
-
-          <h2 className="text-2xl font-bold mb-6">{ch.title}</h2>
-
-          {/* Cells */}
-          <div className="space-y-4 mb-8">
-            {ch.cells.map((cell, ci) => {
-              const key = `${chapter}-${ci}`;
-              if (cell.type === "md") {
-                return (
-                  <div key={ci} className="bg-card rounded-2xl border border-border/50 overflow-hidden">
-                    <div className="flex items-center gap-2 px-4 py-2 border-b border-border/50 bg-muted/30">
-                      <FileCode2 className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-xs text-muted-foreground font-mono">markdown</span>
-                    </div>
-                    <div className="px-5 py-4 text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert">
-                      {cell.content!.split("\n").map((line, li) => {
-                        if (line.startsWith("## ")) return <h3 key={li} className="font-semibold text-base mt-3 mb-1">{line.slice(3)}</h3>;
-                        if (line.startsWith("| ")) return <div key={li} className="font-mono text-xs bg-muted px-2 py-0.5 my-0.5 rounded">{line}</div>;
-                        if (line.startsWith("- ")) return <div key={li} className="ml-3 text-muted-foreground">• {line.slice(2).replace(/\*\*(.+?)\*\*/g, "$1")}</div>;
-                        return <p key={li} className="text-muted-foreground">{line.replace(/\*\*(.+?)\*\*/g, "$1")}</p>;
-                      })}
-                    </div>
-                  </div>
-                );
-              }
-              // Code cell
-              const state = cells[key];
-              return (
-                <div key={ci} className="bg-card rounded-2xl border border-border/50 overflow-hidden">
-                  <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 bg-muted/30">
-                    <div className="flex items-center gap-2">
-                      <Terminal className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400" />
-                      <span className="text-xs text-muted-foreground font-mono">{cell.lang}</span>
-                    </div>
-                    <Button size="sm" variant={state?.ran ? "outline" : "default"}
-                      className={`h-7 text-xs gap-1.5 ${state?.ran ? "text-primary border-primary/40" : ""}`}
-                      onClick={() => runCell(key, cell.output!)}>
-                      {state?.ran ? <><CheckCircle2 className="w-3 h-3" /> Exécuté</> : <><PlayCircle className="w-3 h-3" /> Exécuter</>}
-                    </Button>
-                  </div>
-                  <pre className="px-5 py-4 text-xs font-mono overflow-x-auto bg-[#0d1117] text-slate-300 leading-relaxed">
-                    <code>{cell.code}</code>
-                  </pre>
-                  {state?.ran && (
-                    <div className="border-t border-border/50">
-                      <div className="flex items-center gap-2 px-4 py-1.5 bg-muted/20">
-                        <Star className="w-3 h-3 text-primary" />
-                        <span className="text-xs text-muted-foreground font-mono">output</span>
-                      </div>
-                      <pre className="px-5 py-3 text-xs font-mono text-primary/80 leading-relaxed whitespace-pre-wrap">{state.output}</pre>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Nav */}
-          <div className="flex items-center justify-between pt-4 border-t border-border/50">
-            <Button variant="outline" disabled={chapter === 0} onClick={() => setChapter(c => c - 1)} className="gap-2">
-              <ChevronLeft className="w-4 h-4" /> Précédent
-            </Button>
-            {isLast ? (
-              allRan
-                ? <Button className="gap-2" onClick={() => setView("cert")}><Trophy className="w-4 h-4" /> Demander l'attestation</Button>
-                : <Button variant="outline" disabled className="gap-2 text-muted-foreground"><Lock className="w-3.5 h-3.5" /> Exécutez toutes les cellules</Button>
-            ) : (
-              <Button onClick={() => setChapter(c => c + 1)} className="gap-2">
-                Suivant <ChevronRight className="w-4 h-4" />
-              </Button>
-            )}
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  function renderCert() {
-    if (certSent) {
-      return (
-        <div className="max-w-lg mx-auto px-6 py-20 text-center">
-          <CheckCircle2 className="w-16 h-16 text-primary mx-auto mb-6" />
-          <h2 className="text-2xl font-bold mb-3">Demande envoyée !</h2>
-          <p className="text-muted-foreground font-serif mb-8">Votre attestation pour <strong className="text-foreground">{certName}</strong> sera émise et envoyée à <em>{certEmail}</em> dans 24-48h après vérification.</p>
-          <Button onClick={() => setView("dashboard")} className="gap-2">← Retour au tableau de bord</Button>
-        </div>
-      );
-    }
-    return (
-      <div className="max-w-2xl mx-auto px-6 py-12">
-        <div className="text-center mb-10">
-          <Trophy className="w-12 h-12 text-primary mx-auto mb-4" />
-          <span className="text-xs font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">Attestation de compétence</span>
-          <h2 className="text-3xl font-bold mt-4 mb-3">Demander mon attestation</h2>
-          <p className="text-muted-foreground font-serif">Après avoir complété un projet, renseignez vos informations pour recevoir votre attestation numérique.</p>
-        </div>
-
-        {/* Preview */}
-        <div className="bg-card rounded-3xl border-2 border-primary/30 p-8 mb-8 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-primary to-accent" />
-          <div className="flex items-center gap-2 mb-1">
-            <GraduationCap className="w-4 h-4 text-primary" />
-            <span className="text-xs font-semibold text-primary uppercase tracking-wider">DataMEAL Academy</span>
-            <div className="flex-1 h-px bg-border/50 ml-2" />
-          </div>
-          <p className="text-sm text-muted-foreground mb-2 mt-4">Atteste que</p>
-          <p className="text-2xl font-bold font-serif mb-3 text-foreground">{certName || "Votre nom complet"}</p>
-          <p className="text-sm text-muted-foreground mb-3">a complété avec succès le projet :<br /><strong className="text-foreground">Enquête nutritionnelle — Région de Lomé</strong></p>
-          <div className="flex flex-wrap gap-2 mb-4">
-            {["KoboCollect", "Python/pandas", "MEAL Framework", "Analyse terrain"].map(s =>
-              <span key={s} className="text-xs bg-primary/10 text-primary px-2.5 py-1 rounded-full">{s}</span>)}
-          </div>
-          <p className="text-xs text-muted-foreground font-mono">Score du test : {score ?? "—"}/30 &nbsp;|&nbsp; {new Date().toLocaleDateString("fr-FR")}</p>
-        </div>
-
-        {/* Form */}
-        <div className="space-y-4 mb-8">
-          {[
-            { label: "Nom complet *", val: certName, set: setCertName, ph: "Louis TATCHIDA", type: "text" },
-            { label: "Email professionnel *", val: certEmail, set: setCertEmail, ph: "vous@organisation.org", type: "email" },
-            { label: "Organisation / Institution", val: certOrg, set: setCertOrg, ph: "ONG, Gouvernement, Université…", type: "text" },
-          ].map(f => (
-            <div key={f.label}>
-              <label className="block text-sm font-medium mb-1.5">{f.label}</label>
-              <input type={f.type} value={f.val} onChange={e => f.set(e.target.value)} placeholder={f.ph}
-                className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors" />
-            </div>
-          ))}
-        </div>
-
-        <Button size="lg" className="w-full gap-2" onClick={sendCert} disabled={!certName || !certEmail}>
-          <Send className="w-4 h-4" /> Soumettre ma demande d'attestation
-        </Button>
-        <p className="text-xs text-muted-foreground text-center mt-3">L'attestation est émise après vérification de votre notebook complété.</p>
-      </div>
-    );
-  }
 
   // ─── TABS TOPBAR ────────────────────────────────────────────────────────────
   const showTabs = view !== "landing";
-  const tabs: { key: View; label: string }[] = [
-    { key: "test", label: "Test de sélection" },
-    { key: "dashboard", label: "Mes projets" },
-    { key: "notebook", label: "Notebook" },
-    { key: "cert", label: "Attestation" },
-  ];
 
   return (
     <div ref={topRef}>
@@ -821,21 +442,24 @@ export default function ELearning() {
                 <GraduationCap className="w-4 h-4" /> Accueil
               </button>
               <ChevronRight className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-              {tabs.map(t => {
-                const active = view === t.key || (t.key === "notebook" && view === "notebook");
-                const disabled = !passed && t.key !== "test";
-                return (
-                  <button key={t.key}
-                    disabled={disabled}
-                    onClick={() => !disabled && setView(t.key)}
-                    className={`shrink-0 px-4 py-3 text-sm border-b-2 transition-colors whitespace-nowrap ${
-                      active ? "border-primary text-primary font-medium" : disabled ? "border-transparent text-muted-foreground/40 cursor-not-allowed" : "border-transparent text-muted-foreground hover:text-foreground"
-                    }`}>
-                    {disabled && t.key !== "test" && <Lock className="w-3 h-3 inline mr-1" />}
-                    {t.label}
-                  </button>
-                );
-              })}
+              <button
+                onClick={startTest}
+                className={`shrink-0 px-4 py-3 text-sm border-b-2 transition-colors whitespace-nowrap ${
+                  view === "test" || view === "test-result" ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}>
+                Test de sélection
+              </button>
+              {/* Les cours, la progression et les attestations vivent dans l'espace étudiant :
+                  y renvoyer plutôt que d'en présenter une copie locale non enregistrée. */}
+              <button
+                disabled={!passed}
+                onClick={() => passed && navigate("/academy/dashboard")}
+                className={`shrink-0 px-4 py-3 text-sm border-b-2 border-transparent transition-colors whitespace-nowrap ${
+                  passed ? "text-muted-foreground hover:text-foreground" : "text-muted-foreground/40 cursor-not-allowed"
+                }`}>
+                {!passed && <Lock className="w-3 h-3 inline mr-1" />}
+                Mes cours et attestations
+              </button>
             </div>
           </div>
         </div>
@@ -844,9 +468,6 @@ export default function ELearning() {
       {view === "landing" && renderLanding()}
       {view === "test" && renderTest()}
       {view === "test-result" && renderTestResult()}
-      {view === "dashboard" && renderDashboard()}
-      {view === "notebook" && renderNotebook()}
-      {view === "cert" && renderCert()}
     </div>
   );
 }

@@ -101,6 +101,7 @@ export default function AcademyClassroom() {
   const [enrolled, setEnrolled] = useState(false);
   const [testPassed, setTestPassed] = useState(false);
   const [schedule, setSchedule] = useState<Record<number, any>>({});
+  const [completeError, setCompleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
@@ -146,22 +147,33 @@ export default function AcademyClassroom() {
   async function completeLesson() {
     if (!course || !courseId) return;
     const lesson = course.lessons[activeLesson];
-  const lessonSched = lesson ? schedule[lesson.id] : null;
-  const lessonDone = lesson ? completedLessons.has(lesson.id) : false;
-  const lessonStatus = lessonDone ? "completed" : (lessonSched?.status || (testPassed && activeLesson === 0 ? "available" : "locked"));
-  const lessonLocked = lessonStatus === "locked";
-  const lessonMissed = lessonStatus === "missed";
     setSubmitting(true);
+    setCompleteError(null);
     try {
       const res = await studentFetch("/api/academy/complete-lesson", {
         method: "POST",
         body: JSON.stringify({ course_id: courseId, lesson_id: lesson.id, score: lesson.points }),
       });
       const data = await res.json();
-      setProgress(data.progress);
+      // Le serveur peut refuser (leçon verrouillée, fenêtre dépassée, admission expirée, email non
+      // vérifié) : sans ce contrôle la leçon s'affichait comme complétée alors que rien n'était
+      // enregistré, et la barre de progression recevait un pourcentage indéfini.
+      if (!res.ok) {
+        setCompleteError(data?.message || "Impossible d'enregistrer cette leçon.");
+        if (data?.locked || data?.missed) {
+          setSchedule(prev => ({
+            ...prev,
+            [lesson.id]: { ...(prev[lesson.id] || {}), status: data.missed ? "missed" : "locked", unlock_at: data.unlockAt ?? prev[lesson.id]?.unlock_at },
+          }));
+        }
+        return;
+      }
+      if (typeof data.progress === "number") setProgress(data.progress);
       setCompletedLessons(prev => new Set(prev).add(lesson.id));
       if (activeLesson < course.lessons.length - 1) setActiveLesson(a => a + 1);
-    } catch (e) { /* handled */ } finally { setSubmitting(false); }
+    } catch (e: any) {
+      setCompleteError("Erreur réseau. Réessayez.");
+    } finally { setSubmitting(false); }
   }
 
   async function requestAttestation() {
@@ -244,7 +256,7 @@ export default function AcademyClassroom() {
             const isLocked = !done && st === "locked";
             const isMissed = !done && st === "missed";
             return (
-              <button key={l.id} onClick={() => setActiveLesson(i)}
+              <button key={l.id} onClick={() => { setActiveLesson(i); setCompleteError(null); }}
                 className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-colors flex items-center gap-2 ${activeLesson === i ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
                 {done ? <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
                   : isMissed ? <X className="w-3.5 h-3.5 text-destructive shrink-0" />
@@ -388,9 +400,17 @@ export default function AcademyClassroom() {
         </div>
         )}
 
+        {/* Erreur de validation renvoyée par le serveur */}
+        {completeError && (
+          <div className="bg-destructive/5 border border-destructive/30 rounded-2xl p-4 mb-4 flex items-start gap-3">
+            <AlertTriangle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+            <p className="text-sm text-destructive">{completeError}</p>
+          </div>
+        )}
+
         {/* Nav + complete */}
         <div className="flex items-center justify-between pt-4 border-t border-border/50">
-          <Button variant="outline" disabled={activeLesson === 0} onClick={() => setActiveLesson(a => a - 1)} className="gap-2">
+          <Button variant="outline" disabled={activeLesson === 0} onClick={() => { setActiveLesson(a => a - 1); setCompleteError(null); }} className="gap-2">
             <ChevronLeft className="w-4 h-4" /> Précédent
           </Button>
           <div className="flex gap-2">
@@ -401,7 +421,7 @@ export default function AcademyClassroom() {
               </Button>
             )}
             {isLessonDone && activeLesson < course.lessons.length - 1 && (
-              <Button onClick={() => setActiveLesson(a => a + 1)} className="gap-2">Suivant <ChevronRight className="w-4 h-4" /></Button>
+              <Button onClick={() => { setActiveLesson(a => a + 1); setCompleteError(null); }} className="gap-2">Suivant <ChevronRight className="w-4 h-4" /></Button>
             )}
             {allLessonsDone && (
               <Button onClick={requestAttestation} disabled={submitting} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">
