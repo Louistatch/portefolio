@@ -104,7 +104,10 @@ function App() {
             <Route path="/academy/login">{() => <Layout><AcademyLogin /></Layout>}</Route>
             <Route path="/academy/dashboard">{() => <Layout><RequireStudentAuth><AcademyDashboard /></RequireStudentAuth></Layout>}</Route>
             <Route path="/academy/classroom/:id">{() => <Layout><RequireStudentAuth><AcademyClassroom /></RequireStudentAuth></Layout>}</Route>
-            <Route path="/academy/verify">{() => <Layout><RequireStudentAuth><AcademyVerify /></RequireStudentAuth></Layout>}</Route>
+            {/* Publique : le lien de validation arrive par email et s'ouvre souvent sur un autre
+                appareil/navigateur, où la session étudiant n'existe pas. Derrière un garde, le
+                token de l'URL était perdu par la redirection et l'email n'était jamais validé. */}
+            <Route path="/academy/verify">{() => <Layout><AcademyVerify /></Layout>}</Route>
             <Route path="/academy/forgot-password">{() => <Layout><AcademyForgotPassword /></Layout>}</Route>
             <Route path="/academy/reset-password">{() => <Layout><AcademyResetPassword /></Layout>}</Route>
             <Route path="/academy/profile">{() => <Layout><RequireStudentAuth><AcademyProfile /></RequireStudentAuth></Layout>}</Route>
