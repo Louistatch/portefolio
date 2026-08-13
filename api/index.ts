@@ -8,7 +8,10 @@ import crypto from "crypto";
 import path from "path";
 import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
-import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises";
+// Extension .js obligatoire : le paquet est en "type": "module", et Node ESM ne devine pas
+// l'extension d'un import relatif. Sans elle, le chargement de la fonction échoue en
+// production (ERR_MODULE_NOT_FOUND) alors que le build, lui, passe sans broncher.
+import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises.js";
 
 // ── Supabase client ──
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
