@@ -62,6 +62,7 @@ export default function ELearning() {
   const [submitError, setSubmitError] = useState(false);
   const [submitErrorMsg, setSubmitErrorMsg] = useState<string | null>(null);
   const [needVerification, setNeedVerification] = useState(false);
+  const [nextLesson, setNextLesson] = useState<any>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
   const passed = testStatus?.passed === true || (score !== null && score >= 21);
@@ -100,11 +101,23 @@ export default function ELearning() {
         setNeedVerification(!!data?.needVerification);
       }
       studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
+      // Admis : on récupère tout de suite la leçon débloquée pour pouvoir enchaîner d'un clic,
+      // au lieu de renvoyer l'étudiant chercher son point d'entrée dans le tableau de bord.
+      if (data?.passed) loadNextLesson();
     } catch (e) {
       setSubmitError(true);
     } finally {
       setSubmitting(false);
     }
+  }
+
+  async function loadNextLesson() {
+    try {
+      const sched = await studentFetch("/api/academy/lesson-schedule").then(r => r.json());
+      const list = Array.isArray(sched) ? sched : [];
+      const avail = list.find((s: any) => s.status === "available") || list[0];
+      if (avail) setNextLesson(avail);
+    } catch { /* le tableau de bord reste la porte d'entrée de repli */ }
   }
 
   // ── Vérifie l'authentification avant de démarrer le test
@@ -390,16 +403,33 @@ export default function ELearning() {
             ? "Score : " + pct + "% — Vous etes admis(e) ! Votre attestation d\u0027admission (valable 3 mois) est disponible. Une lecon se debloque chaque semaine."
             : "Score : " + pct + "% — Score requis : 70% (21/30). Vous pourrez repasser le test dans une semaine."}
         </p>
+        {/* Admis : l'enchaînement immédiat est la première leçon, pas un menu. */}
+        {passed && (
+          <div className="bg-primary/5 border border-primary/25 rounded-2xl p-5 mb-8 text-left max-w-lg mx-auto">
+            <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Prochaine étape</p>
+            <p className="font-semibold mb-1">
+              {nextLesson ? nextLesson.sms_lessons?.title || "Votre première leçon" : "Votre première leçon vous attend"}
+            </p>
+            <p className="text-sm text-muted-foreground mb-4">
+              Chaque leçon se termine par des exercices à faire vous-même : c'est ce travail qui donne votre note.
+              {nextLesson?.due_at && ` À rendre avant le ${new Date(nextLesson.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.`}
+            </p>
+            <Button size="lg" className="gap-2 w-full sm:w-auto"
+              onClick={() => navigate(nextLesson ? `/academy/classroom/${nextLesson.course_id}` : "/academy/dashboard")}>
+              <GraduationCap className="w-4 h-4" /> Commencer ma première leçon
+            </Button>
+          </div>
+        )}
+
         <div className="flex flex-wrap gap-4 justify-center mb-10">
           {passed
             ? <>
-                <Button size="lg" className="gap-2" onClick={() => navigate("/academy/dashboard")}><GraduationCap className="w-4 h-4" /> Accéder à mes cours</Button>
+                <Button size="lg" variant="outline" className="gap-2" onClick={() => navigate("/academy/dashboard")}>Mon tableau de bord</Button>
                 <Button size="lg" variant="outline" className="gap-2" onClick={() => downloadStudentFile("/api/academy/certificate/admission", "attestation-admission").catch(() => alert("Téléchargement impossible, réessayez."))}>
                   <Download className="w-4 h-4" /> Mon attestation
                 </Button>
               </>
             : <Button size="lg" className="gap-2" onClick={() => setView("landing")}>Retour a l'accueil</Button>}
-          {passed && <Button variant="outline" onClick={() => setView("landing")}>Retour</Button>}
         </div>
 
 

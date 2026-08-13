@@ -5,12 +5,19 @@ import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, Terminal,
   FileCode2, Loader2, Trophy, Lock, X, BookOpen, Star, Info, Lightbulb,
-  AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon,
+  AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon, PenLine,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn } from "@/lib/student";
 import DOMPurify from "dompurify";
 
-interface Cell { type: string; content?: string; lang?: string; code?: string; output?: string; variant?: string; title?: string; url?: string; provider?: string; desc?: string; question?: string; opts?: string[]; ans?: number; svg?: string; caption?: string; }
+interface Cell {
+  type: string; content?: string; lang?: string; code?: string; output?: string; variant?: string;
+  title?: string; url?: string; provider?: string; desc?: string; question?: string; opts?: string[];
+  ans?: number; svg?: string; caption?: string;
+  // Cellules d'exercice (le corrigé est retiré côté serveur avant envoi)
+  id?: string; kind?: "choice" | "number" | "text"; prompt?: string; unit?: string;
+  hint?: string; explain?: string; placeholder?: string;
+}
 interface Lesson { id: number; title: string; content: { cells: Cell[] }; points: number; order_index: number; }
 interface Course { id: number; code: string; title: string; description: string; tools: string[]; lessons: Lesson[]; }
 
@@ -85,6 +92,81 @@ const FigureCell = memo(function FigureCell({ title, svg, caption }: { title?: s
   );
 });
 
+// ── Exercice noté ──
+// L'énoncé demande de produire quelque chose (un calcul, une décision, une écriture) ; le
+// corrigé n'est pas dans la page — il reste en base et c'est le serveur qui tranche.
+function ExerciseCell({ exId, cell, value, result, locked, onChange }: {
+  exId: string; cell: any; value: any;
+  result?: { correct: boolean; explain: string | null };
+  locked: boolean; onChange: (v: any) => void;
+}) {
+  const [showHint, setShowHint] = useState(false);
+  const state = result ? (result.correct ? "correct" : "wrong") : "todo";
+  const border = state === "correct" ? "border-primary/50" : state === "wrong" ? "border-destructive/40" : "border-amber-500/40";
+
+  return (
+    <div className={`bg-card rounded-2xl border ${border} overflow-hidden`}>
+      <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-amber-500/5">
+        <div className="flex items-center gap-2">
+          <PenLine className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+          <span className="text-xs font-medium">À vous de jouer{cell.title ? ` — ${cell.title}` : ""}</span>
+        </div>
+        {state === "correct" && <span className="text-[10px] font-semibold text-primary flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> Juste</span>}
+        {state === "wrong" && <span className="text-[10px] font-semibold text-destructive flex items-center gap-1"><X className="w-3 h-3" /> À revoir</span>}
+      </div>
+
+      <div className="p-4 space-y-3">
+        <p className="text-sm leading-relaxed">{cell.prompt}</p>
+
+        {cell.kind === "choice" ? (
+          <div className="space-y-2">
+            {(cell.opts || []).map((opt: string, i: number) => (
+              <button key={i} disabled={locked} onClick={() => onChange(i)}
+                className={`w-full text-left px-4 py-2.5 rounded-xl border text-sm transition-colors ${
+                  Number(value) === i ? "border-primary bg-primary/10 text-primary" : "border-border hover:border-primary/40"
+                } ${locked ? "opacity-70 cursor-default" : ""}`}>
+                <span className="font-mono text-xs text-muted-foreground mr-2">{String.fromCharCode(65 + i)}.</span>{opt}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <input
+            type={cell.kind === "number" ? "number" : "text"}
+            inputMode={cell.kind === "number" ? "decimal" : undefined}
+            step="any"
+            disabled={locked}
+            value={value ?? ""}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder={cell.placeholder || (cell.kind === "number" ? "Votre résultat" : "Votre réponse")}
+            className="w-full px-4 py-2.5 rounded-xl border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-colors disabled:opacity-70"
+          />
+        )}
+
+        {cell.unit && <p className="text-xs text-muted-foreground">Unité attendue : {cell.unit}</p>}
+
+        {/* Leçon revue après coup : les réponses saisies ne sont pas rechargées. */}
+        {locked && !result && (
+          <p className="text-xs text-muted-foreground italic">Leçon déjà validée — cet exercice a été corrigé.</p>
+        )}
+
+        {cell.hint && !result && (
+          showHint
+            ? <p className="text-xs text-muted-foreground bg-muted/50 rounded-xl p-3 flex gap-2"><Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />{cell.hint}</p>
+            : <button onClick={() => setShowHint(true)} className="text-xs text-primary hover:underline flex items-center gap-1"><Lightbulb className="w-3 h-3" /> Un indice</button>
+        )}
+
+        {/* La correction n'apparaît qu'après passage par le serveur */}
+        {result?.explain && (
+          <div className={`text-xs rounded-xl p-3 leading-relaxed ${result.correct ? "bg-primary/5 text-foreground/80" : "bg-destructive/5 text-foreground/80"}`}>
+            <span className="font-semibold">{result.correct ? "Pourquoi c'est juste : " : "Correction : "}</span>
+            {result.explain}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function AcademyClassroom() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/academy/classroom/:id");
@@ -102,6 +184,10 @@ export default function AcademyClassroom() {
   const [testPassed, setTestPassed] = useState(false);
   const [schedule, setSchedule] = useState<Record<number, any>>({});
   const [completeError, setCompleteError] = useState<string | null>(null);
+  // Réponses saisies pour les exercices de la leçon courante, et correction renvoyée par le serveur.
+  const [exAnswers, setExAnswers] = useState<Record<string, any>>({});
+  const [exResults, setExResults] = useState<Record<string, { correct: boolean; explain: string | null }>>({});
+  const [lessonScore, setLessonScore] = useState<{ score: number; max: number } | null>(null);
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
@@ -144,6 +230,15 @@ export default function AcademyClassroom() {
 
   function runCell(key: string) { setRanCells(prev => new Set(prev).add(key)); }
 
+  // Changer de leçon repart d'une copie vierge : réponses, correction et message d'erreur.
+  function goToLesson(index: number) {
+    setActiveLesson(index);
+    setCompleteError(null);
+    setExAnswers({});
+    setExResults({});
+    setLessonScore(null);
+  }
+
   async function completeLesson() {
     if (!course || !courseId) return;
     const lesson = course.lessons[activeLesson];
@@ -152,9 +247,15 @@ export default function AcademyClassroom() {
     try {
       const res = await studentFetch("/api/academy/complete-lesson", {
         method: "POST",
-        body: JSON.stringify({ course_id: courseId, lesson_id: lesson.id, score: lesson.points }),
+        body: JSON.stringify({ course_id: courseId, lesson_id: lesson.id, answers: exAnswers }),
       });
       const data = await res.json();
+      // Exercices ratés : la correction s'affiche exercice par exercice, rien n'est enregistré.
+      if (res.status === 422 && data?.exercisesFailed) {
+        setExResults(Object.fromEntries((data.exerciseResults || []).map((r: any) => [r.id, { correct: r.correct, explain: r.explain }])));
+        setCompleteError(data.message || "Certaines réponses sont à revoir.");
+        return;
+      }
       // Le serveur peut refuser (leçon verrouillée, fenêtre dépassée, admission expirée, email non
       // vérifié) : sans ce contrôle la leçon s'affichait comme complétée alors que rien n'était
       // enregistré, et la barre de progression recevait un pourcentage indéfini.
@@ -169,8 +270,11 @@ export default function AcademyClassroom() {
         return;
       }
       if (typeof data.progress === "number") setProgress(data.progress);
+      if (data.exerciseResults) {
+        setExResults(Object.fromEntries(data.exerciseResults.map((r: any) => [r.id, { correct: r.correct, explain: r.explain }])));
+      }
+      if (typeof data.lessonScore === "number") setLessonScore({ score: data.lessonScore, max: data.lessonMax });
       setCompletedLessons(prev => new Set(prev).add(lesson.id));
-      if (activeLesson < course.lessons.length - 1) setActiveLesson(a => a + 1);
     } catch (e: any) {
       setCompleteError("Erreur réseau. Réessayez.");
     } finally { setSubmitting(false); }
@@ -232,6 +336,16 @@ export default function AcademyClassroom() {
   const cells = lesson?.content?.cells || [];
   const codeCells = cells.filter(c => c.type === "code");
   const allCodeRan = codeCells.every((_, i) => ranCells.has(`${activeLesson}-code-${i}`));
+  // Exercices de la leçon : identifiants dans le même ordre que le rendu, pour savoir
+  // si l'étudiant a bien tout renseigné avant de soumettre sa copie.
+  const exerciseIds = cells.reduce<string[]>((acc, c, ci) => {
+    if (c.type !== "exercise") return acc;
+    acc.push((c as any).id || `ex${cells.slice(0, ci).filter(x => x.type === "exercise").length + 1}`);
+    return acc;
+  }, []);
+  const hasExercises = exerciseIds.length > 0;
+  const answeredCount = exerciseIds.filter(id => exAnswers[id] !== undefined && exAnswers[id] !== "").length;
+  const allAnswered = answeredCount === exerciseIds.length;
   const isLessonDone = completedLessons.has(lesson?.id);
   const allLessonsDone = course.lessons.every(l => completedLessons.has(l.id));
 
@@ -256,7 +370,7 @@ export default function AcademyClassroom() {
             const isLocked = !done && st === "locked";
             const isMissed = !done && st === "missed";
             return (
-              <button key={l.id} onClick={() => { setActiveLesson(i); setCompleteError(null); }}
+              <button key={l.id} onClick={() => goToLesson(i)}
                 className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-colors flex items-center gap-2 ${activeLesson === i ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
                 {done ? <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
                   : isMissed ? <X className="w-3.5 h-3.5 text-destructive shrink-0" />
@@ -353,9 +467,25 @@ export default function AcademyClassroom() {
               );
             }
 
-            // ── Quiz inline ──
+            // ── Quiz inline (auto-correction locale, sans note) ──
             if (cell.type === "quiz") {
               return <QuizCell key={ci} cell={cell} />;
+            }
+
+            // ── Exercice noté : l'étudiant produit une réponse, le serveur corrige ──
+            if (cell.type === "exercise") {
+              const exId = cell.id || `ex${cells.slice(0, ci).filter(c => c.type === "exercise").length + 1}`;
+              return (
+                <ExerciseCell
+                  key={ci}
+                  exId={exId}
+                  cell={cell}
+                  value={exAnswers[exId]}
+                  result={exResults[exId]}
+                  locked={isLessonDone}
+                  onChange={(v) => setExAnswers(prev => ({ ...prev, [exId]: v }))}
+                />
+              );
             }
 
             // ── Notebook LIVE (JupyterLite embed — exécute vraiment dans le navigateur) ──
@@ -400,6 +530,17 @@ export default function AcademyClassroom() {
         </div>
         )}
 
+        {/* Note obtenue après correction serveur */}
+        {lessonScore && (
+          <div className="bg-primary/5 border border-primary/30 rounded-2xl p-4 mb-4 flex items-center gap-3">
+            <Trophy className="w-5 h-5 text-primary shrink-0" />
+            <div>
+              <p className="font-medium text-sm">Leçon validée — {lessonScore.score}/{lessonScore.max} points</p>
+              <p className="text-xs text-muted-foreground">La correction de chaque exercice est affichée ci-dessus.</p>
+            </div>
+          </div>
+        )}
+
         {/* Erreur de validation renvoyée par le serveur */}
         {completeError && (
           <div className="bg-destructive/5 border border-destructive/30 rounded-2xl p-4 mb-4 flex items-start gap-3">
@@ -410,18 +551,24 @@ export default function AcademyClassroom() {
 
         {/* Nav + complete */}
         <div className="flex items-center justify-between pt-4 border-t border-border/50">
-          <Button variant="outline" disabled={activeLesson === 0} onClick={() => { setActiveLesson(a => a - 1); setCompleteError(null); }} className="gap-2">
+          <Button variant="outline" disabled={activeLesson === 0} onClick={() => goToLesson(activeLesson - 1)} className="gap-2">
             <ChevronLeft className="w-4 h-4" /> Précédent
           </Button>
           <div className="flex gap-2">
             {!isLessonDone && (
-              <Button onClick={completeLesson} disabled={submitting || lessonLocked || lessonMissed || (codeCells.length > 0 && !allCodeRan)} className="gap-2">
+              <Button
+                onClick={completeLesson}
+                disabled={submitting || lessonLocked || lessonMissed || (codeCells.length > 0 && !allCodeRan) || (hasExercises && !allAnswered)}
+                className="gap-2">
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                {codeCells.length > 0 && !allCodeRan ? "Exécutez les cellules" : "Marquer comme complété"}
+                {codeCells.length > 0 && !allCodeRan ? "Exécutez les cellules"
+                  : hasExercises && !allAnswered ? `Répondez aux exercices (${answeredCount}/${exerciseIds.length})`
+                  : hasExercises ? "Corriger ma copie"
+                  : "Marquer comme complété"}
               </Button>
             )}
             {isLessonDone && activeLesson < course.lessons.length - 1 && (
-              <Button onClick={() => { setActiveLesson(a => a + 1); setCompleteError(null); }} className="gap-2">Suivant <ChevronRight className="w-4 h-4" /></Button>
+              <Button onClick={() => goToLesson(activeLesson + 1)} className="gap-2">Suivant <ChevronRight className="w-4 h-4" /></Button>
             )}
             {allLessonsDone && (
               <Button onClick={requestAttestation} disabled={submitting} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">

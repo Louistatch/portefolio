@@ -8,6 +8,7 @@ import crypto from "crypto";
 import path from "path";
 import sharp from "sharp";
 import { PDFDocument } from "pdf-lib";
+import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises";
 
 // ── Supabase client ──
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -822,19 +823,25 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
   }
   if (error) return res.status(400).json({ message: error.message });
 
-  // Email de validation
+  // Email de validation — on attend le résultat réel de l'envoi : annoncer "email envoyé"
+  // alors que Resend a refusé (domaine non validé, quota) laissait l'étudiant attendre
+  // indéfiniment un message qui n'arriverait jamais.
+  let emailSent = false;
   if (resend) {
     const verifyUrl = `${SITE_URL}/academy/verify?token=${verifyToken}`;
-    resend.emails.send({
-      from: FROM_EMAIL, to: email,
-      subject: "Confirmez votre inscription — DataMEAL Academy",
-      html: verifyEmailHtml(full_name, verifyUrl, verifyCode),
-    }).then(() => logAcademyEmail(data.id, "verify", email, "Confirmez votre inscription"))
-      .catch((e: any) => console.error("Verify email error:", e));
+    try {
+      const r: any = await resend.emails.send({
+        from: FROM_EMAIL, to: email,
+        subject: "Confirmez votre inscription — DataMEAL Academy",
+        html: verifyEmailHtml(full_name, verifyUrl, verifyCode),
+      });
+      if (r?.error) console.error("Verify email refused:", r.error?.message || r.error);
+      else { emailSent = true; await logAcademyEmail(data.id, "verify", email, "Confirmez votre inscription"); }
+    } catch (e: any) { console.error("Verify email error:", e?.message || e); }
   }
 
   const token = generateStudentToken(data.id);
-  res.status(201).json({ token, student: data, emailSent: !!resend });
+  res.status(201).json({ token, student: data, emailSent });
 });
 
 // ── Soumettre le test d'aptitude (étudiant authentifié) ──
@@ -992,8 +999,10 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
   // Vérifier le délai de re-tentative (1 semaine après échec)
   const { data: stud } = await supabase.from("students")
     .select("admitted_at, admission_expires, next_test_allowed, test_attempts, status, email_verified").eq("id", sid).single();
-  if (stud && stud.email_verified === false)
-    return res.status(403).json({ message: "Vérifiez votre adresse email avant de passer le test.", needVerification: true });
+  // L'email non vérifié ne bloque plus le test : quand l'envoi d'email échoue (domaine
+  // d'expédition non validé, quota, boîte inexistante), l'étudiant était enfermé dans une
+  // impasse dont aucune action de sa part ne pouvait le sortir. La vérification reste exigée
+  // au moment de délivrer un document officiel (attestation, certificat).
   // Une admission expirée peut être repassée (sinon un étudiant dont les 3 mois sont écoulés
   // resterait bloqué pour toujours puisqu'admitted_at reste défini).
   const admissionExpired = !!stud?.admission_expires && new Date(stud.admission_expires) < new Date();
@@ -1307,7 +1316,13 @@ app.get("/api/academy/courses/:id", async (req, res) => {
   const { data: course, error } = await supabase.from("sms_courses").select("*").eq("id", Number(req.params.id)).eq("is_published", true).single();
   if (error) return res.status(404).json({ message: "Cours introuvable" });
   const { data: lessons } = await supabase.from("sms_lessons").select("*").eq("course_id", course.id).order("order_index");
-  res.json({ ...course, lessons: lessons || [] });
+  // Le contenu part vers le navigateur : les corrigés d'exercices en sont retirés.
+  const safeLessons = (lessons || []).map((l: any) => {
+    let content = l.content;
+    if (typeof content === "string") { try { content = JSON.parse(content); } catch { content = null; } }
+    return { ...l, content: content ? stripExerciseAnswers(content) : l.content };
+  });
+  res.json({ ...course, lessons: safeLessons });
 });
 
 // ── Mes inscriptions (avec infos cours) ──
@@ -1364,12 +1379,12 @@ app.get("/api/academy/my-grades", requireStudent, async (req, res) => {
 // ── Compléter une leçon (auto-note + progression) ──
 app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const { course_id, lesson_id } = req.body;
+  const { course_id, lesson_id, answers } = req.body;
   if (!course_id || !lesson_id) return res.status(400).json({ message: "course_id et lesson_id requis" });
 
-  // Vérifier l'email + l'admission
+  // Admission requise. L'email non vérifié ne bloque pas l'apprentissage (voir submit-test) :
+  // il est exigé au moment de délivrer une attestation ou un certificat.
   const { data: stud } = await supabase.from("students").select("admitted_at, admission_expires, email_verified").eq("id", sid).single();
-  if (stud && stud.email_verified === false) return res.status(403).json({ message: "Vérifiez votre adresse email pour accéder aux cours.", needVerification: true });
   if (!stud?.admitted_at) return res.status(403).json({ message: "Vous devez réussir le test d'admission pour accéder aux cours." });
   if (stud.admission_expires && new Date(stud.admission_expires) < new Date())
     return res.status(403).json({ message: "Votre période d'admission (3 mois) a expiré. Repassez le test d'admission." });
@@ -1380,7 +1395,7 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   if (!enr) await supabase.from("enrollments").insert({ student_id: sid, course_id, started_at: new Date().toISOString() });
 
   // Vérifier que la leçon existe bien dans le cours indiqué (empêche un lesson_id forgé/d'un autre cours)
-  const { data: lesson } = await supabase.from("sms_lessons").select("title, points").eq("id", lesson_id).eq("course_id", course_id).maybeSingle();
+  const { data: lesson } = await supabase.from("sms_lessons").select("title, points, content").eq("id", lesson_id).eq("course_id", course_id).maybeSingle();
   if (!lesson) return res.status(404).json({ message: "Leçon introuvable pour ce cours." });
 
   // GATING WQU : la leçon doit être 'available' (débloquée cette semaine, fenêtre non dépassée)
@@ -1395,8 +1410,22 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   if (lp.status === "missed")
     return res.status(403).json({ message: "La fenêtre d'une semaine pour cette leçon est dépassée. Vous avez été recalé(e) sur cette leçon.", missed: true });
 
-  const finalScore = lesson.points ?? 10;
+  // Correction des exercices « faire faire ». Une leçon qui en contient ne se valide pas en
+  // cliquant : la note reflète les réponses produites par l'étudiant.
+  let lessonContent = lesson.content;
+  if (typeof lessonContent === "string") { try { lessonContent = JSON.parse(lessonContent); } catch { lessonContent = null; } }
+  const graded = gradeLessonExercises(lessonContent, answers);
+
   const maxScore = lesson.points ?? 10;
+  if (graded && !graded.passed) {
+    // Échec : rien n'est enregistré, l'étudiant revoit sa copie et recommence.
+    return res.status(422).json({
+      message: `${graded.correctCount}/${graded.total} exercices justes — il en faut ${EXERCISE_PASS_PCT}% pour valider la leçon.`,
+      exerciseResults: graded.results, scorePct: graded.scorePct,
+      correctCount: graded.correctCount, total: graded.total, exercisesFailed: true,
+    });
+  }
+  const finalScore = graded ? Math.round(maxScore * graded.scorePct / 100) : maxScore;
 
   // Insertion idempotente (une seule note par élève/leçon, protégée par la contrainte UNIQUE(student_id, lesson_id))
   await supabase.from("grades").upsert({
@@ -1409,7 +1438,14 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
     .eq("student_id", sid).eq("lesson_id", lesson_id).then(() => {}, () => {});
 
   const result = await recalcCourseProgress(sid, course_id);
-  res.json(result);
+  res.json({
+    ...result,
+    lessonScore: finalScore, lessonMax: maxScore,
+    exerciseResults: graded?.results ?? null,
+    scorePct: graded?.scorePct ?? null,
+    correctCount: graded?.correctCount ?? null,
+    total: graded?.total ?? null,
+  });
 });
 
 // ── Planning hebdomadaire des leçons (modèle WQU) ──
@@ -1455,6 +1491,11 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   const { data: enr } = await supabase.from("enrollments")
     .select("progress, status").eq("student_id", sid).eq("course_id", course_id).maybeSingle();
   if (!enr || enr.progress < 100) return res.status(403).json({ message: "Vous devez compléter 100% du cours avant de demander l'attestation." });
+
+  // Un document nominatif n'est délivré qu'à une adresse email confirmée.
+  const { data: verif } = await supabase.from("students").select("email_verified").eq("id", sid).single();
+  if (verif && verif.email_verified === false)
+    return res.status(403).json({ message: "Confirmez votre adresse email pour recevoir votre attestation.", needVerification: true });
 
   // Ne regarder que les attestations DE COURS : l'attestation d'admission et le certificat final
   // sont rattachés au même course_id et feraient croire, à tort, à une demande déjà déposée.

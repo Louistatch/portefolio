@@ -11,6 +11,7 @@ export default function AcademyRegister() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
   const [showPwd, setShowPwd] = useState(false);
 
   function update(k: string, v: string) { setForm(f => ({ ...f, [k]: v })); }
@@ -46,6 +47,7 @@ export default function AcademyRegister() {
       if (!res.ok) throw new Error(data.message || "Erreur d'inscription");
       setStudentToken(data.token);
       setStudent(data.student);
+      setEmailSent(!!data.emailSent);
       setRegistered(true);
     } catch (e: any) { setError(e.message); } finally { setLoading(false); }
   }
@@ -56,12 +58,22 @@ export default function AcademyRegister() {
         <SEO title="Inscription réussie — DataMEAL Academy" description="Confirmez votre email." />
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5"><Mail className="w-8 h-8 text-primary" /></div>
         <h1 className="text-2xl font-bold mb-2">Bienvenue, {form.full_name.split(" ")[0]} !</h1>
-        <p className="text-muted-foreground mb-6">Votre compte est créé. Un email de confirmation a été envoyé à <strong>{form.email}</strong>.</p>
+        {/* L'état affiché reflète le résultat réel de l'envoi, pas une supposition. */}
+        <p className="text-muted-foreground mb-6">
+          {emailSent
+            ? <>Votre compte est créé. Un email de confirmation a été envoyé à <strong>{form.email}</strong>.</>
+            : <>Votre compte est créé et vous êtes connecté(e).</>}
+        </p>
         <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-6 text-sm text-muted-foreground text-left">
-          <p className="mb-2">📩 <strong className="text-foreground">Vous ne voyez pas l'email ?</strong> Vérifiez vos spams, ou demandez un renvoi depuis votre profil.</p>
-          <p>Vous pouvez passer le test d'aptitude dès maintenant — la vérification de l'email peut se faire plus tard.</p>
+          {emailSent
+            ? <p className="mb-2">📩 <strong className="text-foreground">Vous ne voyez pas l'email ?</strong> Regardez dans vos spams, ou demandez un renvoi depuis la page de confirmation.</p>
+            : <p className="mb-2">📩 <strong className="text-foreground">L'email de confirmation n'a pas pu partir</strong> (service d'envoi indisponible). Ce n'est pas bloquant : confirmez plus tard, ou l'équipe validera votre compte.</p>}
+          <p>Vous pouvez passer le test d'admission dès maintenant. La confirmation d'email n'est nécessaire que pour recevoir vos attestations.</p>
         </div>
-        <Button className="gap-2 w-full" size="lg" onClick={() => navigate("/elearning")}><CheckCircle2 className="w-4 h-4" /> Passer le test d'aptitude</Button>
+        <Button className="gap-2 w-full" size="lg" onClick={() => navigate("/elearning")}><CheckCircle2 className="w-4 h-4" /> Passer le test d'admission</Button>
+        <button onClick={() => navigate("/academy/verify")} className="text-sm text-primary hover:underline mt-4">
+          J'ai un code de confirmation
+        </button>
       </div>
     );
   }
