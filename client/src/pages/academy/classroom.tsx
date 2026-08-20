@@ -14,6 +14,7 @@ interface Cell {
   type: string; content?: string; lang?: string; code?: string; output?: string; variant?: string;
   title?: string; url?: string; provider?: string; desc?: string; question?: string; opts?: string[];
   ans?: number; svg?: string; caption?: string;
+  src?: string;                       // cellule image : chemin interne d'une capture
   // Cellules d'exercice (le corrigé est retiré côté serveur avant envoi)
   id?: string; kind?: "choice" | "number" | "text"; prompt?: string; unit?: string;
   hint?: string; explain?: string; placeholder?: string;
@@ -89,6 +90,35 @@ const FigureCell = memo(function FigureCell({ title, svg, caption }: { title?: s
         </div>
       )}
     </div>
+  );
+});
+
+// ── Capture d'écran ──
+// Les leçons Kobo s'appuient sur de vraies captures de l'outil : sans elles, « cliquez sur
+// Déployer » n'aide pas quelqu'un qui découvre l'interface. Les fichiers sont servis en
+// statique depuis client/public ; on n'accepte qu'un chemin interne pour qu'un contenu de
+// leçon ne puisse pas faire charger une image tierce.
+const ImageCell = memo(function ImageCell({ src, title, caption }: { src?: string; title?: string; caption?: string }) {
+  const safe = typeof src === "string" && src.startsWith("/") && !src.startsWith("//") ? src : null;
+  if (!safe) return null;
+  return (
+    <figure className="bg-card rounded-2xl border border-border/50 overflow-hidden m-0">
+      {title && (
+        <div className="flex items-center gap-2 px-4 py-2.5 border-b border-border/50 bg-muted/30">
+          <ImageIcon className="w-3.5 h-3.5 text-primary" />
+          <span className="text-xs font-medium text-foreground">{title}</span>
+        </div>
+      )}
+      <a href={safe} target="_blank" rel="noopener noreferrer" className="block bg-slate-50 dark:bg-slate-900/40">
+        <img src={safe} alt={caption || title || "Capture d'écran"} loading="lazy" decoding="async"
+          className="w-full h-auto max-h-[520px] object-contain mx-auto" />
+      </a>
+      {caption && (
+        <figcaption className="px-4 py-2.5 bg-muted/20 border-t border-border/50">
+          <p className="text-xs text-muted-foreground leading-relaxed">{caption}</p>
+        </figcaption>
+      )}
+    </figure>
   );
 });
 
@@ -443,6 +473,11 @@ export default function AcademyClassroom() {
             // ── Figure SVG (capture d'interface annotée) ──
             if (cell.type === "figure") {
               return <FigureCell key={ci} title={cell.title} svg={cell.svg} caption={cell.caption} />;
+            }
+
+            // ── Capture d'écran de l'outil ──
+            if (cell.type === "image") {
+              return <ImageCell key={ci} src={cell.src} title={cell.title} caption={cell.caption} />;
             }
 
             // ── Ressource externe open-source ──
