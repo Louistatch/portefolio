@@ -15,7 +15,8 @@
 -- (chemins /academy/kobo/*.webp) : elles doivent être déployées AVANT
 -- l'exécution de ce script, sinon les leçons afficheront des images cassées.
 --
--- Script idempotent : une leçon contenant déjà une capture Kobo est ignorée.
+-- Script idempotent : une leçon mentionnant déjà Kara est ignorée (les leçons 1 et 2
+-- ne reçoivent aucune capture — se fier aux images laisserait passer un doublon).
 -- À exécuter dans Supabase SQL Editor APRÈS kobo_course_enriched.sql
 -- et academy_exercises_meal01.sql.
 -- ════════════════════════════════════════════════════════════════
@@ -53,7 +54,7 @@ WHERE id = (
     AND l.title ILIKE '%collecte de données terrain%'
   ORDER BY l.order_index LIMIT 1
 )
-  AND NOT (content->'cells') @> '[{"type":"image"}]'::jsonb;
+  AND content::text NOT LIKE '%Kara%';
 
 -- ── Le constructeur de formulaire : ajouter une question ──
 UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells') || '[
@@ -84,13 +85,13 @@ WHERE id = (
     AND (l.title ILIKE '%ajouter une question%' OR l.title ILIKE '%les bases%')
   ORDER BY l.order_index LIMIT 1
 )
-  AND NOT (content->'cells') @> '[{"type":"image"}]'::jsonb;
+  AND content::text NOT LIKE '%Kara%';
 
 -- ── Choisir le bon type de réponse ──
 UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells') || '[
  {
   "type": "md",
-  "content": "## Quatre types de questions, et pas un de plus\n\nUn questionnaire se compose de quatre grands types. Les reconnaître, c''est savoir quel champ créer dans l''outil.\n\n- **Question fermée à réponse unique** — l''enquêté choisit une seule réponse parmi les options. *Ex. le quartier.*\n- **Question fermée à réponse multiple** — plusieurs réponses possibles parmi la liste. *Ex. les propositions d''aménagement.*\n- **Question texte** — réponse libre. *Ex. le nom du secteur.*\n- **Question numérique** — une valeur chiffrée. *Ex. la superficie.*"
+  "content": "## Quatre types de questions, et pas un de plus\n\nUn questionnaire se compose de quatre grands types. Les reconnaître, c''est savoir quel champ créer dans l''outil. Les exemples ci-dessous sont ceux du guide d''entretien de Kara :\n\n- **Question fermée à réponse unique** — l''enquêté choisit une seule réponse parmi les options. *Ex. le quartier : Kpéwa, Tomdè, Ramco, Kassena.*\n- **Question fermée à réponse multiple** — plusieurs réponses possibles parmi la liste. *Ex. les propositions d''aménagement : conserver, parc urbain, réserve botanique.*\n- **Question texte** — réponse libre. *Ex. le nom du secteur ou du lieu-dit.*\n- **Question numérique** — une valeur chiffrée. *Ex. la superficie en hectares.*"
  },
  {
   "type": "md",
@@ -115,7 +116,7 @@ WHERE id = (
     AND l.title ILIKE '%type de réponse%'
   ORDER BY l.order_index LIMIT 1
 )
-  AND NOT (content->'cells') @> '[{"type":"image"}]'::jsonb;
+  AND content::text NOT LIKE '%Kara%';
 
 -- ── Rendre le formulaire intelligent (validation & logique) ──
 UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells') || '[
@@ -146,7 +147,7 @@ WHERE id = (
     AND l.title ILIKE '%validation%'
   ORDER BY l.order_index LIMIT 1
 )
-  AND NOT (content->'cells') @> '[{"type":"image"}]'::jsonb;
+  AND content::text NOT LIKE '%Kara%';
 
 -- ── Déployer le formulaire et lancer la collecte ──
 UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells') || '[
@@ -286,7 +287,7 @@ WHERE id = (
     AND (l.title ILIKE '%déployer%' OR l.title ILIKE '%lancer la collecte%')
   ORDER BY l.order_index LIMIT 1
 )
-  AND NOT (content->'cells') @> '[{"type":"image"}]'::jsonb;
+  AND content::text NOT LIKE '%Kara%';
 
 -- ── Collecter sur le terrain avec KoboCollect ──
 UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells') || '[
@@ -399,7 +400,7 @@ WHERE id = (
     AND l.title ILIKE '%avec kobocollect%'
   ORDER BY l.order_index LIMIT 1
 )
-  AND NOT (content->'cells') @> '[{"type":"image"}]'::jsonb;
+  AND content::text NOT LIKE '%Kara%';
 
 -- ── Récupérer et analyser les données (capstone) ──
 UPDATE sms_lessons SET content = jsonb_set(content, '{cells}', (content->'cells') || '[
@@ -456,7 +457,7 @@ WHERE id = (
     AND (l.title ILIKE '%analyser les données%' OR l.title ILIKE '%indicateurs nutritionnels%')
   ORDER BY l.order_index LIMIT 1
 )
-  AND NOT (content->'cells') @> '[{"type":"image"}]'::jsonb;
+  AND content::text NOT LIKE '%Kara%';
 
 -- ── Rapport ──
 -- Un UPDATE sans effet affiche « Success. No rows returned » exactement comme un
