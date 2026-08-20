@@ -795,7 +795,10 @@ async function notifyNewCourseEmails(course: { id: number; code?: string; title:
 }
 
 app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res) => {
-  const { full_name, email, password, phone, country, organization } = req.body;
+  const { email, password, phone, country, organization, first_name, middle_name, last_name } = req.body;
+  // L'état civil décomposé fait foi ; full_name reste accepté pour ne pas casser un client
+  // plus ancien, et sert alors de repli.
+  const full_name = composeFullName(first_name, middle_name, last_name) || req.body.full_name;
   if (!full_name || !email || !password) return res.status(400).json({ message: "Nom, email et mot de passe requis" });
   if (password.length < 8) return res.status(400).json({ message: "Le mot de passe doit faire au moins 8 caractères" });
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ message: "Email invalide" });
@@ -810,7 +813,8 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
 
   let { data, error } = await supabase.from("students")
     .insert({
-      full_name, email, password_hash: hash, phone, country, organization,
+      full_name, first_name, middle_name, last_name,
+      email, password_hash: hash, phone, country, organization,
       entry_score: 0, status: "pending_test",
       email_verified: false, verify_token: verifyToken, verify_code: verifyCode, verify_expires: verifyExpires,
     })
@@ -818,7 +822,7 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
 
   // Fallback : si la migration des colonnes de vérification n'est pas encore appliquée,
   // on crée le compte sans ces colonnes (le compte n'est pas bloqué).
-  if (error && /verify_|email_verified|column/i.test(error.message)) {
+  if (error && /verify_|email_verified|first_name|last_name|column/i.test(error.message)) {
     const retry = await supabase.from("students")
       .insert({ full_name, email, password_hash: hash, phone, country, organization, entry_score: 0, status: "pending_test" })
       .select("id, full_name, email, status").single();
@@ -1269,7 +1273,7 @@ app.post("/api/academy/login", rateLimit(10, 5 * 60 * 1000), async (req, res) =>
 app.get("/api/academy/me", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data, error } = await supabase.from("students")
-    .select("id, full_name, email, phone, country, city, organization, profession, bio, gender, birth_year, linkedin, experience_level, interests, entry_score, avatar_url, status, email_verified, course_emails, created_at, last_login")
+    .select("id, full_name, first_name, middle_name, last_name, email, phone, country, city, organization, profession, bio, gender, birth_year, linkedin, experience_level, interests, entry_score, avatar_url, status, email_verified, course_emails, created_at, last_login")
     .eq("id", sid).single();
   if (error) return res.status(404).json({ message: "Étudiant introuvable" });
   res.json(data);
@@ -1278,8 +1282,8 @@ app.get("/api/academy/me", requireStudent, async (req, res) => {
 // ── Mettre à jour son profil ──
 app.put("/api/academy/me", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const allowed = ["full_name", "phone", "country", "city", "organization", "profession", "bio", "gender", "birth_year", "linkedin", "experience_level", "interests", "avatar_url", "course_emails"];
-  const maxLengths: Record<string, number> = { full_name: 120, phone: 30, country: 60, city: 60, organization: 120, profession: 120, bio: 1000, gender: 20, linkedin: 200 };
+  const allowed = ["full_name", "first_name", "middle_name", "last_name", "phone", "country", "city", "organization", "profession", "bio", "gender", "birth_year", "linkedin", "experience_level", "interests", "avatar_url", "course_emails"];
+  const maxLengths: Record<string, number> = { full_name: 120, first_name: 60, middle_name: 60, last_name: 60, phone: 30, country: 60, city: 60, organization: 120, profession: 120, bio: 1000, gender: 20, linkedin: 200 };
   const update: any = {};
   for (const k of allowed) {
     if (!(k in req.body)) continue;
@@ -1289,8 +1293,20 @@ app.put("/api/academy/me", requireStudent, async (req, res) => {
     update[k] = typeof v === "string" ? v.trim() : v;
   }
   if (Object.keys(update).length === 0) return res.status(400).json({ message: "Aucun champ à mettre à jour" });
+
+  // full_name est dérivé, jamais saisi en parallèle : dès qu'une partie de l'état civil
+  // change, on le recompose pour que le nom affiché et le nom imprimé sur les documents
+  // ne puissent pas diverger.
+  if ("first_name" in update || "middle_name" in update || "last_name" in update) {
+    const { data: cur } = await supabase.from("students")
+      .select("first_name, middle_name, last_name").eq("id", sid).single();
+    const merged = { ...(cur || {}), ...update };
+    const composed = composeFullName(merged.first_name, merged.middle_name, merged.last_name);
+    if (composed) update.full_name = composed;
+  }
+
   const { data, error } = await supabase.from("students").update(update).eq("id", sid)
-    .select("id, full_name, email, phone, country, city, organization, profession, bio, gender, birth_year, linkedin, experience_level, interests, avatar_url, course_emails").single();
+    .select("id, full_name, first_name, middle_name, last_name, email, phone, country, city, organization, profession, bio, gender, birth_year, linkedin, experience_level, interests, avatar_url, course_emails").single();
   if (error) return res.status(400).json({ message: error.message });
   res.json(data);
 });
@@ -2055,6 +2071,28 @@ async function certificatePdf(opts: Parameters<typeof certificateSvg>[0]): Promi
   return Buffer.from(bytes);
 }
 
+/**
+ * Nom porté par un document officiel (attestation, certificat).
+ *
+ * Convention des documents administratifs d'Afrique de l'Ouest, celle de la signature
+ * du certificat elle-même (« TATCHIDA Issodo Louis ») : NOM en capitales, puis les
+ * prénoms. Tant que l'état civil décomposé n'est pas renseigné — comptes créés avant
+ * son introduction — on retombe sur full_name plutôt que de deviner le découpage.
+ */
+function officialName(st: { first_name?: string | null; middle_name?: string | null; last_name?: string | null; full_name?: string | null }): string {
+  const last = (st.last_name || "").trim();
+  const first = (st.first_name || "").trim();
+  const middle = (st.middle_name || "").trim();
+  if (!last || !first) return (st.full_name || "").trim();
+  return [last.toUpperCase(), first, middle].filter(Boolean).join(" ");
+}
+
+/** full_name affiché partout ailleurs (accueil, emails, admin), dérivé de l'état civil. */
+function composeFullName(first?: string | null, middle?: string | null, last?: string | null): string | null {
+  const parts = [first, middle, last].map(v => (v || "").trim()).filter(Boolean);
+  return parts.length ? parts.join(" ") : null;
+}
+
 // ── Nom de fichier propre : Nom_Prenom_Type_ID.pdf ──
 function certFileName(name: string, type: string, certNo: string): string {
   const clean = String(name).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "");
@@ -2204,12 +2242,12 @@ function certificateHtml(opts: {
 app.get("/api/academy/certificate/admission", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data: stud } = await supabase.from("students")
-    .select("full_name, admitted_at, admission_expires, entry_score").eq("id", sid).single();
+    .select("full_name, first_name, middle_name, last_name, admitted_at, admission_expires, entry_score").eq("id", sid).single();
   if (!stud?.admitted_at) return res.status(403).send("Vous n'êtes pas encore admis(e).");
   const { data: cert } = await supabase.from("attestations")
     .select("certificate_no").eq("student_id", sid).eq("cert_type", "admission").maybeSingle();
   const opts = {
-    name: stud.full_name, type: "admission" as const,
+    name: officialName(stud), type: "admission" as const,
     certNo: cert?.certificate_no || `DMA-ADM-${sid}`,
     score: Math.round((stud.entry_score ?? 0) / 30 * 100),
     issuedAt: stud.admitted_at, expiresAt: stud.admission_expires,
@@ -2234,13 +2272,13 @@ app.get("/api/academy/certificate/admission", requireStudent, async (req, res) =
 app.get("/api/academy/certificate/final", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data: stud } = await supabase.from("students")
-    .select("full_name, final_certificate_no, final_certified_at").eq("id", sid).single();
+    .select("full_name, first_name, middle_name, last_name, final_certificate_no, final_certified_at").eq("id", sid).single();
   if (!stud?.final_certificate_no) return res.status(403).send("Vous devez terminer les 3 cours pour obtenir le certificat final.");
   const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
   const ga = allGrades || [];
   const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
   const opts = {
-    name: stud.full_name, type: "final" as const,
+    name: officialName(stud), type: "final" as const,
     certNo: stud.final_certificate_no, score: avg, issuedAt: stud.final_certified_at,
   };
   if (req.query.format === "html") {
@@ -2276,14 +2314,14 @@ app.get("/api/academy/verify-certificate/:certNo", rateLimit(30, 5 * 60 * 1000),
 
   // Chercher dans les attestations
   const { data: att } = await supabase.from("attestations")
-    .select("certificate_no, cert_type, final_score, issued_at, expires_at, status, students(full_name), sms_courses(code, title)")
+    .select("certificate_no, cert_type, final_score, issued_at, expires_at, status, students(full_name, first_name, middle_name, last_name), sms_courses(code, title)")
     .eq("certificate_no", certNo).maybeSingle();
 
   // Chercher aussi le certificat final stocké sur l'étudiant
   let final: any = null;
   if (!att) {
     const { data: stud } = await supabase.from("students")
-      .select("full_name, final_certificate_no, final_certified_at").eq("final_certificate_no", certNo).maybeSingle();
+      .select("full_name, first_name, middle_name, last_name, final_certificate_no, final_certified_at").eq("final_certificate_no", certNo).maybeSingle();
     if (stud) final = stud;
   }
 
@@ -2298,7 +2336,9 @@ app.get("/api/academy/verify-certificate/:certNo", rateLimit(30, 5 * 60 * 1000),
       : `Attestation — ${(att as any).sms_courses?.title || "Cours"}`;
     return res.json({
       valid: !expired && att.status !== "rejected",
-      holder: (att as any).students?.full_name || "—",
+      // Même nom que celui imprimé sur le document, sinon la vérification publique
+      // semble désigner quelqu'un d'autre.
+      holder: (att as any).students ? officialName((att as any).students) || "—" : "—",
       type: typeLabel,
       certificate_no: att.certificate_no,
       score: att.final_score ?? null,
@@ -2311,7 +2351,7 @@ app.get("/api/academy/verify-certificate/:certNo", rateLimit(30, 5 * 60 * 1000),
 
   return res.json({
     valid: true,
-    holder: final.full_name,
+    holder: officialName(final),
     type: "Certificat Super-Expert MEAL",
     certificate_no: final.final_certificate_no,
     issued_at: final.final_certified_at,

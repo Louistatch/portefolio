@@ -7,7 +7,7 @@ import { setStudentToken, setStudent } from "@/lib/student";
 
 export default function AcademyRegister() {
   const [, navigate] = useLocation();
-  const [form, setForm] = useState({ full_name: "", email: "", password: "", confirm: "", phone: "", country: "", organization: "" });
+  const [form, setForm] = useState({ first_name: "", middle_name: "", last_name: "", email: "", password: "", confirm: "", phone: "", country: "", organization: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [registered, setRegistered] = useState(false);
@@ -31,7 +31,7 @@ export default function AcademyRegister() {
   async function submit() {
     if (loading) return;
     setError("");
-    if (!form.full_name || !form.email || !form.password) { setError("Nom, email et mot de passe sont obligatoires."); return; }
+    if (!form.first_name || !form.last_name || !form.email || !form.password) { setError("Prénom, nom, email et mot de passe sont obligatoires."); return; }
     if (form.password.length < 8) { setError("Le mot de passe doit faire au moins 8 caractères."); return; }
     if (form.password !== form.confirm) { setError("Les mots de passe ne correspondent pas."); return; }
     setLoading(true);
@@ -39,7 +39,8 @@ export default function AcademyRegister() {
       const res = await fetch("/api/academy/register", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          full_name: form.full_name, email: form.email, password: form.password,
+          first_name: form.first_name, middle_name: form.middle_name, last_name: form.last_name,
+          email: form.email, password: form.password,
           phone: form.phone, country: form.country, organization: form.organization,
         }),
       });
@@ -57,7 +58,7 @@ export default function AcademyRegister() {
       <div className="max-w-md mx-auto px-6 py-20 text-center">
         <SEO title="Inscription réussie — DataMEAL Academy" description="Confirmez votre email." />
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5"><Mail className="w-8 h-8 text-primary" /></div>
-        <h1 className="text-2xl font-bold mb-2">Bienvenue, {form.full_name.split(" ")[0]} !</h1>
+        <h1 className="text-2xl font-bold mb-2">Bienvenue, {form.first_name} !</h1>
         {/* L'état affiché reflète le résultat réel de l'envoi, pas une supposition. */}
         <p className="text-muted-foreground mb-6">
           {emailSent
@@ -101,9 +102,27 @@ export default function AcademyRegister() {
       </div>
 
       <div className="space-y-4">
+        {/* État civil décomposé : ces trois champs composent le nom imprimé sur les
+            attestations et certificats. Un champ libre unique produisait des documents
+            ne portant qu'un nom de famille, ou qu'un prénom. */}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Prénom *</label>
+            <input className={field} value={form.first_name} onChange={e => update("first_name", e.target.value)} placeholder="Issodo" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1.5">Nom de famille *</label>
+            <input className={field} value={form.last_name} onChange={e => update("last_name", e.target.value)} placeholder="TATCHIDA" />
+          </div>
+        </div>
         <div>
-          <label className="block text-sm font-medium mb-1.5">Nom complet *</label>
-          <input className={field} value={form.full_name} onChange={e => update("full_name", e.target.value)} placeholder="Louis TATCHIDA" />
+          <label className="block text-sm font-medium mb-1.5">
+            Deuxième prénom <span className="text-muted-foreground font-normal">(facultatif)</span>
+          </label>
+          <input className={field} value={form.middle_name} onChange={e => update("middle_name", e.target.value)} placeholder="Louis" />
+          <p className="text-xs text-muted-foreground mt-1.5">
+            Renseignez votre état civil complet tel qu'il doit figurer sur vos attestations et certificats.
+          </p>
         </div>
         <div>
           <label className="block text-sm font-medium mb-1.5">Email *</label>

@@ -51,7 +51,8 @@ export default function AcademyProfile() {
       const data = await studentFetch("/api/academy/me", {
         method: "PUT",
         body: JSON.stringify({
-          full_name: p.full_name, phone: p.phone, country: p.country, city: p.city,
+          first_name: p.first_name, middle_name: p.middle_name, last_name: p.last_name,
+          phone: p.phone, country: p.country, city: p.city,
           organization: p.organization, profession: p.profession, bio: p.bio,
           gender: p.gender, birth_year: p.birth_year ? Number(p.birth_year) : null,
           linkedin: p.linkedin, experience_level: p.experience_level,
@@ -154,7 +155,35 @@ export default function AcademyProfile() {
       <section className="bg-card rounded-2xl border border-border/50 p-6 mb-5">
         <h2 className="font-semibold mb-4 flex items-center gap-2"><User className="w-4 h-4 text-primary" /> Informations personnelles</h2>
         <div className="grid sm:grid-cols-2 gap-4">
-          <div><label className="block text-sm font-medium mb-1.5">Nom complet</label><input className={field} value={p.full_name || ""} onChange={e => up("full_name", e.target.value)} /></div>
+          {/* État civil : c'est ce nom qui est imprimé sur les attestations et certificats. */}
+          <div className="sm:col-span-2 bg-primary/5 border border-primary/20 rounded-2xl p-4">
+            <p className="text-sm font-medium mb-1">État civil</p>
+            <p className="text-xs text-muted-foreground mb-3">
+              Ce nom figure sur vos attestations et certificats, et sur leur page de vérification publique.
+              {(!p.first_name || !p.last_name) && (
+                <span className="text-amber-600 dark:text-amber-400 font-medium"> Complétez-le : votre compte a été créé avant ce champ, vos documents portent pour l'instant « {p.full_name} ».</span>
+              )}
+            </p>
+            <div className="grid sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-xs font-medium mb-1.5">Prénom</label>
+                <input className={field} value={p.first_name || ""} onChange={e => up("first_name", e.target.value)} placeholder="Issodo" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5">Deuxième prénom</label>
+                <input className={field} value={p.middle_name || ""} onChange={e => up("middle_name", e.target.value)} placeholder="facultatif" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1.5">Nom de famille</label>
+                <input className={field} value={p.last_name || ""} onChange={e => up("last_name", e.target.value)} placeholder="TATCHIDA" />
+              </div>
+            </div>
+            {p.first_name && p.last_name && (
+              <p className="text-xs text-muted-foreground mt-3">
+                Sur vos documents : <strong className="text-foreground font-mono">{[p.last_name.toUpperCase(), p.first_name, p.middle_name].filter(Boolean).join(" ")}</strong>
+              </p>
+            )}
+          </div>
           <div><label className="block text-sm font-medium mb-1.5">Profession</label><input className={field} value={p.profession || ""} onChange={e => up("profession", e.target.value)} placeholder="Agent MEAL, Chargé de projet…" /></div>
           <div><label className="block text-sm font-medium mb-1.5">Téléphone</label><input className={field} value={p.phone || ""} onChange={e => up("phone", e.target.value)} /></div>
           <div><label className="block text-sm font-medium mb-1.5">Organisation</label><input className={field} value={p.organization || ""} onChange={e => up("organization", e.target.value)} /></div>
