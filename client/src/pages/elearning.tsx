@@ -415,7 +415,7 @@ export default function ELearning() {
               {nextLesson?.due_at && ` À rendre avant le ${new Date(nextLesson.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.`}
             </p>
             <Button size="lg" className="gap-2 w-full sm:w-auto"
-              onClick={() => navigate(nextLesson ? `/academy/classroom/${nextLesson.course_id}` : "/academy/dashboard")}>
+              onClick={() => navigate(nextLesson ? `/academy/classroom/${nextLesson.course_id}?lesson=${nextLesson.lesson_id}` : "/academy/dashboard")}>
               <GraduationCap className="w-4 h-4" /> Commencer ma première leçon
             </Button>
           </div>

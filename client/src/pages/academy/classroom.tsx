@@ -213,6 +213,10 @@ export default function AcademyClassroom() {
   const [enrolled, setEnrolled] = useState(false);
   const [testPassed, setTestPassed] = useState(false);
   const [schedule, setSchedule] = useState<Record<number, any>>({});
+  // Planning complet, tous cours confondus : en semaine N, une leçon est ouverte dans
+  // chaque cours. Sans cette liste, la salle ne connaît que son propre cours et ne peut
+  // pas proposer les autres leçons de la semaine.
+  const [weekPlan, setWeekPlan] = useState<any[]>([]);
   const [completeError, setCompleteError] = useState<string | null>(null);
   // Réponses saisies pour les exercices de la leçon courante, et correction renvoyée par le serveur.
   const [exAnswers, setExAnswers] = useState<Record<string, any>>({});
@@ -251,9 +255,19 @@ export default function AcademyClassroom() {
         const done = new Set<number>((g.grades || []).filter((gr: any) => gr.course_id === courseId && gr.lesson_id).map((gr: any) => gr.lesson_id as number));
         setCompletedLessons(done);
         // Map du planning hebdomadaire par lesson_id
+        const schedList = Array.isArray(sched) ? sched : [];
         const schedMap: Record<number, any> = {};
-        (Array.isArray(sched) ? sched : []).forEach((s: any) => { schedMap[s.lesson_id] = s; });
+        schedList.forEach((s: any) => { schedMap[s.lesson_id] = s; });
         setSchedule(schedMap);
+        setWeekPlan(schedList);
+
+        // Lien profond « ?lesson=<id> » : ouvrir la leçon demandée plutôt que la première
+        // du cours, qui est souvent déjà terminée.
+        const wanted = Number(new URLSearchParams(window.location.search).get("lesson"));
+        if (wanted) {
+          const idx = lessons.findIndex((l: any) => l.id === wanted);
+          if (idx >= 0) setActiveLesson(idx);
+        }
       } catch (e) { setCourse(null); setLoadError(true); } finally { setLoading(false); }
     })();
   }, [courseId]);
@@ -378,6 +392,21 @@ export default function AcademyClassroom() {
   const allAnswered = answeredCount === exerciseIds.length;
   const isLessonDone = completedLessons.has(lesson?.id);
   const allLessonsDone = course.lessons.every(l => completedLessons.has(l.id));
+
+  // La leçon suivante DANS ce cours n'est ouverte que si la semaine en cours l'a débloquée.
+  const nextInCourse = course.lessons[activeLesson + 1];
+  const nextInCourseSched = nextInCourse ? schedule[nextInCourse.id] : null;
+  const nextInCourseOpen = !!nextInCourse &&
+    (completedLessons.has(nextInCourse.id) || nextInCourseSched?.status === "available");
+
+  // Les leçons encore ouvertes cette semaine, tous cours confondus. Le planning avance en
+  // parallèle : quand la suite de ce cours attend la semaine prochaine, l'étudiant a
+  // presque toujours une autre leçon disponible ailleurs — c'est là qu'il faut l'emmener.
+  const openElsewhere = weekPlan
+    .filter((sp: any) => sp.status === "available"
+      && !completedLessons.has(sp.lesson_id)
+      && sp.lesson_id !== lesson?.id)
+    .sort((a: any, b: any) => (a.sms_courses?.code || "").localeCompare(b.sms_courses?.code || ""));
 
   return (
     <div className="flex min-h-screen">
@@ -584,6 +613,46 @@ export default function AcademyClassroom() {
           </div>
         )}
 
+        {/* Et maintenant ? — l'enchaînement quand la suite de ce cours n'est pas encore ouverte.
+            Sans ce panneau, « Suivant » menait droit sur une leçon verrouillée de la semaine
+            suivante, alors que d'autres leçons de la semaine en cours restaient à faire. */}
+        {isLessonDone && !nextInCourseOpen && (openElsewhere.length > 0 || nextInCourse) && (
+          <div className="bg-primary/5 border border-primary/25 rounded-2xl p-5 mb-4">
+            <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-2">Et maintenant ?</p>
+            {nextInCourse && nextInCourseSched?.unlock_at && (
+              <p className="text-sm text-muted-foreground mb-3">
+                La suite de <strong className="text-foreground">{course.code}</strong> — « {nextInCourse.title} » — s'ouvre le{" "}
+                {new Date(nextInCourseSched.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}.
+              </p>
+            )}
+            {openElsewhere.length > 0 ? (
+              <>
+                <p className="text-sm mb-3">
+                  {openElsewhere.length === 1 ? "Il vous reste une leçon ouverte cette semaine :" : `Il vous reste ${openElsewhere.length} leçons ouvertes cette semaine :`}
+                </p>
+                <div className="space-y-2">
+                  {openElsewhere.map((sp: any) => (
+                    <button key={sp.lesson_id}
+                      onClick={() => navigate(`/academy/classroom/${sp.course_id}?lesson=${sp.lesson_id}`)}
+                      className="w-full text-left bg-card border border-border/50 hover:border-primary/40 rounded-xl px-4 py-3 transition-colors flex items-center gap-3">
+                      <span className="text-[10px] font-mono font-semibold text-primary shrink-0">{sp.sms_courses?.code}</span>
+                      <span className="text-sm flex-1 truncate">{sp.sms_lessons?.title || "Leçon"}</span>
+                      <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Vous avez terminé tout ce qui était ouvert cette semaine. Revenez à la prochaine ouverture.
+              </p>
+            )}
+            <Button variant="outline" size="sm" className="mt-3 gap-1.5" onClick={() => navigate("/academy/dashboard")}>
+              Mon planning <ChevronRight className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
+
         {/* Nav + complete */}
         <div className="flex items-center justify-between pt-4 border-t border-border/50">
           <Button variant="outline" disabled={activeLesson === 0} onClick={() => goToLesson(activeLesson - 1)} className="gap-2">
@@ -602,7 +671,7 @@ export default function AcademyClassroom() {
                   : "Marquer comme complété"}
               </Button>
             )}
-            {isLessonDone && activeLesson < course.lessons.length - 1 && (
+            {isLessonDone && nextInCourse && nextInCourseOpen && (
               <Button onClick={() => goToLesson(activeLesson + 1)} className="gap-2">Suivant <ChevronRight className="w-4 h-4" /></Button>
             )}
             {allLessonsDone && (

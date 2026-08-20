@@ -83,7 +83,7 @@ export default function AcademyDashboard() {
             </div>
           </div>
           {nextLesson ? (
-            <button onClick={() => navigate(`/academy/classroom/${nextLesson.course_id}`)}
+            <button onClick={() => navigate(`/academy/classroom/${nextLesson.course_id}?lesson=${nextLesson.lesson_id}`)}
               className="bg-white text-primary rounded-2xl px-5 py-3 text-left hover:bg-white/95 transition-colors shadow-lg">
               <p className="text-[11px] uppercase tracking-wide text-primary/60 font-semibold">Cette semaine</p>
               <p className="font-bold text-sm max-w-[200px] truncate">{nextLesson.sms_lessons?.title || "Leçon disponible"}</p>
@@ -214,7 +214,7 @@ export default function AcademyDashboard() {
                       isMissed ? "Recalé(e)" : `Débloque le ${new Date(s.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
                     </p>
                   </div>
-                  {isAvail && <Button size="sm" onClick={() => navigate(`/academy/classroom/${s.course_id}`)} className="shrink-0">Commencer</Button>}
+                  {isAvail && <Button size="sm" onClick={() => navigate(`/academy/classroom/${s.course_id}?lesson=${s.lesson_id}`)} className="shrink-0">Commencer</Button>}
                 </div>
               );
             })}
