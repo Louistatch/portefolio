@@ -1613,10 +1613,17 @@ app.get("/api/academy/lesson-schedule", requireStudent, async (req, res) => {
   if (stud?.admitted_at) await generateLessonSchedule(sid, new Date(stud.admitted_at));
   await refreshLessonStates(sid);
   const { data, error } = await supabase.from("lesson_progress")
-    .select("*, sms_lessons(title, order_index), sms_courses(code, title)")
+    .select("*, sms_lessons(title, order_index), sms_courses(code, title, order_index)")
     .eq("student_id", sid).order("week_index");
   if (error) return res.status(500).json({ message: error.message });
-  res.json(data || []);
+  // Tri complet : semaine, puis cours, puis rang de la leçon. Trier sur la seule semaine
+  // laissait les leçons d'une même semaine sortir dans l'ordre d'insertion — la leçon 2 de
+  // MEAL-01 s'affichait avant la leçon 1, et les deux parcours s'entremêlaient au hasard.
+  const ordered = (data || []).slice().sort((a: any, b: any) =>
+    (a.week_index - b.week_index)
+    || ((a.sms_courses?.order_index ?? 0) - (b.sms_courses?.order_index ?? 0))
+    || ((a.sms_lessons?.order_index ?? 0) - (b.sms_lessons?.order_index ?? 0)));
+  res.json(ordered);
 });
 
 // ── Relevé de notes complet (transcript WQU) ──

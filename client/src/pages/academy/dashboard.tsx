@@ -25,6 +25,7 @@ export default function AcademyDashboard() {
   const [loading, setLoading] = useState(true);
   // Les cours terminés sont repliés par défaut, parcours par parcours.
   const [showPastOf, setShowPastOf] = useState<Record<string, boolean>>({});
+  const [showAllWeeks, setShowAllWeeks] = useState(false);
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
@@ -54,6 +55,21 @@ export default function AcademyDashboard() {
   // (statut « missed ») remonte avant les leçons de la semaine en cours — c'est bien elle
   // qu'il faut proposer de reprendre en premier.
   const nextLesson = schedule.find((s: any) => s.status === "available" || s.status === "missed");
+
+  // Planning regroupé par semaine. Une liste plate de trente lignes ne se lit pas : sans
+  // séparateur, deux parcours qui avancent en parallèle donnent l'impression d'un fouillis.
+  const weeks: { index: number; rows: any[] }[] = [];
+  for (const s of schedule) {
+    let w = weeks.find(x => x.index === s.week_index);
+    if (!w) { w = { index: s.week_index, rows: [] }; weeks.push(w); }
+    w.rows.push(s);
+  }
+  weeks.sort((a, b) => a.index - b.index);
+  // Semaine « en cours » = la première où il reste quelque chose à faire.
+  const currentWeek = weeks.find(w => w.rows.some(r => r.status !== "completed"))?.index ?? 1;
+  // On déroule la semaine en cours et la suivante ; le reste est replié derrière un bouton.
+  const visibleWeeks = showAllWeeks ? weeks : weeks.filter(w => w.index <= currentWeek + 1);
+  const hiddenWeeks = weeks.length - visibleWeeks.length;
   const overall = transcript?.overall ?? 0;
   const firstName = student?.full_name?.split(" ")[0] || "étudiant";
   const emailVerified = testStatus ? testStatus.emailVerified !== false : true;
@@ -199,30 +215,70 @@ export default function AcademyDashboard() {
             <h2 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Mon planning</h2>
             <span className="text-xs text-muted-foreground">Rythme conseillé — vous pouvez prendre de l'avance</span>
           </div>
-          <div className="bg-card rounded-2xl border border-border/50 divide-y divide-border/40 overflow-hidden">
-            {schedule.map((s: any) => {
-              const isDone = s.status === "completed", isAvail = s.status === "available";
-              // « missed » = en retard sur le rythme conseillé, pas exclu : la leçon reste à faire.
-              const isMissed = s.status === "missed";
-              const isOpen = isAvail || isMissed;
+          <div className="space-y-3">
+            {visibleWeeks.map(w => {
+              const dates = w.rows[0];
+              const done = w.rows.filter((r: any) => r.status === "completed").length;
+              const isCurrent = w.index === currentWeek;
               return (
-                <div key={s.id} className={`flex items-center gap-3 p-3.5 ${isOpen ? "bg-primary/5" : ""}`}>
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
-                    isDone ? "bg-primary text-white" : isAvail ? "bg-primary/15 text-primary" :
-                    isMissed ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"}`}>
-                    {isDone ? <CheckCircle2 className="w-4 h-4" /> : isMissed ? <Clock className="w-4 h-4" /> : isAvail ? `S${s.week_index}` : <Lock className="w-3.5 h-3.5" />}
+                <div key={w.index} className={`bg-card rounded-2xl border overflow-hidden ${isCurrent ? "border-primary/40" : "border-border/50"}`}>
+                  <div className={`flex items-center justify-between px-4 py-2.5 ${isCurrent ? "bg-primary/5" : "bg-muted/30"}`}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`text-xs font-bold ${isCurrent ? "text-primary" : "text-muted-foreground"}`}>Semaine {w.index}</span>
+                      {isCurrent && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary text-white shrink-0">en cours</span>}
+                      <span className="text-[11px] text-muted-foreground truncate">
+                        {new Date(dates.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                        {" → "}
+                        {new Date(dates.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-muted-foreground shrink-0">{done}/{w.rows.length}</span>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{s.sms_lessons?.title || "Leçon"}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {s.sms_courses?.code} · {isDone ? "Complétée ✓" : isAvail ? `Avant le ${new Date(s.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}` :
-                      isMissed ? "En retard — à rattraper" : `Débloque le ${new Date(s.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
-                    </p>
+                  <div className="divide-y divide-border/40">
+                    {w.rows.map((s: any) => {
+                      const isDone = s.status === "completed", isAvail = s.status === "available";
+                      // « missed » = en retard sur le rythme conseillé, pas exclu : la leçon reste à faire.
+                      const isMissed = s.status === "missed";
+                      const isOpen = isAvail || isMissed;
+                      return (
+                        <div key={s.id} className={`flex items-center gap-3 p-3.5 ${isOpen ? "bg-primary/5" : ""}`}>
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
+                            isDone ? "bg-primary text-white" : isAvail ? "bg-primary/15 text-primary" :
+                            isMissed ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"}`}>
+                            {isDone ? <CheckCircle2 className="w-4 h-4" /> : isMissed ? <Clock className="w-4 h-4" />
+                              : isAvail ? <span className="text-[11px]">{s.sms_lessons?.order_index ?? ""}</span> : <Lock className="w-3.5 h-3.5" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{s.sms_lessons?.title || "Leçon"}</p>
+                            <p className="text-xs text-muted-foreground truncate">
+                              <span className="font-mono">{s.sms_courses?.code}</span>
+                              {s.sms_lessons?.order_index ? ` · leçon ${s.sms_lessons.order_index}` : ""}
+                              {" · "}
+                              {isDone ? "Complétée ✓" : isMissed ? "En retard — à rattraper"
+                                : isAvail ? `Avant le ${new Date(s.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`
+                                : `Débloque le ${new Date(s.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
+                            </p>
+                          </div>
+                          {isOpen && <Button size="sm" variant={isMissed ? "outline" : "default"} onClick={() => navigate(`/academy/classroom/${s.course_id}?lesson=${s.lesson_id}`)} className="shrink-0">{isMissed ? "Rattraper" : "Commencer"}</Button>}
+                        </div>
+                      );
+                    })}
                   </div>
-                  {isOpen && <Button size="sm" variant={isMissed ? "outline" : "default"} onClick={() => navigate(`/academy/classroom/${s.course_id}?lesson=${s.lesson_id}`)} className="shrink-0">{isMissed ? "Rattraper" : "Commencer"}</Button>}
                 </div>
               );
             })}
+            {hiddenWeeks > 0 && (
+              <button onClick={() => setShowAllWeeks(true)}
+                className="w-full text-xs text-muted-foreground hover:text-primary py-2.5 rounded-xl border border-dashed border-border/60 hover:border-primary/40 transition-colors">
+                Voir les {hiddenWeeks} semaine{hiddenWeeks > 1 ? "s" : ""} suivante{hiddenWeeks > 1 ? "s" : ""}
+              </button>
+            )}
+            {showAllWeeks && weeks.length > 2 && (
+              <button onClick={() => setShowAllWeeks(false)}
+                className="w-full text-xs text-muted-foreground hover:text-primary py-2.5 rounded-xl border border-dashed border-border/60 hover:border-primary/40 transition-colors">
+                Réduire le planning
+              </button>
+            )}
           </div>
         </section>
       )}
@@ -281,24 +337,32 @@ export default function AcademyDashboard() {
                   Les cours s'enchaînent l'un après l'autre, {program.lessonsPerWeek === 1 ? "une leçon" : `${program.lessonsPerWeek} leçons`} par semaine.
                 </p>
                 <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
-                  {stats.map(({ co, done, prog }, i) => (
+                  {/* L'étape en cours est le premier cours NON TERMINÉ, pas le premier qui a de
+                      l'avancement : les cours d'un parcours s'enchaînent, donc c'est celui-là
+                      qu'il faut finir avant les suivants, même si un cours plus loin a déjà
+                      quelques leçons validées. */}
+                  {stats.map(({ co, done, prog }, i) => {
+                    const isCurrent = i === stats.findIndex(s => !s.done);
+                    return (
                     <div key={co.id} className="flex items-center gap-1.5 shrink-0">
                       {i > 0 && <span className="w-4 h-px bg-border" />}
                       <button
                         onClick={() => testStatus?.passed && navigate(`/academy/classroom/${co.id}`)}
                         disabled={!testStatus?.passed}
-                        title={co.title}
+                        title={`${co.title}${done ? " — terminé" : isCurrent ? " — étape en cours" : prog > 0 ? ` — ${prog}% fait` : ""}`}
                         className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
                           done ? "text-white border-transparent"
-                          : prog > 0 ? "border-current bg-current/10"
+                          : isCurrent ? "border-current bg-current/10"
                           : "border-border text-muted-foreground hover:border-current"
                         } ${testStatus?.passed ? "cursor-pointer" : "cursor-not-allowed opacity-70"}`}
-                        style={done ? { background: program.accent } : prog > 0 ? { color: program.accent } : undefined}>
-                        {done ? <CheckCircle2 className="w-3 h-3" /> : prog > 0 ? <TrendingUp className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+                        style={done ? { background: program.accent } : isCurrent || prog > 0 ? { color: program.accent } : undefined}>
+                        {done ? <CheckCircle2 className="w-3 h-3" /> : isCurrent ? <TrendingUp className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
                         {co.code}
+                        {!done && prog > 0 && <span className="opacity-60">{prog}%</span>}
                       </button>
                     </div>
-                  ))}
+                    );
+                  })}
                   {program.credential && (
                     <div className="flex items-center gap-1.5 shrink-0">
                       <span className="w-4 h-px bg-border" />
