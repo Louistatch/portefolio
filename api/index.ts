@@ -1001,6 +1001,75 @@ async function recalcCourseProgress(sid: number, course_id: number) {
   return { progress, done: doneCount, total: totalLessons || 0, completed: wasCompleted, finalCertificate: finalCert };
 }
 
+/**
+ * Octroie l'admission : verrou, inscription à tous les cours, planning hebdomadaire,
+ * attestation et email. Idempotent — un second appel ne réoctroie rien.
+ *
+ * Le verrou est une comparaison-échange sur `admitted_at` : on n'écrit que si la valeur
+ * n'a pas bougé depuis la lecture. Il utilisait auparavant un filtre `.or()` contenant un
+ * horodatage ISO ; les points de « …:28.249Z » sont des séparateurs dans la grammaire des
+ * filtres PostgREST, la mise à jour ne touchait aucune ligne, et l'erreur était ignorée.
+ * Résultat : score enregistré, statut « actif », mais aucune admission — l'étudiant se
+ * retrouvait devant ses cours verrouillés après avoir réussi le test.
+ */
+async function grantAdmission(sid: number, score: number, now: Date, previousAdmittedAt: string | null):
+    Promise<{ ok: boolean; admissionExpires: string }> {
+  const admissionExpires = new Date(now.getFullYear(), now.getMonth() + ADMISSION_MONTHS, now.getDate()).toISOString();
+  const patch = { admitted_at: now.toISOString(), admission_expires: admissionExpires, next_test_allowed: null };
+
+  const q = supabase.from("students").update(patch).eq("id", sid);
+  // Première admission : la ligne doit être encore vierge. Ré-admission après expiration :
+  // la valeur précédente doit être intacte. Deux filtres simples, aucune ambiguïté d'analyse.
+  const claim = previousAdmittedAt ? q.eq("admitted_at", previousAdmittedAt) : q.is("admitted_at", null);
+  const { data: claimed, error: claimError } = await claim.select("id").maybeSingle();
+
+  if (claimError) {
+    console.error("Admission: échec du verrou —", claimError.message);
+    return { ok: false, admissionExpires };
+  }
+  if (!claimed) {
+    // Aucune ligne prise : soit une requête concurrente a déjà octroyé l'admission,
+    // soit rien ne correspond. On tranche en relisant l'état réel.
+    const { data: cur } = await supabase.from("students").select("admitted_at, admission_expires").eq("id", sid).maybeSingle();
+    const already = !!cur?.admitted_at && (!cur.admission_expires || new Date(cur.admission_expires) > now);
+    return { ok: already, admissionExpires: cur?.admission_expires ?? admissionExpires };
+  }
+
+  // Ré-admission après expiration : repartir d'un planning et d'une attestation propres.
+  await supabase.from("attestations").delete().eq("student_id", sid).eq("cert_type", "admission").then(() => {}, () => {});
+  await supabase.from("lesson_progress").delete().eq("student_id", sid).then(() => {}, () => {});
+
+  const { data: courses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
+  if (courses?.length) {
+    const { data: existing } = await supabase.from("enrollments").select("course_id").eq("student_id", sid);
+    const already = new Set((existing || []).map((e: any) => e.course_id));
+    const toAdd = courses.filter((co: any) => !already.has(co.id))
+      .map((co: any) => ({ student_id: sid, course_id: co.id, started_at: now.toISOString() }));
+    if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
+  }
+  await generateLessonSchedule(sid, now);
+
+  const certNo = `DMA-ADM-${sid}-${Date.now().toString(36).toUpperCase()}`;
+  await supabase.from("attestations").insert({
+    student_id: sid, course_id: courses?.[0]?.id ?? null, cert_type: "admission",
+    certificate_no: certNo, final_score: Math.round(score / 30 * 100),
+    status: "issued", issued_at: now.toISOString(), expires_at: admissionExpires,
+  }).then(() => {}, () => {});
+
+  const { data: stAdm } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
+  if (stAdm?.email) {
+    const dlToken = generateStudentToken(sid);
+    const certUrl = `${SITE_URL}/api/academy/certificate/admission?token=${dlToken}`;
+    sendAcademyEmail({
+      studentId: sid, to: stAdm.email, type: "admission_passed",
+      subject: "🎉 Félicitations — Vous êtes admis(e) à DataMEAL Academy !",
+      html: admissionPassedEmailHtml(stAdm.full_name, Math.round(score / 30 * 100), admissionExpires, certUrl),
+      dedupeKey: `admission:${sid}:${admissionExpires}`,
+    });
+  }
+  return { ok: true, admissionExpires };
+}
+
 app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   // ANTI-TRICHE : le client envoie ses réponses choisies, le serveur calcule le score.
@@ -1061,50 +1130,16 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
 
   let admissionExpires: string | null = null;
   if (passed) {
-    admissionExpires = new Date(now.getFullYear(), now.getMonth() + ADMISSION_MONTHS, now.getDate()).toISOString();
-    // Verrou optimiste : n'octroie l'admission qu'une seule fois même si deux requêtes concurrentes
-    // (double-clic, retry réseau) passent toutes les deux le contrôle "pas encore admis" ci-dessus.
-    const { data: claimed } = await supabase.from("students")
-      .update({ admitted_at: now.toISOString(), admission_expires: admissionExpires, next_test_allowed: null })
-      .eq("id", sid)
-      .or(`admitted_at.is.null,admission_expires.lt.${now.toISOString()}`)
-      .select("id").maybeSingle();
-
-    if (claimed) {
-      // Ré-admission après expiration : repartir d'un planning et d'une attestation propres.
-      await supabase.from("attestations").delete().eq("student_id", sid).eq("cert_type", "admission").then(() => {}, () => {});
-      await supabase.from("lesson_progress").delete().eq("student_id", sid).then(() => {}, () => {});
-
-      // Inscrire à tous les cours + générer un certificat d'admission + planning hebdo
-      const { data: courses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
-      if (courses?.length) {
-        const { data: existing } = await supabase.from("enrollments").select("course_id").eq("student_id", sid);
-        const already = new Set((existing || []).map((e: any) => e.course_id));
-        const toAdd = courses.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: sid, course_id: co.id, started_at: now.toISOString() }));
-        if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
-      }
-      await generateLessonSchedule(sid, now);
-
-      // Certificat d'admission (expire à 3 mois)
-      const certNo = `DMA-ADM-${sid}-${Date.now().toString(36).toUpperCase()}`;
-      await supabase.from("attestations").insert({
-        student_id: sid, course_id: courses?.[0]?.id ?? null, cert_type: "admission",
-        certificate_no: certNo, final_score: Math.round(score / 30 * 100),
-        status: "issued", issued_at: now.toISOString(), expires_at: admissionExpires,
-      }).then(() => {}, () => {});
-
-      // Email de félicitations + lien de téléchargement de l'attestation
-      const { data: stAdm } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
-      if (stAdm?.email) {
-        const dlToken = generateStudentToken(sid);
-        const certUrl = `${SITE_URL}/api/academy/certificate/admission?token=${dlToken}`;
-        sendAcademyEmail({
-          studentId: sid, to: stAdm.email, type: "admission_passed",
-          subject: "🎉 Félicitations — Vous êtes admis(e) à DataMEAL Academy !",
-          html: admissionPassedEmailHtml(stAdm.full_name, Math.round(score / 30 * 100), admissionExpires, certUrl),
-          dedupeKey: `admission:${sid}:${admissionExpires}`,
-        });
-      }
+    const granted = await grantAdmission(sid, score, now, stud?.admitted_at ?? null);
+    admissionExpires = granted.admissionExpires;
+    if (!granted.ok) {
+      // L'admission n'a pas pu être octroyée : le dire, plutôt que de renvoyer un
+      // succès qui laisserait l'étudiant devant des cours verrouillés sans recours.
+      return res.status(500).json({
+        passed, score, correct, status: "active",
+        message: "Votre score est enregistré mais l'ouverture de vos cours a échoué. Rechargez votre tableau de bord, ou contactez l'administration.",
+        admissionFailed: true,
+      });
     }
   }
 
@@ -1119,8 +1154,23 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
 // ── Statut du test / admission pour l'étudiant connecté ──
 app.get("/api/academy/test-status", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const { data } = await supabase.from("students")
+  let { data } = await supabase.from("students")
     .select("entry_score, status, admitted_at, admission_expires, next_test_allowed, test_attempts, email_verified").eq("id", sid).single();
+
+  // Rattrapage : un étudiant ayant atteint le score requis mais dépourvu d'admission est
+  // dans un état incohérent — il voit ses cours verrouillés alors qu'il a réussi, sans
+  // aucune action possible de sa part. On octroie l'admission ici, à la première
+  // consultation, plutôt que d'attendre une intervention administrative.
+  if (data && !data.admitted_at && (data.entry_score ?? 0) >= ADMISSION_PASS_SCORE) {
+    console.warn(`Admission manquante rattrapée pour l'étudiant ${sid} (score ${data.entry_score}).`);
+    const repaired = await grantAdmission(sid, data.entry_score, new Date(), null);
+    if (repaired.ok) {
+      const { data: fresh } = await supabase.from("students")
+        .select("entry_score, status, admitted_at, admission_expires, next_test_allowed, test_attempts, email_verified").eq("id", sid).single();
+      if (fresh) data = fresh;
+    }
+  }
+
   const { data: test } = await supabase.from("grades")
     .select("score, graded_at").eq("student_id", sid).eq("type", "entry_test").maybeSingle();
   const canRetry = !data?.next_test_allowed || new Date(data.next_test_allowed) <= new Date();
