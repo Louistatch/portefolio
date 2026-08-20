@@ -21,7 +21,8 @@ base. Lisez cette page avant d'en lancer un.
 | 10 | `academy_exercises_meal01.sql` | Exercices notés de MEAL-01, matière MEAL (24 exercices) |
 | 11 | `academy_kobo_upgrade.sql` | Support de formation KoboToolbox fusionné dans MEAL-01, cas pratique de Kara (70 cellules, 30 captures) |
 | 12 | `academy_exercises_kobo.sql` | Exercices notés sur la matière KoboToolbox (26 exercices) |
-| 13 | `academy_student_names.sql` | État civil décomposé (prénom / deuxième prénom / nom) |
+| 13 | `academy_exercises_meal02_meal03.sql` | Exercices notés de MEAL-02 et MEAL-03 (52 exercices) |
+| 14 | `academy_student_names.sql` | État civil décomposé (prénom / deuxième prénom / nom) |
 
 ## Le contenu de MEAL-02 et MEAL-03 n'est PAS dans ce dépôt
 
@@ -69,8 +70,11 @@ documenté en tête de fichier. Trois règles :
   « Success. No rows returned » exactement comme un `UPDATE` réussi ;
 - validez avant de déployer avec `npm run verify:exercises`, qui relit les blocs JSON de
   tous les `academy_exercises_*.sql` et rejoue la correction ;
-- préfixez les identifiants d'exercice par jeu (`l…` pour la matière MEAL, `k…` pour la
-  matière Kobo) : deux exercices de même id dans une leçon partageraient la même réponse
+- écrivez **4 exercices par leçon** : le seuil de validation étant de 70 %, à 3 exercices
+  2/3 = 67 % échoue et il faudrait un sans-faute, alors qu'à 4, 3/4 = 75 % passe et
+  l'étudiant a droit à une erreur ;
+- préfixez les identifiants d'exercice par jeu (`l…` matière MEAL de MEAL-01, `k…` matière
+  Kobo de MEAL-01, `m2l…` et `m3l…` pour MEAL-02 et MEAL-03) : deux exercices de même id dans une leçon partageraient la même réponse
   saisie, et le second écraserait le premier à la correction.
 
 Les captures d'écran des leçons vivent dans `client/public/academy/`, servies en statique
