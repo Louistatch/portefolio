@@ -18,7 +18,10 @@ base. Lisez cette page avant d'en lancer un.
 | 7 | `academy_meetings.sql` | Rencontres en ligne (Jitsi) |
 | 8 | `kobo_course_enriched.sql` | Contenu de **MEAL-01** (7 leçons) |
 | 9 | `tof_gestion_financiere_rurale.sql` | Cours **TOF-FIN-01** (12 leçons) |
-| 10 | `academy_exercises_meal01.sql` | Exercices notés de MEAL-01 (24 exercices) |
+| 10 | `academy_exercises_meal01.sql` | Exercices notés de MEAL-01, matière MEAL (24 exercices) |
+| 11 | `academy_kobo_upgrade.sql` | Support de formation KoboToolbox fusionné dans MEAL-01, cas pratique de Kara (70 cellules, 30 captures) |
+| 12 | `academy_exercises_kobo.sql` | Exercices notés sur la matière KoboToolbox (26 exercices) |
+| 13 | `academy_student_names.sql` | État civil décomposé (prénom / deuxième prénom / nom) |
 
 ## Le contenu de MEAL-02 et MEAL-03 n'est PAS dans ce dépôt
 
@@ -65,4 +68,12 @@ documenté en tête de fichier. Trois règles :
   par un `SELECT` de rapport : dans l'éditeur Supabase, un `UPDATE` sans effet affiche
   « Success. No rows returned » exactement comme un `UPDATE` réussi ;
 - validez avant de déployer avec `npm run verify:exercises`, qui relit les blocs JSON de
-  tous les `academy_exercises_*.sql` et rejoue la correction.
+  tous les `academy_exercises_*.sql` et rejoue la correction ;
+- préfixez les identifiants d'exercice par jeu (`l…` pour la matière MEAL, `k…` pour la
+  matière Kobo) : deux exercices de même id dans une leçon partageraient la même réponse
+  saisie, et le second écraserait le premier à la correction.
+
+Les captures d'écran des leçons vivent dans `client/public/academy/`, servies en statique
+et référencées par un chemin interne (`/academy/kobo/…`). Elles doivent être déployées
+avant d'exécuter un script qui les référence, sinon les leçons affichent des images
+cassées.
