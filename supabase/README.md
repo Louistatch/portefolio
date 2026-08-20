@@ -23,6 +23,30 @@ base. Lisez cette page avant d'en lancer un.
 | 12 | `academy_exercises_kobo.sql` | Exercices notés sur la matière KoboToolbox (26 exercices) |
 | 13 | `academy_exercises_meal02_meal03.sql` | Exercices notés de MEAL-02 et MEAL-03 (52 exercices) |
 | 14 | `academy_student_names.sql` | État civil décomposé (prénom / deuxième prénom / nom) |
+| 15 | `academy_reorder_lessons.sql` | Remise en ordre des cellules : cours d'abord, exercices notés en fin de leçon |
+
+## L'ordre des cellules d'une leçon
+
+Chaque apport (support Kobo, exercices) ajoutait ses cellules **à la fin** de
+`content->'cells'`. Les leçons de MEAL-01 se lisaient donc « cours → exercices → encore
+du cours → encore des exercices », et le cours lui-même était désordonné (la leçon 1
+présentait l'outil, puis annonçait neuf cellules plus loin « Le métier, avant l'outil »).
+`academy_reorder_lessons.sql` a remis les 7 leçons de MEAL-01 dans l'ordre le 20/08/2026.
+
+**Règle à tenir pour tout nouvel apport :**
+
+1. tout le cours ;
+2. le chapeau de mise en situation (la cellule `md` qui introduit les exercices) ;
+3. les exercices notés, en fin de leçon.
+
+L'étape 3 n'est pas cosmétique : la validation d'une leçon exige d'avoir répondu à **tous**
+les exercices avant de soumettre. Un exercice placé au milieu oblige donc l'étudiant à
+lire la fin du cours avant de pouvoir répondre au début.
+
+Si vous ajoutez du cours à une leçon de MEAL-01, ajoutez aussi sa clé dans la table `plan`
+du script, sinon la cellule sera reléguée en fin de partie cours. Le script est idempotent
+et ne perd jamais une cellule ; son `SELECT` de rapport final doit afficher `OK` ou
+`sans exercice` sur toutes les lignes.
 
 ## Le contenu de MEAL-02 et MEAL-03 n'est PAS dans ce dépôt
 
