@@ -14,6 +14,7 @@ import fs from "fs";
 // l'extension d'un import relatif. Sans elle, le chargement de la fonction échoue en
 // production (ERR_MODULE_NOT_FOUND) alors que le build, lui, passe sans broncher.
 import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises.js";
+import { programOf } from "../shared/programs.js";
 
 // ── Supabase client ──
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
@@ -862,39 +863,66 @@ const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 // mais ne conditionnent pas sa délivrance.
 const MEAL_PROGRAM_PREFIX = "MEAL-";
 
-// Génère le planning hebdomadaire des leçons depuis la date d'admission (modèle WQU)
-// Les cours avancent EN PARALLÈLE : la semaine 1 débloque la 1re leçon de chaque cours.
-// (Un compteur cumulé sur tous les cours étalerait le programme sur plus de semaines qu'il
-// n'y en a dans la fenêtre d'admission de 3 mois, rendant la fin du cursus inatteignable.)
+/**
+ * Génère le planning hebdomadaire des leçons depuis la date d'admission.
+ *
+ * Les cours d'un même parcours s'ENCHAÎNENT : on parcourt MEAL-01 en entier avant
+ * d'ouvrir MEAL-02, puis MEAL-03. Les parcours, eux, avancent EN PARALLÈLE : la formation
+ * de formateurs progresse pendant le cursus MEAL, sans rien lui prendre.
+ *
+ * Le rythme est propre à chaque parcours et découle d'une contrainte simple : la séquence
+ * doit tenir dans la fenêtre d'admission de 3 mois, soit 13 semaines. 20 leçons MEAL
+ * imposent 2 leçons par semaine (10 semaines) ; les 12 leçons de TOF tiennent à 1 par
+ * semaine (12 semaines).
+ *
+ * Un compteur unique sur tous les cours confondus étalerait le cursus sur 32 semaines,
+ * bien au-delà de l'admission ; un compteur remis à zéro à chaque cours ouvrirait quatre
+ * sujets sans lien la même semaine, ce qui rendait la navigation absurde — « suivant »
+ * menait à une leçon verrouillée alors que trois autres cours attendaient.
+ */
 async function generateLessonSchedule(sid: number, admittedAt: Date) {
   const { data: courses } = await supabase.from("sms_courses")
-    .select("id").eq("is_published", true).order("order_index");
+    .select("id, code").eq("is_published", true).order("order_index");
   if (!courses?.length) return;
 
   const rows: any[] = [];
+  // Première semaine encore libre dans chaque parcours. Un cours démarre toujours sur une
+  // semaine propre : sans cet arrondi, un cours de 7 leçons à 2 par semaine laisserait une
+  // demi-semaine vide, et le suivant démarrerait au milieu — deux cours ouverts en même
+  // temps, ce que la séquence est précisément censée éviter.
+  const nextFreeWeek: Record<string, number> = {};
+
   for (const co of courses) {
+    const program = programOf(co.code);
+    const key = program?.id ?? "autres";
+    const perWeek = Math.max(1, program?.lessonsPerWeek ?? 1);
+    const startWeek = nextFreeWeek[key] ?? 1;
+
     const { data: lessons } = await supabase.from("sms_lessons")
       .select("id").eq("course_id", co.id).order("order_index");
-    let week = 0;
-    for (const les of (lessons || [])) {
-      const unlock = new Date(admittedAt.getTime() + week * WEEK_MS);
+
+    (lessons || []).forEach((les: any, i: number) => {
+      const week = startWeek + Math.floor(i / perWeek);
+      const unlock = new Date(admittedAt.getTime() + (week - 1) * WEEK_MS);
       const due = new Date(unlock.getTime() + WEEK_MS);
       rows.push({
         student_id: sid, course_id: co.id, lesson_id: les.id,
-        week_index: week + 1, unlock_at: unlock.toISOString(), due_at: due.toISOString(),
-        status: week === 0 ? "available" : "locked",
+        week_index: week, unlock_at: unlock.toISOString(), due_at: due.toISOString(),
+        status: week === 1 ? "available" : "locked",
       });
-      week++;
-    }
+    });
+
+    nextFreeWeek[key] = startWeek + Math.ceil((lessons?.length || 0) / perWeek);
   }
+
   // Insert (ignore conflits si déjà généré)
   for (let i = 0; i < rows.length; i += 100) {
     await supabase.from("lesson_progress").upsert(rows.slice(i, i + 100), { onConflict: "student_id,lesson_id", ignoreDuplicates: true }).then(() => {}, () => {});
   }
 
-  // Réalignement des lignes déjà en base : l'upsert ci-dessus ignore les conflits, donc un planning
-  // généré avec un calendrier différent (cours en série au lieu d'en parallèle, ou leçon réordonnée)
-  // garderait à vie ses anciennes dates. On recale les leçons non terminées sur le calendrier courant.
+  // Réalignement des lignes déjà en base : l'upsert ci-dessus ignore les conflits, donc un
+  // planning généré avec un calendrier différent garderait à vie ses anciennes dates. On
+  // recale les leçons non terminées sur le calendrier courant.
   const { data: current } = await supabase.from("lesson_progress")
     .select("id, lesson_id, week_index, unlock_at, due_at, status").eq("student_id", sid);
   const now = Date.now();

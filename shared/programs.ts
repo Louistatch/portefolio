@@ -19,6 +19,16 @@ export type Program = {
   /** Ce qu'on sait faire à la sortie — affiché sous le titre du parcours. */
   outcome: string;
   accent: string;
+  /**
+   * Leçons ouvertes par semaine à l'intérieur du parcours.
+   *
+   * Les cours d'un même parcours s'enchaînent en séquence — on termine MEAL-01 avant
+   * d'entamer MEAL-02 — tandis que les parcours, eux, avancent en parallèle. Reste à
+   * faire tenir la séquence dans la fenêtre d'admission de 3 mois, soit 13 semaines :
+   * le cursus MEAL compte 20 leçons, ce qui impose 2 leçons par semaine (10 semaines) ;
+   * la formation de formateurs en compte 12 et tient à 1 par semaine (12 semaines).
+   */
+  lessonsPerWeek: number;
 };
 
 export const PROGRAMS: Program[] = [
@@ -30,6 +40,7 @@ export const PROGRAMS: Program[] = [
     credential: "Certificat Super-Expert MEAL",
     outcome: "Concevoir une collecte, cartographier les résultats, automatiser le reporting.",
     accent: "#0d9488",
+    lessonsPerWeek: 2,
   },
   {
     id: "tof",
@@ -39,6 +50,7 @@ export const PROGRAMS: Program[] = [
     credential: null,
     outcome: "Concevoir et animer des sessions adaptées aux réalités paysannes.",
     accent: "#7c3aed",
+    lessonsPerWeek: 1,
   },
 ];
 
@@ -81,7 +93,7 @@ export function groupByProgram<T extends CourseLike>(courses: T[]): ProgramGroup
       program: {
         id: "autres", prefix: "", title: "Autres formations",
         subtitle: "Cours hors parcours", credential: null,
-        outcome: "", accent: "#64748b",
+        outcome: "", accent: "#64748b", lessonsPerWeek: 1,
       },
       courses: orphans,
     });

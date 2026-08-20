@@ -272,7 +272,10 @@ export default function AcademyDashboard() {
                 </div>
 
                 {/* Les étapes du parcours, dans l'ordre, avec l'état de chacune */}
-                <div className="flex items-center gap-1.5 mt-4 overflow-x-auto pb-1">
+                <p className="text-[11px] text-muted-foreground mt-3">
+                  Les cours s'enchaînent l'un après l'autre, {program.lessonsPerWeek === 1 ? "une leçon" : `${program.lessonsPerWeek} leçons`} par semaine.
+                </p>
+                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
                   {stats.map(({ co, done, prog }, i) => (
                     <div key={co.id} className="flex items-center gap-1.5 shrink-0">
                       {i > 0 && <span className="w-4 h-px bg-border" />}
