@@ -8,6 +8,7 @@ import {
   Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
   Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
+import { groupByProgram } from "@shared/programs";
 
 interface Cred { id: string; type: string; title: string; subtitle: string; issued_at: string; expires_at: string | null; status: string; certificate_no: string | null; score: number | null; download_url: string | null; skills: string[]; color: string; }
 
@@ -22,6 +23,8 @@ export default function AcademyDashboard() {
   const [creds, setCreds] = useState<Cred[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // Les cours terminés sont repliés par défaut, parcours par parcours.
+  const [showPastOf, setShowPastOf] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
@@ -51,6 +54,8 @@ export default function AcademyDashboard() {
   const overall = transcript?.overall ?? 0;
   const firstName = student?.full_name?.split(" ")[0] || "étudiant";
   const emailVerified = testStatus ? testStatus.emailVerified !== false : true;
+
+  const programGroups = groupByProgram(allCourses as any[]);
 
   const initials = student?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "ET";
 
@@ -107,7 +112,7 @@ export default function AcademyDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" style={{ isolation: "isolate" }}>
         {[
           { label: "Moyenne générale", value: `${overall}%`, icon: TrendingUp, tint: "text-primary bg-primary/10" },
-          { label: "Cours terminés", value: `${completedCourses}/${allCourses.length || 3}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
+          { label: "Cours terminés", value: `${completedCourses}/${allCourses.length}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
           { label: "Credentials", value: creds.length, icon: Award, tint: "text-purple-600 bg-purple-500/10" },
           { label: "Évaluations", value: transcript?.totalGrades ?? 0, icon: CheckCircle2, tint: "text-emerald-600 bg-emerald-500/10" },
         ].map((s) => (
@@ -217,36 +222,124 @@ export default function AcademyDashboard() {
         </section>
       )}
 
-      {/* ───── Catalogue ───── */}
-      {allCourses.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-lg font-bold mb-4 flex items-center gap-2"><BookOpen className="w-5 h-5 text-primary" /> Mes projets</h2>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {allCourses.map((co: any, i: number) => {
-              const enr = enrollments.find(e => e.course_id === co.id);
-              const prog = enr?.progress || 0;
-              const palette = ["from-teal-500/15 to-teal-600/5", "from-blue-500/15 to-blue-600/5", "from-purple-500/15 to-purple-600/5"];
-              return (
-                <div key={co.id} className="bg-card rounded-2xl border border-border/50 overflow-hidden flex flex-col">
-                  <div className={`h-2 bg-gradient-to-r ${palette[i % 3]}`} />
+      {/* ───── Parcours ─────
+          Les cours sont regroupés par parcours et non alignés dans une grille unique :
+          un étudiant du cursus MEAL voyait la formation de formateurs au même rang que
+          ses propres cours, sans savoir lequel comptait pour son certificat. */}
+      {programGroups.map(({ program, courses }) => {
+        const stats = courses.map(co => {
+          const enr = enrollments.find(e => e.course_id === co.id);
+          return { co, enr, prog: enr?.progress || 0, done: enr?.status === "completed" };
+        });
+        const doneCount = stats.filter(s => s.done).length;
+        const programPct = stats.length ? Math.round(stats.reduce((a, s) => a + s.prog, 0) / stats.length) : 0;
+        // Dernière échéance du parcours, lue sur le planning : une date réelle vaut mieux
+        // qu'une durée théorique, puisque le rythme dépend de la date d'admission.
+        const courseIds = new Set(courses.map(c => c.id));
+        const deadlines = schedule.filter((sp: any) => courseIds.has(sp.course_id)).map((sp: any) => sp.due_at).filter(Boolean);
+        const lastDue = deadlines.length ? new Date(Math.max(...deadlines.map((d: string) => new Date(d).getTime()))) : null;
+        const visible = showPastOf[program.id] ? stats : stats.filter(s => !s.done);
+        const hiddenDone = stats.length - visible.length;
+
+        return (
+          <section key={program.id} className="mb-8">
+            {/* En-tête du parcours : ce qu'il vise, où on en est, ce qu'il délivre */}
+            <div className="rounded-2xl border border-border/50 overflow-hidden mb-4">
+              <div className="h-1.5" style={{ background: program.accent }} />
+              <div className="p-5 bg-card">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
+                  <div className="min-w-0">
+                    <h2 className="text-lg font-bold leading-tight">{program.title}</h2>
+                    <p className="text-sm text-muted-foreground mt-0.5">{program.subtitle}</p>
+                    {program.outcome && (
+                      <p className="text-xs text-muted-foreground/80 mt-2 italic">{program.outcome}</p>
+                    )}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="text-2xl font-bold" style={{ color: program.accent }}>{programPct}%</p>
+                    <p className="text-[11px] text-muted-foreground">{doneCount}/{stats.length} cours terminés</p>
+                    {lastDue && (
+                      <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1 justify-end">
+                        <Calendar className="w-3 h-3" />
+                        jusqu'au {lastDue.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
+                      </p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-4">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${programPct}%`, background: program.accent }} />
+                </div>
+
+                {/* Les étapes du parcours, dans l'ordre, avec l'état de chacune */}
+                <div className="flex items-center gap-1.5 mt-4 overflow-x-auto pb-1">
+                  {stats.map(({ co, done, prog }, i) => (
+                    <div key={co.id} className="flex items-center gap-1.5 shrink-0">
+                      {i > 0 && <span className="w-4 h-px bg-border" />}
+                      <button
+                        onClick={() => testStatus?.passed && navigate(`/academy/classroom/${co.id}`)}
+                        disabled={!testStatus?.passed}
+                        title={co.title}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+                          done ? "text-white border-transparent"
+                          : prog > 0 ? "border-current bg-current/10"
+                          : "border-border text-muted-foreground hover:border-current"
+                        } ${testStatus?.passed ? "cursor-pointer" : "cursor-not-allowed opacity-70"}`}
+                        style={done ? { background: program.accent } : prog > 0 ? { color: program.accent } : undefined}>
+                        {done ? <CheckCircle2 className="w-3 h-3" /> : prog > 0 ? <TrendingUp className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
+                        {co.code}
+                      </button>
+                    </div>
+                  ))}
+                  {program.credential && (
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span className="w-4 h-px bg-border" />
+                      <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
+                        doneCount === stats.length && stats.length > 0
+                          ? "border-transparent text-white" : "border-dashed border-border text-muted-foreground"}`}
+                        style={doneCount === stats.length && stats.length > 0 ? { background: program.accent } : undefined}>
+                        <Trophy className="w-3 h-3" /> {program.credential}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {!program.credential && (
+                  <p className="text-[11px] text-muted-foreground mt-3">
+                    Ce parcours ne conditionne pas le certificat du cursus MEAL.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            {/* Les cours du parcours. Les cours terminés sortent de la vue par défaut :
+                ce qui reste à faire doit être ce qu'on voit en premier. */}
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {visible.map(({ co, enr, prog, done }) => (
+                <div key={co.id} className={`bg-card rounded-2xl border overflow-hidden flex flex-col ${done ? "border-border/40 opacity-80" : "border-border/50"}`}>
+                  <div className="h-1" style={{ background: done ? program.accent : `${program.accent}40` }} />
                   <div className="p-5 flex flex-col flex-1">
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono text-primary font-semibold">{co.code}</span>
+                      <span className="text-xs font-mono font-semibold" style={{ color: program.accent }}>{co.code}</span>
                       <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground capitalize">{co.level}</span>
                     </div>
                     <h3 className="font-semibold text-sm mb-2 leading-snug">{co.title}</h3>
                     <p className="text-xs text-muted-foreground mb-4 line-clamp-2 flex-1">{co.description}</p>
                     {enr && (
                       <div className="mb-3">
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full transition-all" style={{ width: `${prog}%` }} /></div>
-                        <p className="text-[11px] text-muted-foreground mt-1">{prog}% complété</p>
+                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full rounded-full transition-all" style={{ width: `${prog}%`, background: program.accent }} />
+                        </div>
+                        <p className="text-[11px] text-muted-foreground mt-1">
+                          {done ? "Terminé ✓" : `${prog}% complété`}
+                        </p>
                       </div>
                     )}
                     <div className="flex items-center gap-2">
-                      <Button size="sm" variant={enr ? "default" : "outline"} className="flex-1 gap-1.5"
+                      <Button size="sm" variant={enr && !done ? "default" : "outline"} className="flex-1 gap-1.5"
                         disabled={!testStatus?.passed}
                         onClick={() => navigate(`/academy/classroom/${co.id}`)}>
                         {!testStatus?.passed ? <><Lock className="w-3.5 h-3.5" /> Test requis</> :
+                         done ? <>Revoir <ChevronRight className="w-3.5 h-3.5" /></> :
                          enr ? <>{prog > 0 ? "Continuer" : "Commencer"} <ChevronRight className="w-3.5 h-3.5" /></> :
                          <>Ouvrir <ChevronRight className="w-3.5 h-3.5" /></>}
                       </Button>
@@ -258,11 +351,24 @@ export default function AcademyDashboard() {
                     </div>
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
+              ))}
+            </div>
+
+            {hiddenDone > 0 && (
+              <button onClick={() => setShowPastOf(prev => ({ ...prev, [program.id]: true }))}
+                className="text-xs text-primary hover:underline mt-3 flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" /> Afficher {hiddenDone} cours terminé{hiddenDone > 1 ? "s" : ""}
+              </button>
+            )}
+            {showPastOf[program.id] && doneCount > 0 && (
+              <button onClick={() => setShowPastOf(prev => ({ ...prev, [program.id]: false }))}
+                className="text-xs text-muted-foreground hover:underline mt-3">
+                Masquer les cours terminés
+              </button>
+            )}
+          </section>
+        );
+      })}
 
       {/* ───── Relevé de notes condensé ───── */}
       {transcript && transcript.grades?.length > 0 && (
