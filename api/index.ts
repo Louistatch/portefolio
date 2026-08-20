@@ -942,19 +942,72 @@ async function generateLessonSchedule(sid: number, admittedAt: Date) {
   }
 }
 
-// Met à jour les statuts de déblocage selon l'heure courante (locked→available, available→missed si dépassé)
+/**
+ * Recalcule les statuts de déblocage. Le calendrier RYTHME, il ne VERROUILLE pas.
+ *
+ * Une leçon s'ouvre dès que l'une de ces conditions est vraie :
+ *   1. sa semaine est arrivée (le rythme conseillé, qui garantit qu'un étudiant bloqué sur
+ *      une leçon difficile finit toujours par voir la suite) ;
+ *   2. c'est la leçon suivante d'un cours déjà entamé — on termine une leçon, la suivante
+ *      s'ouvre immédiatement ;
+ *   3. c'est la première leçon d'un cours dont le précédent, dans le même parcours, est
+ *      entièrement terminé.
+ *
+ * Les points 2 et 3 sont ce qui fait que le parcours « suit » : sans eux, terminer une leçon
+ * laissait la suivante verrouillée jusqu'à la semaine prévue — jusqu'à un mois d'attente
+ * alors que le cours était prêt.
+ *
+ * `missed` ne signifie plus « recalé » mais « en retard » : l'échéance hebdomadaire est un
+ * repère, pas un couperet. La seule échéance qui exclut reste la fenêtre d'admission de
+ * 3 mois, vérifiée à la validation. Auparavant `missed` était définitif — la leçon devenait
+ * à jamais impossible à valider, donc le cours ne pouvait plus atteindre 100 %, donc le
+ * certificat Super-Expert était perdu pour de bon. Une semaine de vacances suffisait.
+ */
 async function refreshLessonStates(sid: number) {
-  const now = new Date();
+  const now = Date.now();
   const { data: lps } = await supabase.from("lesson_progress")
-    .select("id, unlock_at, due_at, status").eq("student_id", sid);
-  if (!lps) return;
-  for (const lp of lps) {
-    if (lp.status === "completed" || lp.status === "missed") continue;
-    const unlock = new Date(lp.unlock_at), due = new Date(lp.due_at);
-    let ns = lp.status;
-    if (now >= unlock && now <= due) ns = "available";
-    else if (now > due) ns = "missed";              // fenêtre dépassée → recalé
-    else ns = "locked";
+    .select("id, lesson_id, course_id, unlock_at, due_at, status, sms_lessons(order_index)")
+    .eq("student_id", sid);
+  if (!lps?.length) return;
+
+  const rankOf = (lp: any) => lp.sms_lessons?.order_index ?? 0;
+
+  // Avancement par cours : rang de la dernière leçon terminée, et cours entièrement terminé.
+  const stat: Record<number, { maxDone: number; total: number; done: number }> = {};
+  for (const lp of lps as any[]) {
+    const s = (stat[lp.course_id] ||= { maxDone: 0, total: 0, done: 0 });
+    s.total++;
+    if (lp.status === "completed") { s.done++; s.maxDone = Math.max(s.maxDone, rankOf(lp)); }
+  }
+  const courseFinished = (id: number) => {
+    const s = stat[id];
+    return !!s && s.total > 0 && s.done === s.total;
+  };
+
+  // Cours qui précède immédiatement, dans le même parcours (même découpage que le planning).
+  const { data: courses } = await supabase.from("sms_courses")
+    .select("id, code").eq("is_published", true).order("order_index");
+  const previousCourse: Record<number, number | null> = {};
+  const lastSeen: Record<string, number | null> = {};
+  for (const co of courses || []) {
+    const key = programOf(co.code)?.id ?? "autres";
+    previousCourse[co.id] = lastSeen[key] ?? null;
+    lastSeen[key] = co.id;
+  }
+
+  for (const lp of lps as any[]) {
+    if (lp.status === "completed") continue;
+    const rank = rankOf(lp);
+    const s = stat[lp.course_id];
+    const prev = previousCourse[lp.course_id];
+
+    const parCalendrier = now >= new Date(lp.unlock_at).getTime();
+    const suiteDuCours = (s?.done ?? 0) > 0 && rank <= (s!.maxDone + 1);
+    const debutDuCoursSuivant = (s?.done ?? 0) === 0 && rank <= 1 && prev != null && courseFinished(prev);
+
+    const ouverte = parCalendrier || suiteDuCours || debutDuCoursSuivant;
+    const enRetard = now > new Date(lp.due_at).getTime();
+    const ns = !ouverte ? "locked" : (enRetard ? "missed" : "available");
     if (ns !== lp.status) await supabase.from("lesson_progress").update({ status: ns }).eq("id", lp.id);
   }
 }
@@ -1500,17 +1553,20 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const { data: lesson } = await supabase.from("sms_lessons").select("title, points, content").eq("id", lesson_id).eq("course_id", course_id).maybeSingle();
   if (!lesson) return res.status(404).json({ message: "Leçon introuvable pour ce cours." });
 
-  // GATING WQU : la leçon doit être 'available' (débloquée cette semaine, fenêtre non dépassée)
-  // Fail-closed : l'absence de ligne lesson_progress est traitée comme verrouillée, pas comme autorisée.
+  // GATING : la leçon ne doit pas être verrouillée. Fail-closed — l'absence de ligne
+  // lesson_progress est traitée comme verrouillée, pas comme autorisée.
   // On régénère d'abord le planning (idempotent) pour rattraper une leçon ajoutée après l'admission.
+  //
+  // Une leçon 'missed' (= en retard sur le rythme conseillé) reste validable : la seule
+  // échéance qui exclut est la fenêtre d'admission de 3 mois, vérifiée plus haut. Refuser ici
+  // rendait la leçon définitivement impossible à valider, donc le cours impossible à terminer,
+  // donc le certificat Super-Expert définitivement perdu.
   await generateLessonSchedule(sid, new Date(stud.admitted_at));
   await refreshLessonStates(sid);
   const { data: lp } = await supabase.from("lesson_progress")
     .select("status, unlock_at, due_at").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
   if (!lp || lp.status === "locked")
     return res.status(403).json({ message: "Cette leçon n'est pas encore débloquée.", unlockAt: lp?.unlock_at, locked: true });
-  if (lp.status === "missed")
-    return res.status(403).json({ message: "La fenêtre d'une semaine pour cette leçon est dépassée. Vous avez été recalé(e) sur cette leçon.", missed: true });
 
   // Correction des exercices « faire faire ». Une leçon qui en contient ne se valide pas en
   // cliquant : la note reflète les réponses produites par l'étudiant.

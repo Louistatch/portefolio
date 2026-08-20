@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, Terminal,
   FileCode2, Loader2, Trophy, Lock, X, BookOpen, Star, Info, Lightbulb,
-  AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon, PenLine,
+  AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon, PenLine, Clock,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn } from "@/lib/student";
 import DOMPurify from "dompurify";
@@ -393,17 +393,19 @@ export default function AcademyClassroom() {
   const isLessonDone = completedLessons.has(lesson?.id);
   const allLessonsDone = course.lessons.every(l => completedLessons.has(l.id));
 
-  // La leçon suivante DANS ce cours n'est ouverte que si la semaine en cours l'a débloquée.
+  // La leçon suivante DANS ce cours. « missed » vaut « en retard », pas « fermée » : elle
+  // reste à faire, donc elle compte comme ouverte pour l'enchaînement.
+  const isOpenStatus = (st?: string) => st === "available" || st === "missed";
   const nextInCourse = course.lessons[activeLesson + 1];
   const nextInCourseSched = nextInCourse ? schedule[nextInCourse.id] : null;
   const nextInCourseOpen = !!nextInCourse &&
-    (completedLessons.has(nextInCourse.id) || nextInCourseSched?.status === "available");
+    (completedLessons.has(nextInCourse.id) || isOpenStatus(nextInCourseSched?.status));
 
   // Les leçons encore ouvertes cette semaine, tous cours confondus. Le planning avance en
   // parallèle : quand la suite de ce cours attend la semaine prochaine, l'étudiant a
   // presque toujours une autre leçon disponible ailleurs — c'est là qu'il faut l'emmener.
   const openElsewhere = weekPlan
-    .filter((sp: any) => sp.status === "available"
+    .filter((sp: any) => isOpenStatus(sp.status)
       && !completedLessons.has(sp.lesson_id)
       && sp.lesson_id !== lesson?.id)
     .sort((a: any, b: any) => (a.sms_courses?.code || "").localeCompare(b.sms_courses?.code || ""));
@@ -432,7 +434,7 @@ export default function AcademyClassroom() {
               <button key={l.id} onClick={() => goToLesson(i)}
                 className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-colors flex items-center gap-2 ${activeLesson === i ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
                 {done ? <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                  : isMissed ? <X className="w-3.5 h-3.5 text-destructive shrink-0" />
+                  : isMissed ? <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
                   : isLocked ? <Lock className="w-3.5 h-3.5 shrink-0 opacity-50" />
                   : <span className="w-3.5 h-3.5 rounded-full border border-current shrink-0" />}
                 <span className="truncate flex-1">{i + 1}. {l.title}</span>
@@ -462,17 +464,17 @@ export default function AcademyClassroom() {
           </div>
         )}
         {lessonMissed && (
-          <div className="bg-destructive/5 border border-destructive/30 rounded-2xl p-5 mb-6 flex items-center gap-3">
-            <X className="w-5 h-5 text-destructive shrink-0" />
+          <div className="bg-amber-500/5 border border-amber-500/30 rounded-2xl p-5 mb-6 flex items-center gap-3">
+            <Clock className="w-5 h-5 text-amber-600 shrink-0" />
             <div>
-              <p className="font-medium text-sm text-destructive">Recalé(e) sur cette leçon</p>
-              <p className="text-xs text-muted-foreground">La fenêtre d'une semaine pour compléter cette leçon est dépassée. Contactez l'administration si besoin.</p>
+              <p className="font-medium text-sm text-amber-700 dark:text-amber-500">En retard sur le rythme conseillé</p>
+              <p className="text-xs text-muted-foreground">La semaine prévue pour cette leçon est passée, mais vous pouvez toujours la valider. Seule la fin de votre période d'admission (3 mois) ferme l'accès.</p>
             </div>
           </div>
         )}
 
-        {/* Notebook cells (masquées si verrouillée) */}
-        {!lessonLocked && !lessonMissed && (
+        {/* Notebook cells (masquées seulement si verrouillée : une leçon en retard reste à faire) */}
+        {!lessonLocked && (
         <div className="space-y-4 mb-8">
           {cells.map((cell, ci) => {
             // ── Markdown (avec tableaux simples) ──
@@ -662,7 +664,7 @@ export default function AcademyClassroom() {
             {!isLessonDone && (
               <Button
                 onClick={completeLesson}
-                disabled={submitting || lessonLocked || lessonMissed || (codeCells.length > 0 && !allCodeRan) || (hasExercises && !allAnswered)}
+                disabled={submitting || lessonLocked || (codeCells.length > 0 && !allCodeRan) || (hasExercises && !allAnswered)}
                 className="gap-2">
                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
                 {codeCells.length > 0 && !allCodeRan ? "Exécutez les cellules"

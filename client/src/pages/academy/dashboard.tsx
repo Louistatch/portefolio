@@ -50,7 +50,10 @@ export default function AcademyDashboard() {
   if (loading) return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
   const completedCourses = enrollments.filter(e => e.status === "completed").length;
-  const nextLesson = schedule.find((s: any) => s.status === "available");
+  // La prochaine leçon à faire : le planning est trié par semaine, donc une leçon en retard
+  // (statut « missed ») remonte avant les leçons de la semaine en cours — c'est bien elle
+  // qu'il faut proposer de reprendre en premier.
+  const nextLesson = schedule.find((s: any) => s.status === "available" || s.status === "missed");
   const overall = transcript?.overall ?? 0;
   const firstName = student?.full_name?.split(" ")[0] || "étudiant";
   const emailVerified = testStatus ? testStatus.emailVerified !== false : true;
@@ -194,27 +197,29 @@ export default function AcademyDashboard() {
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Mon planning</h2>
-            <span className="text-xs text-muted-foreground">1 leçon / semaine</span>
+            <span className="text-xs text-muted-foreground">Rythme conseillé — vous pouvez prendre de l'avance</span>
           </div>
           <div className="bg-card rounded-2xl border border-border/50 divide-y divide-border/40 overflow-hidden">
             {schedule.map((s: any) => {
               const isDone = s.status === "completed", isAvail = s.status === "available";
+              // « missed » = en retard sur le rythme conseillé, pas exclu : la leçon reste à faire.
               const isMissed = s.status === "missed";
+              const isOpen = isAvail || isMissed;
               return (
-                <div key={s.id} className={`flex items-center gap-3 p-3.5 ${isAvail ? "bg-primary/5" : ""}`}>
+                <div key={s.id} className={`flex items-center gap-3 p-3.5 ${isOpen ? "bg-primary/5" : ""}`}>
                   <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
                     isDone ? "bg-primary text-white" : isAvail ? "bg-primary/15 text-primary" :
-                    isMissed ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground"}`}>
-                    {isDone ? <CheckCircle2 className="w-4 h-4" /> : isMissed ? <X className="w-4 h-4" /> : isAvail ? `S${s.week_index}` : <Lock className="w-3.5 h-3.5" />}
+                    isMissed ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"}`}>
+                    {isDone ? <CheckCircle2 className="w-4 h-4" /> : isMissed ? <Clock className="w-4 h-4" /> : isAvail ? `S${s.week_index}` : <Lock className="w-3.5 h-3.5" />}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium truncate">{s.sms_lessons?.title || "Leçon"}</p>
                     <p className="text-xs text-muted-foreground">
                       {s.sms_courses?.code} · {isDone ? "Complétée ✓" : isAvail ? `Avant le ${new Date(s.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}` :
-                      isMissed ? "Recalé(e)" : `Débloque le ${new Date(s.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
+                      isMissed ? "En retard — à rattraper" : `Débloque le ${new Date(s.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
                     </p>
                   </div>
-                  {isAvail && <Button size="sm" onClick={() => navigate(`/academy/classroom/${s.course_id}?lesson=${s.lesson_id}`)} className="shrink-0">Commencer</Button>}
+                  {isOpen && <Button size="sm" variant={isMissed ? "outline" : "default"} onClick={() => navigate(`/academy/classroom/${s.course_id}?lesson=${s.lesson_id}`)} className="shrink-0">{isMissed ? "Rattraper" : "Commencer"}</Button>}
                 </div>
               );
             })}
