@@ -26,8 +26,8 @@
   <text x="146" y="466" font-size="38" font-weight="bold" fill="#ffffff" text-anchor="middle">1</text>
   <text x="212" y="447" font-size="35" font-weight="bold" fill="#0f172a">Créez votre compte</text>
   <text x="212" y="492" font-size="25" fill="#475569">Prénom, nom, e-mail et mot de passe (8 caractères min.).</text>
-  <rect x="212" y="516" width="656" height="50" rx="12" fill="#f0fdfa" stroke="#5eead4" stroke-dasharray="6 4"/>
-  <text x="236" y="548" font-size="25" font-weight="bold" fill="#0d9488" font-family="DejaVu Sans Mono">louisfarm.com/academy/register</text>
+  <rect x="212" y="516" width="412" height="50" rx="12" fill="#f0fdfa" stroke="#5eead4" stroke-dasharray="6 4"/>
+  <text x="236" y="548" font-size="25" font-weight="bold" fill="#0d9488" font-family="DejaVu Sans Mono">louisfarm.com/elearning</text>
 
   <!-- ══ Étape 2 ══ -->
   <rect x="60" y="612" width="960" height="196" rx="26" fill="#ffffff" filter="url(#sh)"/>
@@ -68,5 +68,5 @@
 
   <!-- ══ Pied ══ -->
   <text x="540" y="1528" font-size="28" fill="#64748b" text-anchor="middle">Formation 100 % gratuite et en ligne</text>
-  <text x="540" y="1578" font-size="34" font-weight="bold" fill="#0d9488" text-anchor="middle">louisfarm.com/academy/register</text>
+  <text x="540" y="1578" font-size="38" font-weight="bold" fill="#0d9488" text-anchor="middle">louisfarm.com/elearning</text>
 </svg>

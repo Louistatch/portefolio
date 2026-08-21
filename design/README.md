@@ -7,7 +7,12 @@ jamais retouché à la main : c'est le SVG qui fait foi.
 
 Affiche en 5 étapes destinée aux futurs étudiants (WhatsApp, réseaux sociaux, impression A4).
 Publiée en PNG dans `client/public/academy/inscription.png`, donc accessible à l'adresse
-<https://louisfarm.com/academy/inscription.png>.
+<https://www.louisfarm.com/academy/inscription.png> (le `www.` compte : sans lui, Vercel
+renvoie un 307).
+
+L'adresse imprimée SUR l'affiche est `louisfarm.com/elearning` — la page publique du test
+d'aptitude, porte d'entrée du parcours, d'où part le bouton « Créer un compte ». Ne pas la
+remplacer par `/academy/register`, qui est l'écran suivant et non le point d'entrée.
 
 ### Régénérer le PNG
 
@@ -35,6 +40,7 @@ Le visuel affiche des seuils qui vivent dans le code. Si l'un change, corriger l
 | Accès valable 3 mois | `ADMISSION_MONTHS` dans `api/index.ts` |
 | 70 % de bonnes réponses | `EXERCISE_PASS_PCT` dans `shared/exercises.ts` |
 | 8 caractères minimum | validation du mot de passe, `client/src/pages/academy/register.tsx` |
+| louisfarm.com/elearning | route publique `/elearning` dans `client/src/App.tsx` |
 
 ### Vérifier après modification
 
