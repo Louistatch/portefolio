@@ -1999,8 +1999,22 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
       await supabase.from("lesson_progress").delete().eq("student_id", id).then(() => {}, () => {});
       await generateLessonSchedule(id, now);
     } else if (action === "reset_test") {
-      // Réinitialise le test (permet de repasser immédiatement)
+      // Seconde chance : lève le délai d'attente, l'étudiant peut repasser immédiatement.
+      // Le score précédent est conservé — il sera écrasé à la prochaine tentative.
       await supabase.from("students").update({ next_test_allowed: null, last_test_at: null }).eq("id", id);
+      // Sans cet email, l'étudiant n'apprend jamais qu'on lui a rouvert le test : il est
+      // reparti sur « revenez dans 7 jours » et n'a aucune raison de retourner voir.
+      const { data: st } = await supabase.from("students")
+        .select("full_name, email, entry_score, course_emails").eq("id", id).maybeSingle();
+      if (st?.email && st.course_emails !== false) {
+        sendAcademyEmail({
+          studentId: id, to: st.email, type: "test_reopened",
+          subject: "Vous pouvez repasser le test d'admission",
+          html: testReopenedEmailHtml(st.full_name, st.entry_score ?? null),
+          // Horodatée : réautoriser une nouvelle fois doit bien renvoyer un message.
+          dedupeKey: `test_reopened:${id}:${Date.now()}`,
+        });
+      }
     } else if (action === "revoke_admission") {
       await supabase.from("students").update({ admitted_at: null, admission_expires: null, status: "pending_test" }).eq("id", id);
       await supabase.from("lesson_progress").delete().eq("student_id", id).then(() => {}, () => {});
@@ -2208,6 +2222,17 @@ function newCourseEmailHtml(name: string | undefined, course: { code: string; ti
 // ── Email : projet terminé (100%) ──
 function courseCompletedEmailHtml(name: string, course: { code: string; title: string }) {
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Bravo, ${name.split(" ")[0]} ! 🏁</h1><p class="sub">Vous avez terminé un projet complet</p></div><div class="bd"><span class="badge">✅ Projet terminé</span><p>Félicitations ${name},</p><p>Vous venez de compléter <strong>100%</strong> du projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code} · Terminé</p></div><p>C'est une vraie compétence terrain, directement applicable dans les contextes humanitaires et de développement en Afrique de l'Ouest.</p><p><strong>Prochaine étape :</strong> demandez votre attestation de compétence, ou enchaînez sur le projet suivant pour progresser vers le statut de Super-Expert MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Demander mon attestation</a></p><p class="muted">Continuez sur cette lancée — chaque projet vous rapproche de la maîtrise complète du cycle MEAL.</p></div>`);
+}
+
+// ── Email : seconde chance au test d'admission ──
+// Envoyé quand l'administration lève le délai d'attente. Le ton est délibérément
+// encourageant : l'étudiant vient d'échouer, et souvent d'un cheveu.
+function testReopenedEmailHtml(name: string, previousScore: number | null) {
+  const firstName = (name || "").split(" ")[0] || "";
+  const manque = previousScore != null && previousScore > 0 && previousScore < ADMISSION_PASS_SCORE
+    ? `<div class="info"><h3>Votre dernière tentative : ${previousScore}/30</h3><p style="margin-top:6px">Il vous manquait ${ADMISSION_PASS_SCORE - previousScore} point${ADMISSION_PASS_SCORE - previousScore > 1 ? "s" : ""} pour atteindre les ${ADMISSION_PASS_SCORE}/30 requis.</p></div>`
+    : "";
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Une seconde chance vous est ouverte</h1><p class="sub">Test d'admission — nouvelle tentative autorisée</p></div><div class="bd"><span class="badge">🔓 Test rouvert</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Vous n'avez pas atteint le score requis lors de votre dernière tentative. Nous vous rouvrons le test <strong>dès maintenant</strong> : vous n'avez pas à attendre le délai habituel.</p>${manque}<p>Prenez le temps qu'il faut, installez-vous au calme, et relisez tranquillement chaque question avant de répondre. Le test porte sur les fondamentaux du MEAL, de la collecte de données et des outils de terrain.</p><p style="text-align:center"><a href="${SITE_URL}/elearning" class="btn">Repasser le test</a></p><p class="muted">Rien n'est perdu : seule votre meilleure situation compte, et l'accès à la formation reste entièrement gratuit. Si une question vous semble ambiguë, répondez à cet email — nous vous répondrons.</p></div>`);
 }
 
 // ── Email : leçon validée ──

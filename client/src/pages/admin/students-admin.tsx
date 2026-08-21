@@ -18,6 +18,7 @@ type Student = {
   organization?: string; entry_score?: number; status: string; created_at: string;
   email_verified?: boolean; admitted_at?: string; admission_expires?: string;
   final_certificate_no?: string; test_attempts?: number; last_login?: string;
+  next_test_allowed?: string | null; last_test_at?: string | null;
 };
 
 export default function AdminStudents() {
@@ -48,7 +49,7 @@ export default function AdminStudents() {
     onSuccess: (_d, v) => {
       qc.invalidateQueries({ queryKey: ["academy-students"] });
       qc.invalidateQueries({ queryKey: ["academy-student", selectedId] });
-      const labels: Record<string, string> = { verify_email: "Email vérifié", admit: "Étudiant admis", reset_test: "Test réinitialisé", revoke_admission: "Admission révoquée", delete: "Étudiant supprimé" };
+      const labels: Record<string, string> = { verify_email: "Email vérifié", admit: "Étudiant admis", reset_test: "Nouvelle tentative autorisée — l'étudiant a été prévenu par email", revoke_admission: "Admission révoquée", delete: "Étudiant supprimé" };
       toast({ title: labels[v.act] || "Action effectuée" });
       setMenuId(null);
       if (v.act === "delete") setSelectedId(null);
@@ -195,7 +196,7 @@ export default function AdminStudents() {
                       <div className="absolute right-0 top-9 z-50 w-52 bg-card border border-border/60 rounded-xl shadow-xl overflow-hidden py-1">
                         {s.email_verified === false && <MenuItem icon={ShieldCheck} label="Vérifier l'email" onClick={() => action.mutate({ id: s.id, act: "verify_email" })} />}
                         {!s.admitted_at && <MenuItem icon={UserCheck} label="Admettre manuellement" onClick={() => action.mutate({ id: s.id, act: "admit" })} />}
-                        {!s.admitted_at && <MenuItem icon={RotateCcw} label="Réinitialiser le test" onClick={() => action.mutate({ id: s.id, act: "reset_test" })} />}
+                        {!s.admitted_at && <MenuItem icon={RotateCcw} label="Autoriser une nouvelle tentative" onClick={() => action.mutate({ id: s.id, act: "reset_test" })} />}
                         {s.admitted_at && <MenuItem icon={Ban} label="Révoquer l'admission" onClick={() => action.mutate({ id: s.id, act: "revoke_admission" })} />}
                         <MenuItem icon={Trash2} label="Supprimer" danger onClick={() => { if (confirm(`Supprimer ${s.full_name} ?`)) action.mutate({ id: s.id, act: "delete" }); }} />
                       </div>
@@ -240,6 +241,17 @@ export default function AdminStudents() {
                   <Info label="Organisation" value={detail.student.organization || "—"} />
                   <Info label="Téléphone" value={detail.student.phone || "—"} />
                   <Info label="Tentatives test" value={String(detail.student.test_attempts ?? 0)} />
+                  <Info label="Score au test" value={detail.student.entry_score ? `${detail.student.entry_score}/30` : "pas encore passé"} />
+                  {/* Sans cette ligne, l'admin ne pouvait pas savoir si l'étudiant était
+                      réellement bloqué par le délai de 7 jours, ni si une nouvelle
+                      tentative lui avait déjà été accordée. */}
+                  <Info
+                    label="Reprise du test"
+                    value={detail.student.admitted_at
+                      ? "sans objet (admis)"
+                      : detail.student.next_test_allowed && new Date(detail.student.next_test_allowed) > new Date()
+                        ? `bloquée jusqu'au ${format(new Date(detail.student.next_test_allowed), "d MMM à HH'h'mm", { locale: fr })}`
+                        : "autorisée dès maintenant"} />
                   <Info label="Inscrit le" value={detail.student.created_at ? format(new Date(detail.student.created_at), "d MMM yyyy", { locale: fr }) : "—"} />
                   <Info label="Admis le" value={detail.student.admitted_at ? format(new Date(detail.student.admitted_at), "d MMM yyyy", { locale: fr }) : "—"} />
                 </div>
@@ -248,7 +260,7 @@ export default function AdminStudents() {
                 <div className="flex flex-wrap gap-2">
                   {detail.student.email_verified === false && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => action.mutate({ id: detail.student.id, act: "verify_email" })}><ShieldCheck className="w-3.5 h-3.5" /> Vérifier email</Button>}
                   {!detail.student.admitted_at && <Button size="sm" className="gap-1.5" onClick={() => action.mutate({ id: detail.student.id, act: "admit" })}><UserCheck className="w-3.5 h-3.5" /> Admettre</Button>}
-                  {!detail.student.admitted_at && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => action.mutate({ id: detail.student.id, act: "reset_test" })}><RotateCcw className="w-3.5 h-3.5" /> Reset test</Button>}
+                  {!detail.student.admitted_at && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => action.mutate({ id: detail.student.id, act: "reset_test" })}><RotateCcw className="w-3.5 h-3.5" /> Autoriser une nouvelle tentative</Button>}
                 </div>
 
                 {/* Graphe notes */}
