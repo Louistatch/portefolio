@@ -13,7 +13,12 @@ import { useToast } from "@/hooks/use-toast";
 
 interface Campaign {
   id: number; subject: string; content: string; status: string; recipients_count: number; sent_at: string | null; created_at: string;
+  target_source: string | null;
 }
+
+interface SubscriberSource { source: string; count: number }
+
+const TOUS = "__tous__";
 
 export default function AdminNewsletter() {
   const qc = useQueryClient();
@@ -24,6 +29,7 @@ export default function AdminNewsletter() {
   const [content, setContent] = useState("");
   const [preview, setPreview] = useState(false);
   const [sendDialog, setSendDialog] = useState<Campaign | null>(null);
+  const [targetSource, setTargetSource] = useState<string>(TOUS);
 
   const { data: campaigns, isLoading } = useQuery<Campaign[]>({
     queryKey: ["admin-campaigns"],
@@ -35,24 +41,39 @@ export default function AdminNewsletter() {
     queryFn: async () => { const r = await adminFetch("/api/admin/subscribers?filter=active"); return r.json(); },
   });
 
+  const { data: sources } = useQuery<SubscriberSource[]>({
+    queryKey: ["admin-subscriber-sources"],
+    queryFn: async () => { const r = await adminFetch("/api/admin/subscriber-sources"); return r.json(); },
+  });
+
+  // Nombre de destinataires réels de la campagne en cours d'édition, pour l'afficher
+  // avant l'envoi plutôt qu'après.
+  const targetCount = targetSource === TOUS
+    ? (sources || []).reduce((n, s) => n + s.count, 0)
+    : (sources || []).find(s => s.source === targetSource)?.count ?? 0;
+
+  const countFor = (c: Campaign) => c.target_source
+    ? ((sources || []).find(s => s.source === c.target_source)?.count ?? 0)
+    : (sources || []).reduce((n, s) => n + s.count, 0);
+
   const create = useMutation({
     mutationFn: async () => {
-      const r = await adminFetch("/api/admin/campaigns", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, content }) });
+      const r = await adminFetch("/api/admin/campaigns", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, content, target_source: targetSource === TOUS ? null : targetSource }) });
       if (!r.ok) throw new Error((await r.json()).message);
       return r.json();
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-campaigns"] }); setCreating(false); setSubject(""); setContent(""); toast({ title: "Campagne créée" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-campaigns"] }); setCreating(false); setSubject(""); setContent(""); setTargetSource(TOUS); toast({ title: "Campagne créée" }); },
     onError: (e: any) => toast({ title: "Erreur", description: e.message, variant: "destructive" }),
   });
 
   const update = useMutation({
     mutationFn: async () => {
       if (!editing) return;
-      const r = await adminFetch(`/api/admin/campaigns/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, content }) });
+      const r = await adminFetch(`/api/admin/campaigns/${editing.id}`, { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subject, content, target_source: targetSource === TOUS ? null : targetSource }) });
       if (!r.ok) throw new Error((await r.json()).message);
       return r.json();
     },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-campaigns"] }); setEditing(null); setSubject(""); setContent(""); toast({ title: "Campagne mise à jour" }); },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-campaigns"] }); setEditing(null); setSubject(""); setContent(""); setTargetSource(TOUS); toast({ title: "Campagne mise à jour" }); },
   });
 
   const sendCampaign = useMutation({
@@ -70,9 +91,9 @@ export default function AdminNewsletter() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["admin-campaigns"] }); toast({ title: "Supprimée" }); },
   });
 
-  const startEdit = (c: Campaign) => { setEditing(c); setSubject(c.subject); setContent(c.content); setCreating(false); };
-  const startCreate = () => { setCreating(true); setEditing(null); setSubject(""); setContent(""); };
-  const cancel = () => { setCreating(false); setEditing(null); setSubject(""); setContent(""); };
+  const startEdit = (c: Campaign) => { setEditing(c); setSubject(c.subject); setContent(c.content); setTargetSource(c.target_source || TOUS); setCreating(false); };
+  const startCreate = () => { setCreating(true); setEditing(null); setSubject(""); setContent(""); setTargetSource(TOUS); };
+  const cancel = () => { setCreating(false); setEditing(null); setSubject(""); setContent(""); setTargetSource(TOUS); };
 
   const activeSubCount = subStats?.length || 0;
   const sentCount = (campaigns || []).filter(c => c.status === "sent").length;
@@ -117,6 +138,22 @@ export default function AdminNewsletter() {
             <div>
               <Label>Sujet</Label>
               <Input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Sujet de la newsletter..." className="mt-1" />
+            </div>
+            <div>
+              <Label>Destinataires</Label>
+              <select
+                value={targetSource}
+                onChange={e => setTargetSource(e.target.value)}
+                className="mt-1 w-full h-10 rounded-md border border-input bg-background px-3 text-sm">
+                <option value={TOUS}>Tous les abonnés actifs</option>
+                {(sources || []).map(s => (
+                  <option key={s.source} value={s.source}>{s.source} ({s.count})</option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1.5">
+                {targetCount} destinataire{targetCount > 1 ? "s" : ""}
+                {targetSource !== TOUS && " — les autres abonnés ne recevront rien."}
+              </p>
             </div>
             <div>
               <div className="flex items-center justify-between mb-1">
@@ -177,7 +214,7 @@ export default function AdminNewsletter() {
                   <h3 className="text-lg font-bold mb-1">{c.subject}</h3>
                   <p className="text-sm text-muted-foreground line-clamp-2">{c.content}</p>
                   {c.status === "sent" && c.recipients_count > 0 && (
-                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> {c.recipients_count} destinataire(s)</p>
+                    <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> {c.recipients_count} destinataire(s){c.target_source ? ` · groupe ${c.target_source}` : ""}</p>
                   )}
                 </div>
                 <div className="flex gap-2 shrink-0">
@@ -205,7 +242,7 @@ export default function AdminNewsletter() {
               <Send className="w-5 h-5 text-primary" /> Confirmer l'envoi
             </DialogTitle>
             <DialogDescription>
-              Vous êtes sur le point d'envoyer cette campagne à tous les abonnés actifs.
+              Cet envoi est définitif et ne peut pas être rappelé.
             </DialogDescription>
           </DialogHeader>
 
@@ -226,7 +263,10 @@ export default function AdminNewsletter() {
                 <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
                 <div className="text-sm">
                   <p className="font-medium text-amber-800 dark:text-amber-200">
-                    {activeSubCount} abonné{activeSubCount > 1 ? "s" : ""} actif{activeSubCount > 1 ? "s" : ""} recevront cet email
+                    {countFor(sendDialog)} destinataire{countFor(sendDialog) > 1 ? "s" : ""}
+                    {sendDialog.target_source
+                      ? ` du groupe « ${sendDialog.target_source} »`
+                      : " (tous les abonnés actifs)"}
                   </p>
                   <p className="text-amber-600 dark:text-amber-400 text-xs mt-0.5">Cette action est irréversible.</p>
                 </div>
@@ -242,7 +282,7 @@ export default function AdminNewsletter() {
               className="gap-2"
             >
               {sendCampaign.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-              Envoyer à {activeSubCount} abonné{activeSubCount > 1 ? "s" : ""}
+              Envoyer à {sendDialog ? countFor(sendDialog) : 0} abonné{sendDialog && countFor(sendDialog) > 1 ? "s" : ""}
             </Button>
           </DialogFooter>
         </DialogContent>

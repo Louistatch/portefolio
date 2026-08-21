@@ -474,41 +474,66 @@ app.get("/api/admin/campaigns", requireAuth, async (_req, res) => {
   res.json(data);
 });
 app.post("/api/admin/campaigns", requireAuth, async (req, res) => {
-  const { subject, content } = req.body;
+  const { subject, content, target_source } = req.body;
   if (!subject || !content) return res.status(400).json({ message: "Subject and content required" });
-  const { data, error } = await supabase.from("newsletter_campaigns").insert({ subject, content }).select().single();
+  const { data, error } = await supabase.from("newsletter_campaigns")
+    .insert({ subject, content, target_source: target_source || null }).select().single();
   if (error) return res.status(400).json({ message: error.message });
   res.status(201).json(data);
 });
 app.put("/api/admin/campaigns/:id", requireAuth, async (req, res) => {
-  const { subject, content } = req.body;
-  const { data, error } = await supabase.from("newsletter_campaigns").update({ subject, content }).eq("id", Number(req.params.id)).select().single();
+  const { subject, content, target_source } = req.body;
+  const { data, error } = await supabase.from("newsletter_campaigns")
+    .update({ subject, content, target_source: target_source || null })
+    .eq("id", Number(req.params.id)).select().single();
   if (error) return res.status(400).json({ message: error.message });
   res.json(data);
+});
+
+// Groupes d'abonnés (valeurs distinctes de subscribers.source), pour cibler une campagne.
+app.get("/api/admin/subscriber-sources", requireAuth, async (_req, res) => {
+  const { data, error } = await supabase.from("subscribers").select("source").eq("status", "active");
+  if (error) return res.status(500).json({ message: error.message });
+  const counts: Record<string, number> = {};
+  for (const r of data || []) counts[(r as any).source || "website"] = (counts[(r as any).source || "website"] || 0) + 1;
+  res.json(Object.entries(counts).map(([source, count]) => ({ source, count })).sort((a, b) => b.count - a.count));
 });
 app.post("/api/admin/campaigns/:id/send", requireAuth, async (req, res) => {
   // Get campaign content
   const { data: campaign } = await supabase.from("newsletter_campaigns").select("*").eq("id", Number(req.params.id)).single();
   if (!campaign) return res.status(404).json({ message: "Campaign not found" });
 
-  const { data: subs } = await supabase.from("subscribers").select("email, name").eq("status", "active");
+  // Ciblage : une campagne sans target_source part à tous les abonnés actifs (comportement
+  // historique) ; avec, elle ne part qu'au groupe visé. Sans ce filtre, un message destiné
+  // aux 42 étudiants d'une formation partait aussi aux abonnés de la newsletter générale.
+  let query = supabase.from("subscribers").select("email, name").eq("status", "active");
+  if (campaign.target_source) query = query.eq("source", campaign.target_source);
+  const { data: subs, error: subsError } = await query;
+  if (subsError) return res.status(500).json({ message: subsError.message });
   const count = subs?.length || 0;
 
-  // Send campaign emails via Resend
-  if (resend && subs?.length) {
-    for (let i = 0; i < subs.length; i += 50) {
-      const batch = subs.slice(i, i + 50).map((s: any) => ({
-        from: FROM_EMAIL, to: s.email,
-        subject: campaign.subject,
-        html: campaignEmailHtml(s.name, campaign.subject, campaign.content),
-      }));
-      resend.batch.send(batch).catch((e: any) => console.error("Campaign send error:", e));
-    }
+  // Ne pas marquer « envoyée » une campagne qui n'a atteint personne : le statut est
+  // définitif côté interface, et une cible mal orthographiée passerait pour un succès.
+  if (!count) return res.status(400).json({
+    message: campaign.target_source
+      ? `Aucun abonné actif dans le groupe « ${campaign.target_source} » — rien n'a été envoyé.`
+      : "Aucun abonné actif — rien n'a été envoyé.",
+  });
+  if (!resend) return res.status(503).json({ message: "Service d'envoi non configuré — rien n'a été envoyé." });
+
+  for (let i = 0; i < subs!.length; i += 50) {
+    const batch = subs!.slice(i, i + 50).map((s: any) => ({
+      from: FROM_EMAIL, to: s.email,
+      subject: campaign.subject,
+      html: campaignEmailHtml(s.name, campaign.subject, campaign.content),
+    }));
+    await resend.batch.send(batch).catch((e: any) => console.error("Campaign send error:", e));
   }
 
   const { data, error } = await supabase.from("newsletter_campaigns").update({ status: "sent", recipients_count: count, sent_at: new Date().toISOString() }).eq("id", Number(req.params.id)).select().single();
   if (error) return res.status(400).json({ message: error.message });
-  res.json({ ...data, message: `Campagne envoyée à ${count} abonné${count > 1 ? "s" : ""}` });
+  const cible = campaign.target_source ? ` du groupe « ${campaign.target_source} »` : "";
+  res.json({ ...data, message: `Campagne envoyée à ${count} abonné${count > 1 ? "s" : ""}${cible}` });
 });
 app.delete("/api/admin/campaigns/:id", requireAuth, async (req, res) => {
   const { error } = await supabase.from("newsletter_campaigns").delete().eq("id", Number(req.params.id));
