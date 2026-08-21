@@ -966,7 +966,7 @@ async function generateLessonSchedule(sid: number, admittedAt: Date) {
 async function refreshLessonStates(sid: number) {
   const now = Date.now();
   const { data: lps } = await supabase.from("lesson_progress")
-    .select("id, lesson_id, course_id, unlock_at, due_at, status, sms_lessons(order_index)")
+    .select("id, lesson_id, course_id, unlock_at, due_at, status, sms_lessons(order_index, title)")
     .eq("student_id", sid);
   if (!lps?.length) return;
 
@@ -995,6 +995,9 @@ async function refreshLessonStates(sid: number) {
     lastSeen[key] = co.id;
   }
 
+  // Cours qui viennent de s'ouvrir : leur première leçon passe de verrouillée à accessible.
+  const coursOuverts: { courseId: number; lessonTitle?: string; dueAt: string }[] = [];
+
   for (const lp of lps as any[]) {
     if (lp.status === "completed") continue;
     const rank = rankOf(lp);
@@ -1008,7 +1011,38 @@ async function refreshLessonStates(sid: number) {
     const ouverte = parCalendrier || suiteDuCours || debutDuCoursSuivant;
     const enRetard = now > new Date(lp.due_at).getTime();
     const ns = !ouverte ? "locked" : (enRetard ? "missed" : "available");
-    if (ns !== lp.status) await supabase.from("lesson_progress").update({ status: ns }).eq("id", lp.id);
+    if (ns !== lp.status) {
+      await supabase.from("lesson_progress").update({ status: ns }).eq("id", lp.id);
+      // Le premier cours d'un parcours n'est pas annoncé ici : l'email d'admission le fait
+      // déjà, et deux messages pour la même ouverture se lisent comme un doublon.
+      if (lp.status === "locked" && ns !== "locked" && rank <= 1 && prev != null) {
+        coursOuverts.push({ courseId: lp.course_id, lessonTitle: lp.sms_lessons?.title, dueAt: lp.due_at });
+      }
+    }
+  }
+
+  if (coursOuverts.length) await notifyCoursesUnlocked(sid, coursOuverts);
+}
+
+/**
+ * Prévient l'étudiant qu'un cours vient de s'ouvrir. Idempotent par (étudiant, cours) :
+ * refreshLessonStates tourne à chaque affichage du tableau de bord, la clé de déduplication
+ * est donc le seul garde-fou contre l'envoi en boucle.
+ */
+async function notifyCoursesUnlocked(sid: number, opened: { courseId: number; lessonTitle?: string; dueAt: string }[]) {
+  const { data: stud } = await supabase.from("students")
+    .select("full_name, email, course_emails").eq("id", sid).maybeSingle();
+  if (!stud?.email || stud.course_emails === false) return;
+  for (const o of opened) {
+    const { data: course } = await supabase.from("sms_courses")
+      .select("code, title, description").eq("id", o.courseId).maybeSingle();
+    if (!course) continue;
+    sendAcademyEmail({
+      studentId: sid, to: stud.email, type: "course_unlocked",
+      subject: `🔓 Cours débloqué : ${course.title}`,
+      html: courseUnlockedEmailHtml(stud.full_name, course, o.lessonTitle ? { title: o.lessonTitle } : null, o.dueAt),
+      dedupeKey: `course_unlocked:${sid}:${o.courseId}`,
+    });
   }
 }
 
@@ -1596,6 +1630,18 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
     .eq("student_id", sid).eq("lesson_id", lesson_id).then(() => {}, () => {});
 
   const result = await recalcCourseProgress(sid, course_id);
+
+  // Les statuts sont recalculés APRÈS l'enregistrement de la note : c'est ce passage qui
+  // ouvre la leçon suivante, et qui déclenche l'email « cours débloqué » le cas échéant.
+  await refreshLessonStates(sid);
+
+  // Email de réussite. Pas d'envoi quand la leçon termine le cours : recalcCourseProgress a
+  // déjà envoyé « projet terminé », qui dit mieux la même chose au même moment.
+  if (!result?.completed) {
+    notifyLessonPassed(sid, course_id, lesson_id, lesson.title || "Leçon", finalScore, maxScore, result)
+      .catch((e: any) => console.error("lesson_passed email error:", e?.message || e));
+  }
+
   res.json({
     ...result,
     lessonScore: finalScore, lessonMax: maxScore,
@@ -1605,6 +1651,54 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
     total: graded?.total ?? null,
   });
 });
+
+/**
+ * Email envoyé après chaque leçon validée. Idempotent par (étudiant, leçon) : revalider la
+ * même leçon ne renvoie rien.
+ */
+async function notifyLessonPassed(
+  sid: number, courseId: number, lessonId: number, lessonTitle: string,
+  score: number, max: number, result: { progress: number; done: number; total: number } | undefined,
+) {
+  const { data: stud } = await supabase.from("students")
+    .select("full_name, email, course_emails").eq("id", sid).maybeSingle();
+  if (!stud?.email || stud.course_emails === false) return;
+  const { data: course } = await supabase.from("sms_courses")
+    .select("code, title").eq("id", courseId).maybeSingle();
+  if (!course) return;
+
+  const { data: thisLesson } = await supabase.from("sms_lessons")
+    .select("order_index").eq("id", lessonId).maybeSingle();
+
+  // La leçon suivante du cours, et si elle est déjà accessible — c'est l'information utile :
+  // elle dit à l'étudiant s'il enchaîne maintenant ou ce qu'il fait en attendant.
+  let next: { title: string; open: boolean; unlockAt?: string } | null = null;
+  if (thisLesson?.order_index != null) {
+    const { data: nl } = await supabase.from("sms_lessons")
+      .select("id, title, order_index").eq("course_id", courseId)
+      .gt("order_index", thisLesson.order_index).order("order_index").limit(1).maybeSingle();
+    if (nl) {
+      const { data: nlp } = await supabase.from("lesson_progress")
+        .select("status, unlock_at").eq("student_id", sid).eq("lesson_id", nl.id).maybeSingle();
+      next = {
+        title: nl.title,
+        open: nlp?.status === "available" || nlp?.status === "missed",
+        unlockAt: nlp?.unlock_at,
+      };
+    }
+  }
+
+  sendAcademyEmail({
+    studentId: sid, to: stud.email, type: "lesson_passed",
+    subject: `✅ Leçon validée : ${lessonTitle}`,
+    html: lessonPassedEmailHtml(stud.full_name, course, { title: lessonTitle, order_index: thisLesson?.order_index }, {
+      score, max,
+      progress: result?.progress ?? 0, done: result?.done ?? 0, total: result?.total ?? 0,
+      next,
+    }),
+    dedupeKey: `lesson_passed:${sid}:${lessonId}`,
+  });
+}
 
 // ── Planning hebdomadaire des leçons (modèle WQU) ──
 app.get("/api/academy/lesson-schedule", requireStudent, async (req, res) => {
@@ -2082,6 +2176,40 @@ function newCourseEmailHtml(name: string | undefined, course: { code: string; ti
 // ── Email : projet terminé (100%) ──
 function courseCompletedEmailHtml(name: string, course: { code: string; title: string }) {
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Bravo, ${name.split(" ")[0]} ! 🏁</h1><p class="sub">Vous avez terminé un projet complet</p></div><div class="bd"><span class="badge">✅ Projet terminé</span><p>Félicitations ${name},</p><p>Vous venez de compléter <strong>100%</strong> du projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code} · Terminé</p></div><p>C'est une vraie compétence terrain, directement applicable dans les contextes humanitaires et de développement en Afrique de l'Ouest.</p><p><strong>Prochaine étape :</strong> demandez votre attestation de compétence, ou enchaînez sur le projet suivant pour progresser vers le statut de Super-Expert MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Demander mon attestation</a></p><p class="muted">Continuez sur cette lancée — chaque projet vous rapproche de la maîtrise complète du cycle MEAL.</p></div>`);
+}
+
+// ── Email : leçon validée ──
+// Envoyé après chaque réussite, sauf quand la leçon termine le cours — dans ce cas
+// courseCompletedEmailHtml dit déjà mieux la même chose, et deux emails d'affilée pour le
+// même geste se lisent comme un bug.
+function lessonPassedEmailHtml(
+  name: string,
+  course: { code: string; title: string },
+  lesson: { title: string; order_index?: number },
+  opts: { score: number; max: number; progress: number; done: number; total: number; next?: { title: string; open: boolean; unlockAt?: string } | null },
+) {
+  const firstName = (name || "").split(" ")[0] || "";
+  const pct = opts.max ? Math.round((opts.score / opts.max) * 100) : 0;
+  const rang = lesson.order_index ? `Leçon ${lesson.order_index} · ` : "";
+  const suite = opts.next
+    ? (opts.next.open
+        ? `<p><strong>La suite est déjà ouverte :</strong> « ${opts.next.title} ». Vous pouvez enchaîner tout de suite.</p>
+           <p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Continuer le cours</a></p>`
+        : `<p><strong>Prochaine leçon :</strong> « ${opts.next.title} »${opts.next.unlockAt ? `, à partir du ${new Date(opts.next.unlockAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}. Vous pouvez d'ici là avancer sur vos autres cours.</p>
+           <p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mon planning</a></p>`)
+    : `<p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mon planning</a></p>`;
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Leçon validée${firstName ? `, ${firstName}` : ""} ! ✅</h1><p class="sub">${rang}${course.code}</p></div><div class="bd"><span class="badge">✅ Réussite</span><p>${name ? `Bonjour ${name},` : "Bonjour,"}</p><p>Vous venez de valider :</p><div class="info"><h3>${lesson.title}</h3><p style="margin-top:8px">Note : <strong style="color:#0d9488">${opts.score}/${opts.max}</strong> — ${pct}% de bonnes réponses</p><p style="margin-top:6px;font-size:12px;color:#6b7280">${course.code} · ${course.title}</p></div><p>Vous en êtes à <strong>${opts.done}/${opts.total} leçons</strong> de ce cours, soit <strong>${opts.progress}%</strong>.</p>${suite}<p class="muted">Les exercices sont corrigés côté serveur : cette note reflète vos réponses réelles, pas un simple clic. C'est du travail qui compte.</p></div>`);
+}
+
+// ── Email : nouveau cours débloqué ──
+function courseUnlockedEmailHtml(
+  name: string,
+  course: { code: string; title: string; description?: string },
+  firstLesson?: { title: string } | null,
+  dueAt?: string,
+) {
+  const firstName = (name || "").split(" ")[0] || "";
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Nouveau cours débloqué 🔓</h1><p class="sub">${course.code} · ${course.title}</p></div><div class="bd"><span class="badge">🔓 Accès ouvert</span><p>${firstName ? `Bravo ${firstName},` : "Bravo,"}</p><p>Vous avez avancé assez loin pour ouvrir le cours suivant de votre parcours :</p><div class="info"><h3>${course.title}</h3>${course.description ? `<p style="margin-top:6px">${course.description}</p>` : ""}<p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code}</p></div>${firstLesson ? `<p><strong>Première leçon :</strong> « ${firstLesson.title} »${dueAt ? `, à rendre avant le ${new Date(dueAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}.</p>` : ""}<p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Commencer ce cours</a></p><p class="muted">Rappel : les dates du planning sont un rythme conseillé, pas un couperet. Vous pouvez prendre de l'avance, et une leçon en retard reste rattrapable jusqu'à la fin de votre période d'admission.</p></div>`);
 }
 
 // ── Email : demande d'attestation reçue (accusé) ──
