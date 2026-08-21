@@ -48,7 +48,7 @@ export default function AcademyProfile() {
   async function save() {
     setSaving(true); setMsg("");
     try {
-      const data = await studentFetch("/api/academy/me", {
+      const res = await studentFetch("/api/academy/me", {
         method: "PUT",
         body: JSON.stringify({
           first_name: p.first_name, middle_name: p.middle_name, last_name: p.last_name,
@@ -58,12 +58,21 @@ export default function AcademyProfile() {
           linkedin: p.linkedin, experience_level: p.experience_level,
           interests: p.interests, course_emails: p.course_emails,
         }),
-      }).then(r => r.json());
+      });
+      const data = await res.json();
+      // Sans ce contrôle, un refus du serveur s'affichait « Profil enregistré ✓ » : la
+      // réponse d'erreur était lue comme un profil, et l'étudiant croyait avoir enregistré.
+      if (!res.ok) throw new Error(data?.message || "Enregistrement impossible.");
+      // Recharger l'état depuis la réponse du serveur. Sans cela, le nom affiché en haut de
+      // page et les initiales gardaient l'ancienne valeur après un enregistrement réussi :
+      // l'étudiant modifiait son état civil, voyait la confirmation, mais son ancien nom
+      // restait à l'écran — d'où l'impression que le changement n'avait pas pris.
+      setP((prev: any) => ({ ...prev, ...data }));
       const cur = getStudent();
       if (cur) setStudent({ ...cur, full_name: data.full_name });
       setMsg("Profil enregistré ✓");
       setTimeout(() => setMsg(""), 3000);
-    } catch (e: any) { setMsg(e.message); } finally { setSaving(false); }
+    } catch (e: any) { setMsg(e.message || "Enregistrement impossible."); } finally { setSaving(false); }
   }
 
   async function changePwd() {

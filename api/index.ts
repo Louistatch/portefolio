@@ -823,10 +823,17 @@ async function notifyNewCourseEmails(course: { id: number; code?: string; title:
 }
 
 app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res) => {
-  const { email, password, phone, country, organization, first_name, middle_name, last_name } = req.body;
+  const { email, password, phone, country, organization } = req.body;
+  // Les champs d'état civil sont nettoyés dès l'inscription. Sans cela, un espace laissé en
+  // fin de saisie était stocké tel quel et ressortait dans le nom composé (« ESPOIR  FASSEHO »),
+  // puis sur l'attestation. La mise à jour du profil, elle, trimait déjà.
+  const trim = (v: any) => (typeof v === "string" ? v.trim() : v);
+  const first_name = trim(req.body.first_name);
+  const middle_name = trim(req.body.middle_name);
+  const last_name = trim(req.body.last_name);
   // L'état civil décomposé fait foi ; full_name reste accepté pour ne pas casser un client
   // plus ancien, et sert alors de repli.
-  const full_name = composeFullName(first_name, middle_name, last_name) || req.body.full_name;
+  const full_name = composeFullName(first_name, middle_name, last_name) || trim(req.body.full_name);
   if (!full_name || !email || !password) return res.status(400).json({ message: "Nom, email et mot de passe requis" });
   if (password.length < 8) return res.status(400).json({ message: "Le mot de passe doit faire au moins 8 caractères" });
   if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ message: "Email invalide" });
