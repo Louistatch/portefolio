@@ -1,8 +1,13 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="fr">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
+    <!-- Le site est intégralement en français. Il se déclarait lang="en", ce qui poussait
+         Chrome à proposer une traduction : Google Traduction réécrivait alors les nœuds de
+         texte, désynchronisait le rendu de React, et le test d'admission affichait les
+         options de la question 1 sur toutes les questions suivantes. -->
+    <meta name="google" content="notranslate" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Louis TATCHIDA — Agronome & Expert Finance Agricole</title>
     <meta name="description" content="Agronome & Expert en Finance Agricole — Résilience Climatique & Digitalisation Agricole en Afrique de l'Ouest">

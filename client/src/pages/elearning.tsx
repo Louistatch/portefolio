@@ -318,13 +318,20 @@ export default function ELearning() {
           </div>
         </div>
 
-        {/* Card */}
-        <div className="bg-card rounded-3xl p-8 border border-border/50 shadow-sm mb-6">
+        {/* Card
+            translate="no" : le QCM ne doit jamais passer par un traducteur automatique.
+            Deux raisons. D'abord les énoncés portent des termes techniques qui sont des
+            noms de colonnes ou de fonctions — 'relevant', 'name', 'label', 'hint' — qu'une
+            traduction rend faux : « la colonne 'pertinent' » ne désigne plus rien dans
+            XLSForm. Ensuite Google Traduction remplace les nœuds de texte du DOM, ce que
+            React ne voit pas : au changement de question, les options traduites de la
+            question précédente restaient affichées, et l'étudiant répondait à côté. */}
+        <div translate="no" className="notranslate bg-card rounded-3xl p-8 border border-border/50 shadow-sm mb-6">
           <span className="text-xs font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">{q.domain}</span>
           <p className="text-lg font-medium mt-5 mb-6 leading-relaxed">{q.q}</p>
           <div className="space-y-3">
             {q.opts.map((opt, i) => (
-              <button key={i} onClick={() => setAnswers(prev => ({ ...prev, [qIdx]: i }))}
+              <button key={`${qIdx}-${i}`} onClick={() => setAnswers(prev => ({ ...prev, [qIdx]: i }))}
                 className={`w-full text-left px-5 py-3.5 rounded-2xl border text-sm transition-all duration-150 ${
                   chosen === i
                     ? "border-primary bg-primary/10 text-primary font-medium"

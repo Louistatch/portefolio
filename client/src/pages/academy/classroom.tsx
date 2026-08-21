@@ -135,7 +135,11 @@ function ExerciseCell({ exId, cell, value, result, locked, onChange }: {
   const border = state === "correct" ? "border-primary/50" : state === "wrong" ? "border-destructive/40" : "border-amber-500/40";
 
   return (
-    <div className={`bg-card rounded-2xl border ${border} overflow-hidden`}>
+    // translate="no" : ces exercices sont notés par le serveur, et l'énoncé porte des termes
+    // techniques qu'une traduction automatique fausse (noms de colonnes XLSForm, fonctions
+    // pandas, codes EPSG). Un traducteur réécrit en plus les nœuds du DOM sans que React le
+    // sache, ce qui laissait s'afficher l'énoncé précédent d'une leçon à l'autre.
+    <div translate="no" className={`notranslate bg-card rounded-2xl border ${border} overflow-hidden`}>
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-border/50 bg-amber-500/5">
         <div className="flex items-center gap-2">
           <PenLine className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
