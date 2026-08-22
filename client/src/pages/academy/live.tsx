@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import {
   Loader2, Video, VideoOff, Mic, MicOff, MonitorUp, MessageSquare, Hand,
   PhoneOff, Users, ArrowLeft, AlertCircle, Radio, Maximize2, MoreHorizontal,
-  Settings, LayoutGrid, Send, X,
+  Settings, LayoutGrid, Send, X, Presentation, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn, getStudent } from "@/lib/student";
+import { adminFetch, getToken } from "@/lib/admin";
 
 declare global { interface Window { JitsiMeetExternalAPI?: any } }
 
@@ -36,6 +37,15 @@ export default function AcademyLive() {
   const [draft, setDraft] = useState("");
   const [elapsed, setElapsed] = useState(0);
 
+  // ── Support de séance ──
+  // Le présentateur est reconnu à sa session d'administration, pas au rôle Jitsi : ce dernier
+  // revient au premier arrivé, si bien qu'un étudiant entré avant l'animateur piloterait la
+  // présentation de tout le monde.
+  const [estPresentateur] = useState(() => !!getToken());
+  const [vueSupport, setVueSupport] = useState(false);
+  const [diapo, setDiapo] = useState(0);
+  const [vignettes, setVignettes] = useState(true);
+
   const jitsiRef = useRef<HTMLDivElement>(null);
   const apiRef = useRef<any>(null);
   const myIdRef = useRef<string>("");
@@ -52,6 +62,63 @@ export default function AcademyLive() {
       finally { setLoading(false); }
     })();
   }, [params?.id]);
+
+  const diapos: { url: string; titre?: string }[] =
+    Array.isArray(meeting?.slides) ? meeting.slides : [];
+
+  // Position initiale : on reprend là où en est la projection, pour ne pas repartir de la
+  // première diapositive en rejoignant une séance déjà commencée.
+  useEffect(() => {
+    if (meeting) setDiapo(Math.max(0, Math.min((meeting.current_slide ?? 0), Math.max(0, (meeting.slides?.length ?? 1) - 1))));
+  }, [meeting?.id]);
+
+  // Les participants suivent la projection par consultation périodique. Quatre secondes est
+  // un compromis : assez pour ne pas décrocher d'une explication, assez peu pour ne pas
+  // multiplier les requêtes par le nombre de personnes présentes.
+  useEffect(() => {
+    if (estPresentateur || !joined || diapos.length === 0) return;
+    let vivant = true;
+    const lire = async () => {
+      try {
+        const r = await studentFetch(`/api/academy/meetings/${params?.id}/slide`);
+        if (!r.ok || !vivant) return;
+        const d = await r.json();
+        if (typeof d.index === "number") setDiapo(d.index);
+      } catch { /* la séance continue même si une lecture échoue */ }
+    };
+    lire();
+    const t = setInterval(lire, 4000);
+    return () => { vivant = false; clearInterval(t); };
+  }, [estPresentateur, joined, diapos.length, params?.id]);
+
+  // Le présentateur pousse la nouvelle position. L'affichage local change immédiatement :
+  // attendre la réponse du serveur ferait bégayer la navigation en séance.
+  const allerDiapo = useCallback((index: number) => {
+    if (!diapos.length) return;
+    const borne = Math.max(0, Math.min(index, diapos.length - 1));
+    setDiapo(borne);
+    if (!estPresentateur) return;
+    adminFetch(`/api/admin/academy/meetings/${params?.id}/slide`, {
+      method: "POST", body: JSON.stringify({ index: borne }),
+    }).catch(() => { /* la projection locale reste juste */ });
+  }, [diapos.length, estPresentateur, params?.id]);
+
+  // Flèches du clavier pour le présentateur — indispensable quand on parle en même temps.
+  useEffect(() => {
+    if (!estPresentateur || !vueSupport) return;
+    const onKey = (e: KeyboardEvent) => {
+      const cible = e.target as HTMLElement | null;
+      if (cible && /^(INPUT|TEXTAREA)$/.test(cible.tagName)) return;
+      if (e.key === "ArrowRight" || e.key === "PageDown") { e.preventDefault(); allerDiapo(diapo + 1); }
+      if (e.key === "ArrowLeft" || e.key === "PageUp") { e.preventDefault(); allerDiapo(diapo - 1); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [estPresentateur, vueSupport, diapo, allerDiapo]);
+
+  // Ouvrir le support d'office quand la séance en a un : c'est ce que les participants
+  // viennent voir, pas la mosaïque de visages.
+  useEffect(() => { if (diapos.length > 0) setVueSupport(true); }, [diapos.length]);
 
   // minuteur
   useEffect(() => {
@@ -211,13 +278,13 @@ export default function AcademyLive() {
             <p className="text-sm font-semibold truncate flex items-center gap-2">{meeting?.title}
               {isWebinar && <span className="text-[9px] bg-purple-500/30 text-purple-200 px-1.5 py-0.5 rounded">WEBINAIRE</span>}
             </p>
-            <p className="text-[11px] text-white/50">{fmtTime(elapsed)} · {participants.length} participant{participants.length > 1 ? "s" : ""}</p>
+            <p className="text-[11px] text-white/50">{fmtTime(elapsed)} · {participants.length} participant{participants.length > 1 ? "s" : ""}{diapos.length > 0 && <> · diapo {diapo + 1}/{diapos.length}</>}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
-          <button onClick={() => setLayout(view === "grid" ? "speaker" : "grid")} title="Disposition" className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"><LayoutGrid className="w-4.5 h-4.5" /></button>
+          <button onClick={() => setLayout(view === "grid" ? "speaker" : "grid")} title="Disposition" className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center"><LayoutGrid className="w-[18px] h-[18px]" /></button>
           <button onClick={() => setShowPeople(s => !s)} title="Participants" className={`w-9 h-9 rounded-xl flex items-center justify-center relative ${showPeople ? "bg-white/15" : "hover:bg-white/10"}`}>
-            <Users className="w-4.5 h-4.5" />
+            <Users className="w-[18px] h-[18px]" />
             <span className="absolute -top-1 -right-1 text-[9px] bg-teal-500 rounded-full min-w-4 h-4 px-1 flex items-center justify-center font-bold">{participants.length}</span>
           </button>
         </div>
@@ -234,6 +301,69 @@ export default function AcademyLive() {
             </div>
           )}
           <div ref={jitsiRef} className="absolute inset-0" />
+
+          {/* Support projeté — en superposition, jamais en remplacement : démonter le
+              conteneur Jitsi couperait l'appel de tout le monde. */}
+          {vueSupport && diapos.length > 0 && (
+            <div className="absolute inset-0 z-30 bg-black flex flex-col">
+              <div className="flex-1 relative min-h-0 grid place-items-center p-3">
+                <img key={diapos[diapo]?.url} src={diapos[diapo]?.url}
+                  alt={diapos[diapo]?.titre || `Diapositive ${diapo + 1}`}
+                  className="max-w-full max-h-full object-contain rounded-lg" />
+
+                {estPresentateur && (
+                  <>
+                    <button onClick={() => allerDiapo(diapo - 1)} disabled={diapo === 0}
+                      aria-label="Diapositive précédente"
+                      className="absolute left-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/60 hover:bg-black/80 disabled:opacity-25 grid place-items-center backdrop-blur">
+                      <ChevronLeft className="w-5 h-5" />
+                    </button>
+                    <button onClick={() => allerDiapo(diapo + 1)} disabled={diapo === diapos.length - 1}
+                      aria-label="Diapositive suivante"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-black/60 hover:bg-black/80 disabled:opacity-25 grid place-items-center backdrop-blur">
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </>
+                )}
+
+                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
+                  <span className="px-3 py-1 rounded-full bg-black/65 backdrop-blur text-xs font-medium">
+                    {diapo + 1} / {diapos.length}
+                  </span>
+                  {!estPresentateur && (
+                    <span className="px-3 py-1 rounded-full bg-teal-500/80 backdrop-blur text-[11px] font-medium">
+                      Suit le présentateur
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {vignettes && diapos.length > 1 && (
+                <div className="shrink-0 border-t border-white/10 bg-[#0b1220]/80 backdrop-blur p-2">
+                  <div className="flex gap-2 overflow-x-auto">
+                    {diapos.map((d, i) => (
+                      <button key={`${d.url}-${i}`}
+                        onClick={() => estPresentateur && allerDiapo(i)}
+                        disabled={!estPresentateur}
+                        aria-label={`Diapositive ${i + 1}`}
+                        aria-current={i === diapo}
+                        className={`relative shrink-0 w-24 aspect-[4/3] rounded-md overflow-hidden border-2 transition-colors ${
+                          i === diapo ? "border-teal-400" : "border-transparent opacity-55"
+                        } ${estPresentateur ? "hover:opacity-100 cursor-pointer" : "cursor-default"}`}>
+                        <img src={d.url} alt="" className="w-full h-full object-cover" />
+                        <span className="absolute bottom-0.5 left-0.5 px-1 rounded bg-black/70 text-[9px] font-bold">{i + 1}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <button onClick={() => setVignettes(v => !v)}
+                className="absolute top-3 right-3 px-2.5 py-1.5 rounded-lg bg-black/60 hover:bg-black/80 backdrop-blur text-[11px] font-medium">
+                {vignettes ? "Masquer les vignettes" : "Vignettes"}
+              </button>
+            </div>
+          )}
           {/* indicateur "mains levées" flottant */}
           {handsUp.length > 0 && (
             <div className="absolute top-3 left-3 z-20 bg-amber-500/90 backdrop-blur px-3 py-1.5 rounded-full text-xs font-medium flex items-center gap-1.5 shadow-lg" style={{ animation: "fadeIn .3s" }}>
@@ -306,6 +436,10 @@ export default function AcademyLive() {
         {!isWebinar && <Ctrl active={sharing} onClick={toggleShare} on={MonitorUp} off={MonitorUp} label="Partager" highlight={sharing} hideMobile />}
         <Ctrl active={handUp} onClick={toggleHand} on={Hand} off={Hand} label="Main" highlight={handUp} />
         <Ctrl active={showChat} onClick={() => { setShowChat(true); setShowPeople(false); }} on={MessageSquare} off={MessageSquare} label="Chat" hideMobile />
+        {diapos.length > 0 && (
+          <Ctrl active={vueSupport} onClick={() => setVueSupport(v => !v)} on={Presentation} off={Presentation}
+            label={vueSupport ? "Vidéo" : "Support"} highlight={vueSupport} />
+        )}
         <button onClick={hangup} className="h-12 px-5 rounded-2xl bg-red-500 hover:bg-red-600 flex items-center gap-2 font-medium transition-colors ml-1">
           <PhoneOff className="w-5 h-5" /> <span className="hidden sm:inline">Quitter</span>
         </button>
