@@ -6,7 +6,7 @@ import { SocialShare } from "@/components/social-share";
 import {
   GraduationCap, User, Award, BookOpen, Loader2, CheckCircle2, Clock,
   Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
-  Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users } from "lucide-react";
+  Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
 import { groupByProgram } from "@shared/programs";
 
@@ -22,6 +22,7 @@ export default function AcademyDashboard() {
   const [transcript, setTranscript] = useState<any>(null);
   const [creds, setCreds] = useState<Cred[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
+  const [bord, setBord] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   // Les cours terminés sont repliés par défaut, parcours par parcours.
   const [showPastOf, setShowPastOf] = useState<Record<string, boolean>>({});
@@ -31,7 +32,7 @@ export default function AcademyDashboard() {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
     (async () => {
       try {
-        const [e, ts, ac, sch, tr, cr, mt] = await Promise.all([
+        const [e, ts, ac, sch, tr, cr, mt, bd] = await Promise.all([
           studentFetch("/api/academy/my-enrollments").then(r => r.json()).catch(() => []),
           studentFetch("/api/academy/test-status").then(r => r.json()).catch(() => null),
           fetch("/api/academy/courses").then(r => r.json()).catch(() => []),
@@ -39,11 +40,13 @@ export default function AcademyDashboard() {
           studentFetch("/api/academy/transcript").then(r => r.json()).catch(() => null),
           studentFetch("/api/academy/my-credentials").then(r => r.json()).catch(() => null),
           studentFetch("/api/academy/meetings").then(r => r.json()).catch(() => null),
+          studentFetch("/api/academy/dashboard").then(r => r.json()).catch(() => null),
         ]);
         setEnrollments(Array.isArray(e) ? e : []);
         setTestStatus(ts); setAllCourses(Array.isArray(ac) ? ac : []);
         setSchedule(Array.isArray(sch) ? sch : []); setTranscript(tr);
         setCreds(cr?.credentials || []); setMeetings(mt?.meetings || []);
+        setBord(bd && !bd.message ? bd : null);
       } finally { setLoading(false); }
     })();
   }, []);
@@ -79,11 +82,11 @@ export default function AcademyDashboard() {
   const initials = student?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "ET";
 
   return (
-    <div className="max-w-6xl mx-auto px-5 sm:px-6 py-8">
+    <div className="max-w-6xl mx-auto space-y-6">
       <SEO title="Mon espace — DataMEAL Academy" description="Tableau de bord étudiant." />
 
       {/* ───── Hero header ───── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-teal-700 p-6 sm:p-8 mb-6 text-white" style={{ transform: "translateZ(0)", isolation: "isolate", WebkitBackfaceVisibility: "hidden" }}>
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-teal-700 p-6 sm:p-8 text-white" style={{ transform: "translateZ(0)", isolation: "isolate", WebkitBackfaceVisibility: "hidden" }}>
         <div className="absolute -right-8 -top-8 w-44 h-44 rounded-full bg-white/10" />
         <div className="absolute -right-16 top-12 w-56 h-56 rounded-full bg-white/5" />
         <div className="relative flex items-center justify-between flex-wrap gap-4">
@@ -118,7 +121,7 @@ export default function AcademyDashboard() {
 
       {/* ───── Alerte vérification email ───── */}
       {!emailVerified && (
-        <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 mb-6 flex items-center justify-between gap-3 flex-wrap">
+        <div className="bg-amber-50 dark:bg-amber-900/15 border border-amber-200 dark:border-amber-900/40 rounded-2xl p-4 flex items-center justify-between gap-3 flex-wrap">
           <div className="flex items-center gap-2.5">
             <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0" />
             <p className="text-sm text-amber-700 dark:text-amber-300">Confirmez votre email pour pouvoir recevoir vos attestations et certificats.</p>
@@ -128,7 +131,7 @@ export default function AcademyDashboard() {
       )}
 
       {/* ───── Stats cards ───── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6" style={{ isolation: "isolate" }}>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" style={{ isolation: "isolate" }}>
         {[
           { label: "Moyenne générale", value: `${overall}%`, icon: TrendingUp, tint: "text-primary bg-primary/10" },
           { label: "Cours terminés", value: `${completedCourses}/${allCourses.length}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
@@ -136,67 +139,16 @@ export default function AcademyDashboard() {
           { label: "Évaluations", value: transcript?.totalGrades ?? 0, icon: CheckCircle2, tint: "text-emerald-600 bg-emerald-500/10" },
         ].map((s) => (
           <div key={s.label} className="bg-card rounded-2xl border border-border/50 p-4">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${s.tint}`}><s.icon className="w-4.5 h-4.5" /></div>
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${s.tint}`}><s.icon className="w-[18px] h-[18px]" /></div>
             <p className="text-2xl font-bold">{s.value}</p>
             <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
 
-      {/* ───── Rencontres en ligne à venir ───── */}
-      {meetings.length > 0 && (
-        <section className="mb-8">
-          <h2 className="text-lg font-bold flex items-center gap-2 mb-4"><Video className="w-5 h-5 text-primary" /> Rencontres en ligne</h2>
-          <div className="grid sm:grid-cols-2 gap-3">
-            {meetings.map((m: any) => {
-              const start = new Date(m.starts_at);
-              const isWebinar = m.kind === "webinar";
-              const isLive = m.status === "live";
-              const soon = start.getTime() - Date.now() < 15 * 60 * 1000 && start.getTime() - Date.now() > -m.duration_min * 60 * 1000;
-              const canJoin = isLive || soon;
-              return (
-                <div key={m.id} className={`bg-card rounded-2xl border p-4 ${isLive ? "border-primary/50 ring-1 ring-primary/20" : "border-border/50"}`}>
-                  <div className="flex items-start gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isWebinar ? "bg-purple-500/10 text-purple-600" : "bg-primary/10 text-primary"}`}>
-                      {isWebinar ? <Radio className="w-5 h-5" /> : <Users className="w-5 h-5" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-sm truncate">{m.title}</p>
-                        {isLive && <span className="text-[9px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded animate-pulse shrink-0">● LIVE</span>}
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-0.5">{start.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} · {start.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {isWebinar ? "Webinaire" : "Interactive"}</p>
-                    </div>
-                  </div>
-                  <Button size="sm" className="w-full mt-3 gap-1.5" variant={canJoin ? "default" : "outline"}
-                    onClick={() => navigate(`/academy/live/${m.id}`)}>
-                    <Video className="w-3.5 h-3.5" /> {canJoin ? "Rejoindre maintenant" : "Voir les détails"}
-                  </Button>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-      )}
-
-      {/* ───── Portefeuille de credentials (style Credly) ───── */}
-      {creds.length > 0 && (
-        <section className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold flex items-center gap-2"><Award className="w-5 h-5 text-primary" /> Mon portefeuille de credentials</h2>
-            <span className="text-xs text-muted-foreground">Vérifiables · Téléchargeables</span>
-          </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {creds.map((cr) => (
-              <CredentialCard key={cr.id} cred={cr} />
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* ───── Bannière test (non admis) ───── */}
       {testStatus && !testStatus.passed && emailVerified && (
-        <div className="bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 rounded-2xl p-5 mb-6 flex items-center justify-between flex-wrap gap-4" style={{ transform: "translateZ(0)" }}>
+        <div className="bg-gradient-to-r from-primary/10 to-transparent border border-primary/20 rounded-2xl p-5 flex items-center justify-between flex-wrap gap-4" style={{ transform: "translateZ(0)" }}>
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-primary/15 flex items-center justify-center"><Target className="w-5 h-5 text-primary" /></div>
             <div>
@@ -208,9 +160,29 @@ export default function AcademyDashboard() {
         </div>
       )}
 
+      {/* ───── Deux colonnes : le travail à gauche, le suivi à droite ─────
+          Le planning et les credentials sont ce que l'étudiant vient consulter ; le
+          calendrier, les réalisations et les ressources l'accompagnent sans lui disputer
+          la place. Sur mobile la grille retombe en une colonne, dans cet ordre. */}
+      <div className="grid lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2 space-y-6">
+      {/* ───── Portefeuille de credentials (style Credly) ───── */}
+      {creds.length > 0 && (
+        <section id="credentials" className="scroll-mt-24">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold flex items-center gap-2"><Award className="w-5 h-5 text-primary" /> Mon portefeuille de credentials</h2>
+            <span className="text-xs text-muted-foreground">Vérifiables · Téléchargeables</span>
+          </div>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {creds.map((cr) => (
+              <CredentialCard key={cr.id} cred={cr} />
+            ))}
+          </div>
+        </section>
+      )}
       {/* ───── Planning hebdomadaire ───── */}
       {testStatus?.passed && schedule.length > 0 && (
-        <section className="mb-8">
+        <section>
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Mon planning</h2>
             <span className="text-xs text-muted-foreground">Rythme conseillé — vous pouvez prendre de l'avance</span>
@@ -282,11 +254,56 @@ export default function AcademyDashboard() {
           </div>
         </section>
       )}
+        </div>
+        <div className="space-y-6">
+          {bord?.calendrier?.length > 0 && <Calendrier evenements={bord.calendrier} />}
+          {bord?.realisations?.length > 0 && <Realisations realisations={bord.realisations} xp={bord.xp} />}
+          {bord?.ressources?.length > 0 && <Ressources ressources={bord.ressources} />}
+      {/* ───── Rencontres en ligne à venir ───── */}
+      {meetings.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-4"><Video className="w-5 h-5 text-primary" /> Rencontres en ligne</h2>
+          <div className="grid sm:grid-cols-2 gap-3">
+            {meetings.map((m: any) => {
+              const start = new Date(m.starts_at);
+              const isWebinar = m.kind === "webinar";
+              const isLive = m.status === "live";
+              const soon = start.getTime() - Date.now() < 15 * 60 * 1000 && start.getTime() - Date.now() > -m.duration_min * 60 * 1000;
+              const canJoin = isLive || soon;
+              return (
+                <div key={m.id} className={`bg-card rounded-2xl border p-4 ${isLive ? "border-primary/50 ring-1 ring-primary/20" : "border-border/50"}`}>
+                  <div className="flex items-start gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${isWebinar ? "bg-purple-500/10 text-purple-600" : "bg-primary/10 text-primary"}`}>
+                      {isWebinar ? <Radio className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-sm truncate">{m.title}</p>
+                        {isLive && <span className="text-[9px] font-bold text-white bg-red-500 px-1.5 py-0.5 rounded animate-pulse shrink-0">● LIVE</span>}
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">{start.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })} · {start.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {isWebinar ? "Webinaire" : "Interactive"}</p>
+                    </div>
+                  </div>
+                  <Button size="sm" className="w-full mt-3 gap-1.5" variant={canJoin ? "default" : "outline"}
+                    onClick={() => navigate(`/academy/live/${m.id}`)}>
+                    <Video className="w-3.5 h-3.5" /> {canJoin ? "Rejoindre maintenant" : "Voir les détails"}
+                  </Button>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+        </div>
+      </div>
 
       {/* ───── Parcours ─────
           Les cours sont regroupés par parcours et non alignés dans une grille unique :
           un étudiant du cursus MEAL voyait la formation de formateurs au même rang que
-          ses propres cours, sans savoir lequel comptait pour son certificat. */}
+          ses propres cours, sans savoir lequel comptait pour son certificat.
+          Les ancres #parcours et #cours servent les liens du menu latéral. */}
+      <div id="parcours" className="scroll-mt-24" />
+      <div id="cours" className="scroll-mt-24" />
       {programGroups.map(({ program, courses }) => {
         const stats = courses.map(co => {
           const enr = enrollments.find(e => e.course_id === co.id);
@@ -537,5 +554,197 @@ function CredentialCard({ cred }: { cred: Cred }) {
         <div className="px-5 pb-3"><p className="text-[9px] font-mono text-muted-foreground/60">N° {cred.certificate_no}</p></div>
       )}
     </div>
+  );
+}
+
+// ═══════════════ Panneaux latéraux ═══════════════
+
+/** Coquille commune : même en-tête, même bordure, pour que les panneaux se lisent en série. */
+export function Bloc({ titre, icone: Icone, action, children, id }: {
+  titre: string; icone: any; action?: React.ReactNode; children: React.ReactNode; id?: string;
+}) {
+  return (
+    <section id={id} className="bg-card rounded-2xl border border-border/50 scroll-mt-24">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
+        <h2 className="font-semibold text-sm flex items-center gap-2">
+          <Icone className="w-4 h-4 text-primary" /> {titre}
+        </h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+/**
+ * Calendrier du mois, avec les jours porteurs d'une échéance ou d'une rencontre.
+ *
+ * La grille commence toujours un lundi : construite naïvement à partir du 1er du mois, elle
+ * décalerait toutes les dates d'un ou plusieurs jours selon le jour de la semaine.
+ */
+export function Calendrier({ evenements }: { evenements: any[] }) {
+  const [decalage, setDecalage] = useState(0);
+  const aujourdhui = new Date();
+  const vue = new Date(aujourdhui.getFullYear(), aujourdhui.getMonth() + decalage, 1);
+
+  const premierJour = new Date(vue.getFullYear(), vue.getMonth(), 1);
+  const nbJours = new Date(vue.getFullYear(), vue.getMonth() + 1, 0).getDate();
+  // getDay() renvoie 0 pour dimanche ; la semaine française commence le lundi.
+  const debutLundi = (premierJour.getDay() + 6) % 7;
+
+  const cle = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const parJour: Record<string, any[]> = {};
+  for (const e of evenements) {
+    const k = cle(new Date(e.date));
+    (parJour[k] ||= []).push(e);
+  }
+
+  const cases: (number | null)[] = [
+    ...Array<null>(debutLundi).fill(null),
+    ...Array.from({ length: nbJours }, (_, i) => i + 1),
+  ];
+
+  return (
+    <Bloc titre="Mon calendrier" icone={Calendar}
+      action={
+        <div className="flex items-center gap-1">
+          <button onClick={() => setDecalage(d => d - 1)} aria-label="Mois précédent"
+            className="w-6 h-6 rounded-md hover:bg-muted grid place-items-center text-muted-foreground">
+            <ChevronRight className="w-3.5 h-3.5 rotate-180" />
+          </button>
+          <span className="text-xs font-medium min-w-[92px] text-center capitalize">
+            {vue.toLocaleDateString("fr-FR", { month: "long", year: "numeric" })}
+          </span>
+          <button onClick={() => setDecalage(d => d + 1)} aria-label="Mois suivant"
+            className="w-6 h-6 rounded-md hover:bg-muted grid place-items-center text-muted-foreground">
+            <ChevronRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      }>
+      <div className="p-4">
+        <div className="grid grid-cols-7 gap-1 mb-1.5">
+          {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map(j => (
+            <span key={j} className="text-[10px] text-muted-foreground text-center font-medium">{j}</span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 gap-1">
+          {cases.map((n, i) => {
+            if (n === null) return <span key={`v${i}`} />;
+            const d = new Date(vue.getFullYear(), vue.getMonth(), n);
+            const evts = parJour[cle(d)] || [];
+            const estAujourdhui = cle(d) === cle(aujourdhui);
+            const aRencontre = evts.some(e => e.type === "rencontre");
+            const enRetard = evts.some(e => e.type === "echeance" && e.statut === "missed");
+            return (
+              <span key={n}
+                title={evts.map(e => `${e.titre}${e.detail ? ` — ${e.detail}` : ""}`).join("\n") || undefined}
+                className={`relative aspect-square grid place-items-center rounded-lg text-xs ${
+                  estAujourdhui ? "bg-primary text-primary-foreground font-bold"
+                  : evts.length ? "bg-muted font-medium cursor-help" : "text-muted-foreground"
+                }`}>
+                {n}
+                {evts.length > 0 && !estAujourdhui && (
+                  <span className={`absolute bottom-1 w-1 h-1 rounded-full ${
+                    enRetard ? "bg-destructive" : aRencontre ? "bg-violet-500" : "bg-primary"}`} />
+                )}
+              </span>
+            );
+          })}
+        </div>
+        <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-border/40">
+          {[["bg-primary", "échéance"], ["bg-violet-500", "rencontre"], ["bg-destructive", "en retard"]].map(([c, l]) => (
+            <span key={l} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
+              <span className={`w-1.5 h-1.5 rounded-full ${c}`} /> {l}
+            </span>
+          ))}
+        </div>
+      </div>
+    </Bloc>
+  );
+}
+
+/** Réalisations obtenues, puis celles qui restent à décrocher — la suite compte autant que l'acquis. */
+export function Realisations({ realisations, xp }: { realisations: any[]; xp: any }) {
+  const obtenues = realisations.filter(r => r.obtenue);
+  const restantes = realisations.filter(r => !r.obtenue);
+  const pct = xp?.seuilSuivant != null
+    ? Math.min(100, Math.max(0, Math.round(((xp.total - xp.seuilActuel) / (xp.seuilSuivant - xp.seuilActuel)) * 100)))
+    : 100;
+
+  return (
+    <Bloc titre="Mes réalisations" icone={Trophy}
+      action={<span className="text-xs text-muted-foreground">{obtenues.length}/{realisations.length}</span>}>
+      <div className="p-3 space-y-1">
+        {obtenues.map(r => (
+          <div key={r.cle} className="flex items-center gap-3 px-2 py-2">
+            <span className="w-9 h-9 rounded-xl bg-primary/10 text-primary grid place-items-center shrink-0">
+              <Trophy className="w-4 h-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight truncate">{r.titre}</span>
+              <span className="block text-[11px] text-muted-foreground leading-tight truncate">{r.detail}</span>
+            </span>
+            <span className="text-[11px] font-bold text-primary shrink-0">+{r.xp} XP</span>
+          </div>
+        ))}
+        {restantes.slice(0, 2).map(r => (
+          <div key={r.cle} className="flex items-center gap-3 px-2 py-2 opacity-55">
+            <span className="w-9 h-9 rounded-xl bg-muted grid place-items-center shrink-0">
+              <Lock className="w-3.5 h-3.5 text-muted-foreground" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight truncate">{r.titre}</span>
+              <span className="block text-[11px] text-muted-foreground leading-tight truncate">{r.detail}</span>
+            </span>
+            <span className="text-[11px] text-muted-foreground shrink-0">+{r.xp} XP</span>
+          </div>
+        ))}
+      </div>
+
+      {xp && (
+        <div className="mx-3 mb-3 p-3 rounded-xl bg-primary/5 border border-primary/15">
+          <div className="flex items-baseline justify-between mb-1">
+            <span className="text-[11px] text-muted-foreground">Votre niveau</span>
+            <span className="text-sm font-bold text-primary">{xp.total} XP</span>
+          </div>
+          <p className="text-[13px] font-semibold mb-2">{xp.titre}</p>
+          <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+            <div className="h-full bg-primary rounded-full" style={{ width: `${pct}%` }} />
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1.5">
+            {xp.seuilSuivant != null
+              ? `${xp.restantPourNiveauSuivant} XP pour « ${xp.titreSuivant} »`
+              : "Palier le plus élevé atteint"}
+          </p>
+        </div>
+      )}
+    </Bloc>
+  );
+}
+
+/** Ressources des leçons ouvertes. Ce sont des liens externes, pas des fichiers : le dire. */
+export function Ressources({ ressources }: { ressources: any[] }) {
+  return (
+    <Bloc id="ressources" titre="Ressources utiles" icone={BookOpen}
+      action={<span className="text-xs text-muted-foreground">{ressources.length}</span>}>
+      <div className="p-3 space-y-0.5">
+        {ressources.slice(0, 6).map(r => (
+          <a key={r.url} href={r.url} target="_blank" rel="noopener noreferrer"
+            className="flex items-center gap-3 px-2 py-2 rounded-xl hover:bg-muted/60 transition-colors">
+            <span className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 grid place-items-center shrink-0">
+              <BookOpen className="w-4 h-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[13px] font-medium leading-tight truncate">{r.titre}</span>
+              <span className="block text-[11px] text-muted-foreground leading-tight truncate">
+                {[r.fournisseur, r.cours].filter(Boolean).join(" · ") || "Lien externe"}
+              </span>
+            </span>
+            <ExternalLink className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+          </a>
+        ))}
+      </div>
+    </Bloc>
   );
 }
