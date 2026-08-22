@@ -576,6 +576,152 @@ app.get("/api/admin/stats", requireAuth, async (_req, res) => {
   });
 });
 
+/**
+ * Tableau de bord de l'administration — tout ce que l'écran affiche, en un appel.
+ *
+ * Les chiffres viennent tous de la base. Aucune valeur n'est estimée ni arrondie à la
+ * hausse : un tableau de bord dont on doit se méfier ne sert à rien.
+ *
+ * `?jours=` fixe la fenêtre d'analyse (7, 30 ou 90). Les tendances comparent cette fenêtre
+ * à celle qui la précède immédiatement, de même durée.
+ */
+app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
+  const jours = Math.min(365, Math.max(1, Number(req.query.jours) || 30));
+  const J = 86400000;
+  const now = Date.now();
+  const debut = new Date(now - jours * J);
+  const debutPrecedent = new Date(now - 2 * jours * J);
+
+  const [studentsQ, enrollmentsQ, coursesQ, subscribersQ, attestationsQ, messagesQ, commentsQ] = await Promise.all([
+    supabase.from("students").select("id, full_name, email, created_at, status, admitted_at, admission_expires, entry_score, email_verified, final_certificate_no, final_certified_at"),
+    supabase.from("enrollments").select("student_id, course_id, progress, status"),
+    supabase.from("sms_courses").select("id, code, title, is_published"),
+    supabase.from("subscribers").select("source, status, created_at"),
+    supabase.from("attestations").select("student_id, cert_type, status, issued_at").order("issued_at", { ascending: false }).limit(20),
+    supabase.from("contact_messages").select("name, subject, created_at").order("created_at", { ascending: false }).limit(10),
+    supabase.from("comments").select("author_name, created_at").order("created_at", { ascending: false }).limit(10),
+  ]);
+
+  const students = studentsQ.data || [];
+  const enrollments = enrollmentsQ.data || [];
+  const courses = coursesQ.data || [];
+  const subscribers = subscribersQ.data || [];
+
+  const dansFenetre = (d: any) => d && new Date(d).getTime() >= debut.getTime();
+  const dansFenetrePrecedente = (d: any) =>
+    d && new Date(d).getTime() >= debutPrecedent.getTime() && new Date(d).getTime() < debut.getTime();
+  // Une tendance ne veut rien dire sans base de comparaison : on renvoie null plutôt que
+  // « +100 % », qui donnerait l'illusion d'une croissance là où il n'y avait rien.
+  const tendance = (courant: number, precedent: number) =>
+    precedent === 0 ? null : Math.round(((courant - precedent) / precedent) * 1000) / 10;
+
+  const admisActif = (s: any) =>
+    !!s.admitted_at && (!s.admission_expires || new Date(s.admission_expires).getTime() > now);
+  const admissionExpiree = (s: any) =>
+    !!s.admitted_at && !!s.admission_expires && new Date(s.admission_expires).getTime() <= now;
+
+  const kpi = (filtre: (s: any) => boolean, champDate: string) => {
+    const total = students.filter(filtre).length;
+    const c = students.filter(s => filtre(s) && dansFenetre((s as any)[champDate])).length;
+    const p = students.filter(s => filtre(s) && dansFenetrePrecedente((s as any)[champDate])).length;
+    return { valeur: total, surPeriode: c, tendance: tendance(c, p) };
+  };
+
+  // ── Série des inscriptions, un point par jour, y compris les jours vides ──
+  const parJour: Record<string, number> = {};
+  for (let i = jours - 1; i >= 0; i--) parJour[new Date(now - i * J).toISOString().slice(0, 10)] = 0;
+  for (const s of students) {
+    const k = new Date(s.created_at).toISOString().slice(0, 10);
+    if (k in parJour) parJour[k]++;
+  }
+  const inscriptions = Object.entries(parJour).map(([date, n]) => ({ date, n }));
+
+  // ── Progression moyenne par étudiant, d'après ses inscriptions aux cours ──
+  const progParEtudiant: Record<number, number> = {};
+  const compteParEtudiant: Record<number, number> = {};
+  for (const e of enrollments) {
+    progParEtudiant[e.student_id] = (progParEtudiant[e.student_id] || 0) + (Number(e.progress) || 0);
+    compteParEtudiant[e.student_id] = (compteParEtudiant[e.student_id] || 0) + 1;
+  }
+  const progressionDe = (id: number) =>
+    compteParEtudiant[id] ? Math.round(progParEtudiant[id] / compteParEtudiant[id]) : null;
+
+  const etudiantsRecents = [...students]
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+    .slice(0, 8)
+    .map(s => ({
+      id: s.id,
+      nom: (s.full_name || "").trim() || s.email,
+      email: s.email,
+      statut: admisActif(s) ? "admis" : admissionExpiree(s) ? "expire" : "en_attente",
+      emailVerifie: s.email_verified !== false,
+      progression: progressionDe(s.id),
+      inscritLe: s.created_at,
+    }));
+
+  // ── Flux d'activité, toutes sources confondues, du plus récent au plus ancien ──
+  const activite: any[] = [];
+  for (const s of students) {
+    activite.push({ type: "inscription", titre: "Nouvelle inscription", detail: `${(s.full_name || s.email || "").trim()} s'est inscrit(e)`, quand: s.created_at });
+    if (s.admitted_at) activite.push({ type: "admission", titre: "Admission accordée", detail: `${(s.full_name || s.email || "").trim()} — ${s.entry_score ?? "?"}/30`, quand: s.admitted_at });
+    if (s.final_certified_at) activite.push({ type: "certificat", titre: "Certificat final délivré", detail: (s.full_name || s.email || "").trim(), quand: s.final_certified_at });
+  }
+  for (const m of messagesQ.data || []) activite.push({ type: "message", titre: "Message reçu", detail: `${m.name || "Anonyme"} — ${m.subject || "sans objet"}`, quand: m.created_at });
+  for (const c of commentsQ.data || []) activite.push({ type: "commentaire", titre: "Nouveau commentaire", detail: (c as any).author_name || "Anonyme", quand: (c as any).created_at });
+  activite.sort((a, b) => new Date(b.quand).getTime() - new Date(a.quand).getTime());
+
+  // ── Cours les plus suivis ──
+  const parCours: Record<number, number> = {};
+  for (const e of enrollments) parCours[e.course_id] = (parCours[e.course_id] || 0) + 1;
+  const topCours = courses
+    .map(co => ({ code: co.code, titre: co.title, etudiants: parCours[co.id] || 0, publie: co.is_published }))
+    .sort((a, b) => b.etudiants - a.etudiants)
+    .slice(0, 5);
+
+  // ── Origine des abonnés à la newsletter (subscribers.source) ──
+  const abonnesActifs = subscribers.filter(s => s.status === "active");
+  const parSource: Record<string, number> = {};
+  for (const s of abonnesActifs) parSource[s.source || "website"] = (parSource[s.source || "website"] || 0) + 1;
+  const totalSources = abonnesActifs.length || 1;
+  const sources = Object.entries(parSource)
+    .map(([source, n]) => ({ source, n, pct: Math.round((n / totalSources) * 1000) / 10 }))
+    .sort((a, b) => b.n - a.n);
+
+  const nouveauxSurPeriode = students.filter(s => dansFenetre(s.created_at)).length;
+  const admisSurPeriode = students.filter(s => dansFenetre(s.admitted_at)).length;
+  const coursTermines = enrollments.filter(e => e.status === "completed").length;
+
+  res.json({
+    periode: { jours, debut: debut.toISOString(), fin: new Date(now).toISOString() },
+    kpis: {
+      etudiants: kpi(() => true, "created_at"),
+      admis: kpi(admisActif, "admitted_at"),
+      enAttente: kpi((s: any) => !s.admitted_at, "created_at"),
+      certifies: kpi((s: any) => !!s.final_certificate_no, "final_certified_at"),
+    },
+    inscriptions,
+    repartition: {
+      admis: students.filter(admisActif).length,
+      enAttente: students.filter((s: any) => !s.admitted_at).length,
+      expires: students.filter(admissionExpiree).length,
+      total: students.length,
+    },
+    etudiantsRecents,
+    activite: activite.slice(0, 12),
+    topCours,
+    sources,
+    performances: {
+      nouvellesInscriptions: nouveauxSurPeriode,
+      // Part des inscrits de la période qui ont franchi le test d'admission.
+      tauxAdmission: nouveauxSurPeriode ? Math.round((admisSurPeriode / nouveauxSurPeriode) * 100) : 0,
+      etudiantsActifs: students.filter(admisActif).length,
+      coursTermines,
+      moyenneQuotidienne: Math.round((nouveauxSurPeriode / jours) * 10) / 10,
+      emailsNonVerifies: students.filter((s: any) => s.email_verified === false).length,
+    },
+  });
+});
+
 // ── Admin Testimonials CRUD ──
 app.get("/api/admin/testimonials", requireAuth, async (_req, res) => {
   const { data, error } = await supabase.from("testimonials").select("*").order("created_at", { ascending: false });
