@@ -1975,6 +1975,197 @@ async function notifyLessonPassed(
   });
 }
 
+/**
+ * Progression, reconnaissance et ressources de l'étudiant — en un appel.
+ *
+ * Rien n'est stocké pour cela : les points, le niveau et les réalisations sont RECALCULÉS
+ * à chaque appel depuis les faits déjà en base (notes, leçons validées, admission,
+ * attestations). Une table de compteurs aurait pu diverger de la réalité — un étudiant
+ * crédité de points pour une leçon qu'on lui a retirée, par exemple — alors qu'un calcul
+ * dérivé ne peut pas mentir.
+ */
+
+// Ce que rapporte chaque fait. Barème volontairement simple et lisible : un étudiant doit
+// pouvoir comprendre d'où viennent ses points sans consulter de documentation.
+const XP = {
+  admission: 50,
+  parLecon: 20,
+  parCoursTermine: 100,
+  parAttestation: 75,
+  certificatFinal: 300,
+};
+
+// Paliers cumulatifs. Le libellé compte autant que le nombre : « Apprenant engagé » dit
+// quelque chose, « Niveau 2 » ne dit rien.
+const NIVEAUX = [
+  { seuil: 0, titre: "Premiers pas" },
+  { seuil: 200, titre: "Apprenant engagé" },
+  { seuil: 500, titre: "Praticien" },
+  { seuil: 900, titre: "Praticien confirmé" },
+  { seuil: 1400, titre: "Expert MEAL" },
+];
+
+app.get("/api/academy/dashboard", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+
+  const { data: stud } = await supabase.from("students")
+    .select("full_name, email, email_verified, admitted_at, admission_expires, entry_score, final_certificate_no, final_certified_at")
+    .eq("id", sid).maybeSingle();
+  if (!stud) return res.status(404).json({ message: "Étudiant introuvable" });
+
+  const [gradesQ, enrollmentsQ, progressQ, attestationsQ, meetingsQ, coursesQ] = await Promise.all([
+    supabase.from("grades").select("lesson_id, course_id, score, max_score, type, graded_at").eq("student_id", sid),
+    supabase.from("enrollments").select("course_id, progress, status").eq("student_id", sid),
+    supabase.from("lesson_progress")
+      .select("lesson_id, course_id, week_index, unlock_at, due_at, status, sms_lessons(title, order_index), sms_courses(code)")
+      .eq("student_id", sid),
+    supabase.from("attestations").select("cert_type, status, issued_at").eq("student_id", sid),
+    supabase.from("academy_meetings").select("id, title, starts_at, duration_min, status").neq("status", "cancelled"),
+    supabase.from("sms_courses").select("id, code, title").eq("is_published", true).order("order_index"),
+  ]);
+
+  const grades = gradesQ.data || [];
+  const enrollments = enrollmentsQ.data || [];
+  const progress = progressQ.data || [];
+  const attestations = (attestationsQ.data || []).filter((a: any) => a.status === "issued");
+  const courses = coursesQ.data || [];
+
+  const notesLecon = grades.filter(g => g.type === "lesson");
+  const coursTermines = enrollments.filter(e => e.status === "completed").length;
+
+  // ── Réalisations : des prédicats sur des faits, jamais un compteur stocké ──
+  // Jours d'activité distincts, pour repérer une série de trois jours consécutifs.
+  const joursActifs = [...new Set(notesLecon
+    .map(g => g.graded_at && new Date(g.graded_at).toISOString().slice(0, 10))
+    .filter(Boolean) as string[])].sort();
+  let plusLongueSerie = joursActifs.length ? 1 : 0;
+  let serieCourante = plusLongueSerie;
+  for (let i = 1; i < joursActifs.length; i++) {
+    const veille = new Date(joursActifs[i - 1]).getTime() + 86400000;
+    serieCourante = new Date(joursActifs[i]).getTime() === veille ? serieCourante + 1 : 1;
+    plusLongueSerie = Math.max(plusLongueSerie, serieCourante);
+  }
+
+  const sansFaute = notesLecon.some(g => Number(g.max_score) > 0 && Number(g.score) === Number(g.max_score));
+  const miParcours = enrollments.some(e => Number(e.progress) >= 50);
+  const cursusMeal = courses.filter(c => c.code.startsWith(MEAL_PROGRAM_PREFIX));
+  const idsMeal = new Set(cursusMeal.map(c => c.id));
+  const mealTermines = enrollments.filter(e => e.status === "completed" && idsMeal.has(e.course_id)).length;
+
+  const definitions = [
+    { cle: "premier_pas", titre: "Premier pas", detail: "Valider sa première leçon", xp: 10, obtenue: notesLecon.length >= 1,
+      quand: notesLecon.length ? notesLecon.map(g => g.graded_at).sort()[0] : null },
+    { cle: "admis", titre: "Admis", detail: "Réussir le test d'admission", xp: 15, obtenue: !!stud.admitted_at, quand: stud.admitted_at },
+    { cle: "perseverant", titre: "Persévérant", detail: "Trois jours d'activité consécutifs", xp: 20, obtenue: plusLongueSerie >= 3, quand: null },
+    { cle: "sans_faute", titre: "Sans faute", detail: "Obtenir la note maximale à une leçon", xp: 25, obtenue: sansFaute, quand: null },
+    { cle: "mi_parcours", titre: "Mi-parcours", detail: "Atteindre la moitié d'un cours", xp: 30, obtenue: miParcours, quand: null },
+    { cle: "cursus_complet", titre: "Cursus complet", detail: `Terminer les ${cursusMeal.length} cours du cursus MEAL`, xp: 100,
+      obtenue: cursusMeal.length > 0 && mealTermines === cursusMeal.length, quand: stud.final_certified_at },
+  ];
+  const realisations = definitions.map(({ quand, ...r }) => ({ ...r, obtenueLe: r.obtenue ? quand : null }));
+
+  // ── Points et niveau ──
+  const detailXp = [
+    { source: "Admission réussie", points: stud.admitted_at ? XP.admission : 0 },
+    { source: `${notesLecon.length} leçon${notesLecon.length > 1 ? "s" : ""} validée${notesLecon.length > 1 ? "s" : ""}`, points: notesLecon.length * XP.parLecon },
+    { source: `${coursTermines} cours terminé${coursTermines > 1 ? "s" : ""}`, points: coursTermines * XP.parCoursTermine },
+    { source: `${attestations.length} attestation${attestations.length > 1 ? "s" : ""}`, points: attestations.length * XP.parAttestation },
+    { source: "Certificat final", points: stud.final_certificate_no ? XP.certificatFinal : 0 },
+    { source: "Réalisations", points: realisations.filter(r => r.obtenue).reduce((n, r) => n + r.xp, 0) },
+  ].filter(d => d.points > 0);
+  const totalXp = detailXp.reduce((n, d) => n + d.points, 0);
+
+  const indexNiveau = Math.max(0, NIVEAUX.filter(n => totalXp >= n.seuil).length - 1);
+  const niveauSuivant = NIVEAUX[indexNiveau + 1] ?? null;
+
+  // ── Ressources des leçons déjà ouvertes ──
+  // Une ressource d'une leçon encore verrouillée dévoilerait le contenu à venir ; on ne
+  // remonte donc que celles des leçons accessibles.
+  const lecons0uvertes = new Set(progress.filter(p => p.status !== "locked").map(p => p.lesson_id));
+  let ressources: any[] = [];
+  if (lecons0uvertes.size) {
+    const { data: contenus } = await supabase.from("sms_lessons")
+      .select("id, title, content, sms_courses(code)")
+      .in("id", [...lecons0uvertes]);
+    const vues = new Set<string>();
+    for (const l of contenus || []) {
+      let c: any = (l as any).content;
+      if (typeof c === "string") { try { c = JSON.parse(c); } catch { c = null; } }
+      for (const cell of c?.cells || []) {
+        if (cell?.type !== "resource" || !cell.url || vues.has(cell.url)) continue;
+        vues.add(cell.url);
+        ressources.push({
+          titre: cell.title || cell.url,
+          description: cell.desc || null,
+          url: cell.url,
+          fournisseur: cell.provider || null,
+          cours: (l as any).sms_courses?.code ?? null,
+          lecon: (l as any).title ?? null,
+        });
+      }
+    }
+  }
+
+  // ── Calendrier : échéances de leçons et rencontres à venir ──
+  const evenements = [
+    ...progress
+      .filter(p => p.status !== "completed" && p.due_at)
+      .map(p => ({
+        date: p.due_at,
+        type: "echeance",
+        titre: (p as any).sms_lessons?.title || "Leçon",
+        detail: `${(p as any).sms_courses?.code ?? ""} · à rendre`,
+        statut: p.status,
+        lessonId: p.lesson_id,
+        courseId: p.course_id,
+      })),
+    ...(meetingsQ.data || []).map((m: any) => ({
+      date: m.starts_at,
+      type: "rencontre",
+      titre: m.title,
+      detail: `${m.duration_min ?? 60} min en ligne`,
+      statut: m.status,
+      meetingId: m.id,
+    })),
+  ].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+  const notesToutes = grades.filter(g => Number(g.max_score) > 0);
+  const moyenne = notesToutes.length
+    ? Math.round(notesToutes.reduce((n, g) => n + (Number(g.score) / Number(g.max_score)) * 100, 0) / notesToutes.length)
+    : null;
+
+  res.json({
+    etudiant: {
+      nom: (stud.full_name || "").trim() || stud.email,
+      email: stud.email,
+      emailVerifie: stud.email_verified !== false,
+      admis: !!stud.admitted_at,
+      admissionExpire: stud.admission_expires,
+    },
+    indicateurs: {
+      moyenne,
+      coursTermines,
+      coursTotal: courses.length,
+      credentials: attestations.length + (stud.final_certificate_no ? 1 : 0),
+      leconsValidees: notesLecon.length,
+      evaluations: notesToutes.length,
+    },
+    xp: {
+      total: totalXp,
+      niveau: indexNiveau + 1,
+      titre: NIVEAUX[indexNiveau].titre,
+      seuilActuel: NIVEAUX[indexNiveau].seuil,
+      seuilSuivant: niveauSuivant?.seuil ?? null,
+      titreSuivant: niveauSuivant?.titre ?? null,
+      restantPourNiveauSuivant: niveauSuivant ? niveauSuivant.seuil - totalXp : null,
+      detail: detailXp,
+    },
+    realisations,
+    ressources: ressources.slice(0, 12),
+    calendrier: evenements,
+  });
+});
+
 // ── Planning hebdomadaire des leçons (modèle WQU) ──
 app.get("/api/academy/lesson-schedule", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
