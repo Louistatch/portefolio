@@ -105,3 +105,41 @@ Les captures d'écran des leçons vivent dans `client/public/academy/`, servies 
 et référencées par un chemin interne (`/academy/kobo/…`). Elles doivent être déployées
 avant d'exécuter un script qui les référence, sinon les leçons affichent des images
 cassées.
+
+
+## Relances de vérification d'adresse (tâche planifiée)
+
+`POST /api/cron/verify-reminders` relance les étudiants dont l'adresse n'est pas confirmée.
+Déclenché tous les jours à 9 h UTC par l'ordonnanceur Vercel (`crons` dans `vercel.json`).
+
+Trois relances : **J+1**, **J+3**, **J+7** après l'inscription, puis plus rien. Au-delà de
+**30 jours** le compte est considéré comme abandonné et sort de la sélection.
+
+Le rang de la relance se déduit de l'âge du compte, jamais d'un compteur : si la tâche saute
+un jour, l'étudiant reçoit la relance qui correspond à son ancienneté au lieu de la manquer.
+La clé de déduplication `verify_reminder:<étudiant>:<rang>` garantit qu'un même rang ne part
+qu'une fois, même si la tâche est rejouée.
+
+**Le jeton est régénéré à chaque envoi.** `verify_expires` vaut 24 heures : réutiliser le
+jeton de l'inscription enverrait un lien mort dès la relance du troisième jour. Si l'écriture
+du nouveau jeton échoue, l'email n'est pas envoyé — mieux vaut pas de message qu'un lien
+invalide.
+
+### Variable d'environnement à définir
+
+| Variable | Rôle |
+|---|---|
+| `CRON_SECRET` | Autorise un appel manuel : `Authorization: Bearer <secret>` |
+
+L'ordonnanceur Vercel est reconnu par son en-tête `x-vercel-cron` et n'a pas besoin du secret.
+**Sans secret défini, tout appel externe est refusé** (401) : un endpoint ouvert permettrait à
+n'importe qui de déclencher un envoi de masse et de brûler la réputation du domaine d'envoi.
+
+### Déclencher une exécution à la main
+
+```bash
+curl -X POST https://www.louisfarm.com/api/cron/verify-reminders \
+  -H "Authorization: Bearer $CRON_SECRET"
+```
+
+La réponse détaille le résultat : `{"candidats":5,"envoyees":3,"ignorees":2,"parEtape":{"J+1":1,"J+3":1,"J+7":1}}`.

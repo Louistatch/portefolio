@@ -1378,6 +1378,76 @@ app.post("/api/academy/verify-code", rateLimit(15, 10 * 60 * 1000), requireStude
 // (endpoint my-verify-code supprimé — faille de sécurité, le code ne doit jamais être exposé au client)
 
 
+/**
+ * Relances périodiques de vérification d'adresse.
+ *
+ * Appelé par une tâche planifiée quotidienne (voir vercel.json). Une relance déclenchée
+ * depuis le site ne servirait à rien : elle n'atteindrait que les étudiants qui reviennent,
+ * alors que ce sont précisément ceux qui ne reviennent pas qu'il faut rappeler.
+ *
+ * Trois relances : lendemain de l'inscription, puis à trois jours, puis à sept. Au-delà,
+ * insister devient du harcèlement — et au-delà de 30 jours le compte est considéré comme
+ * abandonné. Le rang de la relance se déduit de l'âge du compte, pas d'un compteur : si la
+ * tâche saute un jour, l'étudiant reçoit quand même la bonne relance au lieu de la manquer.
+ *
+ * Le jeton est régénéré à chaque envoi. Il expire en 24 heures : réutiliser celui de
+ * l'inscription enverrait un lien mort dès la relance du troisième jour.
+ */
+const VERIFY_REMINDER_DAYS = [1, 3, 7];
+const VERIFY_REMINDER_GIVE_UP_DAYS = 30;
+
+app.post("/api/cron/verify-reminders", async (req, res) => {
+  // Fail-closed : sans secret configuré, l'endpoint refuse toute requête qui ne vient pas
+  // de l'ordonnanceur Vercel. Ouvert, il permettrait à n'importe qui de déclencher un envoi
+  // de masse — et de griller la réputation du domaine d'expédition.
+  const secret = process.env.CRON_SECRET;
+  const fromVercelCron = req.headers["x-vercel-cron"] !== undefined;
+  const authorized = fromVercelCron || (!!secret && req.headers.authorization === `Bearer ${secret}`);
+  if (!authorized) return res.status(401).json({ message: "Non autorisé" });
+
+  const now = Date.now();
+  const horizon = new Date(now - VERIFY_REMINDER_GIVE_UP_DAYS * 86400000).toISOString();
+  const { data: students, error } = await supabase.from("students")
+    .select("id, full_name, email, created_at, course_emails")
+    .eq("email_verified", false)
+    .gte("created_at", horizon);
+  if (error) return res.status(500).json({ message: error.message });
+
+  let envoyees = 0, ignorees = 0;
+  const parEtape: Record<string, number> = {};
+  for (const s of students || []) {
+    if ((s as any).course_emails === false || !s.email) { ignorees++; continue; }
+    const ageJours = Math.floor((now - new Date(s.created_at).getTime()) / 86400000);
+    // Rang applicable : la relance la plus avancée que l'âge du compte justifie.
+    const etape = [...VERIFY_REMINDER_DAYS].reverse().find(d => ageJours >= d);
+    if (!etape) { ignorees++; continue; }
+
+    const verifyToken = crypto.randomBytes(32).toString("hex");
+    const verifyCode = String(crypto.randomInt(100000, 999999));
+    const verifyExpires = new Date(now + 24 * 60 * 60 * 1000).toISOString();
+    const { error: upErr } = await supabase.from("students")
+      .update({ verify_token: verifyToken, verify_code: verifyCode, verify_expires: verifyExpires })
+      .eq("id", s.id);
+    // Ne pas envoyer un lien qu'on n'a pas réussi à enregistrer : il serait invalide.
+    if (upErr) { console.error(`verify-reminders: écriture du jeton échouée pour ${s.id}`, upErr.message); ignorees++; continue; }
+
+    const r = await sendAcademyEmail({
+      studentId: s.id, to: s.email, type: "verify_reminder",
+      subject: etape === 1 ? "Il reste une étape — confirmez votre adresse"
+        : etape === 3 ? "Votre compte DataMEAL Academy attend toujours"
+        : "Dernier rappel — confirmez votre adresse",
+      html: verifyReminderEmailHtml(s.full_name, `${SITE_URL}/academy/verify?token=${verifyToken}`, verifyCode, etape),
+      // Une relance par rang et par étudiant : rejouer la tâche n'en renvoie pas une seconde.
+      dedupeKey: `verify_reminder:${s.id}:${etape}`,
+    });
+    if (r.sent) { envoyees++; parEtape[`J+${etape}`] = (parEtape[`J+${etape}`] || 0) + 1; }
+    else ignorees++;
+  }
+
+  console.log(`verify-reminders: ${envoyees} relance(s) envoyée(s), ${ignorees} ignorée(s) sur ${students?.length ?? 0} compte(s) non vérifié(s).`, parEtape);
+  res.json({ candidats: students?.length ?? 0, envoyees, ignorees, parEtape });
+});
+
 // ── Renvoyer l'email de validation ──
 app.post("/api/academy/resend-verify", rateLimit(5, 15 * 60 * 1000), requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
@@ -2222,6 +2292,22 @@ function newCourseEmailHtml(name: string | undefined, course: { code: string; ti
 // ── Email : projet terminé (100%) ──
 function courseCompletedEmailHtml(name: string, course: { code: string; title: string }) {
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Bravo, ${name.split(" ")[0]} ! 🏁</h1><p class="sub">Vous avez terminé un projet complet</p></div><div class="bd"><span class="badge">✅ Projet terminé</span><p>Félicitations ${name},</p><p>Vous venez de compléter <strong>100%</strong> du projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code} · Terminé</p></div><p>C'est une vraie compétence terrain, directement applicable dans les contextes humanitaires et de développement en Afrique de l'Ouest.</p><p><strong>Prochaine étape :</strong> demandez votre attestation de compétence, ou enchaînez sur le projet suivant pour progresser vers le statut de Super-Expert MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Demander mon attestation</a></p><p class="muted">Continuez sur cette lancée — chaque projet vous rapproche de la maîtrise complète du cycle MEAL.</p></div>`);
+}
+
+// ── Email : relance de vérification d'adresse ──
+// Le ton monte d'une relance à l'autre : le premier message suppose un oubli, le dernier
+// annonce que c'est le dernier. Un rappel identique répété trois fois se fait ignorer.
+function verifyReminderEmailHtml(name: string, url: string, code: string, step: number) {
+  const firstName = (name || "").split(" ")[0] || "";
+  const t = step === 1
+    ? { badge: "📬 Rappel", titre: "Il reste une étape", sous: "Confirmez votre adresse email",
+        corps: `<p>Vous avez créé votre compte hier, mais votre adresse n'est pas encore confirmée. C'est l'affaire d'un clic.</p>` }
+    : step === 3
+    ? { badge: "⏳ Toujours en attente", titre: "Votre compte attend encore", sous: "Confirmation d'adresse",
+        corps: `<p>Votre adresse email n'est toujours pas confirmée. Vous pouvez suivre les cours sans cela, mais <strong>nous ne pourrons vous délivrer ni attestation ni certificat</strong> tant que ce n'est pas fait.</p>` }
+    : { badge: "🔔 Dernier rappel", titre: "Dernier rappel", sous: "Confirmation d'adresse",
+        corps: `<p>C'est le dernier message que nous vous enverrons à ce sujet. Sans confirmation, votre compte reste utilisable pour apprendre, mais aucun document officiel ne pourra vous être délivré.</p>` };
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>${t.titre}</h1><p class="sub">${t.sous}</p></div><div class="bd"><span class="badge">${t.badge}</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p>${t.corps}<p style="text-align:center"><a href="${url}" class="btn">Confirmer mon adresse</a></p><div class="code"><p class="lbl">Ou saisissez ce code dans l'application :</p><p class="val">${code}</p></div><p class="muted"><strong>Vous ne trouvez pas nos messages ?</strong> Regardez dans vos spams ou courriers indésirables. Si vous y trouvez un email de notre part, marquez-le « Non spam » et ajoutez contact@louisfarm.com à vos contacts — les suivants arriveront normalement.</p><p class="muted">Ce lien et ce code sont valables 24 heures. Si vous n'êtes pas à l'origine de cette inscription, ignorez ce message.</p></div>`);
 }
 
 // ── Email : seconde chance au test d'admission ──
