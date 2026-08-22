@@ -577,6 +577,33 @@ app.get("/api/admin/stats", requireAuth, async (_req, res) => {
 });
 
 /**
+ * Compteurs des pastilles de navigation et de la cloche de notifications.
+ *
+ * Volontairement séparé du tableau de bord : ces chiffres sont affichés sur TOUTES les pages
+ * de l'administration, alors que le tableau de bord n'est chargé que sur la sienne. Les
+ * mêler obligerait chaque écran à rapatrier des séries temporelles dont il n'a que faire.
+ *
+ * Une pastille ne compte que ce qui appelle une action — un message non lu, un commentaire
+ * à modérer — jamais un total. Une pastille qui affiche « 42 » en permanence cesse d'être
+ * regardée.
+ */
+app.get("/api/admin/badges", requireAuth, async (_req, res) => {
+  const [messages, commentaires, rdv, etudiants] = await Promise.all([
+    supabase.from("contact_messages").select("id", { count: "exact", head: true }).eq("is_read", false),
+    supabase.from("comments").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "pending"),
+    supabase.from("students").select("id", { count: "exact", head: true }).eq("email_verified", false),
+  ]);
+  const b = {
+    messagesNonLus: messages.count || 0,
+    commentairesEnAttente: commentaires.count || 0,
+    rendezVousEnAttente: rdv.count || 0,
+    emailsNonVerifies: etudiants.count || 0,
+  };
+  res.json({ ...b, total: b.messagesNonLus + b.commentairesEnAttente + b.rendezVousEnAttente + b.emailsNonVerifies });
+});
+
+/**
  * Tableau de bord de l'administration — tout ce que l'écran affiche, en un appel.
  *
  * Les chiffres viennent tous de la base. Aucune valeur n'est estimée ni arrondie à la

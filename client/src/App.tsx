@@ -32,7 +32,8 @@ import AcademyLive from "@/pages/academy/live";
 
 // Admin
 import AdminLogin from "@/pages/admin/login";
-import Dashboard, { AdminLayout } from "@/pages/admin/dashboard";
+import Dashboard from "@/pages/admin/dashboard";
+import { AdminLayout } from "@/components/admin/admin-layout";
 import AdminPosts from "@/pages/admin/posts";
 import AdminPublications from "@/pages/admin/publications-admin";
 import AdminAppointments from "@/pages/admin/appointments-admin";
