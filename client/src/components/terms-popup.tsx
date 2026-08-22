@@ -199,7 +199,7 @@ export function TermsPopup() {
               {/* Footer */}
               <div className="border-t border-border/50 bg-muted/30 p-6 space-y-4">
                 <div className="flex items-center gap-3 p-4 bg-background rounded-xl border border-border/50 hover:border-primary/50 transition-colors cursor-pointer" onClick={() => setAccepted(!accepted)}>
-                  <Checkbox checked={accepted} onCheckedChange={setAccepted} className="w-5 h-5" />
+                  <Checkbox checked={accepted} onCheckedChange={(v) => setAccepted(v === true)} className="w-5 h-5" />
                   <label className="text-sm font-medium cursor-pointer flex-1">
                     J'accepte les conditions d'utilisation
                   </label>
