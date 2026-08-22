@@ -3307,15 +3307,34 @@ app.get("/api/admin/academy/meetings", requireAuth, async (_req, res) => {
   res.json(data || []);
 });
 
+/**
+ * Normalise les diapositives reçues du client.
+ *
+ * Le support est stocké tel quel en base et projeté à tous les participants : on n'accepte
+ * donc que des URL http(s), et on écarte tout le reste. Sans ce filtre, une URL `javascript:`
+ * ou `data:` glissée dans la charge utile s'exécuterait dans la salle de tous les étudiants.
+ */
+function normaliserDiapositives(entree: any): { url: string; titre: string }[] | null {
+  if (!Array.isArray(entree)) return null;
+  return entree
+    .map((d: any) => ({
+      url: typeof d?.url === "string" ? d.url.trim() : "",
+      titre: typeof d?.titre === "string" ? d.titre.trim().slice(0, 120) : "",
+    }))
+    .filter(d => /^https?:\/\//i.test(d.url))
+    .slice(0, 100);
+}
+
 // ── Admin : créer une session ──
 app.post("/api/admin/academy/meetings", requireAuth, async (req, res) => {
   const { title, description, kind, starts_at, duration_min, course_id } = req.body;
+  const slides = normaliserDiapositives(req.body.slides) ?? [];
   if (!title || !starts_at) return res.status(400).json({ message: "Titre et date requis." });
   // room_name unique et difficile à deviner
   const slug = String(title).toLowerCase().normalize("NFD").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 30);
   const room_name = `datameal-${slug}-${crypto.randomBytes(4).toString("hex")}`;
   const { data, error } = await supabase.from("academy_meetings")
-    .insert({ title, description, kind: kind || "meeting", starts_at, duration_min: duration_min || 60, course_id: course_id || null, room_name, status: "scheduled" })
+    .insert({ title, description, kind: kind || "meeting", starts_at, duration_min: duration_min || 60, course_id: course_id || null, room_name, status: "scheduled", slides, current_slide: 0 })
     .select().single();
   if (error) return res.status(400).json({ message: error.message });
 
@@ -3347,9 +3366,55 @@ app.put("/api/admin/academy/meetings/:id", requireAuth, async (req, res) => {
   if (starts_at) update.starts_at = starts_at;
   if (duration_min) update.duration_min = duration_min;
   if (kind) update.kind = kind;
+  if (req.body.slides !== undefined) {
+    const slides = normaliserDiapositives(req.body.slides);
+    if (!slides) return res.status(400).json({ message: "slides doit être un tableau." });
+    update.slides = slides;
+    // Remplacer le support sans borner l'index projetterait une diapositive qui n'existe plus.
+    update.current_slide = 0;
+  }
   const { data, error } = await supabase.from("academy_meetings").update(update).eq("id", Number(req.params.id)).select().single();
   if (error) return res.status(400).json({ message: error.message });
   res.json(data);
+});
+
+/**
+ * Diapositive projetée — le présentateur écrit, les participants lisent.
+ *
+ * L'écriture exige une session d'administration : dans la salle, le contrôle du support ne
+ * peut pas dépendre du rôle Jitsi, attribué au premier arrivé. Un étudiant qui rejoindrait
+ * avant l'animateur pourrait sinon piloter la présentation de tout le monde.
+ */
+app.post("/api/admin/academy/meetings/:id/slide", requireAuth, async (req, res) => {
+  const { data: m } = await supabase.from("academy_meetings")
+    .select("slides").eq("id", Number(req.params.id)).maybeSingle();
+  if (!m) return res.status(404).json({ message: "Session introuvable." });
+
+  const total = Array.isArray(m.slides) ? m.slides.length : 0;
+  if (!total) return res.status(400).json({ message: "Cette rencontre n'a pas de support." });
+
+  // On borne au lieu de refuser : en fin de support, « suivant » ne doit pas afficher d'erreur
+  // au présentateur en pleine séance, simplement ne rien faire.
+  const demande = Number(req.body?.index);
+  if (!Number.isFinite(demande)) return res.status(400).json({ message: "index requis." });
+  const index = Math.min(total - 1, Math.max(0, Math.trunc(demande)));
+
+  const { error } = await supabase.from("academy_meetings")
+    .update({ current_slide: index }).eq("id", Number(req.params.id));
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ index, total });
+});
+
+/**
+ * Consultation de l'état de projection, interrogée en boucle par les participants.
+ * Réponse volontairement minimale : elle est demandée toutes les quelques secondes par
+ * chaque personne présente, et renvoyer la session entière multiplierait la charge pour rien.
+ */
+app.get("/api/academy/meetings/:id/slide", requireStudent, async (req, res) => {
+  const { data: m } = await supabase.from("academy_meetings")
+    .select("current_slide, status").eq("id", Number(req.params.id)).maybeSingle();
+  if (!m) return res.status(404).json({ message: "Session introuvable." });
+  res.json({ index: m.current_slide ?? 0, status: m.status });
 });
 
 // ── Admin : supprimer une session ──
