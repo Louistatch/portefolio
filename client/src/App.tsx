@@ -34,6 +34,7 @@ import AcademyLive from "@/pages/academy/live";
 import AdminLogin from "@/pages/admin/login";
 import Dashboard from "@/pages/admin/dashboard";
 import { AdminLayout } from "@/components/admin/admin-layout";
+import { AcademyLayout } from "@/components/academy/academy-layout";
 import AdminPosts from "@/pages/admin/posts";
 import AdminPublications from "@/pages/admin/publications-admin";
 import AdminAppointments from "@/pages/admin/appointments-admin";
@@ -103,7 +104,7 @@ function App() {
             {/* DataMEAL Academy — espace étudiant (pas de Layout admin) */}
             <Route path="/academy/register">{() => <Layout><AcademyRegister /></Layout>}</Route>
             <Route path="/academy/login">{() => <Layout><AcademyLogin /></Layout>}</Route>
-            <Route path="/academy/dashboard">{() => <Layout><RequireStudentAuth><AcademyDashboard /></RequireStudentAuth></Layout>}</Route>
+            <Route path="/academy/dashboard">{() => <RequireStudentAuth><AcademyLayout><AcademyDashboard /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/classroom/:id">{() => <Layout><RequireStudentAuth><AcademyClassroom /></RequireStudentAuth></Layout>}</Route>
             {/* Publique : le lien de validation arrive par email et s'ouvre souvent sur un autre
                 appareil/navigateur, où la session étudiant n'existe pas. Derrière un garde, le
@@ -111,7 +112,7 @@ function App() {
             <Route path="/academy/verify">{() => <Layout><AcademyVerify /></Layout>}</Route>
             <Route path="/academy/forgot-password">{() => <Layout><AcademyForgotPassword /></Layout>}</Route>
             <Route path="/academy/reset-password">{() => <Layout><AcademyResetPassword /></Layout>}</Route>
-            <Route path="/academy/profile">{() => <Layout><RequireStudentAuth><AcademyProfile /></RequireStudentAuth></Layout>}</Route>
+            <Route path="/academy/profile">{() => <RequireStudentAuth><AcademyLayout><AcademyProfile /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/verify-certificate/:certNo">{() => <Layout><VerifyCertificate /></Layout>}</Route>
             <Route path="/academy/verify-certificate">{() => <Layout><VerifyCertificate /></Layout>}</Route>
             <Route path="/academy/live/:id">{() => <Layout><RequireStudentAuth><AcademyLive /></RequireStudentAuth></Layout>}</Route>

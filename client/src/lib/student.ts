@@ -1,6 +1,25 @@
 const STUDENT_TOKEN = "academy_token";
 const STUDENT_INFO = "academy_student";
 
+/**
+ * Accès protégés au stockage local.
+ *
+ * `localStorage` n'est pas toujours joignable : navigation privée stricte, navigateur
+ * configuré pour bloquer les données de site, certains WebView. L'accès ne renvoie alors pas
+ * `null`, il LÈVE une exception — qui, appelée au rendu d'un composant, fait écran blanc sur
+ * tout l'espace étudiant. Le repli silencieux vaut mieux qu'une page morte : au pire
+ * l'étudiant devra se reconnecter.
+ */
+function lire(cle: string): string | null {
+  try { return localStorage.getItem(cle); } catch { return null; }
+}
+function ecrire(cle: string, valeur: string) {
+  try { localStorage.setItem(cle, valeur); } catch { /* stockage indisponible */ }
+}
+function effacer(cle: string) {
+  try { localStorage.removeItem(cle); } catch { /* stockage indisponible */ }
+}
+
 export interface Student {
   id: number;
   full_name: string;
@@ -9,15 +28,15 @@ export interface Student {
 }
 
 export function getStudentToken(): string | null {
-  return localStorage.getItem(STUDENT_TOKEN);
+  return lire(STUDENT_TOKEN);
 }
 
 export function setStudentToken(token: string) {
-  localStorage.setItem(STUDENT_TOKEN, token);
+  ecrire(STUDENT_TOKEN, token);
 }
 
 export function getStudent(): Student | null {
-  const raw = localStorage.getItem(STUDENT_INFO);
+  const raw = lire(STUDENT_INFO);
   if (!raw) return null;
   try {
     return JSON.parse(raw);
@@ -28,12 +47,12 @@ export function getStudent(): Student | null {
 }
 
 export function setStudent(s: Student) {
-  localStorage.setItem(STUDENT_INFO, JSON.stringify(s));
+  ecrire(STUDENT_INFO, JSON.stringify(s));
 }
 
 export function clearStudentSession() {
-  localStorage.removeItem(STUDENT_TOKEN);
-  localStorage.removeItem(STUDENT_INFO);
+  effacer(STUDENT_TOKEN);
+  effacer(STUDENT_INFO);
 }
 
 export function isStudentLoggedIn(): boolean {
