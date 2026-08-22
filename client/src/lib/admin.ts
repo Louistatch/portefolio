@@ -1,15 +1,19 @@
 const TOKEN_KEY = "admin_token";
 
+// localStorage n'est pas toujours joignable — navigation privée stricte, données de site
+// bloquées, certains WebView. L'accès ne renvoie alors pas null, il LÈVE une exception, qui
+// appelée au rendu ferait écran blanc sur toute l'administration. Même durcissement que
+// côté étudiant.
 export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  try { return localStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
 
 export function setToken(token: string) {
-  localStorage.setItem(TOKEN_KEY, token);
+  try { localStorage.setItem(TOKEN_KEY, token); } catch { /* stockage indisponible */ }
 }
 
 export function clearToken() {
-  localStorage.removeItem(TOKEN_KEY);
+  try { localStorage.removeItem(TOKEN_KEY); } catch { /* stockage indisponible */ }
 }
 
 export async function adminFetch(url: string, options: RequestInit = {}) {

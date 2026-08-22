@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import {
   Video, Plus, Loader2, Calendar, Radio, Users, Trash2, X,
   Play, Square, Copy, ExternalLink, CheckCircle2, MessageCircle, AlertCircle,
+  Images, Upload, ArrowLeft, ArrowRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -72,11 +73,114 @@ function IllustrationVide() {
   );
 }
 
+
+type Diapo = { url: string; titre: string };
+
+/**
+ * Envoi du support de séance.
+ *
+ * Les fichiers sont envoyés un par un plutôt qu'en lot : le point d'entrée d'envoi accepte un
+ * fichier à la fois, et une erreur sur la troisième image ne doit pas faire perdre les deux
+ * premières. Chaque diapositive déjà envoyée reste acquise.
+ */
+function EnvoiDiapositives({ valeur, onChange }: { valeur: Diapo[]; onChange: (d: Diapo[]) => void }) {
+  const champ = useRef<HTMLInputElement>(null);
+  const [enCours, setEnCours] = useState(0);
+  const [total, setTotal] = useState(0);
+  const [erreur, setErreur] = useState("");
+
+  async function envoyer(e: React.ChangeEvent<HTMLInputElement>) {
+    const fichiers = Array.from(e.target.files || []);
+    if (!fichiers.length) return;
+    setErreur(""); setTotal(fichiers.length); setEnCours(0);
+
+    const ajoutees: Diapo[] = [];
+    for (let i = 0; i < fichiers.length; i++) {
+      setEnCours(i + 1);
+      const fd = new FormData();
+      fd.append("file", fichiers[i]);
+      try {
+        const r = await adminFetch("/api/admin/upload/image", { method: "POST", body: fd });
+        if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || "Envoi refusé");
+        const d = await r.json();
+        // Le nom du fichier fait un titre par défaut correct, sans son extension.
+        ajoutees.push({ url: d.url, titre: fichiers[i].name.replace(/\.[^.]+$/, "").slice(0, 120) });
+      } catch (err: any) {
+        setErreur(`« ${fichiers[i].name} » n'a pas pu être envoyée : ${err?.message || "erreur"}`);
+        break;
+      }
+    }
+    if (ajoutees.length) onChange([...valeur, ...ajoutees]);
+    setTotal(0); setEnCours(0);
+    if (champ.current) champ.current.value = "";
+  }
+
+  const deplacer = (i: number, delta: number) => {
+    const j = i + delta;
+    if (j < 0 || j >= valeur.length) return;
+    const copie = [...valeur];
+    [copie[i], copie[j]] = [copie[j], copie[i]];
+    onChange(copie);
+  };
+
+  return (
+    <div>
+      <label className="block text-sm font-medium mb-1.5">
+        Support de séance <span className="text-muted-foreground font-normal">— facultatif</span>
+      </label>
+      <input ref={champ} type="file" accept="image/*" multiple className="hidden" onChange={envoyer} />
+
+      {valeur.length > 0 && (
+        <div className="grid grid-cols-4 sm:grid-cols-5 gap-2 mb-2">
+          {valeur.map((d, i) => (
+            <div key={`${d.url}-${i}`} className="relative group rounded-lg overflow-hidden border border-border bg-muted aspect-[4/3]">
+              <img src={d.url} alt={d.titre} className="w-full h-full object-cover" />
+              <span className="absolute top-1 left-1 w-5 h-5 rounded bg-black/65 text-white text-[10px] font-bold grid place-items-center">
+                {i + 1}
+              </span>
+              <div className="absolute inset-x-0 bottom-0 flex opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity bg-black/65">
+                <button type="button" onClick={() => deplacer(i, -1)} disabled={i === 0}
+                  aria-label="Déplacer avant" className="flex-1 py-1 text-white disabled:opacity-30 hover:bg-white/15">
+                  <ArrowLeft className="w-3 h-3 mx-auto" />
+                </button>
+                <button type="button" onClick={() => onChange(valeur.filter((_, k) => k !== i))}
+                  aria-label="Retirer" className="flex-1 py-1 text-red-300 hover:bg-white/15">
+                  <Trash2 className="w-3 h-3 mx-auto" />
+                </button>
+                <button type="button" onClick={() => deplacer(i, 1)} disabled={i === valeur.length - 1}
+                  aria-label="Déplacer après" className="flex-1 py-1 text-white disabled:opacity-30 hover:bg-white/15">
+                  <ArrowRight className="w-3 h-3 mx-auto" />
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <button type="button" onClick={() => champ.current?.click()} disabled={total > 0}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-border/70 text-sm text-muted-foreground hover:border-primary/50 hover:text-foreground transition-colors disabled:opacity-60">
+        {total > 0
+          ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi {enCours}/{total}…</>
+          : <><Upload className="w-4 h-4" /> {valeur.length ? "Ajouter des diapositives" : "Envoyer des diapositives (images)"}</>}
+      </button>
+
+      {erreur && <p className="text-xs text-destructive mt-1.5 flex items-start gap-1.5">
+        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-px" />{erreur}
+      </p>}
+      <p className="text-[11px] text-muted-foreground mt-1.5">
+        {valeur.length > 0
+          ? `${valeur.length} diapositive${valeur.length > 1 ? "s" : ""} · projetées dans cet ordre pendant la séance.`
+          : "Exportez vos diapositives en images. Elles seront projetées dans la salle, et vous les ferez défiler pour tous."}
+      </p>
+    </div>
+  );
+}
+
 export default function AdminMeetings() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [showForm, setShowForm] = useState(false);
-  const vide = { title: "", description: "", kind: "meeting", starts_at: "", duration_min: 60 };
+  const vide = { title: "", description: "", kind: "meeting", starts_at: "", duration_min: 60, slides: [] as Diapo[] };
   const [form, setForm] = useState(vide);
 
   const { data: meetings, isLoading } = useQuery<any[]>({
@@ -152,7 +256,7 @@ export default function AdminMeetings() {
           <div className="text-center mt-6 mb-8">
             <p className="font-semibold text-lg">Aucune rencontre planifiée</p>
             <p className="text-sm text-muted-foreground mt-1">
-              Choisissez un format pour organiser votre première séance.
+              Choisissez un format. Vous pourrez y joindre vos diapositives dans la foulée.
             </p>
           </div>
           <div className="grid sm:grid-cols-3 gap-3 max-w-3xl mx-auto">
@@ -244,6 +348,8 @@ export default function AdminMeetings() {
                   className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm" placeholder="Au programme…" />
               </div>
 
+              <EnvoiDiapositives valeur={form.slides} onChange={(slides) => setForm({ ...form, slides })} />
+
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium mb-1.5">Date et heure *</label>
@@ -284,6 +390,7 @@ function CarteRencontre({ m, onStatus, onDelete, toast, past }: any) {
   const t = typeDe(m.kind);
   const joinUrl = `${window.location.origin}/academy/live/${m.id}`;
   const enDirect = m.status === "live";
+  const nbDiapos = Array.isArray(m.slides) ? m.slides.length : 0;
   return (
     <div className={`bg-card rounded-2xl border p-4 flex items-center gap-4 flex-wrap sm:flex-nowrap ${
       enDirect ? "border-primary/50 ring-1 ring-primary/20" : "border-border/50"} ${past ? "opacity-70" : ""}`}>
@@ -301,6 +408,7 @@ function CarteRencontre({ m, onStatus, onDelete, toast, past }: any) {
           <span>·</span>{m.duration_min} min
           <span>·</span><span>{t.court}</span>
           {m.sms_courses?.code && <><span>·</span><span className="font-mono">{m.sms_courses.code}</span></>}
+          {nbDiapos > 0 && <><span>·</span><span className="inline-flex items-center gap-1"><Images className="w-3 h-3" />{nbDiapos} diapo{nbDiapos > 1 ? "s" : ""}</span></>}
         </p>
       </div>
       <div className="flex items-center gap-1.5 shrink-0 ml-auto">
