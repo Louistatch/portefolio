@@ -1,7 +1,8 @@
+# Attention : ne pas exclure `script` — buildCommand exécute script/pages-partage.mjs,
+# qui génère la page d'aperçu de partage. L'exclure fait échouer le build sur Vercel.
 .local
 .git
 .replit
 supabase
-script
 attached_assets
 *.pdf
