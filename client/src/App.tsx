@@ -128,7 +128,7 @@ function App() {
             <Route path="/booking">{() => <Layout><Booking /></Layout>}</Route>
             <Route path="/contact">{() => <Layout><Contact /></Layout>}</Route>
             <Route path="/stats">{() => <Layout><Stats /></Layout>}</Route>
-            <Route path="/elearning">{() => <Layout><ELearning /></Layout>}</Route>
+            <Route path="/elearning">{() => <Layout sansEntete><ELearning /></Layout>}</Route>
 
             <Route>{() => <Layout><NotFound /></Layout>}</Route>
           </Switch>

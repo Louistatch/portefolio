@@ -5,7 +5,7 @@ import {
   GraduationCap, ChevronRight, ChevronLeft, CheckCircle2,
   Lock, BookOpen, ArrowRight, ClipboardCheck,
   Download, X, Clock, Menu, Target, Users, Award, Sprout,
-  MapPin, Rocket, CalendarDays, Info } from "lucide-react";
+  MapPin, Rocket, CalendarDays, Info, LayoutDashboard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialShare } from "@/components/social-share";
 import { isStudentLoggedIn, getStudent, studentFetch, downloadStudentFile } from "@/lib/student";
@@ -191,15 +191,15 @@ export default function ELearning() {
 
   function renderNav() {
     return (
-      <div className={`sticky top-[60px] z-30 -mt-6 mb-0 transition-shadow ${compact ? "shadow-sm" : ""}`}>
-        <div className="bg-background/85 backdrop-blur-md border-y border-border/50">
+      <div className={`sticky top-0 z-40 transition-shadow ${compact ? "shadow-sm" : ""}`}>
+        <div className="bg-background/85 backdrop-blur-md border-b border-border/50">
           <div className="max-w-6xl mx-auto px-5 sm:px-6 h-14 flex items-center justify-between gap-4">
             <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
               className="flex items-center gap-2 shrink-0 text-left">
               <span className="w-8 h-8 rounded-xl bg-primary text-primary-foreground grid place-items-center shrink-0">
                 <Sprout className="w-[18px] h-[18px]" />
               </span>
-              <span className="font-bold text-sm leading-tight hidden sm:flex items-center gap-1.5">
+              <span className="font-bold text-sm leading-tight flex items-center gap-1.5">
                 LouisFarm
                 <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
                   LEARNING
@@ -217,7 +217,12 @@ export default function ELearning() {
             </nav>
 
             <div className="flex items-center gap-2 shrink-0">
-              {!isStudentLoggedIn() && (
+              {isStudentLoggedIn() ? (
+                <Button size="sm" variant="outline" className="hidden sm:inline-flex gap-1.5"
+                  onClick={() => navigate("/academy/dashboard")}>
+                  <LayoutDashboard className="w-3.5 h-3.5" /> Mon espace
+                </Button>
+              ) : (
                 <Button size="sm" variant="outline" className="hidden sm:inline-flex"
                   onClick={() => navigate("/academy/login")}>
                   Se connecter
@@ -243,12 +248,11 @@ export default function ELearning() {
                   {a.label}
                 </button>
               ))}
-              {!isStudentLoggedIn() && (
-                <button onClick={() => { setMenuOuvert(false); navigate("/academy/login"); }}
-                  className="w-full text-left px-2 py-2.5 rounded-xl text-sm font-medium text-primary hover:bg-muted transition-colors">
-                  Se connecter
-                </button>
-              )}
+              <button
+                onClick={() => { setMenuOuvert(false); navigate(isStudentLoggedIn() ? "/academy/dashboard" : "/academy/login"); }}
+                className="w-full text-left px-2 py-2.5 rounded-xl text-sm font-medium text-primary hover:bg-muted transition-colors">
+                {isStudentLoggedIn() ? "Mon espace" : "Se connecter"}
+              </button>
             </div>
           )}
         </div>

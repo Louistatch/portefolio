@@ -20,7 +20,15 @@ const NAV_ITEMS = [
   { href: "/contact", label: "Contact", icon: Mail },
 ];
 
-export function Layout({ children }: { children: ReactNode }) {
+/**
+ * Coque du site.
+ *
+ * `sansEntete` retire l'en-tête du portfolio pour les pages qui portent déjà le leur. La page
+ * de la formation est dans ce cas : elle a sa propre marque, sa propre navigation et ses
+ * propres actions. Les empiler donnait deux marques et deux menus hamburger l'un sur l'autre.
+ * Le pied de page, lui, reste — c'est le même site.
+ */
+export function Layout({ children, sansEntete = false }: { children: ReactNode; sansEntete?: boolean }) {
   const [location, navigate] = useLocation();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -57,7 +65,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass-nav py-3" : "bg-transparent py-5"}`}>
+      {!sansEntete && (<><header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass-nav py-3" : "bg-transparent py-5"}`}>
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold tracking-tighter text-foreground hover:text-primary transition-colors flex items-center gap-2">
             {profile?.photo_url ? (
@@ -171,9 +179,9 @@ export function Layout({ children }: { children: ReactNode }) {
             </Link>
           )}
         </div>
-      )}
+      )}</>)}
 
-      <main className="flex-1 pt-24 pb-12 w-full page-enter">
+      <main className={`flex-1 pb-12 w-full page-enter ${sansEntete ? "" : "pt-24"}`}>
         {children}
       </main>
       <TermsPopup />
