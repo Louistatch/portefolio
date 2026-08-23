@@ -1775,6 +1775,131 @@ app.get("/api/academy/courses", async (_req, res) => {
   res.json(data);
 });
 
+/**
+ * Données de la page de présentation — publique, aucun jeton requis.
+ *
+ * Les trois cours du cursus MEAL sont présentés sous l'identité de l'outil qu'ils
+ * enseignent, parce que c'est ainsi que les gens les cherchent : on s'inscrit pour
+ * « apprendre KoboCollect », pas pour « MEAL-01 ». Le code du cours reste affiché, il fait
+ * le lien avec ce que l'étudiant retrouvera une fois admis.
+ *
+ * Les chiffres annoncés sont comptés en base. Une page de présentation qui gonfle ses
+ * chiffres se fait démentir dès la première leçon.
+ */
+const OUTILS: Record<string, { outil: string; objectif: string; competences: string[]; accent: string }> = {
+  "MEAL-01": {
+    outil: "KoboCollect",
+    objectif: "Collecte de données sur le terrain",
+    competences: ["Création de formulaires XLSForm", "Collecte hors ligne sur mobile", "Synchronisation et gestion des données"],
+    accent: "#0d9488",
+  },
+  "MEAL-02": {
+    outil: "QGIS",
+    objectif: "Cartographie et analyse spatiale",
+    competences: ["Création de cartes thématiques", "Analyse spatiale et zones tampons", "Production d'indicateurs visuels"],
+    accent: "#2563eb",
+  },
+  "MEAL-03": {
+    outil: "Python",
+    objectif: "Analyse et automatisation du reporting",
+    competences: ["Nettoyage et analyse de données", "Extraction par API", "Rapports générés automatiquement"],
+    accent: "#7c3aed",
+  },
+};
+
+// Fenêtres d'inscription, à titre indicatif : l'admission reste continue. Le calendrier
+// donne un repère de rythme, il ne conditionne pas l'accès — un visiteur qui arrive un
+// 15 août ne doit pas croire qu'il lui faut attendre six semaines.
+const MOIS_INSCRIPTION = [0, 2, 4, 6, 8, 10]; // janvier, mars, mai, juillet, septembre, novembre
+
+app.get("/api/academy/landing", async (_req, res) => {
+  const [coursQ, etudiantsQ, leconsQ] = await Promise.all([
+    supabase.from("sms_courses").select("id, code, title, description, level, order_index").eq("is_published", true).order("order_index"),
+    supabase.from("students").select("id, admitted_at"),
+    supabase.from("sms_lessons").select("id, course_id, content"),
+  ]);
+
+  const cours = coursQ.data || [];
+  const lecons = leconsQ.data || [];
+  const etudiants = etudiantsQ.data || [];
+
+  const compterExercices = (courseId: number) => {
+    let n = 0;
+    for (const l of lecons) {
+      if (l.course_id !== courseId) continue;
+      let c: any = (l as any).content;
+      if (typeof c === "string") { try { c = JSON.parse(c); } catch { c = null; } }
+      n += (c?.cells || []).filter((x: any) => x?.type === "exercise").length;
+    }
+    return n;
+  };
+
+  const modules = cours
+    .filter(c => OUTILS[c.code])
+    .map(c => ({
+      code: c.code,
+      outil: OUTILS[c.code].outil,
+      objectif: OUTILS[c.code].objectif,
+      competences: OUTILS[c.code].competences,
+      accent: OUTILS[c.code].accent,
+      titreProjet: c.title,
+      description: c.description,
+      niveau: c.level,
+      lecons: lecons.filter(l => l.course_id === c.id).length,
+      exercices: compterExercices(c.id),
+    }));
+
+  // ── Calendrier indicatif ──
+  const maintenant = new Date();
+  const annee = maintenant.getFullYear();
+  const nomMois = (m: number, a: number) =>
+    new Date(a, m, 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+
+  // On déroule sur deux ans pour que « la prochaine » existe toujours, même en décembre.
+  const sessions: any[] = [];
+  for (const a of [annee, annee + 1]) {
+    for (const m of MOIS_INSCRIPTION) {
+      const debut = new Date(a, m, 1);
+      const fin = new Date(a, m + 1, 0, 23, 59, 59);
+      const demarrage = new Date(a, m + 1, 1);
+      sessions.push({
+        id: `${a}-${String(m + 1).padStart(2, "0")}`,
+        moisInscription: nomMois(m, a),
+        moisDemarrage: nomMois(m + 1, a),
+        debutInscription: debut.toISOString(),
+        finInscription: fin.toISOString(),
+        demarrage: demarrage.toISOString(),
+        statut: maintenant > fin ? "terminee" : maintenant >= debut ? "ouverte" : "a_venir",
+      });
+    }
+  }
+  const courante = sessions.find(s => s.statut === "ouverte") ?? null;
+  const prochaine = sessions.find(s => s.statut === "a_venir") ?? null;
+
+  res.json({
+    modules,
+    // L'admission ne dépend pas du calendrier : on l'affirme dans la charge utile pour que
+    // l'interface ne puisse pas laisser croire le contraire.
+    admissionContinue: true,
+    seuilAdmission: ADMISSION_PASS_SCORE,
+    questionsTest: 30,
+    moisAcces: ADMISSION_MONTHS,
+    seuilExercices: EXERCISE_PASS_PCT,
+    chiffres: {
+      etudiants: etudiants.length,
+      admis: etudiants.filter(e => e.admitted_at).length,
+      cours: cours.length,
+      lecons: lecons.length,
+      exercices: cours.reduce((n, c) => n + compterExercices(c.id), 0),
+    },
+    calendrier: {
+      sessions: sessions.filter(s => s.statut !== "terminee").slice(0, 6),
+      courante,
+      prochaine,
+    },
+  });
+});
+
 // ── Détail d'un cours + leçons ──
 app.get("/api/academy/courses/:id", async (req, res) => {
   const { data: course, error } = await supabase.from("sms_courses").select("*").eq("id", Number(req.params.id)).eq("is_published", true).single();
