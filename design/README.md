@@ -55,29 +55,32 @@ Image Open Graph (1200 × 630) affichée quand le lien de la formation est coll�
 WhatsApp, Facebook, LinkedIn ou Telegram. Publiée en PNG dans
 `client/public/academy/partage-elearning.png`.
 
-### Pourquoi une route serveur est nécessaire
+### Pourquoi une page dédiée est nécessaire
 
 Le site est une application React : les balises posées par le composant `<SEO>` sont
 injectées **après** le chargement, par JavaScript. Or aucun robot de prévisualisation
-n'exécute JavaScript — ils lisaient donc l'`index.html` brut, dont les balises décrivent le
+n'exécute JavaScript — ils lisaient donc l'`index.html` livré, dont les balises décrivent le
 portfolio. Partager `/elearning` affichait le portrait de Louis et « Agronome & Expert
 Finance Agricole », pas la formation.
 
-Le montage tient en deux pièces :
+`script/pages-partage.mjs`, lancé après `vite build`, recopie l'`index.html` construit en y
+remplaçant les balises et écrit `dist/public/elearning.html` ; une réécriture dans
+`vercel.json` sert ce fichier sur `/elearning`. L'application démarre exactement pareil — le
+routeur lit `window.location`, que la réécriture ne change pas — et les mêmes fichiers JS et
+CSS sont référencés.
 
-1. `app.get("/elearning", …)` dans `api/index.ts` renvoie une page minimale ne contenant que
-   les balises Open Graph.
-2. Une réécriture dans `vercel.json`, conditionnée à l'`user-agent`, n'y envoie **que** les
-   robots. Les visiteurs continuent de recevoir l'application, et l'adresse partagée reste la
-   vraie : <https://www.louisfarm.com/elearning>.
+Trois décisions à ne pas défaire :
 
-Deux détails qui ont chacun leur raison d'être :
-
-- **Les URL des balises pointent sur `www.`**, jamais sur l'apex. `louisfarm.com` répond 307
-  vers `www.` en ajoutant un jeton `_vercel_share` ; le robot de WhatsApp abandonne alors la
-  vignette. D'où la constante `CANONICAL_URL` dans `api/index.ts`.
-- **Googlebot est volontairement exclu** du filtre. Il exécute JavaScript et doit indexer la
-  vraie page ; lui servir une page-croupion nuirait au référencement.
+- **Pas de détection d'user-agent.** Une première version n'envoyait les robots vers une page
+  d'aperçu que si leur `user-agent` correspondait. Ce montage n'est vérifiable ni depuis un
+  poste de développement, ni par la personne qui partage le lien : il échoue en silence.
+  Ici, il suffit d'afficher la source de la page pour lire les balises.
+- **Les URL visent `www.`**, jamais l'apex. `louisfarm.com` répond 307 vers `www.` en
+  ajoutant un jeton `_vercel_share` ; le robot de WhatsApp renonce alors à la vignette
+  plutôt que de suivre le rebond.
+- **Chaque remplacement est vérifié.** Un `String.replace` dont le motif ne correspond plus
+  ne lève rien, il rend la chaîne inchangée : le build passerait au vert et la page partirait
+  avec les balises du portfolio. Le script échoue bruyamment à la place.
 
 Le PNG doit rester **sous ~300 Ko**, seuil au-delà duquel WhatsApp renonce à la grande
 vignette (il fait aujourd'hui 64 Ko).

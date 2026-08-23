@@ -5,19 +5,12 @@
   "framework": null,
   "rewrites": [
     {
-      "source": "/sitemap.xml",
-      "destination": "/api/sitemap.xml"
+      "source": "/elearning",
+      "destination": "/elearning.html"
     },
     {
-      "source": "/elearning",
-      "has": [
-        {
-          "type": "header",
-          "key": "user-agent",
-          "value": ".*([Ww]hats[Aa]pp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|TelegramBot|Slackbot|Discordbot|redditbot|Pinterestbot|SkypeUriPreview|vkShare|Embedly|Iframely).*"
-        }
-      ],
-      "destination": "/api"
+      "source": "/sitemap.xml",
+      "destination": "/api/sitemap.xml"
     },
     {
       "source": "/api/(.*)",
