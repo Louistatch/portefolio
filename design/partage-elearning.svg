@@ -1,0 +1,84 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630"
+     font-family="DejaVu Sans">
+  <!--
+    Vignette de partage de la formation (Open Graph, 1200 × 630).
+
+    Elle est lue en tout petit dans une conversation WhatsApp : c'est ce qui commande la
+    composition. Peu de mots, très gros, et trois pastilles d'outils dont la couleur suffit à
+    reconnaître le contenu même quand le texte devient illisible. Les couleurs des pastilles
+    sont celles des cartes de module de la page, pour qu'on retrouve la même chose en arrivant.
+  -->
+  <defs>
+    <linearGradient id="fond" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#08281c"/>
+      <stop offset="1" stop-color="#124a34"/>
+    </linearGradient>
+    <radialGradient id="halo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#5ce6a2" stop-opacity="0.30"/>
+      <stop offset="1" stop-color="#5ce6a2" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="url(#fond)"/>
+  <circle cx="1010" cy="300" r="330" fill="url(#halo)"/>
+
+  <!-- ── Marque ── -->
+  <g transform="translate(70,64)">
+    <rect width="46" height="46" rx="14" fill="#5ce6a2"/>
+    <path d="M12 32 C12 18, 22 11, 34 12 C34 24, 25 33, 12 32 Z" fill="#08281c"/>
+    <path d="M12 34 C18 27, 25 22, 32 19" stroke="#08281c" stroke-width="2.4"
+          stroke-linecap="round" fill="none"/>
+    <text x="60" y="24" font-size="27" font-weight="bold" fill="#ffffff">LouisFarm</text>
+    <!-- La pastille démarre à x=244 : « LouisFarm » en DejaVu Sans Bold 27 court jusqu'à
+         x≈228, et la version précédente la posait à 205, donc par-dessus le mot. -->
+    <rect x="244" y="5" width="120" height="28" rx="8" fill="#ffffff" fill-opacity="0.16"/>
+    <text x="257" y="25" font-size="15" font-weight="bold" fill="#5ce6a2"
+          letter-spacing="1.5">LEARNING</text>
+  </g>
+
+  <!-- ── Accroche ── -->
+  <text x="70" y="228" font-size="66" font-weight="bold" fill="#ffffff">Formation MEAL</text>
+  <text x="70" y="306" font-size="66" font-weight="bold" fill="#5ce6a2">100 % gratuite</text>
+
+  <text x="70" y="360" font-size="26" fill="#ffffff" fill-opacity="0.72">Collecter, analyser et cartographier</text>
+  <text x="70" y="396" font-size="26" fill="#ffffff" fill-opacity="0.72">des données de terrain.</text>
+
+  <!-- ── Les trois outils ── -->
+  <g transform="translate(70,440)">
+    <g>
+      <rect width="212" height="64" rx="18" fill="#0d9488"/>
+      <rect x="18" y="16" width="24" height="32" rx="5" fill="#ffffff" fill-opacity="0.9"/>
+      <rect x="23" y="21" width="14" height="18" rx="2" fill="#0d9488"/>
+      <text x="56" y="40" font-size="21" font-weight="bold" fill="#ffffff">KoboCollect</text>
+    </g>
+    <g transform="translate(228,0)">
+      <rect width="132" height="64" rx="18" fill="#2563eb"/>
+      <path d="M20 20 L32 16 L42 22 L48 18 L46 46 L34 50 L24 46 L18 48 Z"
+            fill="#ffffff" fill-opacity="0.9"/>
+      <text x="62" y="40" font-size="21" font-weight="bold" fill="#ffffff">QGIS</text>
+    </g>
+    <g transform="translate(376,0)">
+      <rect width="158" height="64" rx="18" fill="#7c3aed"/>
+      <rect x="18" y="20" width="8" height="24" rx="2" fill="#ffffff" fill-opacity="0.9"/>
+      <rect x="30" y="14" width="8" height="30" rx="2" fill="#ffffff" fill-opacity="0.9"/>
+      <rect x="42" y="26" width="8" height="18" rx="2" fill="#ffffff" fill-opacity="0.9"/>
+      <text x="62" y="40" font-size="21" font-weight="bold" fill="#ffffff">Python</text>
+    </g>
+  </g>
+
+  <!-- ── Pied : adresse et condition d'entrée ── -->
+  <text x="70" y="566" font-size="25" font-weight="bold" fill="#ffffff">louisfarm.com/elearning</text>
+  <text x="70" y="600" font-size="19" fill="#ffffff" fill-opacity="0.55">Admission sur test · Inscription ouverte en permanence</text>
+
+  <!-- ── Objet de droite : la toque, lisible même en vignette ── -->
+  <g transform="translate(880,196)">
+    <circle cx="130" cy="130" r="130" fill="#ffffff" fill-opacity="0.07"/>
+    <g transform="translate(28,44)">
+      <path d="M102 0 L204 44 L102 88 L0 44 Z" fill="#5ce6a2"/>
+      <path d="M102 88 L0 44 L0 62 L102 106 L204 62 L204 44 Z" fill="#3fcf8a"/>
+      <path d="M44 74 L44 128 C44 146, 160 146, 160 128 L160 74 L102 100 Z" fill="#ffffff"/>
+      <path d="M196 52 L196 120" stroke="#5ce6a2" stroke-width="6" stroke-linecap="round"/>
+      <circle cx="196" cy="128" r="11" fill="#5ce6a2"/>
+    </g>
+  </g>
+</svg>

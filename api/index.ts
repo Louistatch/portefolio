@@ -240,8 +240,13 @@ app.get("/api/rss", async (_req, res) => {
 });
 
 // ── Sitemap ──
-app.get("/api/sitemap.xml", async (_req, res) => {
-  const staticPages = ["/", "/about", "/research", "/publications", "/blog", "/faq", "/booking", "/contact", "/stats"];
+// Deux chemins, et ce n'est pas de la coquetterie : une réécriture Vercel vers une fonction
+// conserve le chemin demandé par le client et ne s'en sert que pour choisir la fonction. La
+// règle `/sitemap.xml` → `/api/sitemap.xml` fait donc arriver ici une requête dont l'URL est
+// « /sitemap.xml », que la seule route « /api/sitemap.xml » ne captait pas : l'adresse
+// publique répondait 404 « Cannot GET /sitemap.xml ».
+app.get(["/sitemap.xml", "/api/sitemap.xml"], async (_req, res) => {
+  const staticPages = ["/", "/about", "/research", "/publications", "/blog", "/faq", "/booking", "/contact", "/stats", "/elearning"];
   const { data: posts } = await supabase.from("posts").select("slug, published_at").order("published_at", { ascending: false });
   const urls = staticPages.map(p => `<url><loc>${SITE_URL}${p}</loc><changefreq>${p === "/" ? "weekly" : "monthly"}</changefreq><priority>${p === "/" ? "1.0" : "0.8"}</priority></url>`);
   (posts || []).forEach(p => urls.push(`<url><loc>${SITE_URL}/blog/${p.slug}</loc><lastmod>${p.published_at ? new Date(p.published_at).toISOString().split("T")[0] : ""}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`));
@@ -850,6 +855,65 @@ app.get("/api/og-image", async (req, res) => {
 
 // ── OG Meta for Publications (social sharing) ──
 function escHtml(s: string) { return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, " "); }
+
+/**
+ * Hôte canonique, avec le `www.`.
+ *
+ * L'apex `louisfarm.com` répond 307 vers `www.`, en ajoutant au passage un jeton
+ * `_vercel_share` dans l'URL. Les robots de prévisualisation ne suivent pas tous les
+ * redirections, et celui de WhatsApp abandonne volontiers la vignette plutôt que de la
+ * chercher ailleurs. Les adresses annoncées dans les balises Open Graph doivent donc viser
+ * directement l'hôte final, sans rebond.
+ */
+const CANONICAL_URL = SITE_URL.replace(/:\/\/louisfarm\.com/, "://www.louisfarm.com");
+
+/**
+ * Aperçu de la formation lors d'un partage (WhatsApp, Facebook, LinkedIn, Telegram…).
+ *
+ * Cette page existe parce que le site est une application React : les balises posées par le
+ * composant <SEO> sont injectées par JavaScript après le chargement, et aucun robot de
+ * prévisualisation n'exécute JavaScript. Ils lisaient donc l'index.html brut, dont les
+ * balises décrivent le portfolio — partager la formation affichait le portrait de Louis et
+ * « Agronome & Expert Finance Agricole ».
+ *
+ * Seuls les robots arrivent ici, par une réécriture Vercel conditionnée à l'user-agent
+ * (voir vercel.json) ; les visiteurs continuent de recevoir l'application. L'adresse
+ * partagée reste donc la vraie : https://www.louisfarm.com/elearning
+ */
+app.get("/elearning", (_req, res) => {
+  const titre = "Formation MEAL gratuite — KoboCollect, QGIS, Python";
+  const desc = "Apprenez à collecter, analyser et cartographier des données de terrain. "
+    + "Trois modules par projets, attestation incluse. Inscription ouverte en permanence, admission sur test.";
+  const image = `${CANONICAL_URL}/academy/partage-elearning.png`;
+  const url = `${CANONICAL_URL}/elearning`;
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.setHeader("Cache-Control", "public, max-age=3600");
+  res.send(`<!DOCTYPE html><html lang="fr"><head>
+<meta charset="utf-8">
+<title>${escHtml(titre)} | LouisFarm Learning</title>
+<meta name="description" content="${escHtml(desc)}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="${escHtml(titre)}">
+<meta property="og:description" content="${escHtml(desc)}">
+<meta property="og:image" content="${image}">
+<meta property="og:image:type" content="image/png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Formation MEAL 100 % gratuite — KoboCollect, QGIS, Python">
+<meta property="og:url" content="${url}">
+<meta property="og:locale" content="fr_FR">
+<meta property="og:site_name" content="LouisFarm Learning">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="${escHtml(titre)}">
+<meta name="twitter:description" content="${escHtml(desc)}">
+<meta name="twitter:image" content="${image}">
+<link rel="canonical" href="${url}">
+</head><body>
+<h1>${escHtml(titre)}</h1>
+<p>${escHtml(desc)}</p>
+<p><a href="${url}">Accéder à la formation</a></p>
+</body></html>`);
+});
 
 app.get("/api/og/publication/:id", async (req, res) => {
   const { data: pub } = await supabase.from("publications").select("*").eq("id", Number(req.params.id)).single();

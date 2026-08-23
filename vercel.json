@@ -9,6 +9,17 @@
       "destination": "/api/sitemap.xml"
     },
     {
+      "source": "/elearning",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*([Ww]hats[Aa]pp|facebookexternalhit|Facebot|Twitterbot|LinkedInBot|TelegramBot|Slackbot|Discordbot|redditbot|Pinterestbot|SkypeUriPreview|vkShare|Embedly|Iframely).*"
+        }
+      ],
+      "destination": "/api"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api"
     },
