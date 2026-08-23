@@ -1885,12 +1885,16 @@ app.get("/api/academy/landing", async (_req, res) => {
     questionsTest: 30,
     moisAcces: ADMISSION_MONTHS,
     seuilExercices: EXERCISE_PASS_PCT,
+    // Les chiffres portent sur les modules RÉELLEMENT présentés, pas sur tout le catalogue.
+    // La base contient aussi des cours hors cursus MEAL (formations de formateurs, par
+    // exemple) : les compter ici afficherait « 4 modules » au-dessus de trois cartes, et
+    // « 32 leçons » là où les trois cartes en totalisent 20. Le visiteur compte, lui.
     chiffres: {
       etudiants: etudiants.length,
       admis: etudiants.filter(e => e.admitted_at).length,
-      cours: cours.length,
-      lecons: lecons.length,
-      exercices: cours.reduce((n, c) => n + compterExercices(c.id), 0),
+      cours: modules.length,
+      lecons: modules.reduce((n, m) => n + m.lecons, 0),
+      exercices: modules.reduce((n, m) => n + m.exercices, 0),
     },
     calendrier: {
       sessions: sessions.filter(s => s.statut !== "terminee").slice(0, 6),
