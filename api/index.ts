@@ -1801,8 +1801,8 @@ const OUTILS: Record<string, { outil: string; objectif: string; competences: str
   },
   "MEAL-03": {
     outil: "Python",
-    objectif: "Analyse et automatisation du reporting",
-    competences: ["Nettoyage et analyse de données", "Extraction par API", "Rapports générés automatiquement"],
+    objectif: "Analyse et traitement des données",
+    competences: ["Bases de la programmation", "Nettoyage et analyse des données", "Visualisation et automatisation"],
     accent: "#7c3aed",
   },
 };

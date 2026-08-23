@@ -3,12 +3,16 @@ import { useLocation } from "wouter";
 import { SEO } from "@/components/seo";
 import {
   GraduationCap, ChevronRight, ChevronLeft, CheckCircle2,
-  Lock, PlayCircle, BookOpen, Trophy,
-  ArrowRight, Terminal, Layers, ClipboardCheck,
-  Cpu, Globe, Download, X, Clock } from "lucide-react";
+  Lock, BookOpen, ArrowRight, ClipboardCheck,
+  Download, X, Clock, Menu, Target, Users, Award, Sprout,
+  MapPin, Rocket, CalendarDays, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialShare } from "@/components/social-share";
 import { isStudentLoggedIn, getStudent, studentFetch, downloadStudentFile } from "@/lib/student";
+import {
+  Section, CarteBenefice, CarteModule, CarteValeur, CarteSession, Etape, Chiffre,
+  AvisAdmissionContinue, VERT_FONCE, VERT_FONCE_2, VERT_CLAIR,
+} from "@/components/academy/landing-parts";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 // Le parcours réel (cours, progression, attestations) vit dans /academy/* : cette page
@@ -64,6 +68,11 @@ export default function ELearning() {
   const [needVerification, setNeedVerification] = useState(false);
   const [nextLesson, setNextLesson] = useState<any>(null);
   const topRef = useRef<HTMLDivElement>(null);
+  const [pageData, setPageData] = useState<any>(null);
+  const [pageEtat, setPageEtat] = useState<"chargement" | "ok" | "erreur">("chargement");
+  const [menuOuvert, setMenuOuvert] = useState(false);
+  const [compact, setCompact] = useState(false);
+  const [moduleDetail, setModuleDetail] = useState<any>(null);
 
   const passed = testStatus?.passed === true || (score !== null && score >= 21);
   const answeredCount = Object.keys(answers).length;
@@ -74,6 +83,27 @@ export default function ELearning() {
     if (isStudentLoggedIn()) {
       studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
     }
+  }, []);
+
+  // Contenu de la page : modules, chiffres et calendrier viennent tous du serveur, pour que
+  // la vitrine ne puisse pas se désynchroniser du catalogue réel.
+  // Trois états distincts, et non « données ou pas de données » : un chargement lent et un
+  // serveur en panne demandent deux affichages différents. Confondre les deux laisse le
+  // visiteur devant des squelettes qui ne se rempliront jamais.
+  useEffect(() => {
+    fetch("/api/academy/landing")
+      .then(r => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then(d => { setPageData(d); setPageEtat("ok"); })
+      .catch(() => setPageEtat("erreur"));
+  }, []);
+
+  // La navigation se compacte au défilement. passive: true — l'écouteur n'annule jamais
+  // l'évènement, et le préciser évite au navigateur d'attendre pour faire défiler.
+  useEffect(() => {
+    const onScroll = () => setCompact(window.scrollY > 24);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   // ── SUBMIT TEST (étudiant authentifié — score enregistré sur son compte)
@@ -136,162 +166,566 @@ export default function ELearning() {
 
   // ─────────────────── RENDER HELPERS ──────────────────────────────────────
 
-  function renderLanding() {
+  // ── Barre de navigation de la page ──
+  // Le site a déjà son en-tête fixe : celui-ci se glisse dessous et sert à circuler entre les
+  // sections d'une page longue, avec les deux actions toujours à portée. Chaque entrée pointe
+  // vers quelque chose qui existe — pas de lien décoratif qui ne mène nulle part.
+  const ANCRES: { label: string; vers: string; externe?: boolean }[] = [
+    { label: "Accueil", vers: "/", externe: true },
+    { label: "Modules", vers: "modules" },
+    { label: "Parcours", vers: "parcours" },
+    { label: "Sessions", vers: "sessions" },
+    { label: "Ressources", vers: "/publications", externe: true },
+    { label: "À propos", vers: "/about", externe: true },
+  ];
+
+  function versSection(id: string) {
+    setMenuOuvert(false);
+    document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  function allerA(a: { vers: string; externe?: boolean }) {
+    if (a.externe) { setMenuOuvert(false); navigate(a.vers); return; }
+    versSection(a.vers);
+  }
+
+  function renderNav() {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-12 lg:py-20">
-        <SEO title="DataMEAL Academy" description="Plateforme eLearning gratuite MEAL — KoboCollect, Python, QGIS. Apprenez par les projets terrain." />
+      <div className={`sticky top-[60px] z-30 -mt-6 mb-0 transition-shadow ${compact ? "shadow-sm" : ""}`}>
+        <div className="bg-background/85 backdrop-blur-md border-y border-border/50">
+          <div className="max-w-6xl mx-auto px-5 sm:px-6 h-14 flex items-center justify-between gap-4">
+            <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="flex items-center gap-2 shrink-0 text-left">
+              <span className="w-8 h-8 rounded-xl bg-primary text-primary-foreground grid place-items-center shrink-0">
+                <Sprout className="w-[18px] h-[18px]" />
+              </span>
+              <span className="font-bold text-sm leading-tight hidden sm:flex items-center gap-1.5">
+                LouisFarm
+                <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
+                  LEARNING
+                </span>
+              </span>
+            </button>
 
-        {/* Bandeau authentification */}
-        {!isStudentLoggedIn() ? (
-          <div className="bg-card border border-border/50 rounded-2xl p-4 mb-8 flex items-center justify-between flex-wrap gap-3">
-            <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">Connexion requise</span> — créez un compte pour passer le test d'aptitude.
-            </p>
-            <div className="flex gap-2">
-              <Button size="sm" variant="outline" onClick={() => navigate("/academy/login")}>Se connecter</Button>
-              <Button size="sm" onClick={() => navigate("/academy/register")}>Créer un compte</Button>
+            <nav className="hidden lg:flex items-center gap-0.5" aria-label="Navigation de la formation">
+              {ANCRES.map(a => (
+                <button key={a.label} onClick={() => allerA(a)}
+                  className="px-3 py-1.5 rounded-full text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                  {a.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="flex items-center gap-2 shrink-0">
+              {!isStudentLoggedIn() && (
+                <Button size="sm" variant="outline" className="hidden sm:inline-flex"
+                  onClick={() => navigate("/academy/login")}>
+                  Se connecter
+                </Button>
+              )}
+              <Button size="sm" onClick={startTest} className="gap-1.5">
+                {isStudentLoggedIn() ? "Passer le test" : "S'inscrire"}
+                <ArrowRight className="w-3.5 h-3.5" />
+              </Button>
+              <button onClick={() => setMenuOuvert(o => !o)}
+                aria-label={menuOuvert ? "Fermer le menu" : "Ouvrir le menu"} aria-expanded={menuOuvert}
+                className="lg:hidden w-9 h-9 rounded-xl border border-border/60 grid place-items-center">
+                {menuOuvert ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+              </button>
             </div>
           </div>
-        ) : (
-          <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 mb-8 flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-primary shrink-0" />
-            <p className="text-sm">Connecté en tant que <span className="font-medium">{getStudent()?.full_name}</span>. Vous pouvez passer le test.</p>
-          </div>
-        )}
 
-        {/* Hero */}
-        <div className="mb-16">
-          <span className="inline-flex items-center gap-2 text-xs font-medium bg-primary/10 text-primary px-3 py-1.5 rounded-full mb-6">
-            <GraduationCap className="w-3.5 h-3.5" /> Accès gratuit · Sur sélection · 30 questions
-          </span>
-          <h1 className="text-4xl lg:text-5xl font-bold mb-6 leading-tight">
-            Maîtrisez le <span className="text-primary">MEAL terrain</span><br className="hidden lg:block" /> par les projets
-          </h1>
-          <p className="text-xl text-muted-foreground font-serif max-w-2xl mb-8 leading-relaxed">
-            Une formation gratuite et intensive par projets sur KoboCollect, Python et QGIS pour construire des systèmes de Suivi-Évaluation dans les contextes humanitaires et de développement.
+          {menuOuvert && (
+            <div className="lg:hidden border-t border-border/50 px-5 py-2 bg-background">
+              {ANCRES.map(a => (
+                <button key={a.label} onClick={() => allerA(a)}
+                  className="w-full text-left px-2 py-2.5 rounded-xl text-sm hover:bg-muted transition-colors">
+                  {a.label}
+                </button>
+              ))}
+              {!isStudentLoggedIn() && (
+                <button onClick={() => { setMenuOuvert(false); navigate("/academy/login"); }}
+                  className="w-full text-left px-2 py-2.5 rounded-xl text-sm font-medium text-primary hover:bg-muted transition-colors">
+                  Se connecter
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  /** Squelette d'une carte de module — occupe la place réelle pour éviter le saut de page. */
+  function SqueletteModule() {
+    return (
+      <div className="bg-card rounded-3xl border border-border/60 overflow-hidden animate-pulse">
+        <div className="h-1.5 bg-muted" />
+        <div className="p-6 space-y-4">
+          <div className="w-12 h-12 rounded-2xl bg-muted" />
+          <div className="h-5 w-1/2 rounded bg-muted" />
+          <div className="h-3 w-3/4 rounded bg-muted" />
+          <div className="h-16 rounded-2xl bg-muted" />
+          <div className="space-y-2">
+            <div className="h-3 w-full rounded bg-muted" />
+            <div className="h-3 w-5/6 rounded bg-muted" />
+            <div className="h-3 w-2/3 rounded bg-muted" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderModules() {
+    if (pageEtat === "chargement") {
+      return (
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5" aria-busy="true" aria-live="polite">
+          {[0, 1, 2].map(i => <SqueletteModule key={i} />)}
+        </div>
+      );
+    }
+    // Panne du catalogue : on ne remplace pas par une liste écrite en dur, qui mentirait le jour
+    // où le programme change. On le dit, et on garde l'inscription accessible.
+    if (pageEtat === "erreur") {
+      return (
+        <div className="rounded-3xl border border-border/60 bg-card p-8 text-center">
+          <Clock className="w-6 h-6 text-muted-foreground mx-auto mb-3" />
+          <p className="font-medium">Le catalogue n'a pas pu être chargé</p>
+          <p className="text-sm text-muted-foreground mt-1.5 max-w-md mx-auto">
+            Le programme reste inchangé — KoboCollect, QGIS et Python. Rechargez la page, ou
+            inscrivez-vous dès maintenant : rien ne dépend de cet affichage.
           </p>
-          <div className="flex flex-wrap items-center gap-4">
-            <Button size="lg" className="gap-2" onClick={startTest}>
-              <PlayCircle className="w-5 h-5" /> Passer le test de sélection
-            </Button>
-            <Button size="lg" variant="outline" className="gap-2" onClick={() => document.getElementById("how")?.scrollIntoView({ behavior: "smooth" })}>
-              Comment ça marche <ChevronRight className="w-4 h-4" />
-            </Button>
-            <SocialShare
-              url="/elearning"
-              title="Formation MEAL gratuite par projets (KoboCollect, Python, QGIS) — DataMEAL Academy"
-              description="Apprends à construire des systèmes de Suivi-Évaluation pour l'humanitaire et le développement. Formation gratuite, par projets, certifiante. Inscris-toi sur DataMEAL Academy !"
-            />
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-16">
-          {[
-            { n: "30", l: "Questions de sélection", icon: ClipboardCheck },
-            { n: "3", l: "Projets terrain complets", icon: Layers },
-            { n: "100%", l: "Gratuit & certifié", icon: Trophy },
-            { n: "Notebooks", l: "Intégrés Python + QGIS", icon: Terminal },
-          ].map((s) => (
-            <div key={s.l} className="bg-card rounded-2xl p-5 border border-border/50 flex flex-col gap-2">
-              <s.icon className="w-5 h-5 text-primary" />
-              <div className="text-2xl font-bold">{s.n}</div>
-              <div className="text-xs text-muted-foreground">{s.l}</div>
-            </div>
-          ))}
-        </div>
-
-        {/* How it works */}
-        <div id="how" className="mb-16">
-          <h2 className="text-2xl font-bold mb-8">Comment ça marche</h2>
-          <div className="grid lg:grid-cols-4 gap-4">
-            {[
-              { step: "01", title: "Test de sélection", desc: "30 questions sur le MEAL, KoboCollect, Python et QGIS. Score minimum 70%.", icon: ClipboardCheck },
-              { step: "02", title: "Accès aux projets", desc: "3 projets terrain progressifs, chacun avec un notebook interactif intégré.", icon: BookOpen },
-              { step: "03", title: "Notebook + exécution", desc: "Écrivez et exécutez du code Python/PyQGIS directement dans votre navigateur.", icon: Terminal },
-              { step: "04", title: "Attestation", desc: "Finissez un projet et demandez votre attestation de compétence signée.", icon: Trophy },
-            ].map((s) => (
-              <div key={s.step} className="bg-card rounded-2xl p-6 border border-border/50 relative">
-                <div className="text-5xl font-black text-muted/30 mb-3 font-serif">{s.step}</div>
-                <s.icon className="w-6 h-6 text-primary mb-3" />
-                <h3 className="font-semibold mb-2">{s.title}</h3>
-                <p className="text-sm text-muted-foreground">{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Tools */}
-        <div className="mb-16">
-          <h2 className="text-2xl font-bold mb-8">Les trois piliers du MEAL moderne</h2>
-          <div className="grid lg:grid-cols-3 gap-6">
-            {[
-              { title: "KoboCollect", icon: Cpu, tags: ["XLSForm", "ODK", "API REST"], desc: "Conception de formulaires XLSForm, déploiement d'enquêtes, collecte GPS et gestion des soumissions via l'API KoboToolbox.", color: "bg-primary/10 text-primary" },
-              { title: "Python MEAL", icon: Terminal, tags: ["pandas", "matplotlib", "openpyxl"], desc: "Nettoyage et analyse des données terrain, visualisation des indicateurs SMART, génération automatique de rapports de suivi.", color: "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300" },
-              { title: "QGIS + PyQGIS", icon: Globe, tags: ["PyQGIS", "PostGIS", "Atlas"], desc: "Cartographie des zones d'intervention, analyse spatiale des bénéficiaires, cartes pour les rapports bailleurs de fonds.", color: "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300" },
-            ].map((t) => (
-              <div key={t.title} className="group bg-card rounded-3xl p-8 border border-border/50 shadow-sm hover:shadow-xl hover:border-primary/30 transition-all duration-300">
-                <div className={`w-12 h-12 rounded-2xl ${t.color} flex items-center justify-center mb-5 group-hover:scale-110 transition-transform duration-300`}>
-                  <t.icon className="w-6 h-6" />
-                </div>
-                <h3 className="font-bold text-lg mb-2">{t.title}</h3>
-                <p className="text-sm text-muted-foreground leading-relaxed mb-4">{t.desc}</p>
-                <div className="flex flex-wrap gap-2">
-                  {t.tags.map(tag => <span key={tag} className="text-xs bg-muted px-2.5 py-1 rounded-full text-muted-foreground">{tag}</span>)}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Témoignages */}
-        <div className="mb-16">
-          <h2 className="text-2xl font-bold mb-2">Ils ont suivi la formation</h2>
-          <p className="text-muted-foreground mb-8">Des professionnels du MEAL en Afrique de l'Ouest, formés par les projets.</p>
-          <div className="grid lg:grid-cols-3 gap-5">
-            {[
-              {
-                name: "Aïcha D.", role: "Agent de suivi-évaluation", org: "ONG nutrition · Lomé, Togo",
-                initials: "AD",
-                quote: "Je partais de zéro en informatique. Aujourd'hui je conçois mes propres formulaires KoboCollect et je sors les indicateurs MUAC toute seule. Sur le terrain à Agoè, ça a tout changé : plus de papier, des données fiables le jour même.",
-              },
-              {
-                name: "Boukari S.", role: "Chargé de projets WASH", org: "Coopératives · Kara, Togo",
-                initials: "BS",
-                quote: "Le projet QGIS m'a permis d'identifier 7 villages sans point d'eau à moins de 2 km. J'ai présenté la carte au bailleur, et les forages ont été budgétisés. Une compétence qui se voit immédiatement sur le terrain.",
-              },
-              {
-                name: "Fatoumata K.", role: "Coordinatrice MEAL", org: "ONG régionale · Ouagadougou, Burkina Faso",
-                initials: "FK",
-                quote: "Avant, je passais deux semaines par trimestre sur les rapports. Le pipeline automatisé du Projet 3 me fait tout en un clic : données Kobo, cartes, Excel, PDF. Je consacre enfin ce temps à l'accompagnement des équipes.",
-              },
-            ].map((t) => (
-              <div key={t.name} className="bg-card rounded-3xl p-6 border border-border/50 flex flex-col">
-                <div className="flex gap-1 mb-4">
-                  {[1,2,3,4,5].map(s => <span key={s} className="text-amber-500">★</span>)}
-                </div>
-                <p className="text-sm text-muted-foreground leading-relaxed font-serif italic flex-1">« {t.quote} »</p>
-                <div className="flex items-center gap-3 mt-5 pt-4 border-t border-border/40">
-                  <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary font-bold text-sm shrink-0">{t.initials}</div>
-                  <div>
-                    <p className="font-medium text-sm">{t.name}</p>
-                    <p className="text-xs text-muted-foreground">{t.role} · {t.org}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* CTA final */}
-        <div className="bg-primary/5 rounded-3xl p-10 border border-primary/20 text-center">
-          <GraduationCap className="w-12 h-12 text-primary mx-auto mb-4" />
-          <h2 className="text-2xl font-bold mb-3">Prêt(e) à rejoindre la formation ?</h2>
-          <p className="text-muted-foreground mb-6 max-w-lg mx-auto">La formation est entièrement gratuite. Passez le test de 30 questions pour être sélectionné(e).</p>
-          <Button size="lg" className="gap-2" onClick={startTest}>
-            Commencer le test <ArrowRight className="w-4 h-4" />
+          <Button variant="outline" size="sm" className="mt-4" onClick={() => window.location.reload()}>
+            Recharger
           </Button>
         </div>
+      );
+    }
+    const modules = pageData?.modules ?? [];
+    if (modules.length === 0) {
+      return (
+        <div className="rounded-3xl border border-dashed border-border p-8 text-center">
+          <BookOpen className="w-6 h-6 text-muted-foreground mx-auto mb-3" />
+          <p className="font-medium">Les modules arrivent</p>
+          <p className="text-sm text-muted-foreground mt-1.5">
+            Le programme est en cours de publication. Créez votre compte pour être prévenu(e) à l'ouverture.
+          </p>
+        </div>
+      );
+    }
+    return (
+      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
+        {modules.map((m: any) => (
+          <CarteModule key={m.code} module={m} onDetail={() => setModuleDetail(m)} />
+        ))}
+      </div>
+    );
+  }
+
+  function renderDetailModule() {
+    if (!moduleDetail) return null;
+    const m = moduleDetail;
+    return (
+      <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center p-0 sm:p-6"
+        role="dialog" aria-modal="true" aria-label={`Module ${m.outil}`}>
+        <div className="absolute inset-0 bg-foreground/40 backdrop-blur-sm" onClick={() => setModuleDetail(null)} />
+        <div className="relative bg-card w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl border border-border/60 shadow-xl max-h-[85vh] overflow-y-auto">
+          <div className="h-1.5 rounded-t-3xl" style={{ background: m.accent }} />
+          <div className="p-6">
+            <div className="flex items-start justify-between gap-4">
+              <div className="min-w-0">
+                <h3 className="text-xl font-bold">{m.outil}</h3>
+                <p className="text-sm text-muted-foreground">{m.objectif}</p>
+              </div>
+              <button onClick={() => setModuleDetail(null)} aria-label="Fermer"
+                className="w-9 h-9 rounded-xl hover:bg-muted grid place-items-center shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="mt-5 p-4 rounded-2xl bg-muted/50">
+              <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">Projet fil rouge</p>
+              <p className="font-medium mt-1">{m.titreProjet}</p>
+              {m.description && <p className="text-sm text-muted-foreground mt-2 leading-relaxed">{m.description}</p>}
+            </div>
+
+            <p className="text-sm font-semibold mt-5 mb-2">Ce que vous saurez faire</p>
+            <ul className="space-y-2">
+              {m.competences.map((c: string) => (
+                <li key={c} className="flex items-start gap-2 text-sm">
+                  <CheckCircle2 className="w-4 h-4 mt-0.5 shrink-0" style={{ color: m.accent }} />
+                  <span className="text-muted-foreground">{c}</span>
+                </li>
+              ))}
+            </ul>
+
+            <div className="flex flex-wrap gap-x-4 gap-y-1 mt-5 pt-4 border-t border-border/50 text-xs text-muted-foreground">
+              <span><strong className="text-foreground">{m.lecons}</strong> leçons</span>
+              {m.exercices > 0 && <span><strong className="text-foreground">{m.exercices}</strong> exercices notés</span>}
+              <span className="font-mono">{m.code}</span>
+            </div>
+
+            <Button className="w-full mt-5 gap-2" onClick={() => { setModuleDetail(null); startTest(); }}>
+              Rejoindre la formation <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /**
+   * Visuel du héros — les trois outils comme objets, dessinés et non photographiés.
+   *
+   * Un mobile pour KoboCollect, un écran d'analyse pour Python, une carte pour QGIS : la
+   * composition dit la chaîne « collecter → analyser → cartographier » avant qu'on ait lu
+   * le sous-titre. Tout est en SVG et en balisage, donc rien à télécharger, rien qui décale
+   * la mise en page, et le rendu reste net sur un écran dense.
+   */
+  function VisuelHeros() {
+    return (
+      <div className="relative select-none" aria-hidden>
+        <div className="absolute inset-0 rounded-[2rem] blur-2xl opacity-40"
+          style={{ background: `radial-gradient(60% 60% at 60% 40%, ${VERT_CLAIR}, transparent 70%)` }} />
+
+        <div className="relative flex items-end justify-center gap-3 sm:gap-4">
+          {/* KoboCollect — collecte mobile */}
+          <div className="w-[86px] sm:w-[104px] shrink-0 rounded-[1.25rem] bg-white/95 shadow-2xl p-2 rotate-[-4deg]">
+            <div className="rounded-[0.9rem] bg-[#0d9488] p-2.5 text-white">
+              <p className="text-[8px] font-semibold opacity-80">KoboCollect</p>
+              <div className="mt-2 space-y-1.5">
+                {[100, 70, 85].map((w, i) => (
+                  <div key={i} className="h-1.5 rounded-full bg-white/40" style={{ width: `${w}%` }} />
+                ))}
+              </div>
+              <div className="mt-2.5 flex gap-1">
+                <span className="w-3 h-3 rounded-full border-2 border-white/70" />
+                <span className="w-3 h-3 rounded-full bg-white" />
+              </div>
+              <div className="mt-2.5 h-4 rounded-md bg-white/90" />
+            </div>
+          </div>
+
+          {/* Python — analyse */}
+          <div className="w-[150px] sm:w-[190px] shrink-0 rounded-[1.25rem] bg-white/95 shadow-2xl p-2.5">
+            <div className="rounded-[0.9rem] bg-slate-900 p-3">
+              <div className="flex gap-1 mb-2.5">
+                {["#f87171", "#fbbf24", "#4ade80"].map(c => (
+                  <span key={c} className="w-1.5 h-1.5 rounded-full" style={{ background: c }} />
+                ))}
+              </div>
+              <div className="flex items-end gap-1.5 h-14">
+                {[38, 62, 45, 80, 55, 92].map((h, i) => (
+                  <div key={i} className="flex-1 rounded-t-sm"
+                    style={{ height: `${h}%`, background: i % 2 ? "#7c3aed" : VERT_CLAIR }} />
+                ))}
+              </div>
+              <div className="mt-2 space-y-1">
+                <div className="h-1 w-4/5 rounded-full bg-white/25" />
+                <div className="h-1 w-3/5 rounded-full bg-white/15" />
+              </div>
+            </div>
+          </div>
+
+          {/* QGIS — carte */}
+          <div className="w-[86px] sm:w-[104px] shrink-0 rounded-[1.25rem] bg-white/95 shadow-2xl p-2 rotate-[4deg]">
+            <div className="rounded-[0.9rem] bg-[#2563eb]/10 p-2 relative overflow-hidden aspect-square">
+              <svg viewBox="0 0 100 100" className="w-full h-full">
+                <path d="M12 20 L46 10 L70 24 L88 16 L84 76 L58 88 L30 76 L14 84 Z"
+                  fill="#2563eb" fillOpacity="0.18" stroke="#2563eb" strokeWidth="2.5" />
+                <path d="M46 10 L44 74" stroke="#2563eb" strokeWidth="1.5" strokeOpacity="0.4" />
+                <path d="M70 24 L58 88" stroke="#2563eb" strokeWidth="1.5" strokeOpacity="0.4" />
+                <circle cx="36" cy="42" r="5" fill="#16a34a" />
+                <circle cx="64" cy="58" r="5" fill="#16a34a" />
+                <circle cx="52" cy="28" r="4" fill="#f59e0b" />
+              </svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderLanding() {
+    const c = pageData?.chiffres;
+    const cal = pageData?.calendrier;
+    const sessions: any[] = cal?.sessions ?? [];
+    const courante = cal?.courante ?? null;
+    const prochaine = cal?.prochaine ?? null;
+    const seuil = pageData?.seuilAdmission ?? 21;
+    const questions = pageData?.questionsTest ?? QUESTIONS.length;
+    const mois = pageData?.moisAcces ?? 6;
+    const seuilEx = pageData?.seuilExercices ?? 70;
+    const connecte = isStudentLoggedIn();
+    // Une seule vérité pour le mois de démarrage annoncé : la session ouverte s'il y en a une,
+    // sinon la prochaine. Le calendrier, le bandeau d'avis et l'appel final la partagent.
+    const sessionVisee = courante ?? prochaine;
+    const moisDemarrage = sessionVisee?.moisDemarrage?.replace(/ \d{4}$/, "") ?? null;
+
+    return (
+      <div>
+        <SEO title="LouisFarm Learning — Formation MEAL gratuite"
+          description="Formation gratuite et par projets aux outils du MEAL : KoboCollect, QGIS et Python. Inscription ouverte en permanence, admission sur test." />
+
+        {renderNav()}
+        {renderDetailModule()}
+
+        {/* ── Héros ── */}
+        <section className="relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${VERT_FONCE} 0%, ${VERT_FONCE_2} 100%)` }}>
+          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-14 sm:py-20">
+            <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-14 items-center">
+              <div>
+                <span className="inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full text-white"
+                  style={{ background: "rgba(255,255,255,0.12)" }}>
+                  <Sprout className="w-3.5 h-3.5" /> Suivi · Évaluation · Analyse · Impact
+                </span>
+
+                <h1 className="text-white text-3xl sm:text-4xl lg:text-[2.85rem] font-bold leading-[1.12] tracking-tight mt-5">
+                  Maîtrisez les outils numériques pour des projets{" "}
+                  <span style={{ color: VERT_CLAIR }}>MEAL performants</span>
+                </h1>
+
+                <p className="text-base sm:text-lg text-white/75 mt-5 max-w-xl leading-relaxed">
+                  Apprenez KoboCollect, Python et QGIS pour collecter, traiter, analyser et
+                  visualiser des données fiables au service de projets à impact social et
+                  environnemental.
+                </p>
+
+                <div className="flex flex-wrap items-center gap-3 mt-8">
+                  <Button size="lg" className="gap-2 border-0"
+                    style={{ background: VERT_CLAIR, color: VERT_FONCE }} onClick={startTest}>
+                    {connecte ? "Passer le test d'admission" : "Commencer mon apprentissage"}
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                  <Button size="lg" variant="outline"
+                    className="gap-2 bg-transparent text-white border-white/30 hover:bg-white/10 hover:text-white"
+                    onClick={() => versSection("modules")}>
+                    Découvrir les modules <ChevronRight className="w-4 h-4" />
+                  </Button>
+                </div>
+
+                {connecte ? (
+                  <p className="flex items-center gap-2 text-sm text-white/70 mt-5">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: VERT_CLAIR }} />
+                    Connecté en tant que <span className="font-medium text-white">{getStudent()?.full_name}</span>
+                  </p>
+                ) : (
+                  <p className="text-sm text-white/60 mt-5">
+                    Déjà inscrit(e) ?{" "}
+                    <button onClick={() => navigate("/academy/login")}
+                      className="font-medium hover:underline" style={{ color: VERT_CLAIR }}>
+                      Se connecter
+                    </button>
+                  </p>
+                )}
+
+                {/* Chiffres réels, comptés en base — pas des nombres ronds décoratifs. */}
+                <div className="mt-8 pt-6 border-t border-white/15">
+                  {pageEtat === "chargement" ? (
+                    <div className="grid grid-cols-4 gap-4 animate-pulse max-w-sm" aria-busy="true">
+                      {[0, 1, 2, 3].map(i => (
+                        <div key={i} className="space-y-2">
+                          <div className="h-6 w-10 rounded bg-white/15 mx-auto" />
+                          <div className="h-2.5 w-full rounded bg-white/10" />
+                        </div>
+                      ))}
+                    </div>
+                  ) : c ? (
+                    <div className="grid grid-cols-4 gap-4 max-w-sm">
+                      <Chiffre clair valeur={c.cours} libelle="modules" />
+                      <Chiffre clair valeur={c.lecons} libelle="leçons" />
+                      <Chiffre clair valeur={c.exercices} libelle="exercices" />
+                      <Chiffre clair valeur={c.admis} libelle="admis" />
+                    </div>
+                  ) : null}
+                </div>
+              </div>
+
+              <VisuelHeros />
+            </div>
+          </div>
+        </section>
+
+        {/* ── Bandeau de bénéfices immédiats ── */}
+        <div className="relative z-10 max-w-6xl mx-auto px-5 sm:px-6 -mt-8">
+          <div className="bg-card rounded-3xl border border-border/60 shadow-lg p-2 sm:p-3">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 lg:divide-x divide-border/60">
+              <CarteBenefice icone={Target} titre="Formation 100 % pratique"
+                texte="On apprend en faisant, sur des données réelles." />
+              <CarteBenefice icone={MapPin} titre="Projets réels"
+                texte="Trois projets de terrain menés du début à la fin." />
+              <CarteBenefice icone={Award} titre="Attestation incluse"
+                texte="Vérifiable en ligne par un employeur, et gratuite." />
+              <CarteBenefice icone={Users} titre="Accompagnement"
+                texte="Des séances en visio et un canal d'entraide." />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Modules ── */}
+        <Section id="modules" titre="Nos modules de formation"
+          sousTitre="Chaque module se termine par un livrable que vous pouvez montrer : un formulaire déployé, une carte, un rapport automatisé.">
+          {renderModules()}
+        </Section>
+
+        {/* ── Pourquoi nous ── */}
+        <Section id="pourquoi" vert titre="Pourquoi choisir LouisFarm Learning ?"
+          sousTitre="Elle est née d'un constat de terrain : les outils s'apprennent en les utilisant sur des données qui comptent.">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            <CarteValeur icone={Target} titre="Compétences recherchées"
+              texte="KoboCollect, QGIS et Python figurent dans la plupart des offres MEAL." />
+            <CarteValeur icone={ClipboardCheck} titre="Apprentissage par la pratique"
+              texte={`Les exercices sont notés : il faut ${seuilEx} % pour valider une leçon.`} />
+            <CarteValeur icone={Clock} titre="Flexibilité"
+              texte={`${mois} mois d'accès, à votre rythme, sans horaire imposé.`} />
+            <CarteValeur icone={Rocket} titre="Ouverture de carrières"
+              texte="Vos livrables constituent un portfolio présentable en entretien." />
+          </div>
+        </Section>
+
+        {/* ── Calendrier des sessions ── */}
+        <Section id="sessions">
+          <div className="rounded-3xl border border-border/60 bg-card p-5 sm:p-8">
+            <div className="grid lg:grid-cols-[minmax(0,17rem)_1fr] gap-8 lg:gap-10 items-start">
+              <div>
+                <span className="w-12 h-12 rounded-2xl bg-primary/10 text-primary grid place-items-center mb-4">
+                  <CalendarDays className="w-6 h-6" />
+                </span>
+                <h2 className="text-xl sm:text-2xl font-bold leading-tight">
+                  6 périodes d'inscription par module
+                </h2>
+                <p className="text-sm text-muted-foreground mt-2.5 leading-relaxed">
+                  Une nouvelle promotion démarre tous les deux mois
+                  {moisDemarrage ? <> — la prochaine en <span className="capitalize">{moisDemarrage}</span></> : null}.
+                  Vous, vous n'attendez pas : l'inscription est ouverte en permanence.
+                </p>
+                <Button className="mt-5 gap-2" onClick={startTest}>
+                  {connecte ? "Passer le test" : "Rejoindre la formation"}
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+              </div>
+
+              <div>
+                <p className="flex items-center gap-2 text-sm font-semibold mb-4">
+                  <CalendarDays className="w-4 h-4 text-primary" />
+                  Calendrier des inscriptions
+                </p>
+
+                {pageEtat === "chargement" ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 animate-pulse" aria-busy="true">
+                    {[0, 1, 2, 3, 4, 5].map(i => <div key={i} className="h-44 rounded-2xl bg-muted" />)}
+                  </div>
+                ) : sessions.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+                      {sessions.map((s, i) => (
+                        <CarteSession key={s.id} session={s} rang={i + 1}
+                          prochaine={!!prochaine && s.id === prochaine.id} />
+                      ))}
+                    </div>
+                    <p className="flex items-start gap-2 mt-4 text-[11px] text-muted-foreground">
+                      <Info className="w-3.5 h-3.5 shrink-0 mt-px" />
+                      Chaque période d'inscription dure un mois ; la promotion démarre au début
+                      du mois suivant.
+                    </p>
+                    <AvisAdmissionContinue prochaine={sessionVisee} />
+                  </>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border p-8 text-center">
+                    <p className="font-medium">Le calendrier n'est pas disponible</p>
+                    <p className="text-sm text-muted-foreground mt-1.5">
+                      Sans conséquence : l'inscription est ouverte en permanence et vos leçons
+                      s'ouvrent dès le test réussi.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        {/* ── Parcours apprenant ── */}
+        <Section id="parcours" fond titre="Ce qui se passe après l'inscription"
+          sousTitre="Cinq étapes, de la création du compte à l'attestation.">
+          <div className="grid lg:grid-cols-2 gap-x-12">
+            <div>
+              <Etape n={1} titre="Créez votre compte"
+                texte="Nom, e-mail, mot de passe. Vous confirmez ensuite votre adresse en un clic." />
+              <Etape n={2} titre="Passez le test d'admission"
+                texte={`${questions} questions sur le MEAL, KoboCollect, QGIS et Python. Il faut ${seuil} bonnes réponses. En cas d'échec, une nouvelle tentative est possible après une semaine.`} />
+              <Etape n={3} titre="Vos premières leçons s'ouvrent"
+                texte="Immédiatement, sans attendre une date. Le tableau de bord vous indique par où commencer." />
+            </div>
+            <div>
+              <Etape n={4} titre="Vous progressez, vous êtes noté(e)"
+                texte={`Chaque leçon se valide par ses exercices, à ${seuilEx} % minimum. La leçon suivante s'ouvre alors, et un e-mail vous le signale.`} />
+              <Etape n={5} titre="Vous obtenez votre attestation"
+                texte="Une attestation par module terminé, et un certificat final à l'issue des trois. Chacun porte un code de vérification." />
+              <div className="flex gap-3.5">
+                <div className="flex flex-col items-center shrink-0">
+                  <span className="w-8 h-8 rounded-full grid place-items-center bg-primary/10 text-primary">
+                    <Rocket className="w-4 h-4" />
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm leading-tight">Et ensuite</p>
+                  <p className="text-[13px] text-muted-foreground mt-1 leading-relaxed">
+                    Vous gardez l'accès à vos notebooks et à vos livrables : ils constituent un
+                    portfolio que vous pouvez présenter.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Section>
+
+        {/* ── Appel final ── */}
+        <section className="py-14 sm:py-20">
+          <div className="max-w-6xl mx-auto px-5 sm:px-6">
+            <div className="rounded-3xl p-8 sm:p-12 overflow-hidden"
+              style={{ background: `linear-gradient(135deg, ${VERT_FONCE} 0%, ${VERT_FONCE_2} 100%)` }}>
+              <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
+                <span className="w-20 h-20 rounded-3xl grid place-items-center shrink-0"
+                  style={{ background: "rgba(255,255,255,0.1)" }} aria-hidden>
+                  <GraduationCap className="w-10 h-10" style={{ color: VERT_CLAIR }} />
+                </span>
+
+                <div className="flex-1 text-center lg:text-left">
+                  <h2 className="text-white text-2xl sm:text-3xl font-bold tracking-tight leading-tight">
+                    Prêt(e) à développer vos compétences MEAL terrain ?
+                  </h2>
+                  <p className="text-white/70 mt-3 leading-relaxed max-w-2xl">
+                    Créez votre compte, passez le test, et vos premières leçons s'ouvrent dans la
+                    foulée. C'est gratuit, et ça le restera.
+                  </p>
+                </div>
+
+                <div className="shrink-0 text-center">
+                  <Button size="lg" className="gap-2 border-0 w-full sm:w-auto"
+                    style={{ background: VERT_CLAIR, color: VERT_FONCE }} onClick={startTest}>
+                    {connecte ? "Passer le test d'admission" : "S'inscrire maintenant"}
+                    <ArrowRight className="w-4 h-4" />
+                  </Button>
+                  <p className="flex items-center justify-center gap-1.5 text-xs text-white/60 mt-3">
+                    <Users className="w-3.5 h-3.5" />
+                    {c?.admis > 0
+                      ? <>{c.admis} {c.admis > 1 ? "apprenants ont" : "apprenant a"} déjà rejoint</>
+                      : <>Inscription ouverte en permanence</>}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center mt-8">
+              <SocialShare
+                url="/elearning"
+                title="Formation MEAL gratuite par projets (KoboCollect, QGIS, Python) — LouisFarm Learning"
+                description="Apprends à construire des systèmes de Suivi-Évaluation pour l'humanitaire et le développement. Formation gratuite, par projets, certifiante."
+              />
+            </div>
+          </div>
+        </section>
       </div>
     );
   }
