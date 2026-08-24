@@ -226,6 +226,62 @@ export const attestations = pgTable("attestations", {
   issuedAt: timestamp("issued_at"),
 });
 
+// ── Travaux de groupe (Group Work) ──
+// Le cursus prend la forme du modèle WQU à partir de la semaine 4 : une évaluation
+// collective par mois, trois au total (semaines 4, 8, 12). Voir shared/groupwork.ts.
+export const academyGroups = pgTable("academy_groups", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  cohort: text("cohort").notNull(),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const academyGroupMembers = pgTable("academy_group_members", {
+  id: serial("id").primaryKey(),
+  groupId: integer("group_id").references(() => academyGroups.id).notNull(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  role: text("role").default("membre"),
+  joinedAt: timestamp("joined_at").defaultNow(),
+});
+
+export const academyGroupWorks = pgTable("academy_group_works", {
+  id: serial("id").primaryKey(),
+  gwIndex: integer("gw_index").notNull(),
+  weekIndex: integer("week_index").notNull(),
+  title: text("title").notNull(),
+  brief: text("brief"),
+  deliverables: jsonb("deliverables"),
+  maxScore: integer("max_score").default(100),
+  isPublished: boolean("is_published").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const academyGroupSubmissions = pgTable("academy_group_submissions", {
+  id: serial("id").primaryKey(),
+  groupWorkId: integer("group_work_id").references(() => academyGroupWorks.id).notNull(),
+  groupId: integer("group_id").references(() => academyGroups.id).notNull(),
+  submittedBy: integer("submitted_by").references(() => students.id),
+  content: jsonb("content"),
+  status: text("status").default("submitted"),
+  score: integer("score"),
+  feedback: text("feedback"),
+  submittedAt: timestamp("submitted_at").defaultNow(),
+  gradedAt: timestamp("graded_at"),
+});
+
+export const groupWorkProgress = pgTable("group_work_progress", {
+  id: serial("id").primaryKey(),
+  studentId: integer("student_id").references(() => students.id).notNull(),
+  groupWorkId: integer("group_work_id").references(() => academyGroupWorks.id).notNull(),
+  weekIndex: integer("week_index").notNull(),
+  unlockAt: timestamp("unlock_at").notNull(),
+  dueAt: timestamp("due_at").notNull(),
+  status: text("status").default("locked"),
+  completedAt: timestamp("completed_at"),
+  score: integer("score"),
+});
+
 // ── SMS Types ──
 export type Student = typeof students.$inferSelect;
 export type SmsCourse = typeof smsCourses.$inferSelect;
@@ -234,6 +290,11 @@ export type Enrollment = typeof enrollments.$inferSelect;
 export type Grade = typeof grades.$inferSelect;
 export type Submission = typeof submissions.$inferSelect;
 export type Attestation = typeof attestations.$inferSelect;
+export type AcademyGroup = typeof academyGroups.$inferSelect;
+export type AcademyGroupMember = typeof academyGroupMembers.$inferSelect;
+export type AcademyGroupWork = typeof academyGroupWorks.$inferSelect;
+export type AcademyGroupSubmission = typeof academyGroupSubmissions.$inferSelect;
+export type GroupWorkProgress = typeof groupWorkProgress.$inferSelect;
 
 // ── Insert Schemas ──
 export const insertPostSchema = createInsertSchema(posts).omit({ id: true, publishedAt: true, viewsCount: true, likesCount: true });

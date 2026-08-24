@@ -23,6 +23,7 @@ import AcademyRegister from "@/pages/academy/register";
 import AcademyLogin from "@/pages/academy/login";
 import AcademyDashboard from "@/pages/academy/dashboard";
 import AcademyClassroom from "@/pages/academy/classroom";
+import AcademyGroupWork from "@/pages/academy/group-work";
 import AcademyVerify from "@/pages/academy/verify";
 import AcademyForgotPassword from "@/pages/academy/forgot-password";
 import AcademyResetPassword from "@/pages/academy/reset-password";
@@ -46,6 +47,7 @@ import AdminNewsletter from "@/pages/admin/newsletter-admin";
 import AdminTestimonials from "@/pages/admin/testimonials-admin";
 import AdminStudents from "@/pages/admin/students-admin";
 import AdminMeetings from "@/pages/admin/meetings-admin";
+import AdminGroupWork from "@/pages/admin/group-work-admin";
 import Stats from "@/pages/stats";
 import { getToken } from "@/lib/admin";
 import { isStudentLoggedIn } from "@/lib/student";
@@ -100,12 +102,14 @@ function App() {
             <Route path="/admin/testimonials">{() => <RequireAuth><AdminTestimonials /></RequireAuth>}</Route>
             <Route path="/admin/students">{() => <RequireAuth><AdminStudents /></RequireAuth>}</Route>
             <Route path="/admin/meetings">{() => <RequireAuth><AdminMeetings /></RequireAuth>}</Route>
+            <Route path="/admin/group-work">{() => <RequireAuth><AdminGroupWork /></RequireAuth>}</Route>
 
             {/* DataMEAL Academy — espace étudiant (pas de Layout admin) */}
             <Route path="/academy/register">{() => <Layout><AcademyRegister /></Layout>}</Route>
             <Route path="/academy/login">{() => <Layout><AcademyLogin /></Layout>}</Route>
             <Route path="/academy/dashboard">{() => <RequireStudentAuth><AcademyLayout><AcademyDashboard /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/classroom/:id">{() => <Layout><RequireStudentAuth><AcademyClassroom /></RequireStudentAuth></Layout>}</Route>
+            <Route path="/academy/group-work">{() => <RequireStudentAuth><AcademyLayout><AcademyGroupWork /></AcademyLayout></RequireStudentAuth>}</Route>
             {/* Publique : le lien de validation arrive par email et s'ouvre souvent sur un autre
                 appareil/navigateur, où la session étudiant n'existe pas. Derrière un garde, le
                 token de l'URL était perdu par la redirection et l'email n'était jamais validé. */}

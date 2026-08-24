@@ -6,7 +6,7 @@ import { SocialShare } from "@/components/social-share";
 import {
   GraduationCap, User, Award, BookOpen, Loader2, CheckCircle2, Clock,
   Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
-  Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink } from "lucide-react";
+  Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink, Send } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
 import { groupByProgram } from "@shared/programs";
 
@@ -22,6 +22,7 @@ export default function AcademyDashboard() {
   const [transcript, setTranscript] = useState<any>(null);
   const [creds, setCreds] = useState<Cred[]>([]);
   const [meetings, setMeetings] = useState<any[]>([]);
+  const [gw, setGw] = useState<any>(null);
   const [bord, setBord] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   // Les cours terminés sont repliés par défaut, parcours par parcours.
@@ -32,7 +33,7 @@ export default function AcademyDashboard() {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
     (async () => {
       try {
-        const [e, ts, ac, sch, tr, cr, mt, bd] = await Promise.all([
+        const [e, ts, ac, sch, tr, cr, mt, tg, bd] = await Promise.all([
           studentFetch("/api/academy/my-enrollments").then(r => r.json()).catch(() => []),
           studentFetch("/api/academy/test-status").then(r => r.json()).catch(() => null),
           fetch("/api/academy/courses").then(r => r.json()).catch(() => []),
@@ -40,12 +41,14 @@ export default function AcademyDashboard() {
           studentFetch("/api/academy/transcript").then(r => r.json()).catch(() => null),
           studentFetch("/api/academy/my-credentials").then(r => r.json()).catch(() => null),
           studentFetch("/api/academy/meetings").then(r => r.json()).catch(() => null),
+          studentFetch("/api/academy/group-work").then(r => r.json()).catch(() => null),
           studentFetch("/api/academy/dashboard").then(r => r.json()).catch(() => null),
         ]);
         setEnrollments(Array.isArray(e) ? e : []);
         setTestStatus(ts); setAllCourses(Array.isArray(ac) ? ac : []);
         setSchedule(Array.isArray(sch) ? sch : []); setTranscript(tr);
         setCreds(cr?.credentials || []); setMeetings(mt?.meetings || []);
+        setGw(tg && tg.actif !== false ? tg : null);
         setBord(bd && !bd.message ? bd : null);
       } finally { setLoading(false); }
     })();
@@ -66,6 +69,15 @@ export default function AcademyDashboard() {
     let w = weeks.find(x => x.index === s.week_index);
     if (!w) { w = { index: s.week_index, rows: [] }; weeks.push(w); }
     w.rows.push(s);
+  }
+  // Les travaux de groupe s'insèrent DANS le planning, aux semaines 4, 8 et 12 : c'est là
+  // que l'étudiant les cherche — au milieu de ce qu'il a à faire cette semaine-là — et non
+  // dans une liste séparée qu'il faudrait penser à consulter.
+  const travauxGroupe: any[] = gw?.travaux || [];
+  for (const t of travauxGroupe) {
+    let w = weeks.find(x => x.index === t.semaine);
+    if (!w) { w = { index: t.semaine, rows: [] }; weeks.push(w); }
+    w.rows.push({ ...t, kind: "gw", unlock_at: t.ouvertureLe, due_at: t.echeanceLe, status: t.statut });
   }
   weeks.sort((a, b) => a.index - b.index);
   // Semaine « en cours » = la première où il reste quelque chose à faire.
@@ -208,6 +220,10 @@ export default function AcademyDashboard() {
                   </div>
                   <div className="divide-y divide-border/40">
                     {w.rows.map((s: any) => {
+                      if (s.kind === "gw") return (
+                        <LigneTravailGroupe key={`gw-${s.id}`} t={s}
+                          groupe={gw?.groupe} onOuvrir={() => navigate("/academy/group-work")} />
+                      );
                       const isDone = s.status === "completed", isAvail = s.status === "available";
                       // « missed » = en retard sur le rythme conseillé, pas exclu : la leçon reste à faire.
                       const isMissed = s.status === "missed";
@@ -582,6 +598,56 @@ export function Bloc({ titre, icone: Icone, action, children, id }: {
  * La grille commence toujours un lundi : construite naïvement à partir du 1er du mois, elle
  * décalerait toutes les dates d'un ou plusieurs jours selon le jour de la semaine.
  */
+/**
+ * Une ligne « travail de groupe » dans le planning hebdomadaire.
+ *
+ * Elle se distingue d'une leçon par le trait qui compte : ce n'est pas un travail qu'on
+ * fait seul. Le nom du groupe est donc affiché à même la ligne — sans lui, l'étudiant ne
+ * sait pas à qui écrire, et le rendu attend.
+ */
+function LigneTravailGroupe({ t, groupe, onOuvrir }:
+  { t: any; groupe?: { nom: string } | null; onOuvrir: () => void }) {
+  const isDone = t.statut === "completed";
+  const isSubmitted = t.statut === "submitted";
+  const isMissed = t.statut === "missed";
+  const isAvail = t.statut === "available";
+  const isOpen = isAvail || isMissed || isSubmitted;
+
+  return (
+    <div className={`flex items-center gap-3 p-3.5 ${isOpen && !isSubmitted ? "bg-primary/5" : ""}`}>
+      <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+        isDone ? "bg-primary text-white"
+        : isSubmitted ? "bg-blue-500/15 text-blue-600"
+        : isAvail ? "bg-primary/15 text-primary"
+        : isMissed ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"}`}>
+        {isDone ? <CheckCircle2 className="w-4 h-4" />
+          : isSubmitted ? <Clock className="w-4 h-4" />
+          : isOpen ? <Users className="w-4 h-4" /> : <Lock className="w-3.5 h-3.5" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium truncate">{t.titre}</p>
+        <p className="text-xs text-muted-foreground truncate">
+          <span className="font-mono">GW{t.index}</span>
+          {groupe?.nom ? ` · ${groupe.nom}` : " · travail de groupe"}
+          {" · "}
+          {isDone ? `Corrigé — ${t.note}/${t.maxScore}`
+            : isSubmitted ? "Rendu — en cours de correction"
+            : isMissed ? "En retard — à rattraper"
+            : isAvail ? `À rendre avant le ${new Date(t.echeanceLe).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`
+            : `S'ouvre le ${new Date(t.ouvertureLe).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
+        </p>
+      </div>
+      {isOpen && (
+        <Button size="sm" variant={isAvail && !isSubmitted ? "default" : "outline"}
+          onClick={onOuvrir} className="shrink-0 gap-1.5">
+          <Send className="w-3.5 h-3.5" />
+          {isSubmitted ? "Voir" : isMissed ? "Rattraper" : "Déposer"}
+        </Button>
+      )}
+    </div>
+  );
+}
+
 export function Calendrier({ evenements }: { evenements: any[] }) {
   const [decalage, setDecalage] = useState(0);
   const aujourdhui = new Date();
@@ -635,7 +701,9 @@ export function Calendrier({ evenements }: { evenements: any[] }) {
             const evts = parJour[cle(d)] || [];
             const estAujourdhui = cle(d) === cle(aujourdhui);
             const aRencontre = evts.some(e => e.type === "rencontre");
-            const enRetard = evts.some(e => e.type === "echeance" && e.statut === "missed");
+            const aGroupe = evts.some(e => e.type === "travail_groupe");
+            const enRetard = evts.some(e =>
+              (e.type === "echeance" || e.type === "travail_groupe") && e.statut === "missed");
             return (
               <span key={n}
                 title={evts.map(e => `${e.titre}${e.detail ? ` — ${e.detail}` : ""}`).join("\n") || undefined}
@@ -646,14 +714,16 @@ export function Calendrier({ evenements }: { evenements: any[] }) {
                 {n}
                 {evts.length > 0 && !estAujourdhui && (
                   <span className={`absolute bottom-1 w-1 h-1 rounded-full ${
-                    enRetard ? "bg-destructive" : aRencontre ? "bg-violet-500" : "bg-primary"}`} />
+                    enRetard ? "bg-destructive" : aGroupe ? "bg-amber-500"
+                      : aRencontre ? "bg-violet-500" : "bg-primary"}`} />
                 )}
               </span>
             );
           })}
         </div>
         <div className="flex flex-wrap items-center gap-3 mt-3 pt-3 border-t border-border/40">
-          {[["bg-primary", "échéance"], ["bg-violet-500", "rencontre"], ["bg-destructive", "en retard"]].map(([c, l]) => (
+          {[["bg-primary", "échéance"], ["bg-amber-500", "travail de groupe"],
+            ["bg-violet-500", "rencontre"], ["bg-destructive", "en retard"]].map(([c, l]) => (
             <span key={l} className="flex items-center gap-1.5 text-[10px] text-muted-foreground">
               <span className={`w-1.5 h-1.5 rounded-full ${c}`} /> {l}
             </span>

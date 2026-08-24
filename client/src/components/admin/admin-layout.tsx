@@ -35,6 +35,7 @@ const SECTIONS: Section[] = [
     items: [
       { href: "/admin/students", label: "Étudiants", icon: GraduationCap, badge: "emailsNonVerifies" },
       { href: "/admin/meetings", label: "Rencontres en ligne", icon: Video },
+      { href: "/admin/group-work", label: "Travaux de groupe", icon: Users },
     ],
   },
   {
