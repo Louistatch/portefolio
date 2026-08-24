@@ -132,7 +132,7 @@ export const newsletterCampaigns = pgTable("newsletter_campaigns", {
 
 
 // ════════════════════════════════════════════════
-// DataMEAL Academy — School Management System
+// LouisFarm Learning — School Management System
 // ════════════════════════════════════════════════
 
 // ── Students ──

@@ -96,7 +96,7 @@ export default function AcademyGroupWork() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <SEO title="Travaux de groupe — DataMEAL Academy" description="Les évaluations collectives du cursus MEAL." />
+      <SEO title="Travaux de groupe — LouisFarm Learning" description="Les évaluations collectives du cursus MEAL." />
 
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-teal-700 p-6 sm:p-8 text-white">
         <div className="absolute -right-8 -top-8 w-44 h-44 rounded-full bg-white/10" />
@@ -131,7 +131,7 @@ function Vide({ titre, detail, icone: Icone, action }:
   { titre: string; detail: string; icone: any; action?: React.ReactNode }) {
   return (
     <div className="max-w-3xl mx-auto">
-      <SEO title="Travaux de groupe — DataMEAL Academy" description="Les évaluations collectives du cursus." />
+      <SEO title="Travaux de groupe — LouisFarm Learning" description="Les évaluations collectives du cursus." />
       <div className="bg-card rounded-2xl border border-border/50 p-8 text-center">
         <Icone className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
         <p className="font-medium">{titre}</p>

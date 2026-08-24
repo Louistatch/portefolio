@@ -18,7 +18,7 @@ import Booking from "@/pages/booking";
 import Contact from "@/pages/contact";
 import ELearning from "@/pages/elearning";
 
-// DataMEAL Academy
+// LouisFarm Learning
 import AcademyRegister from "@/pages/academy/register";
 import AcademyLogin from "@/pages/academy/login";
 import AcademyDashboard from "@/pages/academy/dashboard";
@@ -108,7 +108,7 @@ function App() {
             <Route path="/admin/student-messages">{() => <RequireAuth><AdminStudentMessages /></RequireAuth>}</Route>
             <Route path="/admin/group-work">{() => <RequireAuth><AdminGroupWork /></RequireAuth>}</Route>
 
-            {/* DataMEAL Academy — espace étudiant (pas de Layout admin) */}
+            {/* LouisFarm Learning — espace étudiant (pas de Layout admin) */}
             <Route path="/academy/register">{() => <Layout><AcademyRegister /></Layout>}</Route>
             <Route path="/academy/login">{() => <Layout><AcademyLogin /></Layout>}</Route>
             <Route path="/academy/dashboard">{() => <RequireStudentAuth><AcademyLayout><AcademyDashboard /></AcademyLayout></RequireStudentAuth>}</Route>

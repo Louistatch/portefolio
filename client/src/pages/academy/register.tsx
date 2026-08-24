@@ -56,7 +56,7 @@ export default function AcademyRegister() {
   if (registered) {
     return (
       <div className="max-w-md mx-auto px-6 py-20 text-center">
-        <SEO title="Inscription réussie — DataMEAL Academy" description="Confirmez votre email." />
+        <SEO title="Inscription réussie — LouisFarm Learning" description="Confirmez votre email." />
         <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5"><Mail className="w-8 h-8 text-primary" /></div>
         <h1 className="text-2xl font-bold mb-2">Bienvenue, {form.first_name} !</h1>
         {/* L'état affiché reflète le résultat réel de l'envoi, pas une supposition. */}
@@ -83,7 +83,7 @@ export default function AcademyRegister() {
 
   return (
     <div className="max-w-md mx-auto px-6 py-12">
-      <SEO title="Inscription — DataMEAL Academy" description="Créez votre compte étudiant DataMEAL Academy." />
+      <SEO title="Inscription — LouisFarm Learning" description="Créez votre compte étudiant LouisFarm Learning." />
       <div className="text-center mb-8">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
           <GraduationCap className="w-7 h-7 text-primary" />

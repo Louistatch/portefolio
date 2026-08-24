@@ -121,7 +121,7 @@ export default function AcademyProfile() {
 
   return (
     <div className="max-w-2xl mx-auto px-6 py-10">
-      <SEO title="Mon profil — DataMEAL Academy" description="Gérez votre profil étudiant." />
+      <SEO title="Mon profil — LouisFarm Learning" description="Gérez votre profil étudiant." />
       <button onClick={() => navigate("/academy/dashboard")} className="flex items-center gap-2 text-sm text-muted-foreground hover:text-primary mb-6">
         <ArrowLeft className="w-4 h-4" /> Tableau de bord
       </button>

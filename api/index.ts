@@ -920,7 +920,7 @@ app.get("/api/og/blog/:slug", async (req, res) => {
 
 
 // ══════════════════════════════════════════════════════════════════
-// DataMEAL ACADEMY — School Management System
+// LouisFarm Learning — School Management System
 // ══════════════════════════════════════════════════════════════════
 
 function generateStudentToken(id: number): string {
@@ -949,7 +949,7 @@ async function logAcademyEmail(student_id: number | null, type: string, email: s
 }
 
 /**
- * Dispatcher email centralisé pour DataMEAL Academy.
+ * Dispatcher email centralisé pour LouisFarm Learning.
  * - Idempotent : avec dedupeKey, n'envoie pas deux fois le même email de cycle de vie.
  * - Journalise systématiquement dans academy_emails.
  * - Ne bloque jamais la requête (fire-and-forget contrôlé), erreurs loggées.
@@ -997,7 +997,7 @@ async function notifyNewCourseEmails(course: { id: number; code?: string; title:
   if (!toNotify.length) return 0;
   const batch = toNotify.map((s: any) => ({
     from: FROM_EMAIL, to: s.email,
-    subject: `Nouveau cours : ${course.title} — DataMEAL Academy`,
+    subject: `Nouveau cours : ${course.title} — LouisFarm Learning`,
     html: newCourseEmailHtml(s.full_name, course),
   }));
   for (let i = 0; i < batch.length; i += 100) {
@@ -1059,7 +1059,7 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
     try {
       const r: any = await resend.emails.send({
         from: FROM_EMAIL, to: email,
-        subject: "Confirmez votre inscription — DataMEAL Academy",
+        subject: "Confirmez votre inscription — LouisFarm Learning",
         html: verifyEmailHtml(full_name, verifyUrl, verifyCode),
       });
       if (r?.error) console.error("Verify email refused:", r.error?.message || r.error);
@@ -1542,13 +1542,13 @@ async function seedGroupForum(groupId: number, gw: any) {
   const lignes: any[] = [];
   if (gw.brief_url) lignes.push({
     group_id: groupId, group_work_id: gw.id, student_id: null,
-    author_name: "DataMEAL Academy", kind: "ressource",
+    author_name: "LouisFarm Learning", kind: "ressource",
     body: `Énoncé du travail — ${gw.title}. À lire avant toute chose : il contient la commande, les livrables attendus et la grille de notation.`,
     attachment_url: gw.brief_url, attachment_name: `${gw.title} — énoncé (PDF)`,
   });
   if (gw.template_url) lignes.push({
     group_id: groupId, group_work_id: gw.id, student_id: null,
-    author_name: "DataMEAL Academy", kind: "ressource",
+    author_name: "LouisFarm Learning", kind: "ressource",
     body: "Modèle de rapport à remplir en équipe : une section nominative par membre, plus les parties communes. C'est ce document, exporté en PDF, qui constitue le rendu.",
     attachment_url: gw.template_url, attachment_name: `${gw.title} — modèle de rapport (DOCX)`,
   });
@@ -1900,7 +1900,7 @@ async function grantAdmission(sid: number, score: number, now: Date, previousAdm
     const certUrl = `${SITE_URL}/api/academy/certificate/admission?token=${dlToken}`;
     sendAcademyEmail({
       studentId: sid, to: stAdm.email, type: "admission_passed",
-      subject: "🎉 Félicitations — Vous êtes admis(e) à DataMEAL Academy !",
+      subject: "🎉 Félicitations — Vous êtes admis(e) à LouisFarm Learning !",
       html: admissionPassedEmailHtml(stAdm.full_name, Math.round(score / 30 * 100), admissionExpires, certUrl),
       dedupeKey: `admission:${sid}:${admissionExpires}`,
     });
@@ -2313,7 +2313,7 @@ app.post("/api/cron/verify-reminders", async (req, res) => {
     const r = await sendAcademyEmail({
       studentId: s.id, to: s.email, type: "verify_reminder",
       subject: etape === 1 ? "Il reste une étape — confirmez votre adresse"
-        : etape === 3 ? "Votre compte DataMEAL Academy attend toujours"
+        : etape === 3 ? "Votre compte LouisFarm Learning attend toujours"
         : "Dernier rappel — confirmez votre adresse",
       html: verifyReminderEmailHtml(s.full_name, `${SITE_URL}/academy/verify?token=${verifyToken}`, verifyCode, etape),
       // Une relance par rang et par étudiant : rejouer la tâche n'en renvoie pas une seconde.
@@ -2345,7 +2345,7 @@ app.post("/api/academy/resend-verify", rateLimit(5, 15 * 60 * 1000), requireStud
     try {
       const r: any = await resend.emails.send({
         from: FROM_EMAIL, to: data.email,
-        subject: "Confirmez votre inscription — DataMEAL Academy",
+        subject: "Confirmez votre inscription — LouisFarm Learning",
         html: verifyEmailHtml(data.full_name, verifyUrl, verifyCode),
       });
       if (r?.error) { emailError = r.error?.message || String(r.error); }
@@ -2374,7 +2374,7 @@ app.post("/api/academy/forgot-password", rateLimit(5, 15 * 60 * 1000), async (re
       const resetUrl = `${SITE_URL}/academy/reset-password?token=${resetToken}`;
       resend.emails.send({
         from: FROM_EMAIL, to: email,
-        subject: "Réinitialisation de votre mot de passe — DataMEAL Academy",
+        subject: "Réinitialisation de votre mot de passe — LouisFarm Learning",
         html: resetEmailHtml(data.full_name, resetUrl),
       }).then(() => logAcademyEmail(data.id, "reset", email, "Réinitialisation mot de passe")).catch(() => {});
     }
@@ -3783,7 +3783,7 @@ app.get("/api/academy/my-credentials", requireStudent, async (req, res) => {
       id: "admission",
       type: "admission",
       title: "Attestation d'admission",
-      subtitle: "Programme MEAL — DataMEAL Academy",
+      subtitle: "Programme MEAL — LouisFarm Learning",
       issued_at: stud.admitted_at,
       expires_at: stud.admission_expires,
       status: expired ? "expired" : "active",
@@ -3881,8 +3881,8 @@ app.post("/api/admin/academy/test-email", requireAuth, async (req, res) => {
   try {
     const result = await resend.emails.send({
       from: FROM_EMAIL, to,
-      subject: "Test DataMEAL Academy",
-      html: emailLayout('<div class="h"><h1>Test réussi</h1></div><div class="b"><p>Si vous lisez cet email, la configuration Resend de DataMEAL Academy fonctionne correctement.</p></div>'),
+      subject: "Test LouisFarm Learning",
+      html: emailLayout('<div class="h"><h1>Test réussi</h1></div><div class="b"><p>Si vous lisez cet email, la configuration Resend de LouisFarm Learning fonctionne correctement.</p></div>'),
     });
     res.json({ message: "Email de test envoyé", id: (result as any)?.data?.id || null });
   } catch (e: any) {
@@ -4469,7 +4469,7 @@ function studentMessageEmailHtml(nom: string | undefined, sujet: string, corps: 
   );
 }
 
-// ── Layout email dédié DataMEAL Academy ──
+// ── Layout email dédié LouisFarm Learning ──
 function academyEmailLayout(content: string) {
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <style>
@@ -4500,28 +4500,28 @@ function academyEmailLayout(content: string) {
   .ft p{color:#9ca3af;font-size:12px;margin:0 0 4px}
   .ft a{color:#0d9488;text-decoration:none}
 </style></head><body><div class="wrap"><div class="card">${content}
-  <div class="ft"><p class="name">🎓 DataMEAL Academy</p><p>Formation gratuite par projets · KoboCollect · Python · QGIS</p><p>Afrique de l'Ouest · <a href="${SITE_URL}/academy/login">Mon espace étudiant</a></p><p style="margin-top:12px;font-size:11px;color:#d1d5db">Vous recevez cet email car vous avez un compte sur DataMEAL Academy.</p></div>
+  <div class="ft"><p class="name">🎓 LouisFarm Learning</p><p>Formation gratuite par projets · KoboCollect · Python · QGIS</p><p>Afrique de l'Ouest · <a href="${SITE_URL}/academy/login">Mon espace étudiant</a></p><p style="margin-top:12px;font-size:11px;color:#d1d5db">Vous recevez cet email car vous avez un compte sur LouisFarm Learning.</p></div>
 </div></div></body></html>`;
 }
 
 function verifyEmailHtml(name: string, url: string, code?: string) {
   const codeBlock = code ? `<div class="cd" style="text-align:center"><p style="margin:0 0 8px;font-size:13px">Ou entrez ce code dans l'application :</p><p style="font-size:28px;font-weight:700;letter-spacing:6px;color:#16a34a;margin:0">${code}</p></div>` : "";
-  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Confirmez votre inscription</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">🎓 Bienvenue</span><p>Bonjour ${name},</p><p>Merci de rejoindre <strong>DataMEAL Academy</strong>, la formation gratuite par projets en MEAL (KoboCollect, Python, QGIS) pour l'Afrique de l'Ouest.</p><p>Pour activer votre compte et passer le test d'aptitude, confirmez votre adresse email :</p><p style="text-align:center"><a href="${url}" class="cta">Confirmer mon email</a></p>${codeBlock}<p style="font-size:13px;color:#9ca3af">Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, ignorez cet email.</p><p>À très vite en cours,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="LouisFarm Learning" class="av"><h1>Confirmez votre inscription</h1><p>LouisFarm Learning</p></div><div class="b"><span class="bg">🎓 Bienvenue</span><p>Bonjour ${name},</p><p>Merci de rejoindre <strong>LouisFarm Learning</strong>, la formation gratuite par projets en MEAL (KoboCollect, Python, QGIS) pour l'Afrique de l'Ouest.</p><p>Pour activer votre compte et passer le test d'aptitude, confirmez votre adresse email :</p><p style="text-align:center"><a href="${url}" class="cta">Confirmer mon email</a></p>${codeBlock}<p style="font-size:13px;color:#9ca3af">Ce lien expire dans 24 heures. Si vous n'avez pas créé de compte, ignorez cet email.</p><p>À très vite en cours,<br><strong>L'équipe LouisFarm Learning</strong></p></div>`);
 }
 
 function resetEmailHtml(name: string, url: string) {
-  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Réinitialisation du mot de passe</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">🔑 Sécurité</span><p>Bonjour ${name},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en choisir un nouveau :</p><p style="text-align:center"><a href="${url}" class="cta">Réinitialiser mon mot de passe</a></p><p style="font-size:13px;color:#9ca3af">Ce lien expire dans 1 heure. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe reste inchangé.</p><p>Cordialement,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="LouisFarm Learning" class="av"><h1>Réinitialisation du mot de passe</h1><p>LouisFarm Learning</p></div><div class="b"><span class="bg">🔑 Sécurité</span><p>Bonjour ${name},</p><p>Vous avez demandé à réinitialiser votre mot de passe. Cliquez sur le bouton ci-dessous pour en choisir un nouveau :</p><p style="text-align:center"><a href="${url}" class="cta">Réinitialiser mon mot de passe</a></p><p style="font-size:13px;color:#9ca3af">Ce lien expire dans 1 heure. Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe reste inchangé.</p><p>Cordialement,<br><strong>L'équipe LouisFarm Learning</strong></p></div>`);
 }
 
 function newCourseEmailHtml(name: string | undefined, course: { code: string; title: string; description?: string }) {
   const g = name ? `Bonjour ${name},` : "Bonjour,";
-  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="DataMEAL Academy" class="av"><h1>Nouveau cours disponible</h1><p>DataMEAL Academy</p></div><div class="b"><span class="bg">📚 Nouveau cours</span><p>${g}</p><p>Un nouveau cours vient d'être ajouté à votre académie :</p><div class="cd"><h3>${course.title}</h3>${course.description ? `<p>${course.description}</p>` : ""}<p style="margin-top:8px;font-size:12px;color:#16a34a;font-weight:600">Code : ${course.code}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="cta">Découvrir le cours</a></p><p>Bonne formation,<br><strong>L'équipe DataMEAL Academy</strong></p></div>`);
+  return emailLayout(`<div class="h"><img src="${PHOTO_URL}" alt="LouisFarm Learning" class="av"><h1>Nouveau cours disponible</h1><p>LouisFarm Learning</p></div><div class="b"><span class="bg">📚 Nouveau cours</span><p>${g}</p><p>Un nouveau cours vient d'être ajouté à votre académie :</p><div class="cd"><h3>${course.title}</h3>${course.description ? `<p>${course.description}</p>` : ""}<p style="margin-top:8px;font-size:12px;color:#16a34a;font-weight:600">Code : ${course.code}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="cta">Découvrir le cours</a></p><p>Bonne formation,<br><strong>L'équipe LouisFarm Learning</strong></p></div>`);
 }
 
 
 // ── Email : projet terminé (100%) ──
 function courseCompletedEmailHtml(name: string, course: { code: string; title: string }) {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Bravo, ${name.split(" ")[0]} ! 🏁</h1><p class="sub">Vous avez terminé un projet complet</p></div><div class="bd"><span class="badge">✅ Projet terminé</span><p>Félicitations ${name},</p><p>Vous venez de compléter <strong>100%</strong> du projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code} · Terminé</p></div><p>C'est une vraie compétence terrain, directement applicable dans les contextes humanitaires et de développement en Afrique de l'Ouest.</p><p><strong>Prochaine étape :</strong> demandez votre attestation de compétence, ou enchaînez sur le projet suivant pour progresser vers le statut de Super-Expert MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Demander mon attestation</a></p><p class="muted">Continuez sur cette lancée — chaque projet vous rapproche de la maîtrise complète du cycle MEAL.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Bravo, ${name.split(" ")[0]} ! 🏁</h1><p class="sub">Vous avez terminé un projet complet</p></div><div class="bd"><span class="badge">✅ Projet terminé</span><p>Félicitations ${name},</p><p>Vous venez de compléter <strong>100%</strong> du projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code} · Terminé</p></div><p>C'est une vraie compétence terrain, directement applicable dans les contextes humanitaires et de développement en Afrique de l'Ouest.</p><p><strong>Prochaine étape :</strong> demandez votre attestation de compétence, ou enchaînez sur le projet suivant pour progresser vers le statut de Super-Expert MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Demander mon attestation</a></p><p class="muted">Continuez sur cette lancée — chaque projet vous rapproche de la maîtrise complète du cycle MEAL.</p></div>`);
 }
 
 // ── Email : relance de vérification d'adresse ──
@@ -4537,7 +4537,7 @@ function verifyReminderEmailHtml(name: string, url: string, code: string, step: 
         corps: `<p>Votre adresse email n'est toujours pas confirmée. Vous pouvez suivre les cours sans cela, mais <strong>nous ne pourrons vous délivrer ni attestation ni certificat</strong> tant que ce n'est pas fait.</p>` }
     : { badge: "🔔 Dernier rappel", titre: "Dernier rappel", sous: "Confirmation d'adresse",
         corps: `<p>C'est le dernier message que nous vous enverrons à ce sujet. Sans confirmation, votre compte reste utilisable pour apprendre, mais aucun document officiel ne pourra vous être délivré.</p>` };
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>${t.titre}</h1><p class="sub">${t.sous}</p></div><div class="bd"><span class="badge">${t.badge}</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p>${t.corps}<p style="text-align:center"><a href="${url}" class="btn">Confirmer mon adresse</a></p><div class="code"><p class="lbl">Ou saisissez ce code dans l'application :</p><p class="val">${code}</p></div><p class="muted"><strong>Vous ne trouvez pas nos messages ?</strong> Regardez dans vos spams ou courriers indésirables. Si vous y trouvez un email de notre part, marquez-le « Non spam » et ajoutez contact@louisfarm.com à vos contacts — les suivants arriveront normalement.</p><p class="muted">Ce lien et ce code sont valables 24 heures. Si vous n'êtes pas à l'origine de cette inscription, ignorez ce message.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>${t.titre}</h1><p class="sub">${t.sous}</p></div><div class="bd"><span class="badge">${t.badge}</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p>${t.corps}<p style="text-align:center"><a href="${url}" class="btn">Confirmer mon adresse</a></p><div class="code"><p class="lbl">Ou saisissez ce code dans l'application :</p><p class="val">${code}</p></div><p class="muted"><strong>Vous ne trouvez pas nos messages ?</strong> Regardez dans vos spams ou courriers indésirables. Si vous y trouvez un email de notre part, marquez-le « Non spam » et ajoutez contact@louisfarm.com à vos contacts — les suivants arriveront normalement.</p><p class="muted">Ce lien et ce code sont valables 24 heures. Si vous n'êtes pas à l'origine de cette inscription, ignorez ce message.</p></div>`);
 }
 
 // ── Email : seconde chance au test d'admission ──
@@ -4548,7 +4548,7 @@ function testReopenedEmailHtml(name: string, previousScore: number | null) {
   const manque = previousScore != null && previousScore > 0 && previousScore < ADMISSION_PASS_SCORE
     ? `<div class="info"><h3>Votre dernière tentative : ${previousScore}/30</h3><p style="margin-top:6px">Il vous manquait ${ADMISSION_PASS_SCORE - previousScore} point${ADMISSION_PASS_SCORE - previousScore > 1 ? "s" : ""} pour atteindre les ${ADMISSION_PASS_SCORE}/30 requis.</p></div>`
     : "";
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Une seconde chance vous est ouverte</h1><p class="sub">Test d'admission — nouvelle tentative autorisée</p></div><div class="bd"><span class="badge">🔓 Test rouvert</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Vous n'avez pas atteint le score requis lors de votre dernière tentative. Nous vous rouvrons le test <strong>dès maintenant</strong> : vous n'avez pas à attendre le délai habituel.</p>${manque}<p>Prenez le temps qu'il faut, installez-vous au calme, et relisez tranquillement chaque question avant de répondre. Le test porte sur les fondamentaux du MEAL, de la collecte de données et des outils de terrain.</p><p style="text-align:center"><a href="${SITE_URL}/elearning" class="btn">Repasser le test</a></p><p class="muted">Rien n'est perdu : seule votre meilleure situation compte, et l'accès à la formation reste entièrement gratuit. Si une question vous semble ambiguë, répondez à cet email — nous vous répondrons.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Une seconde chance vous est ouverte</h1><p class="sub">Test d'admission — nouvelle tentative autorisée</p></div><div class="bd"><span class="badge">🔓 Test rouvert</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Vous n'avez pas atteint le score requis lors de votre dernière tentative. Nous vous rouvrons le test <strong>dès maintenant</strong> : vous n'avez pas à attendre le délai habituel.</p>${manque}<p>Prenez le temps qu'il faut, installez-vous au calme, et relisez tranquillement chaque question avant de répondre. Le test porte sur les fondamentaux du MEAL, de la collecte de données et des outils de terrain.</p><p style="text-align:center"><a href="${SITE_URL}/elearning" class="btn">Repasser le test</a></p><p class="muted">Rien n'est perdu : seule votre meilleure situation compte, et l'accès à la formation reste entièrement gratuit. Si une question vous semble ambiguë, répondez à cet email — nous vous répondrons.</p></div>`);
 }
 
 // ── Email : leçon validée ──
@@ -4571,7 +4571,7 @@ function lessonPassedEmailHtml(
         : `<p><strong>Prochaine leçon :</strong> « ${opts.next.title} »${opts.next.unlockAt ? `, à partir du ${new Date(opts.next.unlockAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}. Vous pouvez d'ici là avancer sur vos autres cours.</p>
            <p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mon planning</a></p>`)
     : `<p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mon planning</a></p>`;
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Leçon validée${firstName ? `, ${firstName}` : ""} ! ✅</h1><p class="sub">${rang}${course.code}</p></div><div class="bd"><span class="badge">✅ Réussite</span><p>${name ? `Bonjour ${name},` : "Bonjour,"}</p><p>Vous venez de valider :</p><div class="info"><h3>${lesson.title}</h3><p style="margin-top:8px">Note : <strong style="color:#0d9488">${opts.score}/${opts.max}</strong> — ${pct}% de bonnes réponses</p><p style="margin-top:6px;font-size:12px;color:#6b7280">${course.code} · ${course.title}</p></div><p>Vous en êtes à <strong>${opts.done}/${opts.total} leçons</strong> de ce cours, soit <strong>${opts.progress}%</strong>.</p>${suite}<p class="muted">Les exercices sont corrigés côté serveur : cette note reflète vos réponses réelles, pas un simple clic. C'est du travail qui compte.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Leçon validée${firstName ? `, ${firstName}` : ""} ! ✅</h1><p class="sub">${rang}${course.code}</p></div><div class="bd"><span class="badge">✅ Réussite</span><p>${name ? `Bonjour ${name},` : "Bonjour,"}</p><p>Vous venez de valider :</p><div class="info"><h3>${lesson.title}</h3><p style="margin-top:8px">Note : <strong style="color:#0d9488">${opts.score}/${opts.max}</strong> — ${pct}% de bonnes réponses</p><p style="margin-top:6px;font-size:12px;color:#6b7280">${course.code} · ${course.title}</p></div><p>Vous en êtes à <strong>${opts.done}/${opts.total} leçons</strong> de ce cours, soit <strong>${opts.progress}%</strong>.</p>${suite}<p class="muted">Les exercices sont corrigés côté serveur : cette note reflète vos réponses réelles, pas un simple clic. C'est du travail qui compte.</p></div>`);
 }
 
 // ── Email : nouveau cours débloqué ──
@@ -4582,7 +4582,7 @@ function courseUnlockedEmailHtml(
   dueAt?: string,
 ) {
   const firstName = (name || "").split(" ")[0] || "";
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Nouveau cours débloqué 🔓</h1><p class="sub">${course.code} · ${course.title}</p></div><div class="bd"><span class="badge">🔓 Accès ouvert</span><p>${firstName ? `Bravo ${firstName},` : "Bravo,"}</p><p>Vous avez avancé assez loin pour ouvrir le cours suivant de votre parcours :</p><div class="info"><h3>${course.title}</h3>${course.description ? `<p style="margin-top:6px">${course.description}</p>` : ""}<p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code}</p></div>${firstLesson ? `<p><strong>Première leçon :</strong> « ${firstLesson.title} »${dueAt ? `, à rendre avant le ${new Date(dueAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}.</p>` : ""}<p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Commencer ce cours</a></p><p class="muted">Rappel : les dates du planning sont un rythme conseillé, pas un couperet. Vous pouvez prendre de l'avance, et une leçon en retard reste rattrapable jusqu'à la fin de votre période d'admission.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Nouveau cours débloqué 🔓</h1><p class="sub">${course.code} · ${course.title}</p></div><div class="bd"><span class="badge">🔓 Accès ouvert</span><p>${firstName ? `Bravo ${firstName},` : "Bravo,"}</p><p>Vous avez avancé assez loin pour ouvrir le cours suivant de votre parcours :</p><div class="info"><h3>${course.title}</h3>${course.description ? `<p style="margin-top:6px">${course.description}</p>` : ""}<p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code}</p></div>${firstLesson ? `<p><strong>Première leçon :</strong> « ${firstLesson.title} »${dueAt ? `, à rendre avant le ${new Date(dueAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}.</p>` : ""}<p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Commencer ce cours</a></p><p class="muted">Rappel : les dates du planning sont un rythme conseillé, pas un couperet. Vous pouvez prendre de l'avance, et une leçon en retard reste rattrapable jusqu'à la fin de votre période d'admission.</p></div>`);
 }
 
 // ── Email : annonce du formateur à toute une promotion ──
@@ -4593,7 +4593,7 @@ function cohortAnnouncementEmailHtml(name: string, cohorte: string, corps: strin
   const echappe = corps
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
     .replace(/\n/g, "<br>");
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Annonce à votre promotion 📣</h1><p class="sub">Promotion ${cohorte}</p></div><div class="bd"><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><div class="info"><p style="margin:0">${echappe}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Répondre sur le forum</a></p><p class="muted">Ce message a été adressé à toute votre promotion. Les échanges continuent sur le forum de la promotion, dans votre espace étudiant.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Annonce à votre promotion 📣</h1><p class="sub">Promotion ${cohorte}</p></div><div class="bd"><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><div class="info"><p style="margin:0">${echappe}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Répondre sur le forum</a></p><p class="muted">Ce message a été adressé à toute votre promotion. Les échanges continuent sur le forum de la promotion, dans votre espace étudiant.</p></div>`);
 }
 
 // ── Email : admission remise à zéro pour retard ──
@@ -4603,7 +4603,7 @@ function cohortAnnouncementEmailHtml(name: string, cohorte: string, corps: strin
 // ouverte immédiatement. Un message sec ferait perdre quelqu'un qui peut encore réussir.
 function admissionResetEmailHtml(name: string, joursDeRetard: number, faites: number, total: number) {
   const firstName = (name || "").split(" ")[0] || "";
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Votre parcours repart de zéro</h1><p class="sub">Et vous pouvez recommencer dès aujourd'hui</p></div><div class="bd"><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Votre parcours accusait <strong>${joursDeRetard} jours de retard</strong> sur le rythme conseillé (${faites} leçon${faites > 1 ? "s" : ""} validée${faites > 1 ? "s" : ""} sur ${total}). À ce stade, la fenêtre d'admission de trois mois qui vous restait ne permettait plus de terminer le cursus.</p><p>Plutôt que de vous laisser accumuler des échéances intenables, nous remettons votre parcours à zéro. <strong>Ce n'est pas une exclusion :</strong> vous pouvez repasser le test d'admission immédiatement, sans délai d'attente, et repartir avec la promotion suivante depuis la semaine 1 — avec un groupe de travail neuf.</p><div class="info"><p style="margin:0"><strong>Ce que vous gardez :</strong> vos notes et vos attestations déjà obtenues. Vous avez fait ce travail, il vous reste acquis.</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Repasser le test d'admission</a></p><p class="muted">Si quelque chose vous a empêché d'avancer et que nous pouvons aider, répondez simplement à cet email.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Votre parcours repart de zéro</h1><p class="sub">Et vous pouvez recommencer dès aujourd'hui</p></div><div class="bd"><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Votre parcours accusait <strong>${joursDeRetard} jours de retard</strong> sur le rythme conseillé (${faites} leçon${faites > 1 ? "s" : ""} validée${faites > 1 ? "s" : ""} sur ${total}). À ce stade, la fenêtre d'admission de trois mois qui vous restait ne permettait plus de terminer le cursus.</p><p>Plutôt que de vous laisser accumuler des échéances intenables, nous remettons votre parcours à zéro. <strong>Ce n'est pas une exclusion :</strong> vous pouvez repasser le test d'admission immédiatement, sans délai d'attente, et repartir avec la promotion suivante depuis la semaine 1 — avec un groupe de travail neuf.</p><div class="info"><p style="margin:0"><strong>Ce que vous gardez :</strong> vos notes et vos attestations déjà obtenues. Vous avez fait ce travail, il vous reste acquis.</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Repasser le test d'admission</a></p><p class="muted">Si quelque chose vous a empêché d'avancer et que nous pouvons aider, répondez simplement à cet email.</p></div>`);
 }
 
 // ── Email : le groupe est constitué ──
@@ -4620,7 +4620,7 @@ function groupFormedEmailHtml(
   const firstName = (name || "").split(" ")[0] || "";
   const equipe = membres.map(m =>
     `<li>${m.nom}${m.email ? ` — <a href="mailto:${m.email}" style="color:#0d9488">${m.email}</a>` : ""}</li>`).join("");
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Votre groupe est constitué 👥</h1><p class="sub">${gw.title}</p></div><div class="bd"><span class="badge">👥 ${groupe.name} · ${membres.length} membres</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Les équipes de <strong>${gw.title}</strong> viennent d'être tirées au sort. Voici la vôtre :</p><ul style="margin:0 0 14px 18px;padding:0;font-size:14px;color:#374151">${equipe}</ul><p>Votre espace de travail est ouvert : vous y trouvez le <strong>forum de votre groupe</strong>, l'<strong>énoncé de chaque projet</strong> et le <strong>modèle de rapport</strong> à remplir ensemble.</p><p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Ouvrir mon espace de groupe</a></p><p class="muted">Cette équipe vaut pour ce travail uniquement : les groupes sont retirés au sort avant chacun des trois projets. Écrivez-vous dès aujourd'hui — les groupes qui se parlent tout de suite sont ceux qui rendent dans les temps.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Votre groupe est constitué 👥</h1><p class="sub">${gw.title}</p></div><div class="bd"><span class="badge">👥 ${groupe.name} · ${membres.length} membres</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Les équipes de <strong>${gw.title}</strong> viennent d'être tirées au sort. Voici la vôtre :</p><ul style="margin:0 0 14px 18px;padding:0;font-size:14px;color:#374151">${equipe}</ul><p>Votre espace de travail est ouvert : vous y trouvez le <strong>forum de votre groupe</strong>, l'<strong>énoncé de chaque projet</strong> et le <strong>modèle de rapport</strong> à remplir ensemble.</p><p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Ouvrir mon espace de groupe</a></p><p class="muted">Cette équipe vaut pour ce travail uniquement : les groupes sont retirés au sort avant chacun des trois projets. Écrivez-vous dès aujourd'hui — les groupes qui se parlent tout de suite sont ceux qui rendent dans les temps.</p></div>`);
 }
 
 // ── Email : un travail de groupe s'ouvre ──
@@ -4636,7 +4636,7 @@ function groupWorkOpenedEmailHtml(
   const firstName = (name || "").split(" ")[0] || "";
   const livrables = Array.isArray(gw.deliverables) ? gw.deliverables : [];
   const equipe = membres.map(m => `<li>${m.nom}${m.email ? ` — <a href="mailto:${m.email}" style="color:#0d9488">${m.email}</a>` : ""}</li>`).join("");
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Travail de groupe ouvert 👥</h1><p class="sub">${gw.title}</p></div><div class="bd"><span class="badge">👥 ${groupe.name} · cohorte ${groupe.cohort}</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Un travail collectif vient de s'ouvrir dans votre parcours. Un seul rendu est attendu <strong>pour tout le groupe</strong>, et la note est partagée par tous ses membres.</p>${gw.brief ? `<div class="info"><h3>${gw.title}</h3><p style="margin-top:6px">${gw.brief}</p></div>` : ""}${livrables.length ? `<p><strong>Livrables attendus :</strong></p><ul style="margin:0 0 12px 18px;padding:0;font-size:14px;color:#374151">${livrables.map((d: any) => `<li>${d}</li>`).join("")}</ul>` : ""}<p><strong>Votre groupe :</strong></p><ul style="margin:0 0 12px 18px;padding:0;font-size:14px;color:#374151">${equipe}</ul>${dueAt ? `<p><strong>À rendre avant le ${new Date(dueAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</strong> — vous avez deux semaines, prenez contact dès maintenant.</p>` : ""}<p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Voir le travail de groupe</a></p><p class="muted">Le premier réflexe utile : écrire à vos coéquipiers aujourd'hui et vous répartir les livrables. Un groupe qui se parle en semaine 1 rend dans les temps.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Travail de groupe ouvert 👥</h1><p class="sub">${gw.title}</p></div><div class="bd"><span class="badge">👥 ${groupe.name} · cohorte ${groupe.cohort}</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Un travail collectif vient de s'ouvrir dans votre parcours. Un seul rendu est attendu <strong>pour tout le groupe</strong>, et la note est partagée par tous ses membres.</p>${gw.brief ? `<div class="info"><h3>${gw.title}</h3><p style="margin-top:6px">${gw.brief}</p></div>` : ""}${livrables.length ? `<p><strong>Livrables attendus :</strong></p><ul style="margin:0 0 12px 18px;padding:0;font-size:14px;color:#374151">${livrables.map((d: any) => `<li>${d}</li>`).join("")}</ul>` : ""}<p><strong>Votre groupe :</strong></p><ul style="margin:0 0 12px 18px;padding:0;font-size:14px;color:#374151">${equipe}</ul>${dueAt ? `<p><strong>À rendre avant le ${new Date(dueAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}</strong> — vous avez deux semaines, prenez contact dès maintenant.</p>` : ""}<p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Voir le travail de groupe</a></p><p class="muted">Le premier réflexe utile : écrire à vos coéquipiers aujourd'hui et vous répartir les livrables. Un groupe qui se parle en semaine 1 rend dans les temps.</p></div>`);
 }
 
 // ── Email : rendu collectif corrigé ──
@@ -4649,22 +4649,22 @@ function groupWorkGradedEmailHtml(
 ) {
   const firstName = (name || "").split(" ")[0] || "";
   const pct = max > 0 ? Math.round((score / max) * 100) : 0;
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Travail de groupe corrigé 📝</h1><p class="sub">${gw.title}</p></div><div class="bd"><span class="badge">${pct >= 70 ? "✅ Validé" : "📝 Corrigé"}</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Le rendu de votre groupe a été corrigé :</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0;font-size:26px;font-weight:800;color:#0d9488">${score}/${max}</p><p style="margin-top:4px;font-size:12px;color:#6b7280">soit ${pct}%</p></div>${feedback ? `<p><strong>Commentaire du formateur :</strong></p><p style="font-size:14px;color:#374151">${feedback}</p>` : ""}<p>Cette note entre dans votre relevé et compte dans votre moyenne, au même titre qu'une évaluation individuelle.</p><p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Voir le détail</a></p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Travail de groupe corrigé 📝</h1><p class="sub">${gw.title}</p></div><div class="bd"><span class="badge">${pct >= 70 ? "✅ Validé" : "📝 Corrigé"}</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Le rendu de votre groupe a été corrigé :</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0;font-size:26px;font-weight:800;color:#0d9488">${score}/${max}</p><p style="margin-top:4px;font-size:12px;color:#6b7280">soit ${pct}%</p></div>${feedback ? `<p><strong>Commentaire du formateur :</strong></p><p style="font-size:14px;color:#374151">${feedback}</p>` : ""}<p>Cette note entre dans votre relevé et compte dans votre moyenne, au même titre qu'une évaluation individuelle.</p><p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Voir le détail</a></p></div>`);
 }
 
 // ── Email : demande d'attestation reçue (accusé) ──
 function attestationRequestedEmailHtml(name: string, course: { code: string; title: string }, certNo: string, score: number) {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Demande reçue 📋</h1><p class="sub">Votre attestation est en cours de validation</p></div><div class="bd"><span class="badge">⏳ En traitement</span><p>Bonjour ${name},</p><p>Nous avons bien reçu votre demande d'attestation pour le projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:6px">Score final : <strong style="color:#0d9488">${score}%</strong></p><p style="margin-top:6px;font-size:12px;color:#6b7280">N° de certificat : <span style="font-family:monospace">${certNo}</span></p></div><p>Notre équipe vérifie votre parcours et validera votre attestation sous <strong>24 à 48 heures</strong>. Vous recevrez un email dès qu'elle sera émise.</p><p class="muted">Aucune action n'est requise de votre part pour le moment. Merci de votre patience.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Demande reçue 📋</h1><p class="sub">Votre attestation est en cours de validation</p></div><div class="bd"><span class="badge">⏳ En traitement</span><p>Bonjour ${name},</p><p>Nous avons bien reçu votre demande d'attestation pour le projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:6px">Score final : <strong style="color:#0d9488">${score}%</strong></p><p style="margin-top:6px;font-size:12px;color:#6b7280">N° de certificat : <span style="font-family:monospace">${certNo}</span></p></div><p>Notre équipe vérifie votre parcours et validera votre attestation sous <strong>24 à 48 heures</strong>. Vous recevrez un email dès qu'elle sera émise.</p><p class="muted">Aucune action n'est requise de votre part pour le moment. Merci de votre patience.</p></div>`);
 }
 
 // ── Email : attestation émise (validée par l'admin) ──
 function attestationIssuedEmailHtml(name: string, course: { code: string; title: string }, certNo: string, score: number) {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Attestation délivrée ! 🎉</h1><p class="sub">Félicitations pour votre réussite</p></div><div class="bd"><span class="badge">🏆 Certifié</span><p>Bravo ${name},</p><p>Votre attestation de compétence est officiellement délivrée :</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><h3 style="color:#0d9488">${course.title}</h3><p style="margin-top:8px">Score final : <strong style="font-size:18px;color:#0d9488">${score}%</strong></p><p style="margin-top:10px;font-size:12px;color:#6b7280">Certificat N° <span style="font-family:monospace;font-weight:700">${certNo}</span></p></div><p>Vous pouvez désormais valoriser cette compétence dans votre CV, sur LinkedIn et auprès de vos employeurs. Ce certificat atteste de votre maîtrise pratique des outils MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mon attestation</a></p><p class="muted">Conservez votre numéro de certificat — il permet de vérifier l'authenticité de votre attestation.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Attestation délivrée ! 🎉</h1><p class="sub">Félicitations pour votre réussite</p></div><div class="bd"><span class="badge">🏆 Certifié</span><p>Bravo ${name},</p><p>Votre attestation de compétence est officiellement délivrée :</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><h3 style="color:#0d9488">${course.title}</h3><p style="margin-top:8px">Score final : <strong style="font-size:18px;color:#0d9488">${score}%</strong></p><p style="margin-top:10px;font-size:12px;color:#6b7280">Certificat N° <span style="font-family:monospace;font-weight:700">${certNo}</span></p></div><p>Vous pouvez désormais valoriser cette compétence dans votre CV, sur LinkedIn et auprès de vos employeurs. Ce certificat atteste de votre maîtrise pratique des outils MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mon attestation</a></p><p class="muted">Conservez votre numéro de certificat — il permet de vérifier l'authenticité de votre attestation.</p></div>`);
 }
 
 // ── Email : attestation refusée (complément requis) ──
 function attestationRejectedEmailHtml(name: string, course: { code: string; title: string }) {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Complément requis</h1><p class="sub">Votre attestation nécessite une vérification</p></div><div class="bd"><span class="badge">📝 À compléter</span><p>Bonjour ${name},</p><p>Après examen de votre demande d'attestation pour <strong>${course.title}</strong>, notre équipe a besoin que vous complétiez ou révisiez certains éléments du projet avant de pouvoir délivrer le certificat.</p><p>Reconnectez-vous à votre espace pour revoir le projet et le finaliser. Vous pourrez ensuite soumettre à nouveau votre demande.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Revoir mon projet</a></p><p class="muted">Besoin d'aide ? Répondez simplement à cet email, nous vous accompagnerons.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Complément requis</h1><p class="sub">Votre attestation nécessite une vérification</p></div><div class="bd"><span class="badge">📝 À compléter</span><p>Bonjour ${name},</p><p>Après examen de votre demande d'attestation pour <strong>${course.title}</strong>, notre équipe a besoin que vous complétiez ou révisiez certains éléments du projet avant de pouvoir délivrer le certificat.</p><p>Reconnectez-vous à votre espace pour revoir le projet et le finaliser. Vous pourrez ensuite soumettre à nouveau votre demande.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Revoir mon projet</a></p><p class="muted">Besoin d'aide ? Répondez simplement à cet email, nous vous accompagnerons.</p></div>`);
 }
 
 
@@ -5134,14 +5134,14 @@ app.get("/api/academy/certificate/final", requireStudent, async (req, res) => {
 });
 
 function finalCertEmailHtml(name: string, certNo: string, avg: number) {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Super-Expert MEAL ! 🎓</h1><p class="sub">Vous avez terminé les 3 projets</p></div><div class="bd"><span class="badge">🏆 Certificat final</span><p>Félicitations ${name},</p><p>Vous avez complété l'intégralité du programme DataMEAL Academy — KoboCollect, QGIS et Reporting automatisé. Vous êtes désormais <strong>Super-Expert MEAL</strong>.</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0">Moyenne générale : <strong style="font-size:20px;color:#0d9488">${avg}%</strong></p><p style="margin-top:8px;font-size:12px;color:#6b7280">Certificat N° <span style="font-family:monospace;font-weight:700">${certNo}</span></p></div><p style="text-align:center"><a href="${SITE_URL}/academy/profile" class="btn">Télécharger mon certificat</a></p><p class="muted">Votre certificat A4 est téléchargeable depuis votre profil, signé et prêt à valoriser.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Super-Expert MEAL ! 🎓</h1><p class="sub">Vous avez terminé les 3 projets</p></div><div class="bd"><span class="badge">🏆 Certificat final</span><p>Félicitations ${name},</p><p>Vous avez complété l'intégralité du programme LouisFarm Learning — KoboCollect, QGIS et Reporting automatisé. Vous êtes désormais <strong>Super-Expert MEAL</strong>.</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0">Moyenne générale : <strong style="font-size:20px;color:#0d9488">${avg}%</strong></p><p style="margin-top:8px;font-size:12px;color:#6b7280">Certificat N° <span style="font-family:monospace;font-weight:700">${certNo}</span></p></div><p style="text-align:center"><a href="${SITE_URL}/academy/profile" class="btn">Télécharger mon certificat</a></p><p class="muted">Votre certificat A4 est téléchargeable depuis votre profil, signé et prêt à valoriser.</p></div>`);
 }
 
 
 // ── Email : admission réussie (félicitations + lien attestation) ──
 function admissionPassedEmailHtml(name: string, scorePct: number, expiresIso: string, certUrl: string) {
   const expires = new Date(expiresIso).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Félicitations, ${name.split(" ")[0]} ! 🎉</h1><p class="sub">Vous êtes officiellement admis(e)</p></div><div class="bd"><span class="badge">✅ Admission confirmée</span><p>Bonjour ${name},</p><p>Excellente nouvelle : vous avez réussi le test d'admission avec un score de <strong style="color:#0d9488">${scorePct}%</strong> et êtes désormais admis(e) au programme <strong>DataMEAL Academy</strong> !</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0;font-size:14px">Votre attestation d'admission est prête</p><p style="margin-top:6px;font-size:12px;color:#6b7280">Valable jusqu'au ${expires}</p></div><p style="text-align:center"><a href="${certUrl}" class="btn">📄 Télécharger mon attestation (A4)</a></p><ul class="steps"><li><span class="n">1</span><span>Une leçon se débloque chaque semaine, dès aujourd'hui</span></li><li><span class="n">2</span><span>Vous avez une semaine par leçon (sinon recalé)</span></li><li><span class="n">3</span><span>Terminez les 3 projets pour décrocher le certificat final de Super-Expert MEAL</span></li></ul><p class="muted">Votre attestation est aussi téléchargeable à tout moment depuis votre profil. Bonne formation !</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Félicitations, ${name.split(" ")[0]} ! 🎉</h1><p class="sub">Vous êtes officiellement admis(e)</p></div><div class="bd"><span class="badge">✅ Admission confirmée</span><p>Bonjour ${name},</p><p>Excellente nouvelle : vous avez réussi le test d'admission avec un score de <strong style="color:#0d9488">${scorePct}%</strong> et êtes désormais admis(e) au programme <strong>LouisFarm Learning</strong> !</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><p style="margin:0;font-size:14px">Votre attestation d'admission est prête</p><p style="margin-top:6px;font-size:12px;color:#6b7280">Valable jusqu'au ${expires}</p></div><p style="text-align:center"><a href="${certUrl}" class="btn">📄 Télécharger mon attestation (A4)</a></p><ul class="steps"><li><span class="n">1</span><span>Une leçon se débloque chaque semaine, dès aujourd'hui</span></li><li><span class="n">2</span><span>Vous avez une semaine par leçon (sinon recalé)</span></li><li><span class="n">3</span><span>Terminez les 3 projets pour décrocher le certificat final de Super-Expert MEAL</span></li></ul><p class="muted">Votre attestation est aussi téléchargeable à tout moment depuis votre profil. Bonne formation !</p></div>`);
 }
 
 // ── Vérification PUBLIQUE d'un certificat (style Credly, sans authentification) ──
@@ -5201,7 +5201,7 @@ app.get("/api/academy/verify-certificate/:certNo", rateLimit(30, 5 * 60 * 1000),
 function meetingEmailHtml(name: string, title: string, startsAt: string, kind: string) {
   const when = new Date(startsAt).toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" });
   const label = kind === "webinar" ? "webinaire" : "rencontre interactive";
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>📅 DATAMEAL ACADEMY</span></div><h1>Rencontre en ligne planifiée</h1><p class="sub">${label}</p></div><div class="bd"><p>Bonjour ${name},</p><p>Une nouvelle ${label} est programmée :</p><div class="info" style="border-color:#5eead4;background:#f0fdfa"><p style="margin:0;font-size:15px;font-weight:700;color:#0d9488">${title}</p><p style="margin-top:8px;font-size:13px;color:#334155">🕒 ${when}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mes rencontres</a></p><p class="muted">Connectez-vous à votre tableau de bord pour rejoindre la session le moment venu. Aucun logiciel à installer — tout se passe dans le navigateur.</p></div>`);
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>📅 LOUISFARM LEARNING</span></div><h1>Rencontre en ligne planifiée</h1><p class="sub">${label}</p></div><div class="bd"><p>Bonjour ${name},</p><p>Une nouvelle ${label} est programmée :</p><div class="info" style="border-color:#5eead4;background:#f0fdfa"><p style="margin:0;font-size:15px;font-weight:700;color:#0d9488">${title}</p><p style="margin-top:8px;font-size:13px;color:#334155">🕒 ${when}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mes rencontres</a></p><p class="muted">Connectez-vous à votre tableau de bord pour rejoindre la session le moment venu. Aucun logiciel à installer — tout se passe dans le navigateur.</p></div>`);
 }
 
 // ══════════════ Rencontres en ligne (Jitsi Meet) ══════════════

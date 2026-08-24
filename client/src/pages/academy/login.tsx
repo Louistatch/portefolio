@@ -39,7 +39,7 @@ export default function AcademyLogin() {
 
   return (
     <div className="max-w-md mx-auto px-6 py-16">
-      <SEO title="Connexion — DataMEAL Academy" description="Connectez-vous à votre espace étudiant." />
+      <SEO title="Connexion — LouisFarm Learning" description="Connectez-vous à votre espace étudiant." />
       <div className="text-center mb-8">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
           <GraduationCap className="w-7 h-7 text-primary" />

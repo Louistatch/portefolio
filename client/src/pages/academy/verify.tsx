@@ -60,7 +60,7 @@ export default function AcademyVerify() {
 
   return (
     <div className="max-w-md mx-auto px-6 py-20 text-center">
-      <SEO title="Vérification email — DataMEAL Academy" description="Validation de votre adresse email." />
+      <SEO title="Vérification email — LouisFarm Learning" description="Validation de votre adresse email." />
 
       {state === "loading" && (<><Loader2 className="w-12 h-12 text-primary mx-auto mb-4 animate-spin" /><p className="text-muted-foreground">Vérification en cours…</p></>)}
 

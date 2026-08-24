@@ -36,7 +36,7 @@ export default function AcademyResetPassword() {
 
   if (done) return (
     <div className="max-w-md mx-auto px-6 py-20 text-center">
-      <SEO title="Mot de passe réinitialisé — DataMEAL Academy" description="Mot de passe modifié." />
+      <SEO title="Mot de passe réinitialisé — LouisFarm Learning" description="Mot de passe modifié." />
       <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-5"><CheckCircle2 className="w-8 h-8 text-primary" /></div>
       <h1 className="text-2xl font-bold mb-2">Mot de passe réinitialisé</h1>
       <p className="text-muted-foreground mb-6">Vous pouvez maintenant vous connecter avec votre nouveau mot de passe.</p>
@@ -46,7 +46,7 @@ export default function AcademyResetPassword() {
 
   return (
     <div className="max-w-md mx-auto px-6 py-16">
-      <SEO title="Réinitialiser le mot de passe — DataMEAL Academy" description="Choisissez un nouveau mot de passe." />
+      <SEO title="Réinitialiser le mot de passe — LouisFarm Learning" description="Choisissez un nouveau mot de passe." />
       <div className="text-center mb-8">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4"><Lock className="w-7 h-7 text-primary" /></div>
         <h1 className="text-2xl font-bold">Nouveau mot de passe</h1>

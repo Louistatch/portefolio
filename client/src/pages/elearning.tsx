@@ -489,7 +489,7 @@ export default function ELearning() {
               <div className="flex items-center gap-2.5 mb-5">
                 <span className="w-7 h-px bg-accent" />
                 <span className="text-[11px] tracking-[0.14em] uppercase text-primary font-bold">
-                  DataMEAL Academy
+                  LouisFarm Learning
                 </span>
               </div>
               <h1 className="font-serif text-3xl sm:text-4xl lg:text-[46px] font-semibold leading-[1.16] tracking-tight mb-5 text-pretty">
@@ -1208,7 +1208,7 @@ export default function ELearning() {
 
   return (
     <div ref={topRef}>
-      <SEO title="DataMEAL Academy" description="Plateforme eLearning MEAL — KoboCollect, Python, QGIS" />
+      <SEO title="LouisFarm Learning" description="Plateforme eLearning MEAL — KoboCollect, Python, QGIS" />
 
       {/* Sub-nav */}
       {showTabs && (

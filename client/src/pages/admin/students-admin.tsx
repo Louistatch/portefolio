@@ -103,7 +103,7 @@ export default function AdminStudents() {
       <div className="flex items-start justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-bold flex items-center gap-2"><GraduationCap className="w-6 h-6 text-primary" /> Gestion des étudiants</h1>
-          <p className="text-muted-foreground text-sm mt-1">DataMEAL Academy — inscriptions, admissions, notes, attestations</p>
+          <p className="text-muted-foreground text-sm mt-1">LouisFarm Learning — inscriptions, admissions, notes, attestations</p>
         </div>
         <Button variant="outline" size="sm" className="gap-2" onClick={() => {
           const rows = [["Nom", "Email", "Pays", "Statut", "Admis", "Score"], ...(students || []).map(s => [s.full_name, s.email, s.country || "", s.status, s.admitted_at ? "oui" : "non", String(s.entry_score ?? "")])];

@@ -83,7 +83,7 @@ export default function AcademyDashboard() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6">
-      <SEO title="Mon espace — DataMEAL Academy" description="Tableau de bord étudiant." />
+      <SEO title="Mon espace — LouisFarm Learning" description="Tableau de bord étudiant." />
 
       {/* ───── En-tête ─────
           Sobre plutôt qu'en aplat dégradé, et surtout : il porte l'ÉCHÉANCE. Un étudiant

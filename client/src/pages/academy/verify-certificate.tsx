@@ -29,7 +29,7 @@ export default function VerifyCertificate() {
 
   return (
     <div className="max-w-2xl mx-auto px-5 py-12">
-      <SEO title="Vérifier un certificat — DataMEAL Academy" description="Vérifiez l'authenticité d'un certificat délivré par DataMEAL Academy." />
+      <SEO title="Vérifier un certificat — LouisFarm Learning" description="Vérifiez l'authenticité d'un certificat délivré par LouisFarm Learning." />
 
       <div className="text-center mb-8">
         <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center mx-auto mb-4">
@@ -84,7 +84,7 @@ export default function VerifyCertificate() {
       )}
 
       <div className="text-center mt-8">
-        <Link href="/elearning"><Button variant="outline" size="sm">Découvrir DataMEAL Academy</Button></Link>
+        <Link href="/elearning"><Button variant="outline" size="sm">Découvrir LouisFarm Learning</Button></Link>
       </div>
     </div>
   );

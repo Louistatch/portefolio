@@ -235,7 +235,7 @@ export default function AcademyLive() {
     const start = meeting?.starts_at ? new Date(meeting.starts_at) : null;
     return (
       <div className="max-w-2xl mx-auto px-5 py-10">
-        <SEO title={`${meeting?.title || "Rencontre"} — DataMEAL Academy`} description="Rejoignez la rencontre en ligne." />
+        <SEO title={`${meeting?.title || "Rencontre"} — LouisFarm Learning`} description="Rejoignez la rencontre en ligne." />
         <Link href="/academy/dashboard"><button className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 mb-6"><ArrowLeft className="w-4 h-4" /> Retour</button></Link>
         <div className="bg-card rounded-3xl border border-border/50 overflow-hidden">
           <div className="relative bg-gradient-to-br from-primary via-primary to-teal-700 p-8 text-white">
