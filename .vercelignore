@@ -1,8 +1,23 @@
-# Attention : ne pas exclure `script` — buildCommand exécute script/pages-partage.mjs,
-# qui génère la page d'aperçu de partage. L'exclure fait échouer le build sur Vercel.
+# Ce fichier décide de ce que Vercel REÇOIT, pas seulement de ce qu'il déploie. Un fichier
+# exclu ici n'est pas sur la machine de build : ni le buildCommand ni le résultat ne peuvent
+# le voir. Deux pannes en sont déjà venues, aucune n'a fait échouer quoi que ce soit
+# localement — d'où les deux avertissements ci-dessous.
+
+# 1. Ne pas exclure `script` : buildCommand exécute script/pages-partage.mjs, qui génère la
+#    page d'aperçu de partage. L'exclure fait échouer le build sur Vercel.
+
+# 2. Ne pas remettre `*.pdf`. La règle datait d'une époque où le seul PDF du dépôt était le CV
+#    à la racine. client/public/academy/ en contient désormais quatre qui sont servis par le
+#    site — le livret de révision et les trois énoncés de travaux de groupe. Un `*.pdf` global
+#    les empêche d'arriver sur la machine de build, donc d'être servis : les liens tombent en
+#    404 alors que le build reste vert et que tout fonctionne en local.
+
 .local
 .git
 .replit
 supabase
 attached_assets
-*.pdf
+
+# Le CV n'est pas dans client/public : le site ne le sert pas, il n'a rien à faire dans
+# l'envoi. Exclusion nommée plutôt que globale, pour ne plus emporter les PDF du cours.
+TATCHIDA_*.pdf

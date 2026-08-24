@@ -16,7 +16,7 @@
  * Ici, n'importe qui peut afficher la source de la page et lire les balises.
  */
 
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
 const RACINE = "dist/public";
@@ -104,3 +104,52 @@ for (const p of PAGES) {
   writeFileSync(join(RACINE, p.fichier), html);
   console.log(`pages-partage : ${p.fichier} généré (${(html.length / 1024).toFixed(1)} Ko)`);
 }
+
+/**
+ * Tout fichier annoncé par le site doit exister dans la sortie déployée.
+ *
+ * Ce contrôle s'exécute pendant le buildCommand, donc SUR Vercel, et c'est là son intérêt :
+ * `.vercelignore` décide de ce que la machine de build reçoit, et un fichier exclu y est
+ * simplement absent. En local il est là, le build est vert, les liens marchent — et en
+ * production ils rendent 404. C'est arrivé aux trois énoncés de travaux de groupe et au
+ * livret de révision, emportés par un `*.pdf` écrit à une époque où le dépôt n'avait qu'un
+ * CV à la racine. Rien n'avait échoué.
+ *
+ * Le seul moment où l'écart est observable est celui-ci. On y échoue donc bruyamment.
+ */
+const EXTENSIONS = /\.(pdf|docx?|pptx?|xlsx?|csv|zip|png|jpe?g|webp|svg|gif|mp4)$/i;
+
+function fichiersSources(dossier) {
+  return readdirSync(dossier, { withFileTypes: true }).flatMap(e => {
+    const chemin = join(dossier, e.name);
+    if (e.isDirectory()) return e.name === "node_modules" ? [] : fichiersSources(chemin);
+    return /\.(ts|tsx|mjs)$/.test(e.name) ? [chemin] : [];
+  });
+}
+
+const references = new Map(); // adresse → fichier qui la cite
+for (const src of [...fichiersSources("shared"), ...fichiersSources("client/src")]) {
+  const code = readFileSync(src, "utf-8");
+  // Adresses absolues écrites en dur. Les routes de l'application (« /academy/dashboard »)
+  // n'ont pas d'extension et sont donc naturellement écartées ; les adresses distantes
+  // commencent par http et ne sont pas concernées.
+  for (const m of code.matchAll(/["'`](\/[A-Za-z0-9_\-./]+)["'`]/g)) {
+    if (EXTENSIONS.test(m[1]) && !references.has(m[1])) references.set(m[1], src);
+  }
+}
+
+const manquants = [...references].filter(([url]) => {
+  const cible = join(RACINE, url);
+  return !existsSync(cible) || !statSync(cible).isFile();
+});
+
+if (manquants.length) {
+  throw new Error(
+    `pages-partage : ${manquants.length} fichier(s) annoncé(s) par le site sont absents de `
+    + `${RACINE} — ils rendront 404 en production :\n`
+    + manquants.map(([url, src]) => `  ${url}  (cité par ${src})`).join("\n")
+    + `\n\nCause la plus probable : une règle de .vercelignore les a exclus de l'envoi.`
+  );
+}
+
+console.log(`pages-partage : ${references.size} fichiers annoncés par le site, tous présents.`);
