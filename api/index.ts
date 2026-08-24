@@ -16,7 +16,9 @@ import fs from "fs";
 import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises.js";
 import { programOf } from "../shared/programs.js";
 import {
-  GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_MAX_MEMBERS, groupNameFor, cohortOf,
+  GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_WORK_ELIGIBILITY_WEEKS,
+  PEER_REVIEW_CRITERIA, PEER_REVIEW_MAX_PER_CRITERION, INSTRUCTOR_RUBRIC,
+  groupNameFor, cohortOf,
 } from "../shared/groupwork.js";
 
 // ── Supabase client ──
@@ -1278,7 +1280,7 @@ async function notifyCoursesUnlocked(sid: number, opened: { courseId: number; le
  * c'est elle qui fait foi : l'administration peut réécrire un énoncé sans redéploiement.
  */
 async function getGroupWorks(): Promise<any[]> {
-  const champs = "id, gw_index, week_index, title, brief, deliverables, max_score, is_published";
+  const champs = "id, gw_index, week_index, title, brief, deliverables, max_score, is_published, brief_url, template_url, rubric";
   const { data, error } = await supabase.from("academy_group_works").select(champs).order("gw_index");
   if (error) return [];             // table absente — la fonctionnalité n'est pas installée
   if (data?.length) return data;
@@ -1286,6 +1288,7 @@ async function getGroupWorks(): Promise<any[]> {
   const semences = GROUP_WORKS.map(g => ({
     gw_index: g.index, week_index: g.weekIndex, title: g.title,
     brief: g.brief, deliverables: g.deliverables, max_score: g.maxScore,
+    brief_url: g.briefUrl, template_url: g.templateUrl, rubric: INSTRUCTOR_RUBRIC,
   }));
   await supabase.from("academy_group_works")
     .upsert(semences, { onConflict: "gw_index", ignoreDuplicates: true }).then(() => {}, () => {});
@@ -1317,56 +1320,198 @@ async function membersOfGroup(groupId: number): Promise<any[]> {
 }
 
 /**
- * Répartit un étudiant dans un groupe de sa cohorte (= son mois d'admission).
+ * Un étudiant entre-t-il dans le dispositif des travaux de groupe ?
  *
- * On REMPLIT le groupe le plus avancé avant d'en ouvrir un nouveau. Répartir au plus vide
- * donnerait quatre groupes d'une personne, c'est-à-dire aucun travail de groupe.
+ * Seulement s'il n'a pas encore franchi sa semaine 2. Les GW ont été ajoutés en cours de
+ * route : les imposer à quelqu'un déjà en semaine 9 lui ferait découvrir trois évaluations
+ * collectives dont deux seraient en retard le jour même de leur apparition.
  *
- * Idempotent : UNIQUE(student_id) sur academy_group_members garantit qu'un second passage
- * ne peut pas dupliquer l'affectation, même si deux requêtes arrivent en même temps.
+ * La règle ne vaut que pour ENTRER. Une fois dans un groupe, on y reste : le temps passe,
+ * et personne ne doit être sorti de son équipe parce qu'il a atteint la semaine 3.
+ */
+function eligibleAuxTravauxDeGroupe(admittedAt: string | Date | null | undefined): boolean {
+  if (!admittedAt) return false;
+  const debut = new Date(admittedAt).getTime();
+  return Date.now() < debut + GROUP_WORK_ELIGIBILITY_WEEKS * WEEK_MS;
+}
+
+/** Mélange de Fisher-Yates. Le tirage est ce qui rend les groupes équitables : par ordre
+ *  d'inscription, les premiers admis — souvent les plus assidus — se retrouveraient ensemble. */
+function melanger<T>(liste: T[]): T[] {
+  const t = liste.slice();
+  for (let i = t.length - 1; i > 0; i--) {
+    const j = crypto.randomInt(0, i + 1);
+    [t[i], t[j]] = [t[j], t[i]];
+  }
+  return t;
+}
+
+/**
+ * Constitue les groupes d'une cohorte : tirage au sort, trois par groupe.
+ *
+ * Deux principes, et ils comptent tous les deux :
+ *
+ *   1. TIRAGE AU SORT. Les étudiants éligibles encore sans groupe sont mélangés avant
+ *      d'être distribués. Sans cela, l'ordre d'insertion en base ferait les équipes.
+ *
+ *   2. AUCUN GROUPE ORPHELIN. 19 étudiants ne font pas des groupes de 3. Plutôt que
+ *      d'ouvrir six groupes de 3 et d'en laisser un dernier à une personne — qui n'aurait
+ *      personne à qui écrire — on ouvre `round(N/3)` groupes et on distribue à tour de
+ *      rôle : 19 donnent 4, 3, 3, 3, 3, 3. Les tailles ne diffèrent jamais de plus d'un.
+ *
+ * Renvoie les groupes RÉELLEMENT créés ou complétés, pour que l'appelant sache qui prévenir.
+ */
+async function formGroupsForCohort(cohorte: string): Promise<{ groupId: number; nouveaux: number[] }[]> {
+  const { data: groupesExistants, error } = await supabase.from("academy_groups")
+    .select("id, name, academy_group_members(student_id)")
+    .eq("cohort", cohorte).eq("is_active", true);
+  if (error) return [];
+
+  const dejaPlaces = new Set((groupesExistants || [])
+    .flatMap((g: any) => (g.academy_group_members || []).map((m: any) => m.student_id)));
+
+  // Les membres d'une AUTRE cohorte comptent aussi : UNIQUE(student_id) est global, et un
+  // étudiant déjà placé ailleurs ne doit pas être compté comme libre.
+  const { data: tousMembres } = await supabase.from("academy_group_members").select("student_id");
+  for (const m of tousMembres || []) dejaPlaces.add(m.student_id);
+
+  const { data: candidats } = await supabase.from("students")
+    .select("id, admitted_at").not("admitted_at", "is", null);
+
+  const libres = melanger((candidats || [])
+    .filter((s: any) => !dejaPlaces.has(s.id))
+    .filter((s: any) => cohortOf(new Date(s.admitted_at)) === cohorte)
+    .filter((s: any) => eligibleAuxTravauxDeGroupe(s.admitted_at))
+    .map((s: any) => s.id));
+
+  if (!libres.length) return [];
+
+  const touches = new Map<number, number[]>();
+  const placer = (groupId: number, sid: number) => {
+    if (!touches.has(groupId)) touches.set(groupId, []);
+    touches.get(groupId)!.push(sid);
+  };
+
+  // 1. Compléter d'abord les groupes incomplets — un groupe de 2 qui attend depuis la
+  //    cohorte précédente vaut mieux qu'un nouveau groupe pendant qu'il reste à 2.
+  const aCompleter = (groupesExistants || [])
+    .map((g: any) => ({ id: g.id, n: (g.academy_group_members || []).length }))
+    .filter(x => x.n < GROUP_TARGET_SIZE)
+    .sort((a, b) => b.n - a.n);
+  for (const g of aCompleter) {
+    while (g.n < GROUP_TARGET_SIZE && libres.length) { placer(g.id, libres.shift()!); g.n++; }
+  }
+
+  // 2. Ouvrir ce qu'il faut de groupes neufs, et distribuer à tour de rôle.
+  if (libres.length) {
+    // Un reliquat d'une seule personne rejoint le groupe le plus petit plutôt que d'ouvrir
+    // un groupe à un membre. C'est le seul cas où un groupe atteint 4 sans arrondi.
+    const tousGroupes = (groupesExistants || []).map((g: any) =>
+      ({ id: g.id, n: (g.academy_group_members || []).length + (touches.get(g.id)?.length ?? 0) }));
+    if (libres.length === 1 && tousGroupes.length) {
+      const plusPetit = tousGroupes.sort((a, b) => a.n - b.n)[0];
+      placer(plusPetit.id, libres.shift()!);
+    } else if (libres.length) {
+      const nb = Math.max(1, Math.round(libres.length / GROUP_TARGET_SIZE));
+      const nouveaux: number[] = [];
+      for (let i = 0; i < nb; i++) {
+        const { data: cree } = await supabase.from("academy_groups")
+          .insert({ name: groupNameFor((groupesExistants || []).length + i), cohort: cohorte })
+          .select("id").maybeSingle();
+        if (cree?.id) nouveaux.push(cree.id);
+      }
+      if (!nouveaux.length) return [];
+      libres.forEach((sid, i) => placer(nouveaux[i % nouveaux.length], sid));
+    }
+  }
+
+  // 3. Écriture. UNIQUE(student_id) absorbe une éventuelle course entre deux appels
+  //    simultanés : le second insert échoue, l'étudiant garde son premier groupe.
+  const resultat: { groupId: number; nouveaux: number[] }[] = [];
+  for (const [groupId, membres] of touches) {
+    const { data: inseres } = await supabase.from("academy_group_members")
+      .insert(membres.map(sid => ({ group_id: groupId, student_id: sid })))
+      .select("student_id");
+    const places = (inseres || []).map((r: any) => r.student_id);
+    if (places.length) resultat.push({ groupId, nouveaux: places });
+  }
+  return resultat;
+}
+
+/**
+ * Garantit que l'étudiant a un groupe, en constituant au besoin ceux de toute sa cohorte.
+ *
+ * La constitution est collective par nature : on ne peut pas placer quelqu'un dans une
+ * équipe de trois sans décider en même temps de ses deux coéquipiers. Le premier étudiant
+ * de la cohorte qui ouvre son espace déclenche donc la répartition pour tout le monde —
+ * et tout le monde reçoit son email dans la foulée.
  */
 async function ensureStudentGroup(sid: number): Promise<any | null> {
   const deja = await groupOfStudent(sid);
   if (deja) return deja;
 
   const { data: stud } = await supabase.from("students").select("admitted_at").eq("id", sid).maybeSingle();
-  if (!stud?.admitted_at) return null;
-  const cohorte = cohortOf(new Date(stud.admitted_at));
+  if (!eligibleAuxTravauxDeGroupe(stud?.admitted_at)) return null;
 
-  const chercher = async () => {
-    const { data, error } = await supabase.from("academy_groups")
-      .select("id, name, academy_group_members(student_id)")
-      .eq("cohort", cohorte).eq("is_active", true);
-    if (error) return null;
-    return data || [];
-  };
-
-  const groupes = await chercher();
-  if (!groupes) return null;
-
-  const placeLibre = groupes
-    .map((g: any) => ({ id: g.id, n: (g.academy_group_members || []).length }))
-    .filter(x => x.n < GROUP_MAX_MEMBERS)
-    .sort((a, b) => b.n - a.n)[0];
-
-  let groupId: number | null = placeLibre?.id ?? null;
-  if (!groupId) {
-    const { data: cree } = await supabase.from("academy_groups")
-      .insert({ name: groupNameFor(groupes.length), cohort: cohorte }).select("id").maybeSingle();
-    groupId = cree?.id ?? null;
-    // Course entre deux inscriptions simultanées : UNIQUE(cohort, name) a rejeté la création,
-    // le groupe existe donc déjà — on relit et on s'y glisse.
-    if (!groupId) {
-      const encore = await chercher();
-      groupId = (encore || []).map((g: any) => ({ id: g.id, n: (g.academy_group_members || []).length }))
-        .sort((a, b) => b.n - a.n)[0]?.id ?? null;
-    }
-  }
-  if (!groupId) return null;
-
-  await supabase.from("academy_group_members")
-    .insert({ student_id: sid, group_id: groupId }).then(() => {}, () => {});
+  const formes = await formGroupsForCohort(cohortOf(new Date(stud!.admitted_at)));
+  for (const f of formes) await announceGroupFormed(f.groupId, f.nouveaux).catch(() => {});
   return await groupOfStudent(sid);
+}
+
+/**
+ * Ce qui se passe à la naissance d'un groupe : ses documents arrivent dans son forum, et
+ * ses membres reçoivent l'email qui les y envoie.
+ *
+ * L'ordre compte — le forum est garni AVANT l'email. Un étudiant qui clique dans la minute
+ * doit trouver l'énoncé et le modèle de rapport, pas un fil vide.
+ */
+async function announceGroupFormed(groupId: number, nouveaux: number[]) {
+  await seedGroupForum(groupId);
+
+  const { data: groupe } = await supabase.from("academy_groups")
+    .select("id, name, cohort").eq("id", groupId).maybeSingle();
+  if (!groupe) return;
+  const membres = await membersOfGroup(groupId);
+
+  const { data: studs } = await supabase.from("students")
+    .select("id, full_name, email, course_emails").in("id", nouveaux);
+  for (const st of studs || []) {
+    if (!st.email || st.course_emails === false) continue;
+    sendAcademyEmail({
+      studentId: st.id, to: st.email, type: "group_formed",
+      subject: `👥 Votre groupe de travail est constitué — ${groupe.name}`,
+      html: groupFormedEmailHtml(st.full_name, groupe, membres),
+      dedupeKey: `group_formed:${st.id}:${groupId}`,
+    });
+  }
+}
+
+/**
+ * Dépose l'énoncé et le modèle de rapport de chaque GW dans le forum du groupe.
+ *
+ * Idempotent par l'index unique partiel sur (group_id, group_work_id, attachment_url) :
+ * rejouer la constitution ne remplit pas le fil de doublons.
+ */
+async function seedGroupForum(groupId: number) {
+  const gws = await getGroupWorks();
+  const lignes: any[] = [];
+  for (const gw of gws) {
+    if (gw.is_published === false) continue;
+    if (gw.brief_url) lignes.push({
+      group_id: groupId, group_work_id: gw.id, student_id: null,
+      author_name: "DataMEAL Academy", kind: "ressource",
+      body: `Énoncé du travail — ${gw.title}. À lire avant toute chose : il contient la commande, les livrables attendus et la grille de notation.`,
+      attachment_url: gw.brief_url, attachment_name: `${gw.title} — énoncé (PDF)`,
+    });
+    if (gw.template_url) lignes.push({
+      group_id: groupId, group_work_id: gw.id, student_id: null,
+      author_name: "DataMEAL Academy", kind: "ressource",
+      body: "Modèle de rapport à remplir en équipe : une section nominative par membre, plus les parties communes. C'est ce document, exporté en PDF, qui constitue le rendu.",
+      attachment_url: gw.template_url, attachment_name: `${gw.title} — modèle de rapport (DOCX)`,
+    });
+  }
+  if (!lignes.length) return;
+  await supabase.from("academy_group_posts").insert(lignes).then(() => {}, () => {});
 }
 
 /**
@@ -1425,15 +1570,18 @@ async function refreshGroupWorkStates(sid: number): Promise<{ groupe: any | null
   if (error || !lignes?.length) return { groupe: null, lignes: [], rendus: [] };
 
   const now = Date.now();
-  const auMoinsUnOuvert = lignes.some((l: any) => now >= new Date(l.unlock_at).getTime());
 
+  // Le groupe se constitue DÈS QUE POSSIBLE, et non à l'ouverture du premier GW en semaine 4.
+  // Attendre la semaine 4 laissait trois semaines pendant lesquelles l'étudiant ne savait pas
+  // avec qui il travaillerait — donc trois semaines qu'il ne pouvait pas utiliser. Le
+  // calendrier des rendus, lui, ne bouge pas : seule la rencontre est avancée.
   let groupe = await groupOfStudent(sid);
-  if (!groupe && auMoinsUnOuvert) groupe = await ensureStudentGroup(sid);
+  if (!groupe) groupe = await ensureStudentGroup(sid);
 
   let rendus: any[] = [];
   if (groupe) {
     const { data } = await supabase.from("academy_group_submissions")
-      .select("id, group_work_id, status, score, feedback, content, submitted_at, graded_at, submitted_by")
+      .select("id, group_work_id, status, score, feedback, content, submitted_at, graded_at, submitted_by, report_url, report_name, archive_url, archive_name, rubric_scores")
       .eq("group_id", groupe.id);
     rendus = data || [];
   }
@@ -2691,6 +2839,9 @@ app.get("/api/academy/group-work", requireStudent, async (req, res) => {
         livrables: Array.isArray(gw.deliverables) ? gw.deliverables : [],
         maxScore: gw.max_score ?? 100,
         semaine: gw.week_index,
+        enonceUrl: gw.brief_url ?? null,
+        modeleUrl: gw.template_url ?? null,
+        grille: Array.isArray(gw.rubric) ? gw.rubric : [],
         ouvertureLe: l?.unlock_at ?? null,
         echeanceLe: l?.due_at ?? null,
         statut: l?.status ?? "locked",
@@ -2701,7 +2852,10 @@ app.get("/api/academy/group-work", requireStudent, async (req, res) => {
           parMoi: rendu.submitted_by === sid,
           par: membres.find(m => m.studentId === rendu.submitted_by)?.nom ?? null,
           contenu: rendu.content ?? null,
+          rapport: rendu.report_url ? { url: rendu.report_url, nom: rendu.report_name } : null,
+          archive: rendu.archive_url ? { url: rendu.archive_url, nom: rendu.archive_name } : null,
         } : null,
+        notesParCritere: rendu?.status === "graded" ? rendu.rubric_scores ?? null : null,
       };
     })
     .sort((a, b) => a.index - b.index);
@@ -2724,10 +2878,13 @@ app.get("/api/academy/group-work", requireStudent, async (req, res) => {
 app.post("/api/academy/group-work/:id/submit", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const gwId = Number(req.params.id);
-  const { resume, liens, contributions } = req.body || {};
+  const { resume, liens, contributions, rapport, archive } = req.body || {};
 
   if (!resume || String(resume).trim().length < 30)
     return res.status(400).json({ message: "Décrivez votre production en quelques lignes (30 caractères minimum)." });
+  // Le rapport PDF est le rendu ; le reste l'accompagne. Sans lui, il n'y a rien à corriger.
+  if (!rapport?.url || !/^https?:\/\/\S+$/i.test(String(rapport.url)))
+    return res.status(400).json({ message: "Joignez le rapport du groupe au format PDF." });
 
   const { data: stud } = await supabase.from("students")
     .select("admitted_at, admission_expires, full_name").eq("id", sid).maybeSingle();
@@ -2765,7 +2922,10 @@ app.post("/api/academy/group-work/:id/submit", requireStudent, async (req, res) 
     .upsert({
       group_work_id: gwId, group_id: groupe.id, submitted_by: sid,
       content: contenu, status: "submitted", submitted_at: new Date().toISOString(),
-      score: null, feedback: null, graded_at: null,
+      report_url: String(rapport.url), report_name: rapport.nom ? String(rapport.nom).slice(0, 200) : "rapport.pdf",
+      archive_url: archive?.url && /^https?:\/\/\S+$/i.test(String(archive.url)) ? String(archive.url) : null,
+      archive_name: archive?.nom ? String(archive.nom).slice(0, 200) : null,
+      score: null, feedback: null, graded_at: null, rubric_scores: null,
     }, { onConflict: "group_work_id,group_id" })
     .select("id, submitted_at").maybeSingle();
   if (error) return res.status(500).json({ message: error.message });
@@ -2779,6 +2939,164 @@ app.post("/api/academy/group-work/:id/submit", requireStudent, async (req, res) 
     .then(() => {}, () => {});
 
   res.json({ message: "Rendu enregistré pour tout le groupe.", renduId: rendu?.id, le: rendu?.submitted_at });
+});
+
+// ══════════════ Forum du groupe ══════════════
+//
+// Un fil par groupe, pas par travail : les trois GW s'enchaînent avec la même équipe, et
+// séparer les fils aurait dispersé une conversation qui, elle, est continue. Les documents
+// de chaque GW y sont épinglés en tête (kind = 'ressource').
+
+/** Le groupe de l'étudiant, ou 403. Toute route du forum passe par là. */
+async function groupeDeLEtudiantOu403(sid: number, res: Response): Promise<any | null> {
+  const groupe = await groupOfStudent(sid);
+  if (!groupe) {
+    res.status(403).json({ message: "Vous n'êtes pas encore rattaché à un groupe." });
+    return null;
+  }
+  return groupe;
+}
+
+app.get("/api/academy/group-forum", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const groupe = await groupeDeLEtudiantOu403(sid, res);
+  if (!groupe) return;
+
+  const { data, error } = await supabase.from("academy_group_posts")
+    .select("id, group_work_id, student_id, author_name, kind, body, attachment_url, attachment_name, created_at")
+    .eq("group_id", groupe.id).order("created_at");
+  if (error) return res.status(500).json({ message: error.message });
+
+  // Les ressources remontent en tête quel que soit leur âge : elles se consultent, elles ne
+  // se lisent pas dans l'ordre chronologique comme les messages.
+  const posts = (data || []).map((p: any) => ({
+    id: p.id, groupWorkId: p.group_work_id, kind: p.kind || "message",
+    auteur: p.author_name || "Étudiant", parMoi: p.student_id === sid,
+    corps: p.body, fichier: p.attachment_url, fichierNom: p.attachment_name, le: p.created_at,
+  }));
+  res.json({
+    groupe: { id: groupe.id, nom: groupe.name, cohorte: groupe.cohort },
+    ressources: posts.filter(p => p.kind === "ressource"),
+    messages: posts.filter(p => p.kind !== "ressource"),
+  });
+});
+
+app.post("/api/academy/group-forum", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const corps = String(req.body?.corps ?? "").trim();
+  if (corps.length < 2) return res.status(400).json({ message: "Votre message est vide." });
+
+  const groupe = await groupeDeLEtudiantOu403(sid, res);
+  if (!groupe) return;
+
+  const { data: stud } = await supabase.from("students").select("full_name, email").eq("id", sid).maybeSingle();
+  const { data, error } = await supabase.from("academy_group_posts").insert({
+    group_id: groupe.id, student_id: sid,
+    author_name: (stud?.full_name || "").trim() || stud?.email || "Étudiant",
+    kind: "message", body: corps.slice(0, 4000),
+    attachment_url: typeof req.body?.fichier === "string" && /^https?:\/\/\S+$/i.test(req.body.fichier) ? req.body.fichier : null,
+    attachment_name: req.body?.fichierNom ? String(req.body.fichierNom).slice(0, 200) : null,
+  }).select("id, created_at").maybeSingle();
+  if (error) return res.status(500).json({ message: error.message });
+  res.status(201).json({ id: data?.id, le: data?.created_at });
+});
+
+// ── Dépôt de fichiers de l'étudiant ──
+//
+// Le rendu d'un GW, c'est un rapport PDF et une archive ZIP des fichiers de travail
+// (tableurs, cartes, code) — la règle du modèle WQU, reprise telle quelle. L'upload est
+// séparé de la soumission : un groupe téléverse, relit, puis soumet.
+const ALLOWED_GROUP_FILES = [".pdf", ".zip", ".docx", ".xlsx", ".csv"];
+const GROUP_FILE_MIME: Record<string, string> = {
+  ".pdf": "application/pdf", ".zip": "application/zip",
+  ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  ".csv": "text/csv",
+};
+
+app.post("/api/academy/group-work/upload", requireStudent, upload.single("file"), async (req: any, res) => {
+  const sid = req.student.sid;
+  if (!req.file) return res.status(400).json({ message: "Aucun fichier reçu." });
+  const groupe = await groupOfStudent(sid);
+  if (!groupe) return res.status(403).json({ message: "Vous n'êtes pas encore rattaché à un groupe." });
+
+  const ext = path.extname(req.file.originalname).toLowerCase();
+  if (!ALLOWED_GROUP_FILES.includes(ext))
+    return res.status(400).json({ message: `Format refusé. Acceptés : ${ALLOWED_GROUP_FILES.join(", ")}` });
+
+  // Le nom en base porte le groupe : un fichier égaré reste rattachable à son équipe.
+  const filename = `gw/groupe-${groupe.id}/${crypto.randomUUID()}${ext}`;
+  const { error } = await supabase.storage.from("documents")
+    .upload(filename, req.file.buffer, { contentType: GROUP_FILE_MIME[ext] || req.file.mimetype, upsert: false });
+  if (error) return res.status(500).json({ message: error.message });
+  const { data: urlData } = supabase.storage.from("documents").getPublicUrl(filename);
+  res.json({ url: urlData.publicUrl, nom: req.file.originalname });
+});
+
+// ══════════════ Évaluation par les pairs ══════════════
+//
+// Chaque membre note les AUTRES membres de son groupe sur quatre critères à 3 points. Ces
+// notes ne modifient pas celle du projet : elles documentent la contribution de chacun,
+// ce qui est la seule façon de trancher quand un rendu collectif est contesté.
+
+app.get("/api/academy/group-work/:id/peer-review", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const gwId = Number(req.params.id);
+  const groupe = await groupeDeLEtudiantOu403(sid, res);
+  if (!groupe) return;
+
+  const membres = await membersOfGroup(groupe.id);
+  const { data: avis } = await supabase.from("academy_group_peer_reviews")
+    .select("reviewer_id, reviewee_id, scores, total, comment")
+    .eq("group_work_id", gwId).eq("group_id", groupe.id);
+
+  res.json({
+    criteres: PEER_REVIEW_CRITERIA,
+    maxParCritere: PEER_REVIEW_MAX_PER_CRITERION,
+    // À évaluer : tout le monde sauf soi-même.
+    aEvaluer: membres.filter(m => m.studentId !== sid).map(m => ({
+      ...m,
+      dejaFait: (avis || []).some((a: any) => a.reviewer_id === sid && a.reviewee_id === m.studentId),
+      notes: (avis || []).find((a: any) => a.reviewer_id === sid && a.reviewee_id === m.studentId)?.scores ?? null,
+    })),
+    // Reçues : ce que les autres ont mis sur moi. Anonyme — publier qui a mis quoi
+    // transformerait l'exercice en règlement de comptes.
+    recues: (avis || []).filter((a: any) => a.reviewee_id === sid)
+      .map((a: any) => ({ scores: a.scores, total: a.total })),
+  });
+});
+
+app.post("/api/academy/group-work/:id/peer-review", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const gwId = Number(req.params.id);
+  const revieweeId = Number(req.body?.membre);
+  if (!revieweeId || revieweeId === sid)
+    return res.status(400).json({ message: "Choisissez un coéquipier à évaluer." });
+
+  const groupe = await groupeDeLEtudiantOu403(sid, res);
+  if (!groupe) return;
+  const membres = await membersOfGroup(groupe.id);
+  if (!membres.some(m => m.studentId === revieweeId))
+    return res.status(403).json({ message: "Cette personne n'est pas dans votre groupe." });
+
+  // On ne garde que les critères connus, bornés à [0, max] : le corps de requête vient du
+  // client, il ne décide ni de la grille ni du plafond.
+  const scores: Record<string, number> = {};
+  let total = 0;
+  for (const c of PEER_REVIEW_CRITERIA) {
+    const brut = Number(req.body?.notes?.[c.cle]);
+    const n = Number.isFinite(brut) ? Math.min(PEER_REVIEW_MAX_PER_CRITERION, Math.max(0, Math.round(brut))) : 0;
+    scores[c.cle] = n;
+    total += n;
+  }
+
+  const { error } = await supabase.from("academy_group_peer_reviews").upsert({
+    group_work_id: gwId, group_id: groupe.id, reviewer_id: sid, reviewee_id: revieweeId,
+    scores, total, comment: req.body?.commentaire ? String(req.body.commentaire).slice(0, 2000) : null,
+    created_at: new Date().toISOString(),
+  }, { onConflict: "group_work_id,reviewer_id,reviewee_id" });
+  if (error) return res.status(500).json({ message: error.message });
+  res.json({ message: "Évaluation enregistrée.", total });
 });
 
 // ── Relevé de notes complet (transcript WQU) ──
@@ -3260,16 +3578,96 @@ app.delete("/api/admin/academy/groups/:id/members/:studentId", requireAuth, asyn
 });
 
 // Répartir d'un coup tous les étudiants admis qui n'ont pas encore de groupe.
+// Constitue les groupes de toutes les cohortes concernées, en une fois.
+//
+// Le système le fait déjà tout seul dès qu'un étudiant éligible ouvre son espace. Ce
+// bouton sert à ne pas attendre ce premier passage — et à voir le résultat avant que les
+// étudiants ne le découvrent.
 app.post("/api/admin/academy/groups/auto-assign", requireAuth, async (_req, res) => {
   const { data: admis } = await supabase.from("students")
-    .select("id").not("admitted_at", "is", null).order("admitted_at");
-  let places = 0;
-  for (const s of admis || []) {
-    const avant = await groupOfStudent(s.id);
-    if (avant) continue;
-    if (await ensureStudentGroup(s.id)) places++;
+    .select("id, admitted_at").not("admitted_at", "is", null);
+
+  const cohortes = [...new Set((admis || [])
+    .filter((s: any) => eligibleAuxTravauxDeGroupe(s.admitted_at))
+    .map((s: any) => cohortOf(new Date(s.admitted_at))))];
+
+  let places = 0, groupes = 0;
+  for (const c of cohortes) {
+    const formes = await formGroupsForCohort(c);
+    for (const f of formes) {
+      groupes++;
+      places += f.nouveaux.length;
+      await announceGroupFormed(f.groupId, f.nouveaux).catch(() => {});
+    }
   }
-  res.json({ message: `${places} étudiant${places > 1 ? "s" : ""} réparti${places > 1 ? "s" : ""}.`, places });
+  res.json({
+    message: places
+      ? `${places} étudiant${places > 1 ? "s" : ""} réparti${places > 1 ? "s" : ""} dans ${groupes} groupe${groupes > 1 ? "s" : ""}. Chacun a reçu l'email de constitution.`
+      : "Aucun étudiant éligible en attente : tous les étudiants encore en deçà de la semaine 2 ont déjà un groupe.",
+    places, groupes,
+  });
+});
+
+
+// ── Vue détaillée d'un groupe : rendus, pairs, forum ──
+//
+// Tout ce qu'il faut pour corriger en un écran. Les évaluations par les pairs sont
+// affichées NOMINATIVEMENT ici — l'anonymat protège les étudiants entre eux, pas
+// vis-à-vis du formateur, qui doit pouvoir arbitrer un désaccord.
+app.get("/api/admin/academy/groups/:id/detail", requireAuth, async (req, res) => {
+  const groupId = Number(req.params.id);
+  const { data: groupe } = await supabase.from("academy_groups")
+    .select("id, name, cohort, is_active, created_at").eq("id", groupId).maybeSingle();
+  if (!groupe) return res.status(404).json({ message: "Groupe introuvable" });
+
+  const [membres, rendusQ, pairsQ, forumQ, travaux] = await Promise.all([
+    membersOfGroup(groupId),
+    supabase.from("academy_group_submissions")
+      .select("*, academy_group_works(gw_index, title, max_score, rubric)").eq("group_id", groupId),
+    supabase.from("academy_group_peer_reviews")
+      .select("group_work_id, reviewer_id, reviewee_id, scores, total, comment").eq("group_id", groupId),
+    supabase.from("academy_group_posts")
+      .select("id, group_work_id, student_id, author_name, kind, body, attachment_url, attachment_name, created_at")
+      .eq("group_id", groupId).order("created_at"),
+    getGroupWorks(),
+  ]);
+
+  const nomDe = (id: number) => membres.find(m => m.studentId === id)?.nom ?? `#${id}`;
+  res.json({
+    groupe: { id: groupe.id, nom: groupe.name, cohorte: groupe.cohort, actif: groupe.is_active !== false },
+    membres,
+    travaux,
+    rendus: (rendusQ.data || []).map((r: any) => ({
+      id: r.id, groupWorkId: r.group_work_id, statut: r.status, note: r.score, feedback: r.feedback,
+      contenu: r.content, notesParCritere: r.rubric_scores, le: r.submitted_at, corrigeLe: r.graded_at,
+      par: nomDe(r.submitted_by),
+      rapport: r.report_url ? { url: r.report_url, nom: r.report_name } : null,
+      archive: r.archive_url ? { url: r.archive_url, nom: r.archive_name } : null,
+    })),
+    pairs: (pairsQ.data || []).map((a: any) => ({
+      groupWorkId: a.group_work_id, evaluateur: nomDe(a.reviewer_id), evalue: nomDe(a.reviewee_id),
+      evalueId: a.reviewee_id, scores: a.scores, total: a.total, commentaire: a.comment,
+    })),
+    forum: (forumQ.data || []).map((p: any) => ({
+      id: p.id, kind: p.kind || "message", auteur: p.author_name || "Étudiant",
+      corps: p.body, fichier: p.attachment_url, fichierNom: p.attachment_name, le: p.created_at,
+    })),
+  });
+});
+
+// ── Le formateur écrit dans le forum d'un groupe ──
+app.post("/api/admin/academy/groups/:id/forum", requireAuth, async (req, res) => {
+  const corps = String(req.body?.corps ?? "").trim();
+  if (corps.length < 2) return res.status(400).json({ message: "Message vide." });
+  const { data, error } = await supabase.from("academy_group_posts").insert({
+    group_id: Number(req.params.id), student_id: null,
+    author_name: req.body?.auteur ? String(req.body.auteur).slice(0, 120) : "Formateur",
+    kind: "message", body: corps.slice(0, 4000),
+    attachment_url: typeof req.body?.fichier === "string" && /^https?:\/\/\S+$/i.test(req.body.fichier) ? req.body.fichier : null,
+    attachment_name: req.body?.fichierNom ? String(req.body.fichierNom).slice(0, 200) : null,
+  }).select("id").maybeSingle();
+  if (error) return res.status(500).json({ message: error.message });
+  res.status(201).json(data);
 });
 
 // ── Corriger un rendu collectif ──
@@ -3290,14 +3688,31 @@ app.put("/api/admin/academy/group-submissions/:id", requireAuth, async (req, res
   if (!sub) return res.status(404).json({ message: "Rendu introuvable" });
   const gw = (await getGroupWorks()).find(g => g.id === sub.group_work_id);
   const max = gw?.max_score ?? 100;
+  const grille: any[] = Array.isArray(gw?.rubric) ? gw!.rubric : [];
 
-  const note = Number(score);
+  // Notation par critère quand la grille est fournie : la note globale en DÉCOULE, elle
+  // n'est pas saisie deux fois. Un total qui ne correspond pas au détail est la première
+  // chose qu'un étudiant conteste, et il a raison.
+  let detail: Record<string, number> | null = null;
+  let note = Number(score);
+  if (req.body?.critères || req.body?.criteres) {
+    const saisie = req.body.criteres ?? req.body["critères"];
+    detail = {};
+    note = 0;
+    for (const c of grille) {
+      const brut = Number(saisie?.[c.cle]);
+      const n = Number.isFinite(brut) ? Math.min(Number(c.points), Math.max(0, Math.round(brut))) : 0;
+      detail[c.cle] = n;
+      note += n;
+    }
+  }
+
   if (!Number.isFinite(note) || note < 0 || note > max)
     return res.status(400).json({ message: `La note doit être comprise entre 0 et ${max}.` });
 
   const { data, error } = await supabase.from("academy_group_submissions")
     .update({ score: Math.round(note), feedback: feedback ? String(feedback).slice(0, 3000) : null,
-              status: "graded", graded_at: new Date().toISOString() })
+              status: "graded", graded_at: new Date().toISOString(), rubric_scores: detail })
     .eq("id", id).select().maybeSingle();
   if (error) return res.status(400).json({ message: error.message });
 
@@ -3475,6 +3890,22 @@ function courseUnlockedEmailHtml(
 ) {
   const firstName = (name || "").split(" ")[0] || "";
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Nouveau cours débloqué 🔓</h1><p class="sub">${course.code} · ${course.title}</p></div><div class="bd"><span class="badge">🔓 Accès ouvert</span><p>${firstName ? `Bravo ${firstName},` : "Bravo,"}</p><p>Vous avez avancé assez loin pour ouvrir le cours suivant de votre parcours :</p><div class="info"><h3>${course.title}</h3>${course.description ? `<p style="margin-top:6px">${course.description}</p>` : ""}<p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code}</p></div>${firstLesson ? `<p><strong>Première leçon :</strong> « ${firstLesson.title} »${dueAt ? `, à rendre avant le ${new Date(dueAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}.</p>` : ""}<p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Commencer ce cours</a></p><p class="muted">Rappel : les dates du planning sont un rythme conseillé, pas un couperet. Vous pouvez prendre de l'avance, et une leçon en retard reste rattrapable jusqu'à la fin de votre période d'admission.</p></div>`);
+}
+
+// ── Email : le groupe est constitué ──
+//
+// Volontairement court. Il ne porte ni l'énoncé ni le modèle de rapport — ceux-là vivent
+// dans le forum du groupe, où ils resteront trouvables dans trois semaines. Le message a
+// un seul travail : dire QUI, et envoyer au bon endroit.
+function groupFormedEmailHtml(
+  name: string,
+  groupe: { name: string; cohort: string },
+  membres: { nom: string; email: string | null }[],
+) {
+  const firstName = (name || "").split(" ")[0] || "";
+  const equipe = membres.map(m =>
+    `<li>${m.nom}${m.email ? ` — <a href="mailto:${m.email}" style="color:#0d9488">${m.email}</a>` : ""}</li>`).join("");
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Votre groupe est constitué 👥</h1><p class="sub">${groupe.name} · cohorte ${groupe.cohort}</p></div><div class="bd"><span class="badge">👥 ${membres.length} membres</span><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Les groupes de travail de votre promotion viennent d'être formés par tirage au sort. Voici votre équipe :</p><ul style="margin:0 0 14px 18px;padding:0;font-size:14px;color:#374151">${equipe}</ul><p>Votre espace de travail est ouvert : vous y trouvez le <strong>forum de votre groupe</strong>, l'<strong>énoncé de chaque projet</strong> et le <strong>modèle de rapport</strong> à remplir ensemble.</p><p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Ouvrir mon espace de groupe</a></p><p class="muted">Écrivez-vous dès aujourd'hui : les groupes qui se parlent la première semaine sont ceux qui rendent dans les temps.</p></div>`);
 }
 
 // ── Email : un travail de groupe s'ouvre ──

@@ -3,8 +3,9 @@ import { adminFetch } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import {
   Users, Loader2, UserPlus, Trash2, Shuffle, Check, X, Pencil,
-  ClipboardCheck, Link2, AlertCircle, Save,
+  ClipboardCheck, Link2, AlertCircle, Save, Download, Star, ChevronDown,
 } from "lucide-react";
+import { PEER_REVIEW_CRITERIA, PEER_REVIEW_MAX_TOTAL } from "@shared/groupwork";
 
 /**
  * Travaux de groupe — administration.
@@ -21,7 +22,7 @@ type Rendu = {
   contenu: any; le: string; corrigeLe: string | null; par: string | null;
 };
 type Groupe = { id: number; nom: string; cohorte: string; actif: boolean; membres: Membre[]; rendus: Rendu[] };
-type Travail = { id: number; gw_index: number; week_index: number; title: string; brief: string | null; deliverables: any; max_score: number };
+type Travail = { id: number; gw_index: number; week_index: number; title: string; brief: string | null; deliverables: any; max_score: number; rubric?: any };
 
 const jour = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "—";
@@ -225,29 +226,103 @@ function CarteGroupe({ groupe, groupes, travaux, action, onDeplacer, onRetirer, 
         {groupe.membres.length === 0 && <p className="text-xs text-muted-foreground px-1">Groupe vide.</p>}
       </div>
 
-      <div className="p-3 space-y-2">
-        {travaux.map(t => {
-          const rendu = groupe.rendus.find(r => r.groupWorkId === t.id);
-          return <LigneRendu key={t.id} travail={t} rendu={rendu} onCorrige={onCorrige} />;
-        })}
-      </div>
+      <PanneauDetail groupe={groupe} travaux={travaux} onCorrige={onCorrige} />
     </section>
   );
 }
 
-function LigneRendu({ travail, rendu, onCorrige }:
-  { travail: Travail; rendu?: Rendu; onCorrige: () => Promise<void> }) {
+/**
+ * Le détail d'un groupe, chargé seulement quand on l'ouvre.
+ *
+ * Il porte ce qui sert à corriger : les fichiers déposés, la grille de notation et les
+ * évaluations que les membres se sont données. Le charger d'office pour tous les groupes
+ * aurait fait, sur une promotion de sept équipes, sept requêtes dont six inutiles.
+ */
+function PanneauDetail({ groupe, travaux, onCorrige }:
+  { groupe: Groupe; travaux: Travail[]; onCorrige: () => Promise<void> }) {
   const [ouvert, setOuvert] = useState(false);
-  const [note, setNote] = useState<string>(rendu?.note != null ? String(rendu.note) : "");
+  const [detail, setDetail] = useState<any>(null);
+  const [chargement, setChargement] = useState(false);
+
+  const charger = async () => {
+    setChargement(true);
+    try {
+      const d = await adminFetch(`/api/admin/academy/groups/${groupe.id}/detail`)
+        .then(r => r.json()).catch(() => null);
+      setDetail(d && !d.message ? d : null);
+    } finally { setChargement(false); }
+  };
+
+  const basculer = async () => {
+    const v = !ouvert;
+    setOuvert(v);
+    if (v && !detail) await charger();
+  };
+
+  const rafraichir = async () => { await charger(); await onCorrige(); };
+  const aCorriger = groupe.rendus.filter(r => r.statut !== "graded").length;
+
+  return (
+    <>
+      <button onClick={basculer}
+        className="w-full flex items-center gap-2 px-4 py-2.5 text-xs text-muted-foreground hover:text-primary hover:bg-muted/30 transition-colors">
+        <ChevronDown className={`w-3.5 h-3.5 transition-transform ${ouvert ? "rotate-180" : ""}`} />
+        {ouvert ? "Masquer le détail" : "Rendus, notation et évaluations par les pairs"}
+        {aCorriger > 0 && (
+          <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">
+            {aCorriger} à corriger
+          </span>
+        )}
+      </button>
+
+      {ouvert && (
+        <div className="p-3 space-y-2 border-t border-border/40">
+          {chargement && <p className="text-xs text-muted-foreground px-1">Chargement…</p>}
+          {detail && travaux.map(t => (
+            <LigneRendu key={t.id} travail={t}
+              rendu={(detail.rendus || []).find((r: any) => r.groupWorkId === t.id)}
+              pairs={(detail.pairs || []).filter((a: any) => a.groupWorkId === t.id)}
+              onCorrige={rafraichir} />
+          ))}
+        </div>
+      )}
+    </>
+  );
+}
+
+/**
+ * Un rendu et sa correction.
+ *
+ * La note se saisit PAR CRITÈRE et le total en découle. Saisir un total à la main à côté
+ * d'une grille affichée revient à demander au formateur de faire l'addition, et à l'étudiant
+ * de constater qu'elle ne tombe pas juste — c'est la première chose qu'il conteste.
+ */
+function LigneRendu({ travail, rendu, pairs, onCorrige }:
+  { travail: Travail; rendu?: any; pairs: any[]; onCorrige: () => Promise<void> }) {
+  const [ouvert, setOuvert] = useState(false);
+  const grille: { cle: string; libelle: string; points: number }[] =
+    Array.isArray((travail as any).rubric) ? (travail as any).rubric : [];
+
+  const [notes, setNotes] = useState<Record<string, string>>(() => {
+    const dep = rendu?.notesParCritere || {};
+    return Object.fromEntries(grille.map(c => [c.cle, dep[c.cle] != null ? String(dep[c.cle]) : ""]));
+  });
   const [feedback, setFeedback] = useState<string>(rendu?.feedback ?? "");
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
 
+  const total = grille.reduce((n, c) => n + (Number(notes[c.cle]) || 0), 0);
+  const complet = grille.length > 0 && grille.every(c => notes[c.cle] !== "");
+
   async function corriger() {
     setErreur(""); setEnvoi(true);
     try {
-      const res = await adminFetch(`/api/admin/academy/group-submissions/${rendu!.id}`, {
-        method: "PUT", body: JSON.stringify({ score: Number(note), feedback }),
+      const res = await adminFetch(`/api/admin/academy/group-submissions/${rendu.id}`, {
+        method: "PUT",
+        body: JSON.stringify({
+          criteres: Object.fromEntries(grille.map(c => [c.cle, Number(notes[c.cle]) || 0])),
+          score: total, feedback,
+        }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) { setErreur(json?.message || "La correction a échoué."); return; }
@@ -284,6 +359,14 @@ function LigneRendu({ travail, rendu, onCorrige }:
         </button>
       </div>
 
+      {/* Les fichiers restent visibles fermé : c'est ce qu'on va chercher le plus souvent. */}
+      {(rendu.rapport || rendu.archive) && (
+        <div className="flex flex-wrap gap-2 mt-2">
+          {rendu.rapport && <Fichier url={rendu.rapport.url} nom={rendu.rapport.nom || "Rapport PDF"} />}
+          {rendu.archive && <Fichier url={rendu.archive.url} nom={rendu.archive.nom || "Archive"} />}
+        </div>
+      )}
+
       {ouvert && (
         <div className="mt-3 space-y-3">
           {rendu.contenu?.summary && (
@@ -306,26 +389,46 @@ function LigneRendu({ travail, rendu, onCorrige }:
           )}
           {rendu.contenu?.contributions && (
             <div>
-              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Répartition du travail</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1">Répartition annoncée</p>
               <p className="text-sm whitespace-pre-wrap">{rendu.contenu.contributions}</p>
             </div>
           )}
 
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="text-xs text-muted-foreground">
-              Note /{travail.max_score}
-              <input type="number" min={0} max={travail.max_score} value={note} onChange={e => setNote(e.target.value)}
-                className="block mt-1 w-24 rounded-lg border border-border/60 bg-background px-2.5 py-1.5 text-sm" />
-            </label>
-            <label className="text-xs text-muted-foreground flex-1 min-w-[200px]">
-              Commentaire (envoyé à tous les membres)
-              <input value={feedback} onChange={e => setFeedback(e.target.value)}
-                className="block mt-1 w-full rounded-lg border border-border/60 bg-background px-2.5 py-1.5 text-sm" />
-            </label>
-            <Button size="sm" className="gap-1.5" onClick={corriger} disabled={envoi || note === ""}>
+          {pairs.length > 0 && <EvaluationsPairs pairs={pairs} />}
+
+          <div className="rounded-xl border border-border/50 bg-background p-3">
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+              Grille de notation
+            </p>
+            <div className="space-y-1.5">
+              {grille.map(c => (
+                <div key={c.cle} className="flex items-center gap-2">
+                  <span className="text-xs flex-1 min-w-0">{c.libelle}</span>
+                  <input type="number" min={0} max={c.points} value={notes[c.cle] ?? ""}
+                    onChange={e => setNotes(p => ({ ...p, [c.cle]: e.target.value }))}
+                    className="w-16 rounded-lg border border-border/60 bg-background px-2 py-1 text-sm text-right" />
+                  <span className="text-xs text-muted-foreground w-8 shrink-0">/{c.points}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-border/40">
+              <span className="text-xs font-semibold flex-1">Total</span>
+              <span className="text-sm font-bold text-primary">{total}/{travail.max_score}</span>
+            </div>
+          </div>
+
+          <label className="block text-xs text-muted-foreground">
+            Commentaire (envoyé à tous les membres)
+            <textarea value={feedback} onChange={e => setFeedback(e.target.value)} rows={2}
+              className="block mt-1 w-full rounded-lg border border-border/60 bg-background px-2.5 py-1.5 text-sm resize-y" />
+          </label>
+
+          <div className="flex items-center gap-2">
+            <Button size="sm" className="gap-1.5" onClick={corriger} disabled={envoi || !complet}>
               {envoi ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
               Enregistrer la note
             </Button>
+            {!complet && <span className="text-[11px] text-muted-foreground">Renseignez tous les critères.</span>}
           </div>
           {erreur && <p className="text-xs text-destructive">{erreur}</p>}
           <p className="text-[11px] text-muted-foreground">
@@ -333,6 +436,71 @@ function LigneRendu({ travail, rendu, onCorrige }:
           </p>
         </div>
       )}
+    </div>
+  );
+}
+
+function Fichier({ url, nom }: { url: string; nom: string }) {
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 rounded-lg border border-border/60 bg-background hover:bg-muted px-2.5 py-1.5 text-xs transition-colors">
+      <Download className="w-3 h-3 text-primary shrink-0" />
+      <span className="truncate max-w-[220px]">{nom}</span>
+    </a>
+  );
+}
+
+/**
+ * Ce que les membres se sont mis entre eux — nominativement.
+ *
+ * L'anonymat de l'évaluation par les pairs protège les étudiants les uns des autres ; il
+ * n'a pas à protéger qui que ce soit du formateur, qui est précisément la personne devant
+ * arbitrer quand un membre dit avoir tout porté.
+ */
+function EvaluationsPairs({ pairs }: { pairs: any[] }) {
+  const evalues = Array.from(new Set(pairs.map(p => p.evalue)));
+  return (
+    <div className="rounded-xl border border-border/50 bg-background p-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-2 flex items-center gap-1.5">
+        <Star className="w-3 h-3" /> Évaluations entre membres
+      </p>
+      <div className="overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="text-muted-foreground">
+              <th className="text-left font-medium py-1 pr-3">Critère</th>
+              {evalues.map(n => <th key={n} className="text-center font-medium py-1 px-2 whitespace-nowrap">{n}</th>)}
+            </tr>
+          </thead>
+          <tbody>
+            {PEER_REVIEW_CRITERIA.map(c => (
+              <tr key={c.cle} className="border-t border-border/40">
+                <td className="py-1.5 pr-3">{c.libelle}</td>
+                {evalues.map(n => {
+                  const recus = pairs.filter(p => p.evalue === n).map(p => Number(p.scores?.[c.cle] ?? 0));
+                  const moy = recus.length ? (recus.reduce((a, b) => a + b, 0) / recus.length) : null;
+                  return <td key={n} className="py-1.5 px-2 text-center font-mono">{moy === null ? "—" : moy.toFixed(1)}</td>;
+                })}
+              </tr>
+            ))}
+            <tr className="border-t border-border/60 font-semibold">
+              <td className="py-1.5 pr-3">Total</td>
+              {evalues.map(n => {
+                const totaux = pairs.filter(p => p.evalue === n).map(p => Number(p.total ?? 0));
+                const moy = totaux.length ? (totaux.reduce((a, b) => a + b, 0) / totaux.length) : null;
+                return <td key={n} className="py-1.5 px-2 text-center font-mono">
+                  {moy === null ? "—" : `${moy.toFixed(0)}/${PEER_REVIEW_MAX_TOTAL}`}
+                </td>;
+              })}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      {pairs.filter(p => p.commentaire).map((p, i) => (
+        <p key={i} className="text-[11px] text-muted-foreground mt-1.5">
+          <span className="font-medium">{p.evaluateur} → {p.evalue} :</span> {p.commentaire}
+        </p>
+      ))}
     </div>
   );
 }

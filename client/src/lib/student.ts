@@ -74,10 +74,15 @@ export function isStudentLoggedIn(): boolean {
 
 export async function studentFetch(url: string, options: RequestInit = {}) {
   const token = getStudentToken();
+  // Un envoi de fichier passe par FormData : imposer application/json écraserait le
+  // Content-Type multipart et sa « boundary », que le navigateur est seul à savoir écrire.
+  // Le serveur recevrait alors un corps qu'il ne sait pas découper, et le fichier serait
+  // perdu sans erreur lisible.
+  const isFormData = options.body instanceof FormData;
   const res = await fetch(url, {
     ...options,
     headers: {
-      "Content-Type": "application/json",
+      ...(isFormData ? {} : { "Content-Type": "application/json" }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...options.headers,
     },

@@ -20,8 +20,58 @@ export const GROUP_WORK_WEEKS = [4, 8, 12] as const;
  *  travail collectif demande de se coordonner, ce qu'une semaine ne permet pas. */
 export const GROUP_WORK_WINDOW_WEEKS = 2;
 
-/** Taille visée d'un groupe. Au-delà, la répartition automatique ouvre un nouveau groupe. */
+/**
+ * Taille d'un groupe : trois, comme le modèle WQU dont ce dispositif est repris.
+ *
+ * L'effectif ne tombe presque jamais juste — 19 étudiants ne font pas des groupes de 3. Le
+ * reste est absorbé en élargissant un groupe existant plutôt qu'en ouvrant un groupe d'une
+ * personne : un « groupe » seul n'est pas un travail de groupe, c'est un devoir individuel
+ * déguisé, et l'étudiant concerné n'a personne à qui écrire.
+ */
+export const GROUP_TARGET_SIZE = 3;
 export const GROUP_MAX_MEMBERS = 4;
+export const GROUP_MIN_MEMBERS = 2;
+
+/**
+ * Un étudiant n'entre dans le dispositif que s'il n'a pas encore franchi sa semaine 2.
+ *
+ * Les travaux de groupe ont été ajoutés en cours de route. Les imposer à quelqu'un qui est
+ * déjà en semaine 9 reviendrait à changer les règles au milieu de la partie : il découvrirait
+ * trois évaluations collectives dont deux seraient déjà en retard le jour de leur apparition.
+ * Le dispositif s'applique donc à ceux dont le parcours commence à peine.
+ */
+export const GROUP_WORK_ELIGIBILITY_WEEKS = 2;
+
+/**
+ * Évaluation par les pairs — chaque membre note les AUTRES membres de son groupe.
+ *
+ * Quatre critères à 3 points, soit 12 au total : c'est la grille WQU, et elle tient en un
+ * écran, ce qui est la condition pour qu'elle soit réellement remplie. Elle ne change pas la
+ * note du projet ; elle documente la contribution de chacun, et c'est à ce titre qu'elle
+ * compte — un rendu collectif sans trace des contributions est ingérable dès qu'un membre
+ * conteste.
+ */
+export const PEER_REVIEW_MAX_PER_CRITERION = 3;
+export const PEER_REVIEW_CRITERIA = [
+  { cle: "planification", libelle: "Contribue à la planification du projet et apporte une contribution utile à son avancement" },
+  { cle: "ponctualite", libelle: "Termine son travail et le partage bien avant l'échéance (pas au dernier moment)" },
+  { cle: "qualite", libelle: "Produit des éléments de qualité, réellement utilisés dans le rendu (et non plagiés)" },
+  { cle: "reactivite", libelle: "Répond aux demandes de clarification et aux révisions demandées par le groupe" },
+] as const;
+
+/** Total maximal d'une évaluation par les pairs : 4 critères × 3 points. */
+export const PEER_REVIEW_MAX_TOTAL = PEER_REVIEW_CRITERIA.length * PEER_REVIEW_MAX_PER_CRITERION;
+
+/**
+ * Grille du formateur. Les points se répartissent sur les mêmes axes pour les trois GW ;
+ * seul l'énoncé change. Le total fait 100, ce qui évite d'avoir à expliquer une conversion.
+ */
+export const INSTRUCTOR_RUBRIC = [
+  { cle: "analyse", libelle: "Analyse quantitative (questions ouvertes)", points: 40 },
+  { cle: "methode", libelle: "Rigueur méthodologique et justification des choix", points: 25 },
+  { cle: "livrables", libelle: "Qualité et complétude des livrables attendus", points: 20 },
+  { cle: "restitution", libelle: "Clarté de la restitution écrite", points: 15 },
+] as const;
 
 export type GroupWorkDef = {
   /** 1, 2 ou 3 — l'ordre dans lequel les GW s'enchaînent. */
@@ -34,6 +84,10 @@ export type GroupWorkDef = {
   /** Livrables attendus, un par ligne dans le formulaire de rendu. */
   deliverables: string[];
   maxScore: number;
+  /** Énoncé imprimable, déposé dans le forum du groupe à sa constitution. */
+  briefUrl: string;
+  /** Modèle de rapport à trois mains, une section réservée par membre. */
+  templateUrl: string;
 };
 
 export const GROUP_WORKS: GroupWorkDef[] = [
@@ -52,6 +106,8 @@ export const GROUP_WORKS: GroupWorkDef[] = [
       "Répartition du travail entre les membres du groupe",
     ],
     maxScore: 100,
+    briefUrl: "/academy/gw/GW1-enonce.pdf",
+    templateUrl: "/academy/gw/GW1-modele-rapport.docx",
   },
   {
     index: 2,
@@ -68,6 +124,8 @@ export const GROUP_WORKS: GroupWorkDef[] = [
       "Répartition du travail entre les membres du groupe",
     ],
     maxScore: 100,
+    briefUrl: "/academy/gw/GW2-enonce.pdf",
+    templateUrl: "/academy/gw/GW2-modele-rapport.docx",
   },
   {
     index: 3,
@@ -84,6 +142,8 @@ export const GROUP_WORKS: GroupWorkDef[] = [
       "Répartition du travail entre les membres du groupe",
     ],
     maxScore: 100,
+    briefUrl: "/academy/gw/GW3-enonce.pdf",
+    templateUrl: "/academy/gw/GW3-modele-rapport.docx",
   },
 ];
 
