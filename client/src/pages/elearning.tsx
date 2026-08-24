@@ -4,7 +4,7 @@ import { SEO } from "@/components/seo";
 import {
   GraduationCap, ChevronRight, ChevronLeft, CheckCircle2,
   Lock, BookOpen, ArrowRight, ClipboardCheck,
-  Download, X, Clock, Target, Users, Award, Sprout, FileText,
+  Download, X, Clock, Target, Users, Award, Sprout, FileText, Check, LayoutDashboard,
   MapPin, Rocket, CalendarDays, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialShare } from "@/components/social-share";
@@ -16,6 +16,8 @@ import {
 import {
   CHAPITRES, LIVRET_TITRE, LIVRET_SOUS_TITRE, LIVRET_AUTEUR, LIVRET_FONCTION, LIVRET_FICHIER,
 } from "@shared/revision";
+import { QUESTIONS_TOF } from "@shared/tof-test";
+import { programById } from "@shared/programs";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 // Le parcours réel (cours, progression, attestations) vit dans /academy/* : cette page
@@ -75,17 +77,35 @@ export default function ELearning() {
   const [pageEtat, setPageEtat] = useState<"chargement" | "ok" | "erreur">("chargement");
   const [compact, setCompact] = useState(false);
   const [moduleDetail, setModuleDetail] = useState<any>(null);
+  // Deux parcours, deux tests, un seul moteur. Dupliquer l'écran de QCM aurait fait deux
+  // corrections d'affichage à porter à chaque fois — et une des deux aurait fini par être
+  // oubliée. Le parcours en cours d'examen commande la banque de questions et l'adresse
+  // d'envoi ; tout le reste est commun.
+  const [parcoursTest, setParcoursTest] = useState<"meal" | "tof">("meal");
+  const [statutTof, setStatutTof] = useState<any>(null);
 
-  const passed = testStatus?.passed === true || (score !== null && score >= 21);
+  const TOF = programById("tof");
+  const surTof = parcoursTest === "tof";
+  // Les deux banques exposent la même forme au moteur : domaine, énoncé, options.
+  const BANQUE: { domain: string; q: string; opts: string[] }[] = surTof
+    ? QUESTIONS_TOF.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts }))
+    : QUESTIONS;
+  const SEUIL = surTof ? TOF.admission.seuil : 21;
+  const statutCourant = surTof ? statutTof : testStatus;
+
+  const passed = statutCourant?.passed === true || (score !== null && score >= SEUIL);
   const answeredCount = Object.keys(answers).length;
 
   useEffect(() => { topRef.current?.scrollIntoView({ behavior: "smooth" }); }, [view]);
 
-  useEffect(() => {
-    if (isStudentLoggedIn()) {
-      studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
-    }
-  }, []);
+  // Les deux admissions sont indépendantes : on lit les deux statuts, sans quoi la page ne
+  // saurait pas dire à un étudiant admis au MEAL qu'il lui reste à passer le second test.
+  function rafraichirStatuts() {
+    if (!isStudentLoggedIn()) return;
+    studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
+    studentFetch("/api/academy/tof/test-status").then(r => r.json()).then(setStatutTof).catch(() => {});
+  }
+  useEffect(() => { rafraichirStatuts(); }, []);
 
   // Contenu de la page : modules, chiffres et calendrier viennent tous du serveur, pour que
   // la vitrine ne puisse pas se désynchroniser du catalogue réel.
@@ -112,13 +132,13 @@ export default function ELearning() {
   async function submitTest() {
     // Le score est calculé et vérifié CÔTÉ SERVEUR uniquement (le client n'a pas le corrigé) : on envoie
     // les réponses choisies et on attend le score officiel avant d'afficher un résultat.
-    const answerArray = QUESTIONS.map((_, i) => (answers[i] ?? -1));
+    const answerArray = BANQUE.map((_, i) => (answers[i] ?? -1));
     setSubmitError(false);
     setSubmitErrorMsg(null);
     setSubmitting(true);
     setView("test-result");
     try {
-      const res = await studentFetch("/api/academy/submit-test", {
+      const res = await studentFetch(surTof ? "/api/academy/tof/submit-test" : "/api/academy/submit-test", {
         method: "POST",
         body: JSON.stringify({ answers: answerArray }),
       });
@@ -132,7 +152,7 @@ export default function ELearning() {
         setSubmitErrorMsg(data?.message || null);
         setNeedVerification(!!data?.needVerification);
       }
-      studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
+      rafraichirStatuts();
       // Admis : on récupère tout de suite la leçon débloquée pour pouvoir enchaîner d'un clic,
       // au lieu de renvoyer l'étudiant chercher son point d'entrée dans le tableau de bord.
       if (data?.passed) loadNextLesson();
@@ -152,19 +172,36 @@ export default function ELearning() {
     } catch { /* le tableau de bord reste la porte d'entrée de repli */ }
   }
 
-  // ── Vérifie l'authentification avant de démarrer le test
-  function startTest() {
+  // ── Démarrage d'un test, pour l'un ou l'autre parcours ──
+  //
+  // Chaque parcours a sa porte. Une seule fonction les ouvre, pour que les vérifications
+  // — compte requis, admission déjà obtenue, délai de reprise — ne s'écrivent qu'une fois.
+  function demarrerTest(parcours: "meal" | "tof") {
     if (!isStudentLoggedIn()) {
       navigate("/academy/register");
       return;
     }
-    if (testStatus?.passed) { navigate("/academy/dashboard"); return; }
-    if (testStatus && !testStatus.canRetry && testStatus.nextTestAllowed) {
+    const statut = parcours === "tof" ? statutTof : testStatus;
+    if (statut?.passed) { navigate("/academy/dashboard"); return; }
+
+    // Changer de banque remet le questionnaire à zéro. Sans cela, les réponses données au
+    // test précédent partiraient comme réponses du nouveau — et seraient corrigées.
+    setParcoursTest(parcours);
+    setQIdx(0);
+    setAnswers({});
+    setScore(null);
+    setSubmitResult(null);
+    setSubmitError(false);
+    setSubmitErrorMsg(null);
+
+    if (statut && !statut.canRetry && statut.nextTestAllowed) {
       setView("test-result"); // affiche le message de verrou
       return;
     }
     setView("test");
   }
+
+  function startTest() { demarrerTest("meal"); }
 
   // ─────────────────── RENDER HELPERS ──────────────────────────────────────
 
@@ -173,6 +210,7 @@ export default function ELearning() {
   // frontière entre naviguer dans le site et naviguer dans la page.
   const ANCRES = [
     { label: "Modules", id: "modules" },
+    { label: "Formateurs", id: "formateurs" },
     { label: "Pourquoi nous", id: "pourquoi" },
     { label: "Sessions", id: "sessions" },
     { label: "Parcours", id: "parcours" },
@@ -645,6 +683,110 @@ export default function ELearning() {
           </div>
         </Section>
 
+        {/* ── Second parcours : formation de formateurs ── */}
+        {/*
+            Volontairement à part, et non parmi les modules MEAL. C'est un autre métier, un
+            autre public et un autre certificat : le présenter au même rang laissait croire
+            qu'il comptait pour le cursus MEAL, ce qu'il n'a jamais fait. Sa porte d'entrée
+            est son propre test, plus court, sur son propre contenu.
+        */}
+        <Section id="formateurs" fond>
+          <div className="rounded-3xl border overflow-hidden"
+            style={{ borderColor: `${TOF.accent}40` }}>
+            <div className="px-6 sm:px-8 py-5 flex flex-wrap items-center gap-3"
+              style={{ background: `${TOF.accent}14` }}>
+              <span className="w-10 h-10 rounded-2xl grid place-items-center shrink-0"
+                style={{ background: TOF.accent, color: "#fff" }}>
+                <Users className="w-5 h-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: TOF.accent }}>
+                  Second parcours · indépendant du cursus MEAL
+                </p>
+                <h2 className="text-xl sm:text-2xl font-bold leading-tight mt-0.5">{TOF.title}</h2>
+              </div>
+            </div>
+
+            <div className="p-6 sm:p-8 bg-card">
+              <div className="grid lg:grid-cols-[1fr_minmax(0,19rem)] gap-8 lg:gap-12 items-start">
+                <div>
+                  <p className="text-base text-muted-foreground leading-relaxed">{TOF.subtitle}</p>
+                  <p className="text-sm mt-3 leading-relaxed">{TOF.outcome}</p>
+
+                  <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mt-6 mb-3">
+                    Ce que vous apprenez à animer
+                  </p>
+                  <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-2">
+                    {["Budget familial", "Épargne communautaire", "Tontines",
+                      "Crédit agricole", "Planification de campagne", "Conduite de session"].map(t => (
+                      <li key={t} className="flex items-start gap-2 text-[13px]">
+                        <Check className="w-4 h-4 mt-0.5 shrink-0" style={{ color: TOF.accent }} />
+                        <span className="text-muted-foreground">{t}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <p className="flex items-start gap-2.5 mt-6 p-3.5 rounded-2xl bg-muted/50 text-[13px] text-muted-foreground leading-relaxed">
+                    <Info className="w-4 h-4 shrink-0 mt-0.5" style={{ color: TOF.accent }} />
+                    <span>
+                      Ce parcours est <strong className="text-foreground">totalement séparé du
+                      cursus MEAL</strong> : son propre test d'admission, son propre certificat.
+                      Rien n'oblige à suivre l'un pour accéder à l'autre.
+                    </span>
+                  </p>
+                </div>
+
+                {/* La carte d'admission propre au parcours */}
+                <div className="rounded-2xl border border-border/60 p-5">
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground font-semibold">
+                    Titre délivré
+                  </p>
+                  <p className="font-semibold text-sm leading-snug mt-1">{TOF.credential}</p>
+
+                  <div className="mt-4 pt-4 border-t border-border/50 space-y-2.5 text-[13px] text-muted-foreground">
+                    <p className="flex items-start gap-2">
+                      <ClipboardCheck className="w-4 h-4 shrink-0 mt-0.5" style={{ color: TOF.accent }} />
+                      Test d'admission : {TOF.admission.seuil} bonnes réponses sur {TOF.admission.nbQuestions}
+                    </p>
+                    <p className="flex items-start gap-2">
+                      <Clock className="w-4 h-4 shrink-0 mt-0.5" style={{ color: TOF.accent }} />
+                      Une leçon par semaine, à votre rythme
+                    </p>
+                    <p className="flex items-start gap-2">
+                      <Award className="w-4 h-4 shrink-0 mt-0.5" style={{ color: TOF.accent }} />
+                      Gratuit, comme le reste de la plateforme
+                    </p>
+                  </div>
+
+                  {/* L'état de l'admission à CE parcours, jamais celui du MEAL : un étudiant
+                      admis au cursus MEAL n'est pas admis ici, et le lui laisser croire le
+                      renverrait vers un tableau de bord sans ce cours. */}
+                  {statutTof?.passed ? (
+                    <div className="mt-5">
+                      <p className="flex items-center gap-2 text-[13px] font-medium"
+                        style={{ color: TOF.accent }}>
+                        <CheckCircle2 className="w-4 h-4 shrink-0" /> Vous êtes admis(e)
+                      </p>
+                      <Button className="w-full mt-3 gap-2" variant="outline"
+                        onClick={() => navigate("/academy/dashboard")}>
+                        <LayoutDashboard className="w-4 h-4" /> Ouvrir mon espace
+                      </Button>
+                    </div>
+                  ) : (
+                    <Button className="w-full mt-5 gap-2 border-0 text-white"
+                      style={{ background: TOF.accent }}
+                      onClick={() => demarrerTest("tof")}>
+                      {isStudentLoggedIn() ? "Passer le test formateurs" : "S'inscrire à ce parcours"}
+                      <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </Section>
+
         {/* ── Ressources ── */}
         <Section id="ressources" titre="Ressources pour préparer le test"
           sousTitre="Beaucoup de candidats échouent sur des notions qu'ils connaissent, faute d'avoir revu le vocabulaire. Ce livret est là pour ça.">
@@ -778,21 +920,21 @@ export default function ELearning() {
   }
 
   function renderTest() {
-    const q = QUESTIONS[qIdx];
+    const q = BANQUE[qIdx];
     const chosen = answers[qIdx];
     return (
       <div className="max-w-2xl mx-auto px-6 py-12">
         {/* Progress */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium">Question {qIdx + 1} / {QUESTIONS.length}</span>
+            <span className="text-sm font-medium">Question {qIdx + 1} / {BANQUE.length}</span>
             <span className="text-sm text-muted-foreground">{answeredCount} réponses</span>
           </div>
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-            <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((qIdx + 1) / QUESTIONS.length) * 100}%` }} />
+            <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((qIdx + 1) / BANQUE.length) * 100}%` }} />
           </div>
           <div className="flex gap-1 mt-2 flex-wrap">
-            {QUESTIONS.map((_, i) => (
+            {BANQUE.map((_, i) => (
               <button key={i} onClick={() => setQIdx(i)}
                 className={`w-5 h-1.5 rounded-full transition-colors cursor-pointer ${answers[i] !== undefined ? "bg-primary" : i === qIdx ? "bg-primary/40" : "bg-muted"}`} />
             ))}
@@ -830,7 +972,7 @@ export default function ELearning() {
           <Button variant="outline" disabled={qIdx === 0} onClick={() => setQIdx(q => q - 1)} className="gap-2">
             <ChevronLeft className="w-4 h-4" /> Précédent
           </Button>
-          {qIdx < QUESTIONS.length - 1 ? (
+          {qIdx < BANQUE.length - 1 ? (
             <Button onClick={() => setQIdx(q => q + 1)} className="gap-2">
               Suivant <ChevronRight className="w-4 h-4" />
             </Button>
@@ -893,7 +1035,7 @@ export default function ELearning() {
         </div>
       );
     }
-    const pct = Math.round((score! / QUESTIONS.length) * 100);
+    const pct = Math.round((score! / BANQUE.length) * 100);
     return (
       <div className="max-w-2xl mx-auto px-6 py-12 text-center">
         <div className={`w-28 h-28 rounded-full mx-auto mb-6 flex flex-col items-center justify-center border-4 ${passed ? "border-primary" : "border-destructive"}`}>
@@ -955,7 +1097,7 @@ export default function ELearning() {
         <div className="bg-card rounded-2xl border border-border/50 p-6 text-left">
           <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-4">Détail des réponses</p>
           <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-            {QUESTIONS.map((q, i) => {
+            {BANQUE.map((q, i) => {
               const ok = !!submitResult?.correct?.[i];
               return (
                 <div key={i} className="flex items-start gap-3 text-sm py-1.5 border-b border-border/30 last:border-0">

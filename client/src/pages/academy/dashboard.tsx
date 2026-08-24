@@ -89,7 +89,20 @@ export default function AcademyDashboard() {
   const firstName = student?.full_name?.split(" ")[0] || "étudiant";
   const emailVerified = testStatus ? testStatus.emailVerified !== false : true;
 
-  const programGroups = groupByProgram(allCourses as any[]);
+  // Les parcours ont désormais chacun leur admission : n'afficher que ceux auxquels
+  // l'étudiant est réellement inscrit. /api/academy/courses renvoie tout le catalogue publié,
+  // si bien qu'un étudiant admis au seul cursus MEAL voyait la formation de formateurs à 0 %,
+  // comme un cours qu'il aurait négligé — alors qu'il n'y a simplement pas accès.
+  //
+  // Le test porte sur l'inscription OU sur la présence d'une leçon planifiée : se fier à la
+  // seule inscription ferait disparaître le parcours d'un étudiant dont l'insertion aurait
+  // échoué, alors que son planning existe et qu'il travaille dedans.
+  const idsAccessibles = new Set<number>([
+    ...enrollments.map((e: any) => e.course_id),
+    ...schedule.map((s: any) => s.course_id),
+  ]);
+  const mesCours = (allCourses as any[]).filter(c => idsAccessibles.has(c.id));
+  const programGroups = groupByProgram(mesCours);
 
   const initials = student?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "ET";
 
@@ -146,7 +159,7 @@ export default function AcademyDashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" style={{ isolation: "isolate" }}>
         {[
           { label: "Moyenne générale", value: `${overall}%`, icon: TrendingUp, tint: "text-primary bg-primary/10" },
-          { label: "Cours terminés", value: `${completedCourses}/${allCourses.length}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
+          { label: "Cours terminés", value: `${completedCourses}/${mesCours.length}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
           { label: "Credentials", value: creds.length, icon: Award, tint: "text-purple-600 bg-purple-500/10" },
           { label: "Évaluations", value: transcript?.totalGrades ?? 0, icon: CheckCircle2, tint: "text-emerald-600 bg-emerald-500/10" },
         ].map((s) => (
