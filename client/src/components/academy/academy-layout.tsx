@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { PROGRAMS } from "@shared/programs";
 import { studentFetch, getStudent, clearStudentSession } from "@/lib/student";
 import {
   Home, Route as RouteIcon, BookOpen, Award, FolderOpen, Users,
@@ -24,10 +25,14 @@ import { Dialog, DialogContent } from "@/components/ui/dialog";
  */
 type Item = { href: string; label: string; icon: any; exact?: boolean };
 
+// « Mes cours » ne renvoie plus à une ancre du tableau de bord : chaque parcours a sa page.
+// Les empiler dans un même écran rendait la séparation purement cosmétique — on lisait
+// toujours ses cours de cartographie et ses cours d'animation rurale l'un sous l'autre.
 const NAV: Item[] = [
   { href: "/academy/dashboard", label: "Accueil", icon: Home, exact: true },
-  { href: "/academy/dashboard#parcours", label: "Mon parcours", icon: RouteIcon },
-  { href: "/academy/dashboard#cours", label: "Mes cours", icon: BookOpen },
+  ...PROGRAMS.map(p => ({
+    href: `/academy/parcours/${p.id}`, label: p.title, icon: RouteIcon, exact: true,
+  })),
   { href: "/academy/group-work", label: "Travaux de groupe", icon: Users, exact: true },
   { href: "/academy/dashboard#credentials", label: "Certifications", icon: Award },
   { href: "/academy/dashboard#ressources", label: "Ressources", icon: FolderOpen },

@@ -8,7 +8,7 @@ import {
   Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
   Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink, Send } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
-import { groupByProgram, programOf } from "@shared/programs";
+import { groupByProgram } from "@shared/programs";
 
 interface Cred { id: string; type: string; title: string; subtitle: string; issued_at: string; expires_at: string | null; status: string; certificate_no: string | null; score: number | null; download_url: string | null; skills: string[]; color: string; }
 
@@ -26,8 +26,6 @@ export default function AcademyDashboard() {
   const [bord, setBord] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   // Les cours terminés sont repliés par défaut, parcours par parcours.
-  const [showPastOf, setShowPastOf] = useState<Record<string, boolean>>({});
-  const [showAllWeeks, setShowAllWeeks] = useState(false);
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
@@ -62,39 +60,6 @@ export default function AcademyDashboard() {
   // qu'il faut proposer de reprendre en premier.
   const nextLesson = schedule.find((s: any) => s.status === "available" || s.status === "missed");
 
-  // Planning regroupé par semaine. Une liste plate de trente lignes ne se lit pas : sans
-  // séparateur, deux parcours qui avancent en parallèle donnent l'impression d'un fouillis.
-  // ── Un planning par parcours ──
-  //
-  // Les parcours ont chacun leur admission, leur rythme et leur certificat : les empiler dans
-  // un même calendrier hebdomadaire donnait, la même semaine, une leçon de cartographie et
-  // une leçon d'animation en milieu rural. L'étudiant lisait cela comme un programme unique
-  // dont il aurait pris du retard sur une moitié.
-  const parcoursDe = (r: any) => programOf(r?.sms_courses?.code)?.id ?? "autres";
-  const planningMeal = schedule.filter((r: any) => parcoursDe(r) === "meal");
-  const planningAutres = schedule.filter((r: any) => parcoursDe(r) !== "meal");
-
-  const weeks: { index: number; rows: any[] }[] = [];
-  for (const s of planningMeal) {
-    let w = weeks.find(x => x.index === s.week_index);
-    if (!w) { w = { index: s.week_index, rows: [] }; weeks.push(w); }
-    w.rows.push(s);
-  }
-  // Les travaux de groupe s'insèrent DANS le planning, aux semaines 4, 8 et 12 : c'est là
-  // que l'étudiant les cherche — au milieu de ce qu'il a à faire cette semaine-là — et non
-  // dans une liste séparée qu'il faudrait penser à consulter.
-  const travauxGroupe: any[] = gw?.travaux || [];
-  for (const t of travauxGroupe) {
-    let w = weeks.find(x => x.index === t.semaine);
-    if (!w) { w = { index: t.semaine, rows: [] }; weeks.push(w); }
-    w.rows.push({ ...t, kind: "gw", unlock_at: t.ouvertureLe, due_at: t.echeanceLe, status: t.statut });
-  }
-  weeks.sort((a, b) => a.index - b.index);
-  // Semaine « en cours » = la première où il reste quelque chose à faire.
-  const currentWeek = weeks.find(w => w.rows.some(r => r.status !== "completed"))?.index ?? 1;
-  // On déroule la semaine en cours et la suivante ; le reste est replié derrière un bouton.
-  const visibleWeeks = showAllWeeks ? weeks : weeks.filter(w => w.index <= currentWeek + 1);
-  const hiddenWeeks = weeks.length - visibleWeeks.length;
   const overall = transcript?.overall ?? 0;
   const firstName = student?.full_name?.split(" ")[0] || "étudiant";
   const emailVerified = testStatus ? testStatus.emailVerified !== false : true;
@@ -113,16 +78,6 @@ export default function AcademyDashboard() {
   ]);
   const mesCours = (allCourses as any[]).filter(c => idsAccessibles.has(c.id));
   const programGroups = groupByProgram(mesCours);
-
-  // Les autres parcours, regroupés chacun sous son titre.
-  const autresPlannings = groupByProgram(
-    (allCourses as any[]).filter(c => planningAutres.some((r: any) => r.course_id === c.id))
-  ).map(g => ({
-    parcours: g.program,
-    lignes: planningAutres
-      .filter((r: any) => g.courses.some(c => c.id === r.course_id))
-      .sort((a: any, b: any) => a.week_index - b.week_index),
-  })).filter(x => x.lignes.length > 0);
 
   const initials = student?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "ET";
 
@@ -225,129 +180,7 @@ export default function AcademyDashboard() {
           </div>
         </section>
       )}
-      {/* ───── Planning des autres parcours ─────
-           Chacun sous son titre et à son accent. Un étudiant peut suivre la formation de
-           formateurs sans être au cursus MEAL : ce bloc ne dépend donc pas de l'admission
-           MEAL, contrairement au planning ci-dessus. */}
-      {autresPlannings.map(({ parcours, lignes }) => (
-        <section key={parcours.id}>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold flex items-center gap-2">
-              <Calendar className="w-5 h-5" style={{ color: parcours.accent }} />
-              {parcours.title} — mon planning
-            </h2>
-            <span className="text-xs text-muted-foreground">Parcours indépendant du cursus MEAL</span>
-          </div>
-          <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/50 overflow-hidden">
-            {lignes.map((r: any) => (
-              <button key={r.id}
-                onClick={() => r.status !== "locked" && navigate(`/academy/classroom/${r.course_id}?lesson=${r.lesson_id}`)}
-                disabled={r.status === "locked"}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                  r.status === "locked" ? "opacity-55 cursor-default" : "hover:bg-muted/50"}`}>
-                <span className="text-[10px] font-mono text-muted-foreground w-10 shrink-0">S{r.week_index}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium truncate">
-                    {r.sms_lessons?.title || `Leçon ${r.lesson_id}`}
-                  </span>
-                  <span className="block text-[11px] text-muted-foreground truncate">
-                    {r.sms_courses?.title}
-                  </span>
-                </span>
-                <span
-                  className={`text-[10px] font-medium px-2 py-1 rounded-full shrink-0 whitespace-nowrap ${
-                    r.status === "completed" ? "" : "bg-muted text-muted-foreground"}`}
-                  style={r.status === "completed"
-                    ? { background: `${parcours.accent}1A`, color: parcours.accent }
-                    : undefined}>
-                  {r.status === "completed" ? "terminée"
-                    : r.status === "locked" ? "à venir"
-                    : r.status === "missed" ? "en retard" : "à faire"}
-                </span>
-              </button>
-            ))}
-          </div>
-        </section>
-      ))}
 
-      {/* ───── Planning hebdomadaire ───── */}
-      {testStatus?.passed && planningMeal.length > 0 && (
-        <section>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Cursus MEAL — mon planning</h2>
-            <span className="text-xs text-muted-foreground">Rythme conseillé — vous pouvez prendre de l'avance</span>
-          </div>
-          <div className="space-y-3">
-            {visibleWeeks.map(w => {
-              const dates = w.rows[0];
-              const done = w.rows.filter((r: any) => r.status === "completed").length;
-              const isCurrent = w.index === currentWeek;
-              return (
-                <div key={w.index} className={`bg-card rounded-2xl border overflow-hidden ${isCurrent ? "border-primary/40" : "border-border/50"}`}>
-                  <div className={`flex items-center justify-between px-4 py-2.5 ${isCurrent ? "bg-primary/5" : "bg-muted/30"}`}>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className={`text-xs font-bold ${isCurrent ? "text-primary" : "text-muted-foreground"}`}>Semaine {w.index}</span>
-                      {isCurrent && <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-primary text-white shrink-0">en cours</span>}
-                      <span className="text-[11px] text-muted-foreground truncate">
-                        {new Date(dates.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                        {" → "}
-                        {new Date(dates.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                      </span>
-                    </div>
-                    <span className="text-[11px] text-muted-foreground shrink-0">{done}/{w.rows.length}</span>
-                  </div>
-                  <div className="divide-y divide-border/40">
-                    {w.rows.map((s: any) => {
-                      if (s.kind === "gw") return (
-                        <LigneTravailGroupe key={`gw-${s.id}`} t={s}
-                          groupe={gw?.groupe} onOuvrir={() => navigate("/academy/group-work")} />
-                      );
-                      const isDone = s.status === "completed", isAvail = s.status === "available";
-                      // « missed » = en retard sur le rythme conseillé, pas exclu : la leçon reste à faire.
-                      const isMissed = s.status === "missed";
-                      const isOpen = isAvail || isMissed;
-                      return (
-                        <div key={s.id} className={`flex items-center gap-3 p-3.5 ${isOpen ? "bg-primary/5" : ""}`}>
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-bold shrink-0 ${
-                            isDone ? "bg-primary text-white" : isAvail ? "bg-primary/15 text-primary" :
-                            isMissed ? "bg-amber-500/15 text-amber-600" : "bg-muted text-muted-foreground"}`}>
-                            {isDone ? <CheckCircle2 className="w-4 h-4" /> : isMissed ? <Clock className="w-4 h-4" />
-                              : isAvail ? <span className="text-[11px]">{s.sms_lessons?.order_index ?? ""}</span> : <Lock className="w-3.5 h-3.5" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">{s.sms_lessons?.title || "Leçon"}</p>
-                            <p className="text-xs text-muted-foreground truncate">
-                              <span className="font-mono">{s.sms_courses?.code}</span>
-                              {s.sms_lessons?.order_index ? ` · leçon ${s.sms_lessons.order_index}` : ""}
-                              {" · "}
-                              {isDone ? "Complétée ✓" : isMissed ? "En retard — à rattraper"
-                                : isAvail ? `Avant le ${new Date(s.due_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`
-                                : `Débloque le ${new Date(s.unlock_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}`}
-                            </p>
-                          </div>
-                          {isOpen && <Button size="sm" variant={isMissed ? "outline" : "default"} onClick={() => navigate(`/academy/classroom/${s.course_id}?lesson=${s.lesson_id}`)} className="shrink-0">{isMissed ? "Rattraper" : "Commencer"}</Button>}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-            {hiddenWeeks > 0 && (
-              <button onClick={() => setShowAllWeeks(true)}
-                className="w-full text-xs text-muted-foreground hover:text-primary py-2.5 rounded-xl border border-dashed border-border/60 hover:border-primary/40 transition-colors">
-                Voir les {hiddenWeeks} semaine{hiddenWeeks > 1 ? "s" : ""} suivante{hiddenWeeks > 1 ? "s" : ""}
-              </button>
-            )}
-            {showAllWeeks && weeks.length > 2 && (
-              <button onClick={() => setShowAllWeeks(false)}
-                className="w-full text-xs text-muted-foreground hover:text-primary py-2.5 rounded-xl border border-dashed border-border/60 hover:border-primary/40 transition-colors">
-                Réduire le planning
-              </button>
-            )}
-          </div>
-        </section>
-      )}
         </div>
         <div className="space-y-6">
           {bord?.calendrier?.length > 0 && <Calendrier evenements={bord.calendrier} />}
@@ -397,161 +230,40 @@ export default function AcademyDashboard() {
           ses propres cours, sans savoir lequel comptait pour son certificat.
           Les ancres #parcours et #cours servent les liens du menu latéral. */}
       <div id="parcours" className="scroll-mt-24" />
-      <div id="cours" className="scroll-mt-24" />
-      {programGroups.map(({ program, courses }) => {
-        const stats = courses.map(co => {
-          const enr = enrollments.find(e => e.course_id === co.id);
-          return { co, enr, prog: enr?.progress || 0, done: enr?.status === "completed" };
-        });
-        const doneCount = stats.filter(s => s.done).length;
-        const programPct = stats.length ? Math.round(stats.reduce((a, s) => a + s.prog, 0) / stats.length) : 0;
-        // Dernière échéance du parcours, lue sur le planning : une date réelle vaut mieux
-        // qu'une durée théorique, puisque le rythme dépend de la date d'admission.
-        const courseIds = new Set(courses.map(c => c.id));
-        const deadlines = schedule.filter((sp: any) => courseIds.has(sp.course_id)).map((sp: any) => sp.due_at).filter(Boolean);
-        const lastDue = deadlines.length ? new Date(Math.max(...deadlines.map((d: string) => new Date(d).getTime()))) : null;
-        const visible = showPastOf[program.id] ? stats : stats.filter(s => !s.done);
-        const hiddenDone = stats.length - visible.length;
-
-        return (
-          <section key={program.id} className="mb-8">
-            {/* En-tête du parcours : ce qu'il vise, où on en est, ce qu'il délivre */}
-            <div className="rounded-2xl border border-border/50 overflow-hidden mb-4">
+      {/* ── Mes parcours ──
+           Une carte par cursus, chacune menant à sa page. Le détail des cours et le planning
+           vivent sur /academy/parcours/:id : les garder ici remettait les deux cursus dans le
+           même écran, ce que la séparation était précisément censée éviter. */}
+      <section id="cours" className="scroll-mt-24 grid sm:grid-cols-2 gap-4">
+        {programGroups.map(({ program, courses }) => {
+          const st = courses.map(co => enrollments.find((e: any) => e.course_id === co.id));
+          const faits = st.filter((e: any) => e?.status === "completed").length;
+          const pct = st.length
+            ? Math.round(st.reduce((a: number, e: any) => a + (e?.progress || 0), 0) / st.length) : 0;
+          return (
+            <button key={program.id} onClick={() => navigate(`/academy/parcours/${program.id}`)}
+              className="text-left rounded-2xl border border-border/50 bg-card overflow-hidden hover:shadow-md transition-shadow">
               <div className="h-1.5" style={{ background: program.accent }} />
-              <div className="p-5 bg-card">
-                <div className="flex items-start justify-between gap-4 flex-wrap">
-                  <div className="min-w-0">
-                    <h2 className="text-lg font-bold leading-tight">{program.title}</h2>
-                    <p className="text-sm text-muted-foreground mt-0.5">{program.subtitle}</p>
-                    {program.outcome && (
-                      <p className="text-xs text-muted-foreground/80 mt-2 italic">{program.outcome}</p>
-                    )}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-2xl font-bold" style={{ color: program.accent }}>{programPct}%</p>
-                    <p className="text-[11px] text-muted-foreground">{doneCount}/{stats.length} cours terminés</p>
-                    {lastDue && (
-                      <p className="text-[11px] text-muted-foreground mt-1 flex items-center gap-1 justify-end">
-                        <Calendar className="w-3 h-3" />
-                        jusqu'au {lastDue.toLocaleDateString("fr-FR", { day: "numeric", month: "short" })}
-                      </p>
-                    )}
-                  </div>
+              <div className="p-5">
+                <h3 className="font-bold leading-tight">{program.title}</h3>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{program.subtitle}</p>
+                <div className="flex items-center justify-between text-xs mt-4 mb-1.5">
+                  <span className="text-muted-foreground">{faits} / {courses.length} cours terminés</span>
+                  <span className="font-semibold" style={{ color: program.accent }}>{pct} %</span>
                 </div>
-
-                <div className="h-1.5 bg-muted rounded-full overflow-hidden mt-4">
-                  <div className="h-full rounded-full transition-all" style={{ width: `${programPct}%`, background: program.accent }} />
+                <div className="h-2 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${pct}%`, background: program.accent }} />
                 </div>
-
-                {/* Les étapes du parcours, dans l'ordre, avec l'état de chacune */}
-                <p className="text-[11px] text-muted-foreground mt-3">
-                  Les cours s'enchaînent l'un après l'autre, {program.lessonsPerWeek === 1 ? "une leçon" : `${program.lessonsPerWeek} leçons`} par semaine.
-                </p>
-                <div className="flex items-center gap-1.5 mt-2 overflow-x-auto pb-1">
-                  {/* L'étape en cours est le premier cours NON TERMINÉ, pas le premier qui a de
-                      l'avancement : les cours d'un parcours s'enchaînent, donc c'est celui-là
-                      qu'il faut finir avant les suivants, même si un cours plus loin a déjà
-                      quelques leçons validées. */}
-                  {stats.map(({ co, done, prog }, i) => {
-                    const isCurrent = i === stats.findIndex(s => !s.done);
-                    return (
-                    <div key={co.id} className="flex items-center gap-1.5 shrink-0">
-                      {i > 0 && <span className="w-4 h-px bg-border" />}
-                      <button
-                        onClick={() => testStatus?.passed && navigate(`/academy/classroom/${co.id}`)}
-                        disabled={!testStatus?.passed}
-                        title={`${co.title}${done ? " — terminé" : isCurrent ? " — étape en cours" : prog > 0 ? ` — ${prog}% fait` : ""}`}
-                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
-                          done ? "text-white border-transparent"
-                          : isCurrent ? "border-current bg-current/10"
-                          : "border-border text-muted-foreground hover:border-current"
-                        } ${testStatus?.passed ? "cursor-pointer" : "cursor-not-allowed opacity-70"}`}
-                        style={done ? { background: program.accent } : isCurrent || prog > 0 ? { color: program.accent } : undefined}>
-                        {done ? <CheckCircle2 className="w-3 h-3" /> : isCurrent ? <TrendingUp className="w-3 h-3" /> : <span className="w-1.5 h-1.5 rounded-full bg-current" />}
-                        {co.code}
-                        {!done && prog > 0 && <span className="opacity-60">{prog}%</span>}
-                      </button>
-                    </div>
-                    );
-                  })}
-                  {program.credential && (
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="w-4 h-px bg-border" />
-                      <span className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
-                        doneCount === stats.length && stats.length > 0
-                          ? "border-transparent text-white" : "border-dashed border-border text-muted-foreground"}`}
-                        style={doneCount === stats.length && stats.length > 0 ? { background: program.accent } : undefined}>
-                        <Trophy className="w-3 h-3" /> {program.credential}
-                      </span>
-                    </div>
-                  )}
-                </div>
-                {!program.credential && (
-                  <p className="text-[11px] text-muted-foreground mt-3">
-                    Ce parcours ne conditionne pas le certificat du cursus MEAL.
-                  </p>
-                )}
+                <span className="inline-flex items-center gap-1 text-xs font-medium mt-4"
+                  style={{ color: program.accent }}>
+                  Ouvrir ce parcours <ChevronRight className="w-3.5 h-3.5" />
+                </span>
               </div>
-            </div>
-
-            {/* Les cours du parcours. Les cours terminés sortent de la vue par défaut :
-                ce qui reste à faire doit être ce qu'on voit en premier. */}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {visible.map(({ co, enr, prog, done }) => (
-                <div key={co.id} className={`bg-card rounded-2xl border overflow-hidden flex flex-col ${done ? "border-border/40 opacity-80" : "border-border/50"}`}>
-                  <div className="h-1" style={{ background: done ? program.accent : `${program.accent}40` }} />
-                  <div className="p-5 flex flex-col flex-1">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-mono font-semibold" style={{ color: program.accent }}>{co.code}</span>
-                      <span className="text-[10px] bg-muted px-2 py-0.5 rounded-full text-muted-foreground capitalize">{co.level}</span>
-                    </div>
-                    <h3 className="font-semibold text-sm mb-2 leading-snug">{co.title}</h3>
-                    <p className="text-xs text-muted-foreground mb-4 line-clamp-2 flex-1">{co.description}</p>
-                    {enr && (
-                      <div className="mb-3">
-                        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                          <div className="h-full rounded-full transition-all" style={{ width: `${prog}%`, background: program.accent }} />
-                        </div>
-                        <p className="text-[11px] text-muted-foreground mt-1">
-                          {done ? "Terminé ✓" : `${prog}% complété`}
-                        </p>
-                      </div>
-                    )}
-                    <div className="flex items-center gap-2">
-                      <Button size="sm" variant={enr && !done ? "default" : "outline"} className="flex-1 gap-1.5"
-                        disabled={!testStatus?.passed}
-                        onClick={() => navigate(`/academy/classroom/${co.id}`)}>
-                        {!testStatus?.passed ? <><Lock className="w-3.5 h-3.5" /> Test requis</> :
-                         done ? <>Revoir <ChevronRight className="w-3.5 h-3.5" /></> :
-                         enr ? <>{prog > 0 ? "Continuer" : "Commencer"} <ChevronRight className="w-3.5 h-3.5" /></> :
-                         <>Ouvrir <ChevronRight className="w-3.5 h-3.5" /></>}
-                      </Button>
-                      <SocialShare
-                        url="/elearning"
-                        title={`${co.title} — Formation MEAL gratuite | DataMEAL Academy`}
-                        description={`${co.description || "Formation par projets"} — Rejoins DataMEAL Academy, une formation MEAL gratuite et certifiante. Inscris-toi !`}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {hiddenDone > 0 && (
-              <button onClick={() => setShowPastOf(prev => ({ ...prev, [program.id]: true }))}
-                className="text-xs text-primary hover:underline mt-3 flex items-center gap-1">
-                <CheckCircle2 className="w-3 h-3" /> Afficher {hiddenDone} cours terminé{hiddenDone > 1 ? "s" : ""}
-              </button>
-            )}
-            {showPastOf[program.id] && doneCount > 0 && (
-              <button onClick={() => setShowPastOf(prev => ({ ...prev, [program.id]: false }))}
-                className="text-xs text-muted-foreground hover:underline mt-3">
-                Masquer les cours terminés
-              </button>
-            )}
-          </section>
-        );
-      })}
+            </button>
+          );
+        })}
+      </section>
 
       {/* ───── Relevé de notes condensé ───── */}
       {transcript && transcript.grades?.length > 0 && (
