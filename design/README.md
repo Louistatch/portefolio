@@ -102,3 +102,39 @@ writeFileSync('client/public/academy/partage-elearning.png',
 Regarder le PNG **et sa réduction à 280 px** — c'est la taille réelle dans une conversation
 WhatsApp. SVG ne renvoie pas le texte à la ligne : la pastille « LEARNING » chevauchait
 « LouisFarm » à la première version, sans la moindre erreur au rendu.
+
+## `livret-revision.pdf` — livret de révision du test d'admission
+
+Livret de 10 pages proposé au téléchargement depuis la section « Ressources » de la page de
+la formation, et sur les deux écrans que voit un candidat qui a échoué. Optionnel : il
+n'ouvre aucun droit et rien ne vérifie qu'il a été lu.
+
+Le contenu vit dans **`shared/revision.ts`**, lu à la fois par le générateur PDF et par la
+page du site — le sommaire affiché en ligne et le PDF ne peuvent donc pas diverger. Le PDF
+est versionné : après toute modification du contenu, le régénérer et le committer.
+
+```bash
+npx tsx script/generate-livret-revision.ts
+```
+
+### Ce que le livret ne contient pas
+
+Aucune des trente questions du test, ni leurs réponses. Les dix questions d'entraînement du
+livret sont différentes. Un livret qui donnerait le corrigé ferait entrer des candidats que
+la formation perdrait en deux semaines : le test vérifie qu'on a les bases pour suivre, il ne
+filtre pas pour filtrer.
+
+### Débordement
+
+Un chapitre par page, forcé. `pdf-lib` n'avertit de rien quand le texte passe sous la marge :
+il dessine dans le vide et le PDF sort tronqué. Le script mesure donc chaque page et
+**échoue** si le contenu dépasse le plancher, en nommant la page fautive. Allonger un
+chapitre dans `shared/revision.ts` peut donc casser la génération — c'est voulu.
+
+### Chiffres à tenir à jour
+
+| Dans le livret | Source |
+|---|---|
+| 21 bonnes réponses sur 30 | `ADMISSION_PASS_SCORE`, `api/index.ts` |
+| Accès valable 3 mois | `ADMISSION_MONTHS`, `api/index.ts` |
+| Nouvelle tentative après une semaine | délai de reprise du test, `api/index.ts` |

@@ -4,7 +4,7 @@ import { SEO } from "@/components/seo";
 import {
   GraduationCap, ChevronRight, ChevronLeft, CheckCircle2,
   Lock, BookOpen, ArrowRight, ClipboardCheck,
-  Download, X, Clock, Target, Users, Award, Sprout,
+  Download, X, Clock, Target, Users, Award, Sprout, FileText,
   MapPin, Rocket, CalendarDays, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialShare } from "@/components/social-share";
@@ -13,6 +13,9 @@ import {
   Section, CarteBenefice, CarteModule, CarteValeur, CarteSession, Etape, Chiffre,
   AvisAdmissionContinue, VERT_FONCE, VERT_FONCE_2, VERT_CLAIR,
 } from "@/components/academy/landing-parts";
+import {
+  CHAPITRES, LIVRET_TITRE, LIVRET_SOUS_TITRE, LIVRET_AUTEUR, LIVRET_FONCTION, LIVRET_FICHIER,
+} from "@shared/revision";
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 // Le parcours réel (cours, progression, attestations) vit dans /academy/* : cette page
@@ -173,6 +176,7 @@ export default function ELearning() {
     { label: "Pourquoi nous", id: "pourquoi" },
     { label: "Sessions", id: "sessions" },
     { label: "Parcours", id: "parcours" },
+    { label: "Ressources", id: "ressources" },
   ];
 
   function versSection(id: string) {
@@ -641,6 +645,88 @@ export default function ELearning() {
           </div>
         </Section>
 
+        {/* ── Ressources ── */}
+        <Section id="ressources" titre="Ressources pour préparer le test"
+          sousTitre="Beaucoup de candidats échouent sur des notions qu'ils connaissent, faute d'avoir revu le vocabulaire. Ce livret est là pour ça.">
+          <div className="grid lg:grid-cols-[minmax(0,20rem)_1fr] gap-8 lg:gap-12 items-start">
+
+            {/* La carte de téléchargement — l'objet principal de la section */}
+            <div className="rounded-3xl border border-border/60 bg-card overflow-hidden">
+              <div className="p-6 text-white" style={{ background: `linear-gradient(135deg, ${VERT_FONCE} 0%, ${VERT_FONCE_2} 100%)` }}>
+                <p className="text-[10px] font-bold tracking-wider" style={{ color: VERT_CLAIR }}>
+                  LOUISFARM LEARNING
+                </p>
+                <p className="text-xl font-bold leading-tight mt-3">{LIVRET_TITRE}</p>
+                <p className="text-[13px] text-white/70 mt-1.5 leading-snug">{LIVRET_SOUS_TITRE}</p>
+              </div>
+
+              <div className="p-6">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5" /> PDF · 10 pages
+                  </span>
+                  <span aria-hidden>·</span>
+                  <span>Gratuit</span>
+                  <span aria-hidden>·</span>
+                  <span>Optionnel</span>
+                </div>
+
+                <p className="text-[13px] text-muted-foreground mt-4 leading-relaxed">
+                  Rédigé par <span className="font-medium text-foreground">{LIVRET_AUTEUR}</span>,{" "}
+                  {LIVRET_FONCTION.toLowerCase()}.
+                </p>
+
+                {/* Un lien, pas un bouton avec téléchargement piloté par script : le fichier
+                    est servi en statique, et un lien simple fonctionne partout — y compris
+                    dans les navigateurs intégrés des applications de messagerie. */}
+                <a href={LIVRET_FICHIER} target="_blank" rel="noopener noreferrer"
+                  className="mt-5 w-full inline-flex items-center justify-center gap-2 h-10 rounded-xl bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity">
+                  <Download className="w-4 h-4" /> Télécharger le livret
+                </a>
+
+                <p className="text-[11px] text-muted-foreground mt-3 text-center leading-snug">
+                  Vous n'y trouverez aucune question du test, ni ses réponses.
+                </p>
+              </div>
+            </div>
+
+            {/* Le sommaire, lu depuis la même source que le PDF */}
+            <div>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold mb-4">
+                Ce que couvre le livret
+              </p>
+              <ul className="space-y-2.5">
+                {CHAPITRES.map(c => (
+                  <li key={c.numero}
+                    className="flex items-start gap-3 p-3.5 rounded-2xl border border-border/60 bg-card">
+                    <span className="w-7 h-7 rounded-xl bg-primary/10 text-primary grid place-items-center text-xs font-bold shrink-0">
+                      {c.numero}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-sm leading-tight">{c.titre}</p>
+                      <p className="text-[12px] text-muted-foreground mt-1 leading-relaxed">{c.objectif}</p>
+                    </div>
+                    {c.questionsAuTest > 0 && (
+                      <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-muted text-muted-foreground shrink-0 whitespace-nowrap">
+                        {c.questionsAuTest} question{c.questionsAuTest > 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+
+              <p className="flex items-start gap-2.5 mt-4 p-3.5 rounded-2xl bg-primary/5 border border-primary/20 text-[13px] text-muted-foreground leading-relaxed">
+                <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <span>
+                  Le livret se termine par <strong className="text-foreground">dix questions
+                  d'entraînement</strong> — différentes de celles du test — avec un corrigé
+                  commenté et un plan de révision sur cinq jours.
+                </span>
+              </p>
+            </div>
+          </div>
+        </Section>
+
         {/* ── Appel final ── */}
         <section className="py-14 sm:py-20">
           <div className="max-w-6xl mx-auto px-5 sm:px-6">
@@ -787,7 +873,22 @@ export default function ELearning() {
           </div>
           <h2 className="text-2xl font-bold mb-3">Patientez avant de reessayer</h2>
           <p className="text-muted-foreground mb-2">Vous avez deja passe le test d'admission sans atteindre le score requis.</p>
-          <p className="text-sm mb-8">Vous pourrez le repasser a partir du <strong className="text-primary">{when}</strong> (delai d'une semaine).</p>
+          <p className="text-sm mb-6">Vous pourrez le repasser a partir du <strong className="text-primary">{when}</strong> (delai d'une semaine).</p>
+          {/* Le délai d'une semaine n'a de sens que s'il sert à réviser : on donne ici de quoi
+              le faire, au moment précis où la personne cherche quoi faire ensuite. */}
+          <a href={LIVRET_FICHIER} target="_blank" rel="noopener noreferrer"
+            className="block text-left rounded-2xl border border-border/60 bg-card p-4 mb-6 hover:shadow-md transition-shadow">
+            <p className="flex items-center gap-2 font-semibold text-sm">
+              <FileText className="w-4 h-4 text-primary shrink-0" /> Profitez de cette semaine
+            </p>
+            <p className="text-[13px] text-muted-foreground mt-1.5 leading-relaxed">
+              Le livret de révision reprend les quatre domaines du test en 10 pages, avec dix
+              questions d'entraînement et leur corrigé.
+            </p>
+            <span className="inline-flex items-center gap-1.5 text-[13px] font-medium text-primary mt-2.5">
+              <Download className="w-3.5 h-3.5" /> Télécharger le livret
+            </span>
+          </a>
           <Button variant="outline" onClick={() => setView("landing")}>Retour a l'accueil</Button>
         </div>
       );
@@ -805,6 +906,21 @@ export default function ELearning() {
             ? "Score : " + pct + "% — Vous etes admis(e) ! Votre attestation d\u0027admission (valable 3 mois) est disponible. Une lecon se debloque chaque semaine."
             : "Score : " + pct + "% — Score requis : 70% (21/30). Vous pourrez repasser le test dans une semaine."}
         </p>
+        {/* Non admis : plutôt que de renvoyer réviser sans rien, on donne le support. */}
+        {!passed && (
+          <a href={LIVRET_FICHIER} target="_blank" rel="noopener noreferrer"
+            className="block text-left bg-card border border-border/60 rounded-2xl p-5 mb-8 max-w-lg mx-auto hover:shadow-md transition-shadow">
+            <p className="text-xs font-semibold text-primary uppercase tracking-wide mb-1">Pour la prochaine fois</p>
+            <p className="font-semibold mb-1">Le livret de révision</p>
+            <p className="text-sm text-muted-foreground mb-3">
+              10 pages sur les quatre domaines du test, dix questions d'entraînement avec leur
+              corrigé, et un plan de révision sur cinq jours. Gratuit.
+            </p>
+            <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+              <Download className="w-4 h-4" /> Télécharger le livret
+            </span>
+          </a>
+        )}
         {/* Admis : l'enchaînement immédiat est la première leçon, pas un menu. */}
         {passed && (
           <div className="bg-primary/5 border border-primary/25 rounded-2xl p-5 mb-8 text-left max-w-lg mx-auto">
