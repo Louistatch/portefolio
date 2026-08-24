@@ -72,6 +72,21 @@ export const PROGRAMS: Program[] = [
     // toujours à l'aise avec un questionnaire en ligne. Le seuil reste à 70 %.
     admission: { nbQuestions: 15, seuil: 11, surStudents: false },
   },
+  {
+    id: "fca",
+    prefix: "FCA-",
+    title: "Finance climatique agricole",
+    subtitle: "Chiffrer ce qu'une mauvaise saison coûte à un portefeuille de crédit",
+    // Troisième titre délivré par LouisFarm. Public distinct des deux autres : agents de
+    // crédit, chargés de portefeuille de SFD, cadres de coopératives et de faîtières.
+    credential: "Certificat d'Analyste du Risque Climatique Agricole",
+    outcome: "Calculer une perte attendue, mesurer une concentration, auditer un produit indiciel, écrire la note qui débloque un financement.",
+    accent: "#b45309",
+    lessonsPerWeek: 1,
+    // Le parcours analyste ne suppose aucun code : le test d'admission porte sur le crédit
+    // et l'arithmétique financière, pas sur Python. Vingt questions, seuil à 70 %.
+    admission: { nbQuestions: 20, seuil: 14, surStudents: false },
+  },
 ];
 
 /** Parcours auquel appartient un cours, d'après son code. */
