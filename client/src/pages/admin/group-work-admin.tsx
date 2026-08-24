@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Users, Loader2, UserPlus, Trash2, Shuffle, Check, X, Pencil,
   ClipboardCheck, Link2, AlertCircle, Save, Download, Star, ChevronDown,
+  MessageSquare, Send, Megaphone, Clock, RotateCcw,
 } from "lucide-react";
 import { PEER_REVIEW_CRITERIA, PEER_REVIEW_MAX_TOTAL } from "@shared/groupwork";
 
@@ -32,7 +33,7 @@ export default function AdminGroupWork() {
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
   const [msg, setMsg] = useState("");
-  const [onglet, setOnglet] = useState<"groupes" | "enonces">("groupes");
+  const [onglet, setOnglet] = useState<"groupes" | "enonces" | "promotions" | "retards">("groupes");
 
   const charger = async () => {
     const d = await adminFetch("/api/admin/academy/groups").then(r => r.json()).catch(() => null);
@@ -133,7 +134,8 @@ export default function AdminGroupWork() {
       {msg && <p className="text-sm text-primary bg-primary/5 border border-primary/20 rounded-xl px-3 py-2">{msg}</p>}
 
       <div className="flex gap-1 border-b border-border/50">
-        {([["groupes", "Groupes et rendus"], ["enonces", "Énoncés"]] as const).map(([cle, label]) => (
+        {([["groupes", "Groupes et rendus"], ["promotions", "Forum des promotions"],
+           ["retards", "Retards"], ["enonces", "Énoncés"]] as const).map(([cle, label]) => (
           <button key={cle} onClick={() => setOnglet(cle)}
             className={`px-3 py-2 text-sm border-b-2 -mb-px transition-colors ${
               onglet === cle ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
@@ -142,7 +144,9 @@ export default function AdminGroupWork() {
         ))}
       </div>
 
-      {onglet === "enonces" ? (
+      {onglet === "promotions" ? <ForumPromotions />
+       : onglet === "retards" ? <Retardataires />
+       : onglet === "enonces" ? (
         <div className="space-y-4">
           {travaux.map(t => <CarteEnonce key={t.id} travail={t} onSaved={charger} />)}
         </div>
@@ -570,5 +574,218 @@ function CarteEnonce({ travail, onSaved }: { travail: Travail; onSaved: () => Pr
         écoulée — une fenêtre déjà passée n'est jamais recalculée.
       </p>
     </section>
+  );
+}
+
+/**
+ * Forum des promotions : le formateur écrit à toute une cohorte.
+ *
+ * Une « annonce » est notifiée par email à tous les étudiants concernés, un message
+ * ordinaire non. La distinction est délibérée : un forum qui prévient à chaque message
+ * finit en dossier spam, et un forum qui ne prévient jamais n'est pas lu.
+ */
+function ForumPromotions() {
+  const [cohortes, setCohortes] = useState<any[]>([]);
+  const [choisie, setChoisie] = useState<string>("");
+  const [fil, setFil] = useState<any[]>([]);
+  const [corps, setCorps] = useState("");
+  const [annonce, setAnnonce] = useState(false);
+  const [envoi, setEnvoi] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  useEffect(() => {
+    (async () => {
+      const c = await adminFetch("/api/admin/academy/cohorts").then(r => r.json()).catch(() => []);
+      const liste = Array.isArray(c) ? c : [];
+      setCohortes(liste);
+      if (liste.length && !choisie) setChoisie(liste[0].cohorte);
+    })();
+  }, []);
+
+  const chargerFil = async (c: string) => {
+    const f = await adminFetch(`/api/admin/academy/cohort-forum/${c}`).then(r => r.json()).catch(() => []);
+    setFil(Array.isArray(f) ? f : []);
+  };
+  useEffect(() => { if (choisie) chargerFil(choisie); }, [choisie]);
+
+  async function publier() {
+    if (corps.trim().length < 2) return;
+    setEnvoi(true); setMsg("");
+    try {
+      const res = await adminFetch(`/api/admin/academy/cohort-forum/${choisie}`, {
+        method: "POST", body: JSON.stringify({ corps, annonce }),
+      });
+      const json = await res.json().catch(() => ({}));
+      setMsg(annonce ? `Annonce publiée — ${json?.prevenus ?? 0} étudiant(s) prévenu(s) par email.` : "Message publié.");
+      setCorps(""); setAnnonce(false);
+      await chargerFil(choisie);
+    } finally { setEnvoi(false); }
+  }
+
+  if (!cohortes.length) {
+    return <p className="text-sm text-muted-foreground">Aucune promotion : il faut au moins un étudiant admis.</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2">
+        {cohortes.map(c => (
+          <button key={c.cohorte} onClick={() => setChoisie(c.cohorte)}
+            className={`rounded-xl border px-3 py-2 text-left transition-colors ${
+              choisie === c.cohorte ? "border-primary bg-primary/5" : "border-border/60 hover:border-primary/40"}`}>
+            <span className="block text-sm font-semibold">Promotion {c.cohorte}</span>
+            <span className="block text-[11px] text-muted-foreground">
+              {c.effectif} étudiant{c.effectif > 1 ? "s" : ""} · {c.messages} message{c.messages > 1 ? "s" : ""}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {msg && <p className="text-sm text-primary bg-primary/5 border border-primary/20 rounded-xl px-3 py-2">{msg}</p>}
+
+      <section className="bg-card rounded-2xl border border-border/50 overflow-hidden">
+        <div className="px-4 py-2.5 bg-muted/30 border-b border-border/40">
+          <h2 className="text-sm font-bold flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-primary" /> Fil de la promotion {choisie}
+          </h2>
+        </div>
+        <div className="p-4 space-y-3 max-h-[420px] overflow-y-auto">
+          {fil.length === 0 && <p className="text-sm text-muted-foreground">Aucun message.</p>}
+          {fil.map(m => (
+            <div key={m.id} className="flex gap-2.5">
+              <span className={`w-8 h-8 rounded-full grid place-items-center text-[10px] font-bold shrink-0 ${
+                m.formateur ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+                {(m.auteur || "?").split(" ").map((x: string) => x[0]).slice(0, 2).join("").toUpperCase()}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] text-muted-foreground">
+                  <span className="font-medium text-foreground">{m.auteur}</span>
+                  {m.kind === "annonce" && <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/15 text-primary">ANNONCE</span>}
+                  {" · "}{new Date(m.le).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+                </p>
+                <p className="text-sm whitespace-pre-wrap break-words">{m.corps}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="p-4 border-t border-border/40 space-y-2">
+          <textarea value={corps} onChange={e => setCorps(e.target.value)} rows={3}
+            placeholder={`Écrire à la promotion ${choisie}…`}
+            className="w-full rounded-xl border border-border/60 bg-background px-3 py-2 text-sm resize-y" />
+          <div className="flex flex-wrap items-center gap-3">
+            <label className="flex items-center gap-2 text-xs text-muted-foreground cursor-pointer">
+              <input type="checkbox" checked={annonce} onChange={e => setAnnonce(e.target.checked)} />
+              <Megaphone className="w-3.5 h-3.5" />
+              Annonce — prévenir chaque étudiant par email
+            </label>
+            <Button size="sm" className="ml-auto gap-1.5" onClick={publier} disabled={envoi || corps.trim().length < 2}>
+              {envoi ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+              Publier
+            </Button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/**
+ * Retards : qui a décroché, et la remise à zéro.
+ *
+ * Le bouton n'est pas automatique, et c'est délibéré : retirer son admission à quelqu'un
+ * est une décision qui se prend en regardant la liste, pas un effet de bord d'une tâche de
+ * fond. Le serveur revérifie de toute façon le seuil — l'interface ne peut pas exclure un
+ * étudiant qui n'est pas en retard.
+ */
+function Retardataires() {
+  const [d, setD] = useState<any>(null);
+  const [envoi, setEnvoi] = useState(false);
+  const [msg, setMsg] = useState("");
+
+  const charger = async () => {
+    const r = await adminFetch("/api/admin/academy/late-students").then(res => res.json()).catch(() => null);
+    setD(r && !r.message ? r : null);
+  };
+  useEffect(() => { charger(); }, []);
+
+  async function remettreAZero() {
+    const cibles = (d?.etudiants || []).filter((e: any) => e.aExclure);
+    if (!confirm(
+      `Remettre à zéro ${cibles.length} étudiant(s) ?\n\n` +
+      `Leur admission, leur planning et leur groupe seront effacés. Leurs notes et attestations sont conservées. ` +
+      `Chacun recevra un email et pourra repasser le test immédiatement.`)) return;
+    setEnvoi(true); setMsg("");
+    try {
+      const res = await adminFetch("/api/admin/academy/late-students/reset", { method: "POST", body: JSON.stringify({}) });
+      const json = await res.json().catch(() => ({}));
+      setMsg(json?.message || "Fait.");
+      await charger();
+    } finally { setEnvoi(false); }
+  }
+
+  if (!d) return <p className="text-sm text-muted-foreground">Chargement…</p>;
+
+  const etudiants: any[] = d.etudiants || [];
+  const aExclure = etudiants.filter(e => e.aExclure);
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-sm text-muted-foreground flex-1 min-w-0">
+          Un étudiant dépassant <strong>{d.seuilJours} jours de retard</strong> sur son échéance la plus
+          ancienne ne peut plus terminer dans sa fenêtre de trois mois. Il repart de zéro et repasse
+          le test pour rejoindre une promotion plus récente.
+        </p>
+        {aExclure.length > 0 && (
+          <Button size="sm" variant="destructive" className="gap-1.5" onClick={remettreAZero} disabled={envoi}>
+            {envoi ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RotateCcw className="w-3.5 h-3.5" />}
+            Remettre à zéro les {aExclure.length} retardataire{aExclure.length > 1 ? "s" : ""}
+          </Button>
+        )}
+      </div>
+
+      {msg && <p className="text-sm text-primary bg-primary/5 border border-primary/20 rounded-xl px-3 py-2">{msg}</p>}
+
+      {aExclure.length === 0 && (
+        <p className="text-sm rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-primary">
+          Aucun étudiant ne dépasse le seuil. Rien à faire.
+        </p>
+      )}
+
+      <section className="bg-card rounded-2xl border border-border/50 overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-muted/30 text-muted-foreground">
+              <tr>
+                <th className="text-left font-medium px-4 py-2.5">Étudiant</th>
+                <th className="text-left font-medium px-3 py-2.5">Promotion</th>
+                <th className="text-right font-medium px-3 py-2.5">Leçons</th>
+                <th className="text-right font-medium px-4 py-2.5">Retard</th>
+              </tr>
+            </thead>
+            <tbody>
+              {etudiants.map(e => (
+                <tr key={e.id} className={`border-t border-border/40 ${e.aExclure ? "bg-destructive/5" : ""}`}>
+                  <td className="px-4 py-2.5">
+                    <span className="block font-medium">{e.nom}</span>
+                    <span className="block text-[11px] text-muted-foreground">{e.email}</span>
+                  </td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{e.cohorte}</td>
+                  <td className="px-3 py-2.5 text-right font-mono text-xs">{e.leconsFaites}/{e.leconsTotal}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    {e.joursDeRetard === 0
+                      ? <span className="text-xs text-muted-foreground">à jour</span>
+                      : <span className={`text-xs font-semibold inline-flex items-center gap-1 ${
+                          e.aExclure ? "text-destructive" : "text-amber-600"}`}>
+                          <Clock className="w-3 h-3" />{e.joursDeRetard} j
+                        </span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
   );
 }

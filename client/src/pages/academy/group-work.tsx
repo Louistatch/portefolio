@@ -59,11 +59,16 @@ export default function AcademyGroupWork() {
   const moi = getStudent();
   const [data, setData] = useState<any>(null);
   const [forum, setForum] = useState<any>(null);
+  const [cohorte, setCohorte] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   const charger = async () => {
-    const d = await studentFetch("/api/academy/group-work").then(r => r.json()).catch(() => null);
+    const [d, promo] = await Promise.all([
+      studentFetch("/api/academy/group-work").then(r => r.json()).catch(() => null),
+      studentFetch("/api/academy/cohort-forum").then(r => r.json()).catch(() => null),
+    ]);
     setData(d);
+    setCohorte(promo && promo.actif !== false ? promo : null);
     if (d?.groupe) {
       const f = await studentFetch("/api/academy/group-forum").then(r => r.json()).catch(() => null);
       setForum(f && !f.message ? f : null);
@@ -127,6 +132,8 @@ export default function AcademyGroupWork() {
       </div>
 
       {data.groupe && <Forum forum={forum} onPoste={charger} />}
+
+      {cohorte && <ForumPromotion promo={cohorte} onPoste={charger} />}
     </div>
   );
 }
@@ -730,6 +737,101 @@ function Forum({ forum, onPoste }: { forum: any; onPoste: () => Promise<void> })
         <div className="flex gap-2 pt-1">
           <textarea value={corps} onChange={e => setCorps(e.target.value)} rows={2}
             placeholder="Écrire à votre groupe…"
+            className="flex-1 min-w-0 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/30" />
+          <Button size="sm" onClick={publier} disabled={envoi || corps.trim().length < 2}
+            className="shrink-0 self-end gap-1.5">
+            {envoi ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
+            Publier
+          </Button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Forum de la promotion — le formateur et tous les étudiants d'une même cohorte.
+ *
+ * Distinct du forum de groupe, et pas par goût de la symétrie : une consigne qui vaut pour
+ * tout le monde n'a pas à être recopiée dans sept fils de groupe, et une question de groupe
+ * n'a pas à être lue par les dix-huit autres. Les annonces du formateur sont épinglées en
+ * tête — ce sont elles qu'on vient chercher.
+ */
+function ForumPromotion({ promo, onPoste }: { promo: any; onPoste: () => Promise<void> }) {
+  const [corps, setCorps] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+
+  async function publier() {
+    if (corps.trim().length < 2) return;
+    setEnvoi(true);
+    try {
+      await studentFetch("/api/academy/cohort-forum", { method: "POST", body: JSON.stringify({ corps }) });
+      setCorps("");
+      await onPoste();
+    } finally { setEnvoi(false); }
+  }
+
+  const annonces: any[] = promo.annonces || [];
+  const messages: any[] = promo.messages || [];
+
+  return (
+    <section className="bg-card rounded-2xl border border-border/50 overflow-hidden">
+      <div className="flex items-center justify-between px-5 py-3 bg-muted/30 border-b border-border/40">
+        <h2 className="font-bold text-sm flex items-center gap-2">
+          <MessageSquare className="w-4 h-4 text-primary" /> Forum de la promotion
+        </h2>
+        <span className="text-[11px] text-muted-foreground">
+          Promotion {promo.cohorte}{promo.effectif ? ` · ${promo.effectif} étudiants` : ""}
+        </span>
+      </div>
+
+      {annonces.length > 0 && (
+        <div className="px-4 sm:px-5 py-3 border-b border-border/40 bg-primary/[0.03] space-y-2.5">
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1.5">
+            <Pin className="w-3 h-3" /> Annonces du formateur
+          </p>
+          {annonces.map(a => (
+            <div key={a.id}>
+              <p className="text-[11px] text-muted-foreground">{a.auteur} · {dateHeure(a.le)}</p>
+              <p className="text-sm whitespace-pre-wrap break-words">{a.corps}</p>
+              {a.fichier && (
+                <a href={a.fichier} target="_blank" rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline inline-flex items-center gap-1.5 mt-1">
+                  <Paperclip className="w-3 h-3 shrink-0" />{a.fichierNom || "Pièce jointe"}
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="px-4 sm:px-5 py-4 space-y-3">
+        {messages.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            Aucun message dans la promotion pour l'instant. C'est l'endroit pour les questions
+            qui intéressent tout le monde — le formateur y répond.
+          </p>
+        )}
+        {messages.map(m => (
+          <div key={m.id} className="flex gap-2.5">
+            <span className={`w-8 h-8 rounded-full grid place-items-center text-[10px] font-bold shrink-0 ${
+              m.formateur ? "bg-primary text-white" : m.parMoi ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
+              {initiales(m.auteur)}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] text-muted-foreground">
+                <span className="font-medium text-foreground">{m.parMoi ? "Vous" : m.auteur}</span>
+                {m.formateur && <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/15 text-primary">FORMATEUR</span>}
+                {" · "}{dateHeure(m.le)}
+              </p>
+              <p className="text-sm whitespace-pre-wrap break-words">{m.corps}</p>
+            </div>
+          </div>
+        ))}
+
+        <div className="flex gap-2 pt-1">
+          <textarea value={corps} onChange={e => setCorps(e.target.value)} rows={2}
+            placeholder="Poser une question à la promotion…"
             className="flex-1 min-w-0 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm resize-y focus:outline-none focus:ring-2 focus:ring-primary/30" />
           <Button size="sm" onClick={publier} disabled={envoi || corps.trim().length < 2}
             className="shrink-0 self-end gap-1.5">

@@ -3113,6 +3113,265 @@ app.post("/api/academy/group-work/:id/peer-review", requireStudent, async (req, 
   res.json({ message: "Évaluation enregistrée.", total });
 });
 
+// ══════════════════════════════════════════════════════════════════
+// Forum de cohorte — le formateur et toute une promotion
+//
+// Le forum de groupe réunit trois personnes ; celui-ci réunit la promotion entière. Les
+// deux ne se remplacent pas : une consigne qui vaut pour tout le monde n'a pas à être
+// recopiée dans sept fils de groupe, et une question de groupe n'a pas à être lue par les
+// dix-huit autres.
+//
+// La cohorte n'est stockée nulle part : elle se DÉRIVE de admitted_at, exactement comme
+// pour la constitution des groupes. Une colonne de plus aurait pu diverger de la date qui
+// fait foi.
+// ══════════════════════════════════════════════════════════════════
+
+/** Cohorte de l'étudiant, ou null s'il n'est pas admis. */
+async function cohorteDeLEtudiant(sid: number): Promise<string | null> {
+  const { data } = await supabase.from("students").select("admitted_at").eq("id", sid).maybeSingle();
+  return data?.admitted_at ? cohortOf(new Date(data.admitted_at)) : null;
+}
+
+function formaterPost(p: any, sid?: number) {
+  return {
+    id: p.id,
+    kind: p.kind || "message",
+    auteur: p.author_name || "Étudiant",
+    formateur: p.is_staff === true,
+    parMoi: sid != null && p.student_id === sid,
+    corps: p.body,
+    fichier: p.attachment_url,
+    fichierNom: p.attachment_name,
+    le: p.created_at,
+  };
+}
+
+app.get("/api/academy/cohort-forum", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const cohorte = await cohorteDeLEtudiant(sid);
+  if (!cohorte) return res.json({ actif: false, cohorte: null, annonces: [], messages: [] });
+
+  const { data, error } = await supabase.from("academy_cohort_posts")
+    .select("id, student_id, author_name, is_staff, kind, body, attachment_url, attachment_name, created_at")
+    .eq("cohort", cohorte).order("created_at");
+  if (error) return res.json({ actif: false, cohorte, annonces: [], messages: [] });
+
+  const posts = (data || []).map((p: any) => formaterPost(p, sid));
+  const { count } = await supabase.from("students")
+    .select("id", { count: "exact", head: true }).not("admitted_at", "is", null);
+
+  res.json({
+    actif: true,
+    cohorte,
+    effectif: count ?? null,
+    annonces: posts.filter(p => p.kind === "annonce"),
+    messages: posts.filter(p => p.kind !== "annonce"),
+  });
+});
+
+app.post("/api/academy/cohort-forum", rateLimit(20, 10 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const corps = String(req.body?.corps ?? "").trim();
+  if (corps.length < 2) return res.status(400).json({ message: "Votre message est vide." });
+
+  const cohorte = await cohorteDeLEtudiant(sid);
+  if (!cohorte) return res.status(403).json({ message: "Le forum de promotion est réservé aux étudiants admis." });
+
+  const { data: stud } = await supabase.from("students").select("full_name, email").eq("id", sid).maybeSingle();
+  const { data, error } = await supabase.from("academy_cohort_posts").insert({
+    cohort: cohorte, student_id: sid,
+    author_name: (stud?.full_name || "").trim() || stud?.email || "Étudiant",
+    is_staff: false, kind: "message", body: corps.slice(0, 4000),
+  }).select("id, created_at").maybeSingle();
+  if (error) return res.status(500).json({ message: error.message });
+  res.status(201).json({ id: data?.id, le: data?.created_at });
+});
+
+// ── Côté formateur : la liste des cohortes, puis le fil de l'une d'elles ──
+app.get("/api/admin/academy/cohorts", requireAuth, async (_req, res) => {
+  const { data: admis } = await supabase.from("students")
+    .select("id, admitted_at").not("admitted_at", "is", null);
+
+  const parCohorte = new Map<string, number>();
+  for (const s of admis || []) {
+    const c = cohortOf(new Date(s.admitted_at));
+    parCohorte.set(c, (parCohorte.get(c) ?? 0) + 1);
+  }
+
+  const { data: posts } = await supabase.from("academy_cohort_posts").select("cohort, created_at");
+  const dernier = new Map<string, string>();
+  for (const p of posts || []) {
+    const actuel = dernier.get(p.cohort);
+    if (!actuel || p.created_at > actuel) dernier.set(p.cohort, p.created_at);
+  }
+
+  res.json([...parCohorte.entries()]
+    .map(([cohorte, effectif]) => ({
+      cohorte, effectif,
+      messages: (posts || []).filter((p: any) => p.cohort === cohorte).length,
+      dernierMessage: dernier.get(cohorte) ?? null,
+    }))
+    .sort((a, b) => b.cohorte.localeCompare(a.cohorte)));
+});
+
+app.get("/api/admin/academy/cohort-forum/:cohorte", requireAuth, async (req, res) => {
+  const cohorte = String(req.params.cohorte);
+  const { data, error } = await supabase.from("academy_cohort_posts")
+    .select("id, student_id, author_name, is_staff, kind, body, attachment_url, attachment_name, created_at")
+    .eq("cohort", cohorte).order("created_at");
+  if (error) return res.status(500).json({ message: error.message });
+  res.json((data || []).map((p: any) => formaterPost(p)));
+});
+
+app.post("/api/admin/academy/cohort-forum/:cohorte", requireAuth, async (req, res) => {
+  const cohorte = String(req.params.cohorte);
+  const corps = String(req.body?.corps ?? "").trim();
+  if (corps.length < 2) return res.status(400).json({ message: "Message vide." });
+  const annonce = req.body?.annonce === true;
+
+  const { data, error } = await supabase.from("academy_cohort_posts").insert({
+    cohort: cohorte, student_id: null,
+    author_name: req.body?.auteur ? String(req.body.auteur).slice(0, 120) : "Formateur",
+    is_staff: true, kind: annonce ? "annonce" : "message", body: corps.slice(0, 4000),
+    attachment_url: typeof req.body?.fichier === "string" && /^https?:\/\/\S+$/i.test(req.body.fichier) ? req.body.fichier : null,
+    attachment_name: req.body?.fichierNom ? String(req.body.fichierNom).slice(0, 200) : null,
+  }).select("id").maybeSingle();
+  if (error) return res.status(500).json({ message: error.message });
+
+  // Une annonce du formateur est notifiée par email : le forum n'est pas consulté tous les
+  // jours, et une consigne que personne ne lit ne vaut pas mieux que pas de consigne.
+  let prevenus = 0;
+  if (annonce) prevenus = await notifierAnnonceCohorte(cohorte, corps);
+  res.status(201).json({ id: data?.id, prevenus });
+});
+
+async function notifierAnnonceCohorte(cohorte: string, corps: string): Promise<number> {
+  const { data: admis } = await supabase.from("students")
+    .select("id, full_name, email, course_emails, admitted_at").not("admitted_at", "is", null);
+  const cibles = (admis || []).filter((s: any) =>
+    cohortOf(new Date(s.admitted_at)) === cohorte && s.email && s.course_emails !== false);
+  const cle = Date.now();
+  let n = 0;
+  for (const s of cibles) {
+    const r = await sendAcademyEmail({
+      studentId: s.id, to: s.email, type: "cohort_announcement",
+      subject: `📣 Annonce à la promotion ${cohorte}`,
+      html: cohortAnnouncementEmailHtml(s.full_name, cohorte, corps),
+      dedupeKey: `cohort_announcement:${s.id}:${cle}`,
+    });
+    if (r.sent) n++;
+  }
+  return n;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// Retard : constat, puis remise à zéro de l'admission
+//
+// Un étudiant qui a plus d'un mois de retard sur le rythme conseillé ne rattrapera pas
+// dans la fenêtre de trois mois qui lui reste : le laisser dans sa cohorte, c'est le
+// laisser accumuler des échéances qu'il ne tiendra pas, et fausser les groupes de ses
+// coéquipiers. Il repasse le test d'admission et repart dans une cohorte plus récente,
+// depuis la semaine 1.
+//
+// Le retard se mesure sur la plus vieille échéance NON TENUE. Compter les leçons faites
+// aurait puni un étudiant rapide en vacances autant qu'un étudiant décroché.
+// ══════════════════════════════════════════════════════════════════
+
+const RETARD_EXCLUSION_JOURS = 30;
+const JOUR_MS = 24 * 60 * 60 * 1000;
+
+/** Constat de retard de tous les admis. Lecture seule — ne modifie rien. */
+async function constatDeRetard() {
+  const { data: admis } = await supabase.from("students")
+    .select("id, full_name, email, admitted_at").not("admitted_at", "is", null);
+  if (!admis?.length) return [];
+
+  const { data: lp } = await supabase.from("lesson_progress")
+    .select("student_id, status, due_at");
+
+  const now = Date.now();
+  return (admis as any[]).map(s => {
+    const siennes = (lp || []).filter((l: any) => l.student_id === s.id);
+    const enRetard = siennes.filter((l: any) => l.status !== "completed" && new Date(l.due_at).getTime() < now);
+    const jours = enRetard.length
+      ? Math.floor(Math.max(...enRetard.map((l: any) => now - new Date(l.due_at).getTime())) / JOUR_MS)
+      : 0;
+    return {
+      id: s.id,
+      nom: (s.full_name || "").trim() || s.email,
+      email: s.email,
+      admisLe: s.admitted_at,
+      cohorte: cohortOf(new Date(s.admitted_at)),
+      leconsFaites: siennes.filter((l: any) => l.status === "completed").length,
+      leconsTotal: siennes.length,
+      joursDeRetard: jours,
+      aExclure: jours > RETARD_EXCLUSION_JOURS,
+    };
+  }).sort((a, b) => b.joursDeRetard - a.joursDeRetard);
+}
+
+app.get("/api/admin/academy/late-students", requireAuth, async (_req, res) => {
+  const constat = await constatDeRetard();
+  res.json({ seuilJours: RETARD_EXCLUSION_JOURS, etudiants: constat });
+});
+
+/**
+ * Remet à zéro l'admission des étudiants trop en retard.
+ *
+ * Ce qui est effacé : l'admission, le planning des leçons, le calendrier des travaux de
+ * groupe et l'appartenance au groupe — sans quoi l'étudiant occuperait une place dans une
+ * équipe qu'il ne rejoindra pas. Ce qui est CONSERVÉ : ses notes et ses attestations. Il a
+ * fait ce travail, on ne le lui retire pas parce qu'il a décroché ensuite.
+ *
+ * Le test est immédiatement repassable (next_test_allowed levé) : le but est qu'il
+ * reparte, pas qu'il attende une semaine de plus.
+ */
+app.post("/api/admin/academy/late-students/reset", requireAuth, async (req, res) => {
+  const constat = await constatDeRetard();
+  const demandes: number[] = Array.isArray(req.body?.ids) ? req.body.ids.map(Number) : [];
+
+  // Sans liste explicite, on ne traite que ceux qui dépassent le seuil. Une liste explicite
+  // est vérifiée contre le même seuil : l'interface ne doit pas pouvoir exclure quelqu'un
+  // qui n'est pas en retard.
+  const cibles = constat.filter(c => c.aExclure && (!demandes.length || demandes.includes(c.id)));
+  if (!cibles.length) return res.json({ message: "Aucun étudiant ne dépasse le seuil de retard.", traites: 0 });
+
+  const now = new Date().toISOString();
+  for (const c of cibles) {
+    await supabase.from("academy_admission_resets").insert({
+      student_id: c.id, previous_admitted_at: c.admisLe, previous_cohort: c.cohorte,
+      days_late: c.joursDeRetard, lessons_done: c.leconsFaites, lessons_total: c.leconsTotal,
+      reason: "retard", reset_at: now,
+    }).then(() => {}, () => {});
+
+    await supabase.from("students").update({
+      admitted_at: null, admission_expires: null, status: "pending_test",
+      next_test_allowed: null, last_test_at: null,
+    }).eq("id", c.id);
+
+    await supabase.from("lesson_progress").delete().eq("student_id", c.id).then(() => {}, () => {});
+    await supabase.from("group_work_progress").delete().eq("student_id", c.id).then(() => {}, () => {});
+    await supabase.from("academy_group_members").delete().eq("student_id", c.id).then(() => {}, () => {});
+    await supabase.from("attestations").delete().eq("student_id", c.id).eq("cert_type", "admission").then(() => {}, () => {});
+
+    const { data: st } = await supabase.from("students")
+      .select("full_name, email, course_emails").eq("id", c.id).maybeSingle();
+    if (st?.email && st.course_emails !== false) {
+      sendAcademyEmail({
+        studentId: c.id, to: st.email, type: "admission_reset",
+        subject: "Votre parcours est remis à zéro — repassez le test quand vous voulez",
+        html: admissionResetEmailHtml(st.full_name, c.joursDeRetard, c.leconsFaites, c.leconsTotal),
+        dedupeKey: `admission_reset:${c.id}:${now}`,
+      });
+    }
+  }
+  res.json({
+    message: `${cibles.length} étudiant${cibles.length > 1 ? "s" : ""} remis à zéro. Chacun peut repasser le test immédiatement.`,
+    traites: cibles.length,
+    ids: cibles.map(c => c.id),
+  });
+});
+
 // ── Relevé de notes complet (transcript WQU) ──
 app.get("/api/academy/transcript", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
@@ -3904,6 +4163,27 @@ function courseUnlockedEmailHtml(
 ) {
   const firstName = (name || "").split(" ")[0] || "";
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Nouveau cours débloqué 🔓</h1><p class="sub">${course.code} · ${course.title}</p></div><div class="bd"><span class="badge">🔓 Accès ouvert</span><p>${firstName ? `Bravo ${firstName},` : "Bravo,"}</p><p>Vous avez avancé assez loin pour ouvrir le cours suivant de votre parcours :</p><div class="info"><h3>${course.title}</h3>${course.description ? `<p style="margin-top:6px">${course.description}</p>` : ""}<p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code}</p></div>${firstLesson ? `<p><strong>Première leçon :</strong> « ${firstLesson.title} »${dueAt ? `, à rendre avant le ${new Date(dueAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}.</p>` : ""}<p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Commencer ce cours</a></p><p class="muted">Rappel : les dates du planning sont un rythme conseillé, pas un couperet. Vous pouvez prendre de l'avance, et une leçon en retard reste rattrapable jusqu'à la fin de votre période d'admission.</p></div>`);
+}
+
+// ── Email : annonce du formateur à toute une promotion ──
+function cohortAnnouncementEmailHtml(name: string, cohorte: string, corps: string) {
+  const firstName = (name || "").split(" ")[0] || "";
+  // Le corps vient d'un champ libre : on échappe avant de l'insérer dans le HTML, sinon un
+  // chevron dans une consigne casserait la mise en page — ou pire.
+  const echappe = corps
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Annonce à votre promotion 📣</h1><p class="sub">Promotion ${cohorte}</p></div><div class="bd"><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><div class="info"><p style="margin:0">${echappe}</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/group-work" class="btn">Répondre sur le forum</a></p><p class="muted">Ce message a été adressé à toute votre promotion. Les échanges continuent sur le forum de la promotion, dans votre espace étudiant.</p></div>`);
+}
+
+// ── Email : admission remise à zéro pour retard ──
+//
+// Le ton compte plus que d'habitude. L'étudiant n'est pas renvoyé : son parcours est
+// remis à zéro parce qu'il ne pouvait plus tenir dans sa fenêtre, et la porte reste
+// ouverte immédiatement. Un message sec ferait perdre quelqu'un qui peut encore réussir.
+function admissionResetEmailHtml(name: string, joursDeRetard: number, faites: number, total: number) {
+  const firstName = (name || "").split(" ")[0] || "";
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 DATAMEAL ACADEMY</span></div><h1>Votre parcours repart de zéro</h1><p class="sub">Et vous pouvez recommencer dès aujourd'hui</p></div><div class="bd"><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Votre parcours accusait <strong>${joursDeRetard} jours de retard</strong> sur le rythme conseillé (${faites} leçon${faites > 1 ? "s" : ""} validée${faites > 1 ? "s" : ""} sur ${total}). À ce stade, la fenêtre d'admission de trois mois qui vous restait ne permettait plus de terminer le cursus.</p><p>Plutôt que de vous laisser accumuler des échéances intenables, nous remettons votre parcours à zéro. <strong>Ce n'est pas une exclusion :</strong> vous pouvez repasser le test d'admission immédiatement, sans délai d'attente, et repartir avec la promotion suivante depuis la semaine 1 — avec un groupe de travail neuf.</p><div class="info"><p style="margin:0"><strong>Ce que vous gardez :</strong> vos notes et vos attestations déjà obtenues. Vous avez fait ce travail, il vous reste acquis.</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Repasser le test d'admission</a></p><p class="muted">Si quelque chose vous a empêché d'avancer et que nous pouvons aider, répondez simplement à cet email.</p></div>`);
 }
 
 // ── Email : le groupe est constitué ──

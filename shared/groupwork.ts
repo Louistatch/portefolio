@@ -16,9 +16,15 @@
 /** Semaines d'ouverture des trois GW, comptées depuis l'admission. Un par mois. */
 export const GROUP_WORK_WEEKS = [4, 8, 12] as const;
 
-/** Durée de la fenêtre de rendu d'un GW, en semaines. Deux fois celle d'une leçon : un
- *  travail collectif demande de se coordonner, ce qu'une semaine ne permet pas. */
-export const GROUP_WORK_WINDOW_WEEKS = 2;
+/**
+ * Durée de la fenêtre de rendu d'un GW, en semaines.
+ *
+ * Une seule — le même rythme qu'une leçon. Le groupe, lui, est constitué dès le premier
+ * jour du parcours : les équipes ont donc des semaines pour lire l'énoncé, se répartir le
+ * travail et avancer avant que la fenêtre de dépôt ne s'ouvre. Ce qui est borné à une
+ * semaine, c'est la remise, pas la préparation.
+ */
+export const GROUP_WORK_WINDOW_WEEKS = 1;
 
 /**
  * Taille d'un groupe : trois, comme le modèle WQU dont ce dispositif est repris.
@@ -84,66 +90,118 @@ export type GroupWorkDef = {
   /** Livrables attendus, un par ligne dans le formulaire de rendu. */
   deliverables: string[];
   maxScore: number;
+  /** Cours du cursus dont ce travail est l'aboutissement — il s'ouvre à sa dernière semaine. */
+  cours: string;
+  /** Conseils de méthode, imprimés dans l'énoncé PDF. */
+  conseils: string[];
   /** Énoncé imprimable, déposé dans le forum du groupe à sa constitution. */
   briefUrl: string;
   /** Modèle de rapport à trois mains, une section réservée par membre. */
   templateUrl: string;
+  /** Sections du modèle de rapport, dans l'ordre : intitulé + consigne de rédaction. */
+  plan: { titre: string; consigne: string }[];
 };
 
+// Chaque travail est l'aboutissement du cours de sa période, et d'aucun autre. Le cursus
+// place MEAL-01 en semaines 1-4, MEAL-02 en 5-8 et MEAL-03 en 9-11 : un GW générique
+// tomberait à côté, et demanderait au groupe des compétences qu'il n'a pas encore vues.
 export const GROUP_WORKS: GroupWorkDef[] = [
   {
     index: 1,
     weekIndex: GROUP_WORK_WEEKS[0],
-    title: "GW1 — Concevoir une collecte de données en équipe",
+    cours: "MEAL-01 — Enquête nutritionnelle, Région de Lomé",
+    title: "GW1 — Le questionnaire nutritionnel de la Région de Lomé",
     brief:
-      "Votre groupe reçoit une commande fictive : mesurer l'effet d'un projet de maraîchage sur les revenus " +
-      "de 200 ménages. À vous de cadrer la collecte, de construire le questionnaire dans KoboToolbox et de " +
-      "défendre vos choix d'échantillonnage. Le rendu est collectif : un seul dépôt pour tout le groupe.",
+      "Votre groupe reprend le terrain de MEAL-01. Le service nutrition d'une ONG doit mesurer la " +
+      "malnutrition aiguë chez les enfants de 6 à 59 mois dans trois quartiers de Lomé. Concevez le " +
+      "formulaire KoboToolbox complet — types de réponse, validations, logique de saut — déployez-le, " +
+      "testez-le sur le terrain avec KoboCollect, et défendez votre plan d'échantillonnage.",
     deliverables: [
-      "Note de cadrage (2 pages) : question d'évaluation, indicateurs, unité d'observation",
-      "Formulaire KoboToolbox déployé (lien de partage ou XLSForm)",
-      "Plan d'échantillonnage justifié (taille, méthode, limites)",
+      "Formulaire KoboToolbox déployé (lien de partage ou XLSForm), comportant au moins une contrainte de validation et un saut conditionnel",
+      "Note de cadrage (2 pages) : indicateurs nutritionnels retenus, unité d'observation, justification des questions posées",
+      "Plan d'échantillonnage : taille, méthode de tirage dans les trois quartiers, limites assumées",
+      "Jeu de test : au moins 5 soumissions réalisées depuis KoboCollect, puis exportées",
       "Répartition du travail entre les membres du groupe",
+    ],
+    conseils: [
+      "Commencez par la question d'évaluation, pas par le formulaire. Un questionnaire écrit avant la question mesure ce qui est facile à mesurer, pas ce qui est utile.",
+      "Les validations et les sauts conditionnels ne se voient qu'à la saisie : testez à trois sur un vrai téléphone avant de déclarer le formulaire fini.",
+      "Un âge en mois, une mesure de périmètre brachial et une date de naissance sont trois occasions de laisser passer une valeur absurde. Contraignez-les.",
+      "Votre échantillon ne se justifie pas par « c'est ce qu'on nous a demandé » : dites ce qu'il permet de détecter, et ce qu'il ne permet pas.",
     ],
     maxScore: 100,
     briefUrl: "/academy/gw/GW1-enonce.pdf",
     templateUrl: "/academy/gw/GW1-modele-rapport.docx",
+    plan: [
+      { titre: "1. Cadrage de l'enquête", consigne: "Question d'évaluation, population cible, indicateurs nutritionnels retenus et pourquoi ceux-là." },
+      { titre: "2. Le formulaire", consigne: "Structure, types de réponse, contraintes de validation et sauts conditionnels. Expliquez ce que chaque contrainte empêche." },
+      { titre: "3. Plan d'échantillonnage", consigne: "Taille, méthode de tirage, base de sondage. Un échantillon non justifié est un échantillon non défendable." },
+      { titre: "4. Test de terrain et limites", consigne: "Ce que vos 5 soumissions de test ont révélé, et ce que votre dispositif ne permettra pas de conclure." },
+    ],
   },
   {
     index: 2,
     weekIndex: GROUP_WORK_WEEKS[1],
-    title: "GW2 — Cartographier et interpréter les résultats",
+    cours: "MEAL-02 — Cartographie des bénéficiaires WASH",
+    title: "GW2 — L'accès à l'eau des bénéficiaires WASH, en cartes",
     brief:
-      "À partir des données collectées au GW1 (ou du jeu de données fourni en cours), produisez la lecture " +
-      "spatiale des résultats : où le projet a porté, où il n'a pas porté, et ce que la carte ne dit pas. " +
-      "Le travail attendu est une analyse, pas une illustration.",
+      "Le programme WASH veut savoir quels ménages bénéficiaires vivent à plus de 500 mètres d'un point " +
+      "d'eau fonctionnel. À partir des points GPS collectés sous KoboCollect, votre groupe produit la carte " +
+      "et l'analyse qui répondent à la question. On attend une analyse spatiale, pas une illustration.",
     deliverables: [
-      "Carte thématique exportée (PNG ou PDF) avec légende, échelle et source",
-      "Projet QGIS ou lien vers les couches utilisées",
+      "Carte thématique exportée (PNG ou PDF) : mise en page complète, légende, échelle, source et projection indiquées",
+      "Analyse tampon (buffer 500 m) autour des points d'eau, avec le décompte des ménages situés hors zone",
+      "Projet QGIS ou couches utilisées, dans l'archive du rendu",
       "Note de lecture (2 pages) : ce que montre la carte, ce qu'elle ne montre pas",
       "Répartition du travail entre les membres du groupe",
+    ],
+    conseils: [
+      "Vérifiez la projection avant toute mesure de distance. Un tampon de 500 m calculé en degrés ne mesure rien.",
+      "La discrétisation choisie change ce que la carte raconte : quantiles et seuils naturels ne donnent pas la même lecture. Choisissez, puis justifiez.",
+      "Une carte sans échelle ni source n'est pas un document de travail — ces mentions ne sont pas décoratives.",
+      "Méfiez-vous de l'effet de zone : une moyenne par quartier masque les écarts à l'intérieur du quartier.",
     ],
     maxScore: 100,
     briefUrl: "/academy/gw/GW2-enonce.pdf",
     templateUrl: "/academy/gw/GW2-modele-rapport.docx",
+    plan: [
+      { titre: "1. Données et préparation", consigne: "Sources, projection retenue, import des points GPS, nettoyages effectués. Quelqu'un doit pouvoir refaire vos cartes à partir de cette section." },
+      { titre: "2. L'analyse tampon", consigne: "Comment vous avez construit les zones de 500 m, et combien de ménages tombent hors couverture. Donnez le chiffre." },
+      { titre: "3. Choix cartographiques", consigne: "Variable représentée, discrétisation, symbologie, mise en page. Justifiez la discrétisation." },
+      { titre: "4. Lecture et limites", consigne: "Ce que montre la carte — nommez les zones, chiffrez — puis ce qu'elle ne montre pas." },
+    ],
   },
   {
     index: 3,
     weekIndex: GROUP_WORK_WEEKS[2],
-    title: "GW3 — Tableau de bord et rapport automatisé",
+    cours: "MEAL-03 — Système de reporting MEAL automatisé",
+    title: "GW3 — La chaîne de reporting automatisée, de l'API au PDF",
     brief:
-      "Dernier travail collectif du cursus : industrialiser la chaîne. Le groupe livre un tableau de bord " +
-      "qui se met à jour depuis la source de données, et le rapport qui en découle. C'est la démonstration " +
-      "de bout en bout attendue d'un expert MEAL.",
+      "Dernier travail collectif du cursus. Votre groupe livre la chaîne complète : connexion à l'API " +
+      "KoboToolbox, moteur d'analyse réutilisable, et rapport généré — tableaux, cartes, PDF — que l'on " +
+      "peut relancer sans rouvrir le code. C'est la démonstration de bout en bout attendue d'un expert MEAL.",
     deliverables: [
-      "Tableau de bord fonctionnel (lien ou fichier) alimenté par la source de données",
-      "Rapport de suivi-évaluation (5 pages) généré à partir du tableau de bord",
-      "Note technique : comment la mise à jour se fait, et ce qu'il reste manuel",
+      "Code de la chaîne (script ou notebook) : connexion à l'API Kobo, analyse, export du rapport",
+      "Rapport généré automatiquement (PDF) comportant au moins un tableau et une carte",
+      "Note technique : comment relancer la chaîne, ce qui est planifié, ce qui reste manuel",
+      "Note d'éthique et de qualité des données (1 page) : anonymisation, consentement, contrôles appliqués",
       "Répartition du travail entre les membres du groupe",
+    ],
+    conseils: [
+      "Une chaîne qu'il faut réalimenter à la main n'est pas automatisée. Dites-le plutôt que de le laisser croire — c'est la note technique qui est jugée, pas la promesse.",
+      "N'écrivez jamais votre jeton d'API dans le code rendu. Un jeton dans une archive déposée est un jeton compromis.",
+      "Écrivez le rapport pour quelqu'un qui n'a pas participé au projet : c'est le test qui révèle les raccourcis.",
+      "Relancez votre chaîne une dernière fois sur une machine propre avant de déposer. Ce qui marche « chez soi » casse une fois sur deux ailleurs.",
     ],
     maxScore: 100,
     briefUrl: "/academy/gw/GW3-enonce.pdf",
     templateUrl: "/academy/gw/GW3-modele-rapport.docx",
+    plan: [
+      { titre: "1. Architecture de la chaîne", consigne: "De l'API Kobo au PDF : quelles étapes, quels outils, quels formats intermédiaires." },
+      { titre: "2. Le moteur d'analyse", consigne: "Les indicateurs calculés, et ce qui rend le moteur réutilisable sur une autre enquête." },
+      { titre: "3. Le rapport produit", consigne: "Ce que le rapport affiche, pour qui, à quelle fréquence. Cette section doit rester valable après une mise à jour des données." },
+      { titre: "4. Éthique, qualité et limites", consigne: "Anonymisation, consentement, contrôles qualité — et ce qui reste manuel dans la chaîne." },
+    ],
   },
 ];
 

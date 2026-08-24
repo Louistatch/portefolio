@@ -26,6 +26,7 @@ base. Lisez cette page avant d'en lancer un.
 | 15 | `academy_reorder_lessons.sql` | Remise en ordre des cellules : cours d'abord, exercices notés en fin de leçon |
 | 16 | `academy_group_work.sql` | Travaux de groupe (modèle WQU) : groupes, énoncés des 3 GW, rendus collectifs, calendrier individuel |
 | 17 | `academy_group_work_v2.sql` | Forum de groupe, dépôt de fichiers du rendu, évaluation par les pairs, grille du formateur |
+| 18 | `academy_cohort_forum.sql` | Forum de promotion (formateur ↔ cohorte) et journal des remises à zéro pour retard |
 
 ## Les travaux de groupe (GW)
 
