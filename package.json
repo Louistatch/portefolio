@@ -10,6 +10,8 @@
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "verify:exercises": "tsx script/verify-exercises.ts",
+    "verify:routes": "node script/verify-routes.mjs",
+    "verify:tests": "tsx script/verify-program-tests.ts",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {

@@ -2093,6 +2093,93 @@ app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000),
   });
 });
 
+// ── Test d'admission du cursus MEAL ──
+//
+// Le MEAL garde sa route propre : son admission vit sur les colonnes de `students`, quand
+// celle des autres parcours vit dans academy_program_admissions. L'asymétrie est documentée
+// dans supabase/academy_program_admissions.sql ; la fondre dans la route générique aurait
+// demandé de migrer les dossiers existants, ce qui n'est pas le sujet ici.
+app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  // ANTI-TRICHE : le client envoie ses réponses choisies, le serveur calcule le score.
+  const { answers } = req.body;
+
+  // Vérifier le délai de re-tentative (1 semaine après échec)
+  const { data: stud } = await supabase.from("students")
+    .select("admitted_at, admission_expires, next_test_allowed, test_attempts, status, email_verified").eq("id", sid).single();
+  // L'email non vérifié ne bloque plus le test : quand l'envoi d'email échoue (domaine
+  // d'expédition non validé, quota, boîte inexistante), l'étudiant était enfermé dans une
+  // impasse dont aucune action de sa part ne pouvait le sortir. La vérification reste exigée
+  // au moment de délivrer un document officiel (attestation, certificat).
+  // Une admission expirée peut être repassée (sinon un étudiant dont les 3 mois sont écoulés
+  // resterait bloqué pour toujours puisqu'admitted_at reste défini).
+  const admissionExpired = !!stud?.admission_expires && new Date(stud.admission_expires) < new Date();
+  if (stud?.admitted_at && !admissionExpired) {
+    return res.status(403).json({ message: "Vous êtes déjà admis(e). Le test ne peut pas être repassé.", alreadyAdmitted: true });
+  }
+  if (stud?.next_test_allowed && new Date(stud.next_test_allowed) > new Date()) {
+    return res.status(403).json({ message: "Vous devez attendre avant de repasser le test.", nextAllowed: stud.next_test_allowed });
+  }
+
+  // Calcul du score CÔTÉ SERVEUR à partir des réponses
+  let score: number;
+  const correct: boolean[] = [];
+  if (Array.isArray(answers)) {
+    score = 0;
+    for (let i = 0; i < ADMISSION_ANSWER_KEY.length; i++) {
+      const isCorrect = Number(answers[i]) === ADMISSION_ANSWER_KEY[i];
+      correct.push(isCorrect);
+      if (isCorrect) score++;
+    }
+  } else {
+    return res.status(400).json({ message: "Réponses requises (answers)." });
+  }
+
+  const passed = score >= ADMISSION_PASS_SCORE;
+  const now = new Date();
+  const attempts = (stud?.test_attempts ?? 0) + 1;
+
+  const update: any = {
+    entry_score: score, test_attempts: attempts, last_test_at: now.toISOString(),
+    status: passed ? "active" : "pending_test",
+  };
+  if (!passed) {
+    update.next_test_allowed = new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  }
+  await supabase.from("students").update(update).eq("id", sid);
+
+  // Note du test
+  const { data: existingTest } = await supabase.from("grades")
+    .select("id").eq("student_id", sid).eq("type", "entry_test").maybeSingle();
+  if (existingTest) {
+    await supabase.from("grades").update({ score, graded_at: now.toISOString() }).eq("id", existingTest.id);
+  } else {
+    await supabase.from("grades").insert({ student_id: sid, title: "Test d'admission MEAL", score, max_score: 30, type: "entry_test" });
+  }
+
+  let admissionExpires: string | null = null;
+  if (passed) {
+    const granted = await grantAdmission(sid, score, now, stud?.admitted_at ?? null);
+    admissionExpires = granted.admissionExpires;
+    if (!granted.ok) {
+      // L'admission n'a pas pu être octroyée : le dire, plutôt que de renvoyer un
+      // succès qui laisserait l'étudiant devant des cours verrouillés sans recours.
+      return res.status(500).json({
+        passed, score, correct, status: "active",
+        message: "Votre score est enregistré mais l'ouverture de vos cours a échoué. Rechargez votre tableau de bord, ou contactez l'administration.",
+        admissionFailed: true,
+      });
+    }
+  }
+
+  res.json({
+    passed, score, correct,
+    status: passed ? "active" : "pending_test",
+    admissionExpires: passed ? admissionExpires : null,
+    nextTestAllowed: passed ? null : update.next_test_allowed,
+  });
+});
+
 app.get("/api/academy/test-status", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   let { data } = await supabase.from("students")

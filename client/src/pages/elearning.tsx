@@ -103,7 +103,11 @@ export default function ELearning() {
   function rafraichirStatuts() {
     if (!isStudentLoggedIn()) return;
     studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
-    studentFetch("/api/academy/tof/test-status").then(r => r.json()).then(setStatutTof).catch(() => {});
+    // Le MEAL garde sa route historique ; les autres parcours passent par la route générique
+    // /api/academy/programs/:id/*, qui sert aussi bien la formation de formateurs que la
+    // finance climatique agricole.
+    studentFetch(`/api/academy/programs/${TOF.id}/test-status`)
+      .then(r => r.json()).then(setStatutTof).catch(() => {});
   }
   useEffect(() => { rafraichirStatuts(); }, []);
 
@@ -138,7 +142,9 @@ export default function ELearning() {
     setSubmitting(true);
     setView("test-result");
     try {
-      const res = await studentFetch(surTof ? "/api/academy/tof/submit-test" : "/api/academy/submit-test", {
+      const res = await studentFetch(surTof
+        ? `/api/academy/programs/${TOF.id}/submit-test`
+        : "/api/academy/submit-test", {
         method: "POST",
         body: JSON.stringify({ answers: answerArray }),
       });
