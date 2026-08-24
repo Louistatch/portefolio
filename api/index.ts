@@ -14,7 +14,9 @@ import fs from "fs";
 // l'extension d'un import relatif. Sans elle, le chargement de la fonction échoue en
 // production (ERR_MODULE_NOT_FOUND) alors que le build, lui, passe sans broncher.
 import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises.js";
-import { programOf } from "../shared/programs.js";
+import { programOf, programById, PROGRAMS } from "../shared/programs.js";
+import { QUESTIONS_TOF } from "../shared/tof-test.js";
+import { TOF_ANSWER_KEY } from "./tof-answers.js";
 import {
   GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_MAX_MEMBERS,
   GROUP_WORK_ELIGIBILITY_WEEKS, GROUP_FORMATION_LEAD_WEEKS,
@@ -1096,10 +1098,50 @@ const MEAL_PROGRAM_PREFIX = "MEAL-";
  * sujets sans lien la même semaine, ce qui rendait la navigation absurde — « suivant »
  * menait à une leçon verrouillée alors que trois autres cours attendaient.
  */
-async function generateLessonSchedule(sid: number, admittedAt: Date) {
-  const { data: courses } = await supabase.from("sms_courses")
+/**
+ * Parcours auxquels l'étudiant est admis, avec la date d'admission propre à chacun.
+ *
+ * Deux sources, et c'est assumé. Le cursus MEAL vit sur les colonnes historiques de
+ * `students`, lues en une trentaine d'endroits — les migrer d'un bloc aurait mis en jeu les
+ * admissions en cours pour un gain nul le jour même. Les autres parcours vivent dans
+ * academy_program_admissions. Cette fonction est le seul endroit qui connaît cette
+ * asymétrie : partout ailleurs, un parcours est un parcours.
+ */
+async function parcoursAdmis(sid: number): Promise<{ programId: string; admittedAt: Date; expires: string | null }[]> {
+  const out: { programId: string; admittedAt: Date; expires: string | null }[] = [];
+
+  const { data: st } = await supabase.from("students")
+    .select("admitted_at, admission_expires").eq("id", sid).maybeSingle();
+  if (st?.admitted_at) {
+    out.push({ programId: "meal", admittedAt: new Date(st.admitted_at), expires: st.admission_expires ?? null });
+  }
+
+  const { data: rows } = await supabase.from("academy_program_admissions")
+    .select("program_id, admitted_at, admission_expires")
+    .eq("student_id", sid).not("admitted_at", "is", null);
+  for (const r of rows || []) {
+    out.push({ programId: r.program_id, admittedAt: new Date(r.admitted_at), expires: r.admission_expires ?? null });
+  }
+  return out;
+}
+
+/** Régénère le planning de chaque parcours auquel l'étudiant est admis, et lui seul. */
+async function regenererPlannings(sid: number) {
+  for (const p of await parcoursAdmis(sid)) {
+    await generateLessonSchedule(sid, p.admittedAt, p.programId);
+  }
+}
+
+async function generateLessonSchedule(sid: number, admittedAt: Date, programId: string) {
+  // Un parcours à la fois, depuis SA date d'admission. Les parcours ont désormais chacun
+  // leur porte d'entrée : planifier les leçons d'un parcours auquel l'étudiant n'est pas
+  // admis lui ouvrirait des cours qu'il n'a pas demandés, et les compterait dans sa
+  // progression. Le filtre par préfixe suit la même convention que partout ailleurs.
+  const parcours = programById(programId);
+  const { data: toutes } = await supabase.from("sms_courses")
     .select("id, code").eq("is_published", true).order("order_index");
-  if (!courses?.length) return;
+  const courses = (toutes || []).filter(c => programOf(c.code)?.id === programId);
+  if (!courses.length) return;
 
   const rows: any[] = [];
   // Première semaine encore libre dans chaque parcours. Un cours démarre toujours sur une
@@ -1109,9 +1151,8 @@ async function generateLessonSchedule(sid: number, admittedAt: Date) {
   const nextFreeWeek: Record<string, number> = {};
 
   for (const co of courses) {
-    const program = programOf(co.code);
-    const key = program?.id ?? "autres";
-    const perWeek = Math.max(1, program?.lessonsPerWeek ?? 1);
+    const key = programId;
+    const perWeek = Math.max(1, parcours.lessonsPerWeek);
     const startWeek = nextFreeWeek[key] ?? 1;
 
     const { data: lessons } = await supabase.from("sms_lessons")
@@ -1822,18 +1863,29 @@ async function grantAdmission(sid: number, score: number, now: Date, previousAdm
   }
 
   // Ré-admission après expiration : repartir d'un planning et d'une attestation propres.
+  // L'effacement est restreint aux cours du cursus MEAL. Il portait auparavant sur tout
+  // `lesson_progress` de l'étudiant : depuis que la formation de formateurs a sa propre
+  // admission, un tel effacement emporterait une progression qui n'a rien à voir avec cette
+  // ré-admission, et que rien ne permettrait de reconstituer.
   await supabase.from("attestations").delete().eq("student_id", sid).eq("cert_type", "admission").then(() => {}, () => {});
-  await supabase.from("lesson_progress").delete().eq("student_id", sid).then(() => {}, () => {});
+  const { data: coursMeal } = await supabase.from("sms_courses")
+    .select("id").like("code", `${MEAL_PROGRAM_PREFIX}%`);
+  const idsMeal = (coursMeal || []).map((c: any) => c.id);
+  if (idsMeal.length) {
+    await supabase.from("lesson_progress").delete().eq("student_id", sid).in("course_id", idsMeal).then(() => {}, () => {});
+  }
 
-  const { data: courses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
+  const { data: courses } = await supabase.from("sms_courses").select("id, code").eq("is_published", true);
   if (courses?.length) {
     const { data: existing } = await supabase.from("enrollments").select("course_id").eq("student_id", sid);
     const already = new Set((existing || []).map((e: any) => e.course_id));
-    const toAdd = courses.filter((co: any) => !already.has(co.id))
+    // Inscription aux seuls cours du cursus MEAL : les autres parcours s'ouvrent par leur
+    // propre test, et inscrire d'office y aurait contourné la porte qu'on vient de poser.
+    const toAdd = courses.filter((co: any) => programOf(co.code)?.id === "meal" && !already.has(co.id))
       .map((co: any) => ({ student_id: sid, course_id: co.id, started_at: now.toISOString() }));
     if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
   }
-  await generateLessonSchedule(sid, now);
+  await generateLessonSchedule(sid, now, "meal");
   await generateGroupWorkSchedule(sid, now);
 
   const certNo = `DMA-ADM-${sid}-${Date.now().toString(36).toUpperCase()}`;
@@ -1856,6 +1908,147 @@ async function grantAdmission(sid: number, score: number, now: Date, previousAdm
   }
   return { ok: true, admissionExpires };
 }
+
+// ══════════════ Formation de formateurs : admission propre au parcours ══════════════
+//
+// LouisFarm délivre deux titres finaux sans rapport l'un avec l'autre. Jusqu'ici le test du
+// cursus MEAL ouvrait l'accès à tous les cours publiés : un formateur rural devait répondre à
+// trente questions sur pandas et QGIS pour accéder à un cours de gestion financière paysanne.
+// Ce parcours a désormais sa porte : quinze questions sur son propre métier.
+
+const TOF = programById("tof");
+
+/** Admission de l'étudiant à un parcours porté par academy_program_admissions. */
+async function admissionParcours(sid: number, programId: string) {
+  const { data } = await supabase.from("academy_program_admissions")
+    .select("admitted_at, admission_expires, entry_score, test_attempts, next_test_allowed")
+    .eq("student_id", sid).eq("program_id", programId).maybeSingle();
+  return data ?? null;
+}
+
+/**
+ * Octroie l'admission au parcours et ouvre son planning. Idempotent.
+ *
+ * Le verrou est l'unicité (student_id, program_id) : deux requêtes simultanées ne peuvent pas
+ * créer deux admissions, la seconde tombe sur le conflit. C'est plus simple que la
+ * comparaison-échange du cursus MEAL, dont la contrainte d'unicité n'existe pas.
+ */
+async function grantProgramAdmission(sid: number, programId: string, score: number, now: Date):
+    Promise<{ ok: boolean; admissionExpires: string }> {
+  const admissionExpires = new Date(
+    now.getFullYear(), now.getMonth() + ADMISSION_MONTHS, now.getDate()).toISOString();
+
+  const { error } = await supabase.from("academy_program_admissions").upsert({
+    student_id: sid, program_id: programId,
+    admitted_at: now.toISOString(), admission_expires: admissionExpires,
+    entry_score: score, last_test_at: now.toISOString(), next_test_allowed: null,
+  }, { onConflict: "student_id,program_id" });
+  if (error) {
+    // Dire l'échec plutôt que de renvoyer un succès qui laisserait l'étudiant devant des
+    // cours verrouillés après avoir réussi son test — la panne qu'a déjà connue le MEAL.
+    console.error(`Admission ${programId} : échec —`, error.message);
+    return { ok: false, admissionExpires };
+  }
+
+  // Inscription aux cours du parcours, puis planning.
+  const { data: toutes } = await supabase.from("sms_courses")
+    .select("id, code").eq("is_published", true);
+  const duParcours = (toutes || []).filter((c: any) => programOf(c.code)?.id === programId);
+  if (duParcours.length) {
+    const { data: existing } = await supabase.from("enrollments").select("course_id").eq("student_id", sid);
+    const deja = new Set((existing || []).map((e: any) => e.course_id));
+    const aAjouter = duParcours.filter((c: any) => !deja.has(c.id))
+      .map((c: any) => ({ student_id: sid, course_id: c.id, started_at: now.toISOString() }));
+    if (aAjouter.length) await supabase.from("enrollments").insert(aAjouter).then(() => {}, () => {});
+  }
+  await generateLessonSchedule(sid, now, programId);
+  await refreshLessonStates(sid);
+  return { ok: true, admissionExpires };
+}
+
+app.get("/api/academy/tof/test-status", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const a = await admissionParcours(sid, "tof");
+  const expiree = !!a?.admission_expires && new Date(a.admission_expires) < new Date();
+  const attente = a?.next_test_allowed ? new Date(a.next_test_allowed) : null;
+  res.json({
+    passed: !!a?.admitted_at && !expiree,
+    score: a?.entry_score ?? null,
+    attempts: a?.test_attempts ?? 0,
+    admittedAt: a?.admitted_at ?? null,
+    admissionExpires: a?.admission_expires ?? null,
+    nextTestAllowed: a?.next_test_allowed ?? null,
+    canRetry: !attente || attente <= new Date(),
+    nbQuestions: TOF.admission.nbQuestions,
+    seuil: TOF.admission.seuil,
+    credential: TOF.credential,
+  });
+});
+
+app.post("/api/academy/tof/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  // ANTI-TRICHE : le client envoie ses choix, le serveur corrige. La clé vit dans
+  // api/tof-answers.ts, qui ne part jamais dans le navigateur.
+  const { answers } = req.body;
+  if (!Array.isArray(answers)) return res.status(400).json({ message: "Réponses requises (answers)." });
+
+  const a = await admissionParcours(sid, "tof");
+  const now = new Date();
+  const expiree = !!a?.admission_expires && new Date(a.admission_expires) < now;
+  if (a?.admitted_at && !expiree) {
+    return res.status(400).json({ message: "Vous êtes déjà admis(e) à la formation de formateurs." });
+  }
+  if (a?.next_test_allowed && new Date(a.next_test_allowed) > now) {
+    return res.status(400).json({
+      message: `Vous pourrez repasser ce test à partir du ${new Date(a.next_test_allowed).toLocaleDateString("fr-FR")}.`,
+      nextTestAllowed: a.next_test_allowed,
+    });
+  }
+
+  const correct: boolean[] = [];
+  let score = 0;
+  for (let i = 0; i < TOF_ANSWER_KEY.length; i++) {
+    const bon = Number(answers[i]) === TOF_ANSWER_KEY[i];
+    correct.push(bon);
+    if (bon) score++;
+  }
+  const passed = score >= TOF.admission.seuil;
+  const tentatives = (a?.test_attempts ?? 0) + 1;
+
+  await supabase.from("academy_program_admissions").upsert({
+    student_id: sid, program_id: "tof",
+    entry_score: score, test_attempts: tentatives, last_test_at: now.toISOString(),
+    next_test_allowed: passed ? null
+      : new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+  }, { onConflict: "student_id,program_id" }).then(() => {}, () => {});
+
+  await supabase.from("grades").insert({
+    student_id: sid, title: "Test d'admission — Formation de formateurs",
+    score, max_score: TOF.admission.nbQuestions, type: "entry_test",
+  }).then(() => {}, () => {});
+
+  let admissionExpires: string | null = null;
+  if (passed) {
+    const octroi = await grantProgramAdmission(sid, "tof", score, now);
+    admissionExpires = octroi.admissionExpires;
+    if (!octroi.ok) {
+      return res.status(500).json({
+        passed, score, correct,
+        message: "Votre score est enregistré mais l'ouverture de vos cours a échoué. Rechargez votre tableau de bord, ou contactez l'administration.",
+        admissionFailed: true,
+      });
+    }
+  }
+
+  res.json({
+    passed, score, correct,
+    seuil: TOF.admission.seuil,
+    nbQuestions: TOF.admission.nbQuestions,
+    admissionExpires,
+    nextTestAllowed: passed ? null
+      : new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+  });
+});
 
 app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
@@ -2464,7 +2657,7 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   // échéance qui exclut est la fenêtre d'admission de 3 mois, vérifiée plus haut. Refuser ici
   // rendait la leçon définitivement impossible à valider, donc le cours impossible à terminer,
   // donc le certificat Super-Expert définitivement perdu.
-  await generateLessonSchedule(sid, new Date(stud.admitted_at));
+  await regenererPlannings(sid);
   await refreshLessonStates(sid);
   const { data: lp } = await supabase.from("lesson_progress")
     .select("status, unlock_at, due_at").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
@@ -2815,7 +3008,7 @@ app.get("/api/academy/dashboard", requireStudent, async (req, res) => {
 app.get("/api/academy/lesson-schedule", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data: stud } = await supabase.from("students").select("admitted_at").eq("id", sid).maybeSingle();
-  if (stud?.admitted_at) await generateLessonSchedule(sid, new Date(stud.admitted_at));
+  await regenererPlannings(sid);
   await refreshLessonStates(sid);
   const { data, error } = await supabase.from("lesson_progress")
     .select("*, sms_lessons(title, order_index), sms_courses(code, title, order_index)")
@@ -3654,7 +3847,7 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
       // débloquer un étudiant dont le calendrier avait été généré sur un ancien rythme.
       await supabase.from("lesson_progress").delete().eq("student_id", id).then(() => {}, () => {});
       await supabase.from("group_work_progress").delete().eq("student_id", id).then(() => {}, () => {});
-      await generateLessonSchedule(id, now);
+      await generateLessonSchedule(id, now, "meal");
       await generateGroupWorkSchedule(id, now);
     } else if (action === "reset_test") {
       // Seconde chance : lève le délai d'attente, l'étudiant peut repasser immédiatement.

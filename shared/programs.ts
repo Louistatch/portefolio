@@ -29,6 +29,20 @@ export type Program = {
    * la formation de formateurs en compte 12 et tient à 1 par semaine (12 semaines).
    */
   lessonsPerWeek: number;
+  /**
+   * Admission propre au parcours.
+   *
+   * `surStudents` distingue les deux mécanismes de stockage. Le cursus MEAL est porté par les
+   * colonnes historiques de `students` (admitted_at, entry_score…), lues en une trentaine
+   * d'endroits ; les autres parcours par la table academy_program_admissions. Une seule
+   * fonction côté serveur sait où regarder — voir admissionParcours() dans api/index.ts.
+   */
+  admission: {
+    nbQuestions: number;
+    /** Bonnes réponses exigées. */
+    seuil: number;
+    surStudents: boolean;
+  };
 };
 
 export const PROGRAMS: Program[] = [
@@ -41,16 +55,22 @@ export const PROGRAMS: Program[] = [
     outcome: "Concevoir une collecte, cartographier les résultats, automatiser le reporting.",
     accent: "#0d9488",
     lessonsPerWeek: 2,
+    admission: { nbQuestions: 30, seuil: 21, surStudents: true },
   },
   {
     id: "tof",
     prefix: "TOF-",
     title: "Formation de formateurs",
     subtitle: "Animer en milieu rural, avec les outils du terrain",
-    credential: null,
+    // LouisFarm délivre deux titres finaux. Celui-ci n'a rien à voir avec le cursus MEAL :
+    // autre public, autre métier, autre test d'admission.
+    credential: "Certificat de Formateur en Gestion Financière Paysanne",
     outcome: "Concevoir et animer des sessions adaptées aux réalités paysannes.",
     accent: "#7c3aed",
     lessonsPerWeek: 1,
+    // Quinze questions et non trente : le public visé anime sur le terrain et n'est pas
+    // toujours à l'aise avec un questionnaire en ligne. Le seuil reste à 70 %.
+    admission: { nbQuestions: 15, seuil: 11, surStudents: false },
   },
 ];
 
@@ -94,9 +114,18 @@ export function groupByProgram<T extends CourseLike>(courses: T[]): ProgramGroup
         id: "autres", prefix: "", title: "Autres formations",
         subtitle: "Cours hors parcours", credential: null,
         outcome: "", accent: "#64748b", lessonsPerWeek: 1,
+        admission: { nbQuestions: 30, seuil: 21, surStudents: true },
       },
       courses: orphans,
     });
   }
   return groups;
+}
+
+/** Parcours par identifiant. Lève si l'identifiant est inconnu : un parcours mal nommé
+ *  doit se voir au premier appel, pas se traduire par une admission silencieusement absente. */
+export function programById(id: string): Program {
+  const p = PROGRAMS.find(x => x.id === id);
+  if (!p) throw new Error(`Parcours inconnu : ${id}`);
+  return p;
 }
