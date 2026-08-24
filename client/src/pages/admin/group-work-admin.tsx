@@ -22,14 +22,16 @@ type Rendu = {
   id: number; groupWorkId: number; statut: string; note: number | null; feedback: string | null;
   contenu: any; le: string; corrigeLe: string | null; par: string | null;
 };
-type Groupe = { id: number; nom: string; cohorte: string; actif: boolean; membres: Membre[]; rendus: Rendu[] };
-type Travail = { id: number; gw_index: number; week_index: number; title: string; brief: string | null; deliverables: any; max_score: number; rubric?: any };
+type Groupe = { id: number; nom: string; cohorte: string; actif?: boolean; membres: Membre[]; rendus: Rendu[] };
 
 const jour = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "—";
 
+type Travail = { id: number; index: number; titre: string; semaine: number; maxScore: number; grille?: any };
+type BlocTravail = { travail: Travail; constitue: boolean; groupes: Groupe[]; sansGroupe: any[] };
+
 export default function AdminGroupWork() {
-  const [data, setData] = useState<{ groupes: Groupe[]; sansGroupe: any[]; travaux: Travail[] } | null>(null);
+  const [data, setData] = useState<{ parTravail: BlocTravail[]; travaux: any[] } | null>(null);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
   const [msg, setMsg] = useState("");
@@ -39,15 +41,30 @@ export default function AdminGroupWork() {
     const d = await adminFetch("/api/admin/academy/groups").then(r => r.json()).catch(() => null);
     setData(d);
   };
-
   useEffect(() => { (async () => { await charger(); setLoading(false); })(); }, []);
 
-  async function repartir() {
-    setAction("auto"); setMsg("");
+  async function tirerAuSort(t: Travail) {
+    if (!confirm(
+      `Tirer au sort les équipes de ${t.titre} ?\n\n` +
+      `Chaque étudiant recevra un email avec la composition de son groupe.`)) return;
+    setAction(`t${t.id}`); setMsg("");
     try {
-      const res = await adminFetch("/api/admin/academy/groups/auto-assign", { method: "POST" });
+      const res = await adminFetch("/api/admin/academy/groups/auto-assign", {
+        method: "POST", body: JSON.stringify({ group_work_id: t.id }),
+      });
       const json = await res.json().catch(() => ({}));
       setMsg(json?.message || "Répartition effectuée.");
+      await charger();
+    } finally { setAction(""); }
+  }
+
+  async function defaire(t: Travail) {
+    if (!confirm(`Défaire les équipes de ${t.titre} ? Un nouveau tirage sera possible.`)) return;
+    setAction(`t${t.id}`); setMsg("");
+    try {
+      const res = await adminFetch(`/api/admin/academy/groups/gw/${t.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      setMsg(json?.message || "Équipes défaites.");
       await charger();
     } finally { setAction(""); }
   }
@@ -70,74 +87,39 @@ export default function AdminGroupWork() {
     } finally { setAction(""); }
   }
 
-  async function supprimerGroupe(g: Groupe) {
-    if (!confirm(`Supprimer ${g.nom} ? Ses ${g.membres.length} membre(s) seront redistribués automatiquement.`)) return;
-    setAction(`g${g.id}`);
-    try {
-      await adminFetch(`/api/admin/academy/groups/${g.id}`, { method: "DELETE" });
-      await charger();
-    } finally { setAction(""); }
-  }
-
-  async function creerGroupe() {
-    const cohorte = prompt("Cohorte du groupe (format 2026-08) :", new Date().toISOString().slice(0, 7));
-    if (!cohorte) return;
-    const nom = prompt("Nom du groupe :", "Groupe Z");
-    if (!nom) return;
-    setAction("new");
-    try {
-      const res = await adminFetch("/api/admin/academy/groups", {
-        method: "POST", body: JSON.stringify({ name: nom, cohort: cohorte }),
-      });
-      if (!res.ok) setMsg((await res.json().catch(() => ({})))?.message || "Création impossible.");
-      await charger();
-    } finally { setAction(""); }
-  }
-
   if (loading) return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
 
-  if (!data || !Array.isArray(data.groupes)) {
+  if (!data || !Array.isArray(data.parTravail)) {
     return (
       <div className="bg-card rounded-2xl border border-border/50 p-8 text-center">
         <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
         <p className="font-medium">Les tables des travaux de groupe ne sont pas encore installées.</p>
         <p className="text-sm text-muted-foreground mt-1">
-          Exécutez <code className="font-mono">supabase/academy_group_work.sql</code> dans le SQL Editor de Supabase.
+          Exécutez les scripts <code className="font-mono">supabase/academy_group_work*.sql</code>.
         </p>
       </div>
     );
   }
 
-  const travaux = data.travaux || [];
-  const enAttente = data.groupes.flatMap(g => g.rendus.filter(r => r.statut !== "graded"));
+  const aCorriger = data.parTravail.flatMap(b => b.groupes.flatMap(g => g.rendus.filter(r => r.statut !== "graded"))).length;
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-xl font-bold flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> Travaux de groupe</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            {data.groupes.length} groupe{data.groupes.length > 1 ? "s" : ""} ·
-            {" "}{enAttente.length} rendu{enAttente.length > 1 ? "s" : ""} à corriger ·
-            {" "}{data.sansGroupe.length} étudiant{data.sansGroupe.length > 1 ? "s" : ""} sans groupe
-          </p>
-        </div>
-        <Button size="sm" variant="outline" className="gap-1.5" onClick={creerGroupe} disabled={!!action}>
-          <UserPlus className="w-3.5 h-3.5" /> Nouveau groupe
-        </Button>
-        <Button size="sm" className="gap-1.5" onClick={repartir} disabled={!!action}>
-          {action === "auto" ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shuffle className="w-3.5 h-3.5" />}
-          Répartir les étudiants sans groupe
-        </Button>
+      <div>
+        <h1 className="text-xl font-bold flex items-center gap-2"><Users className="w-5 h-5 text-primary" /> Travaux de groupe</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">
+          Une équipe différente est tirée au sort pour chaque travail, une semaine avant son
+          ouverture. {aCorriger} rendu{aCorriger > 1 ? "s" : ""} à corriger.
+        </p>
       </div>
 
       {msg && <p className="text-sm text-primary bg-primary/5 border border-primary/20 rounded-xl px-3 py-2">{msg}</p>}
 
-      <div className="flex gap-1 border-b border-border/50">
+      <div className="flex gap-1 border-b border-border/50 overflow-x-auto">
         {([["groupes", "Groupes et rendus"], ["promotions", "Forum des promotions"],
            ["retards", "Retards"], ["enonces", "Énoncés"]] as const).map(([cle, label]) => (
           <button key={cle} onClick={() => setOnglet(cle)}
-            className={`px-3 py-2 text-sm border-b-2 -mb-px transition-colors ${
+            className={`px-3 py-2 text-sm border-b-2 -mb-px whitespace-nowrap transition-colors ${
               onglet === cle ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"}`}>
             {label}
           </button>
@@ -148,66 +130,84 @@ export default function AdminGroupWork() {
        : onglet === "retards" ? <Retardataires />
        : onglet === "enonces" ? (
         <div className="space-y-4">
-          {travaux.map(t => <CarteEnonce key={t.id} travail={t} onSaved={charger} />)}
+          {(data.travaux || []).map((t: any) => <CarteEnonce key={t.id} travail={t} onSaved={charger} />)}
         </div>
       ) : (
-        <>
-          {data.sansGroupe.length > 0 && (
-            <section className="bg-card rounded-2xl border border-amber-500/30 overflow-hidden">
-              <div className="px-4 py-2.5 bg-amber-500/10 border-b border-amber-500/20">
-                <h2 className="text-sm font-bold text-amber-700">Étudiants admis sans groupe</h2>
+        <div className="space-y-8">
+          {data.parTravail.map(bloc => (
+            <div key={bloc.travail.id} className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="min-w-0 flex-1">
+                  <h2 className="font-bold text-sm">{bloc.travail.titre}</h2>
+                  <p className="text-[11px] text-muted-foreground">
+                    Semaine {bloc.travail.semaine} · équipes tirées au sort en semaine {Math.max(1, bloc.travail.semaine - 1)}
+                    {bloc.constitue ? ` · ${bloc.groupes.length} groupe${bloc.groupes.length > 1 ? "s" : ""}` : " · pas encore constituées"}
+                  </p>
+                </div>
+                {bloc.constitue ? (
+                  <Button size="sm" variant="outline" className="gap-1.5" onClick={() => defaire(bloc.travail)} disabled={!!action}>
+                    <RotateCcw className="w-3.5 h-3.5" /> Refaire le tirage
+                  </Button>
+                ) : (
+                  <Button size="sm" className="gap-1.5" onClick={() => tirerAuSort(bloc.travail)} disabled={!!action}>
+                    {action === `t${bloc.travail.id}` ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Shuffle className="w-3.5 h-3.5" />}
+                    Tirer au sort maintenant
+                  </Button>
+                )}
               </div>
-              <div className="p-3 space-y-2">
-                {data.sansGroupe.map((s: any) => (
-                  <div key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
-                    <span className="font-medium">{s.nom}</span>
-                    <span className="text-xs text-muted-foreground">{s.email} · admis le {jour(s.admisLe)}</span>
-                    <select className="ml-auto text-xs rounded-lg border border-border/60 bg-background px-2 py-1.5"
-                      defaultValue="" disabled={action === `m${s.id}`}
-                      onChange={e => e.target.value && deplacer(s.id, Number(e.target.value))}>
-                      <option value="">Affecter à…</option>
-                      {data.groupes.map(g => <option key={g.id} value={g.id}>{g.nom} · {g.cohorte} ({g.membres.length})</option>)}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
 
-          <div className="space-y-4">
-            {data.groupes.map(g => (
-              <CarteGroupe key={g.id} groupe={g} groupes={data.groupes} travaux={travaux}
-                action={action} onDeplacer={deplacer} onRetirer={retirer}
-                onSupprimer={() => supprimerGroupe(g)} onCorrige={charger} />
-            ))}
-            {data.groupes.length === 0 && (
-              <div className="bg-card rounded-2xl border border-dashed border-border/60 p-8 text-center text-sm text-muted-foreground">
-                Aucun groupe pour l'instant. Les groupes se forment tout seuls à l'ouverture du premier
-                travail (semaine 4), ou tout de suite avec « Répartir les étudiants sans groupe ».
-              </div>
-            )}
-          </div>
-        </>
+              {bloc.constitue && bloc.sansGroupe.length > 0 && (
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3 space-y-2">
+                  <p className="text-xs font-semibold text-amber-700">
+                    {bloc.sansGroupe.length} étudiant(s) sans équipe pour ce travail
+                  </p>
+                  {bloc.sansGroupe.map((s: any) => (
+                    <div key={s.id} className="flex flex-wrap items-center gap-2 text-sm">
+                      <span className="font-medium">{s.nom}</span>
+                      <span className="text-xs text-muted-foreground">{s.email}</span>
+                      <select className="ml-auto text-xs rounded-lg border border-border/60 bg-background px-2 py-1.5"
+                        defaultValue="" disabled={action === `m${s.id}`}
+                        onChange={e => e.target.value && deplacer(s.id, Number(e.target.value))}>
+                        <option value="">Affecter à…</option>
+                        {bloc.groupes.map(g => <option key={g.id} value={g.id}>{g.nom} ({g.membres.length})</option>)}
+                      </select>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {bloc.groupes.map(g => (
+                <CarteGroupe key={g.id} groupe={g} groupes={bloc.groupes} travaux={[bloc.travail as any]}
+                  action={action} onDeplacer={deplacer} onRetirer={retirer} onCorrige={charger} />
+              ))}
+
+              {!bloc.constitue && (
+                <p className="text-sm text-muted-foreground rounded-xl border border-dashed border-border/60 p-4">
+                  Les équipes seront tirées au sort automatiquement une semaine avant l'ouverture.
+                  Le bouton ci-dessus permet de le faire dès maintenant.
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
 }
 
-function CarteGroupe({ groupe, groupes, travaux, action, onDeplacer, onRetirer, onSupprimer, onCorrige }: {
-  groupe: Groupe; groupes: Groupe[]; travaux: Travail[]; action: string;
+function CarteGroupe({ groupe, groupes, travaux, action, onDeplacer, onRetirer, onCorrige }: {
+  groupe: Groupe; groupes: Groupe[]; travaux: any[]; action: string;
   onDeplacer: (s: number, g: number) => Promise<void>;
   onRetirer: (s: number, g: number) => Promise<void>;
-  onSupprimer: () => void; onCorrige: () => Promise<void>;
+  onCorrige: () => Promise<void>;
 }) {
   return (
     <section className="bg-card rounded-2xl border border-border/50 overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-2.5 bg-muted/30 border-b border-border/40">
-        <h2 className="text-sm font-bold">{groupe.nom}</h2>
-        <span className="text-[11px] text-muted-foreground">cohorte {groupe.cohorte} · {groupe.membres.length} membre{groupe.membres.length > 1 ? "s" : ""}</span>
-        <button onClick={onSupprimer} disabled={!!action} aria-label={`Supprimer ${groupe.nom}`}
-          className="ml-auto w-7 h-7 rounded-lg hover:bg-background grid place-items-center text-muted-foreground hover:text-destructive">
-          <Trash2 className="w-3.5 h-3.5" />
-        </button>
+        <h3 className="text-sm font-bold">{groupe.nom}</h3>
+        <span className="text-[11px] text-muted-foreground">
+          {groupe.cohorte} · {groupe.membres.length} membre{groupe.membres.length > 1 ? "s" : ""}
+        </span>
       </div>
 
       <div className="p-3 space-y-1.5 border-b border-border/40">
@@ -218,7 +218,7 @@ function CarteGroupe({ groupe, groupes, travaux, action, onDeplacer, onRetirer, 
             <select className="ml-auto text-xs rounded-lg border border-border/60 bg-background px-2 py-1"
               value={groupe.id} disabled={action === `m${m.studentId}`}
               onChange={e => onDeplacer(m.studentId, Number(e.target.value))}>
-              {groupes.map(g => <option key={g.id} value={g.id}>{g.nom} · {g.cohorte}</option>)}
+              {groupes.map(g => <option key={g.id} value={g.id}>{g.nom}</option>)}
             </select>
             <button onClick={() => onRetirer(m.studentId, groupe.id)} disabled={!!action}
               aria-label={`Retirer ${m.nom}`}
@@ -305,7 +305,7 @@ function LigneRendu({ travail, rendu, pairs, onCorrige }:
   { travail: Travail; rendu?: any; pairs: any[]; onCorrige: () => Promise<void> }) {
   const [ouvert, setOuvert] = useState(false);
   const grille: { cle: string; libelle: string; points: number }[] =
-    Array.isArray((travail as any).rubric) ? (travail as any).rubric : [];
+    Array.isArray(travail.grille) ? travail.grille : [];
 
   const [notes, setNotes] = useState<Record<string, string>>(() => {
     const dep = rendu?.notesParCritere || {};
@@ -339,7 +339,7 @@ function LigneRendu({ travail, rendu, pairs, onCorrige }:
     return (
       <div className="flex items-center gap-2 text-xs text-muted-foreground px-1 py-1.5">
         <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/40 shrink-0" />
-        GW{travail.gw_index} · pas encore rendu
+        GW{travail.index} · pas encore rendu
       </div>
     );
   }
@@ -348,13 +348,13 @@ function LigneRendu({ travail, rendu, pairs, onCorrige }:
   return (
     <div className={`rounded-xl border p-3 ${corrige ? "border-border/40 bg-muted/20" : "border-primary/30 bg-primary/5"}`}>
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold">GW{travail.gw_index}</span>
+        <span className="text-xs font-semibold">GW{travail.index}</span>
         <span className="text-xs text-muted-foreground">
           rendu le {jour(rendu.le)}{rendu.par ? ` par ${rendu.par}` : ""}
         </span>
         <span className={`ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full ${
           corrige ? "bg-primary text-white" : "bg-amber-500/15 text-amber-600"}`}>
-          {corrige ? `${rendu.note}/${travail.max_score}` : "à corriger"}
+          {corrige ? `${rendu.note}/${travail.maxScore}` : "à corriger"}
         </span>
         <button onClick={() => setOuvert(v => !v)}
           className="text-xs text-muted-foreground hover:text-primary inline-flex items-center gap-1">
@@ -417,7 +417,7 @@ function LigneRendu({ travail, rendu, pairs, onCorrige }:
             </div>
             <div className="flex items-center gap-2 mt-2.5 pt-2.5 border-t border-border/40">
               <span className="text-xs font-semibold flex-1">Total</span>
-              <span className="text-sm font-bold text-primary">{total}/{travail.max_score}</span>
+              <span className="text-sm font-bold text-primary">{total}/{travail.maxScore}</span>
             </div>
           </div>
 
@@ -509,7 +509,9 @@ function EvaluationsPairs({ pairs }: { pairs: any[] }) {
   );
 }
 
-function CarteEnonce({ travail, onSaved }: { travail: Travail; onSaved: () => Promise<void> }) {
+type TravailBrut = { id: number; gw_index: number; week_index: number; title: string; brief: string | null; deliverables: any; max_score: number };
+
+function CarteEnonce({ travail, onSaved }: { travail: TravailBrut; onSaved: () => Promise<void> }) {
   const [titre, setTitre] = useState(travail.title);
   const [brief, setBrief] = useState(travail.brief ?? "");
   const [livrables, setLivrables] = useState<string>(

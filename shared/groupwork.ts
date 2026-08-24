@@ -9,6 +9,12 @@
 // leçons : chacun avance sur sa propre horloge, et les groupes sont constitués par cohorte
 // (mois d'admission) pour que les membres d'un même groupe aient des échéances proches.
 //
+// LES ÉQUIPES CHANGENT À CHAQUE TRAVAIL. Elles sont retirées au sort avant chacun des trois
+// GW, une semaine avant son ouverture. Trois projets menés avec les deux mêmes coéquipiers,
+// c'est une seule expérience répétée trois fois ; retirer au sort, c'est travailler avec
+// neuf personnes différentes et réapprendre à s'organiser à chaque fois — ce qui est
+// précisément ce que l'exercice cherche à faire travailler.
+//
 // Ce fichier est la source de vérité du calendrier et des énoncés. La table
 // `academy_group_works` est semée depuis ces valeurs au premier appel de l'API ; une fois
 // semée, elle prime (l'énoncé reste modifiable depuis l'administration sans redéploiement).
@@ -27,16 +33,30 @@ export const GROUP_WORK_WEEKS = [4, 8, 12] as const;
 export const GROUP_WORK_WINDOW_WEEKS = 1;
 
 /**
- * Taille d'un groupe : trois, comme le modèle WQU dont ce dispositif est repris.
+ * Taille d'un groupe : trois, comme le modèle dont ce dispositif est repris.
  *
- * L'effectif ne tombe presque jamais juste — 19 étudiants ne font pas des groupes de 3. Le
- * reste est absorbé en élargissant un groupe existant plutôt qu'en ouvrant un groupe d'une
- * personne : un « groupe » seul n'est pas un travail de groupe, c'est un devoir individuel
- * déguisé, et l'étudiant concerné n'a personne à qui écrire.
+ * Un effectif tombe rarement juste — 19 étudiants ne font pas des trios entiers. Le reste
+ * est absorbé en portant UN groupe à quatre, jamais en ouvrant un groupe d'une personne
+ * (qui n'a personne à qui écrire) ni en gonflant un groupe au-delà de quatre (où plus
+ * personne ne se sent responsable du rendu). Comme les équipes sont retirées au sort à
+ * chaque travail, la place de quatrième tourne d'elle-même.
  */
 export const GROUP_TARGET_SIZE = 3;
 export const GROUP_MAX_MEMBERS = 4;
-export const GROUP_MIN_MEMBERS = 2;
+
+/**
+ * Combien de semaines AVANT l'ouverture d'un travail son groupe est-il constitué.
+ *
+ * Une seule : les équipes du GW1 (semaine 4) se forment en semaine 3. Assez tôt pour que
+ * le groupe se présente, lise l'énoncé et se répartisse le travail ; pas plus tôt, car une
+ * équipe annoncée un mois à l'avance est une équipe oubliée le jour venu.
+ */
+export const GROUP_FORMATION_LEAD_WEEKS = 1;
+
+/** Semaine de constitution des groupes d'un travail donné : 3, 7 puis 11. */
+export function formationWeekOf(weekIndex: number): number {
+  return Math.max(1, weekIndex - GROUP_FORMATION_LEAD_WEEKS);
+}
 
 /**
  * Un étudiant n'entre dans le dispositif que s'il n'a pas encore franchi sa semaine 2.
@@ -227,3 +247,30 @@ export const GROUP_WORK_STATUS_LABEL: Record<GroupWorkStatus, string> = {
   completed: "Corrigé",
   missed: "En retard",
 };
+
+/**
+ * Consignes de rendu affichées sur chaque travail, dans l'ordre du modèle de référence.
+ *
+ * Elles vivent ici et non dans la page : l'énoncé PDF les imprime aussi, et deux copies
+ * auraient fini par diverger — l'étudiant lisant une règle sur l'écran et une autre sur le
+ * papier, sans savoir laquelle fait foi.
+ */
+export const SUBMISSION_INSTRUCTIONS = {
+  avant: {
+    titre: "Avant la date limite de dépôt",
+    points: [
+      "Lisez l'énoncé du travail et sa grille de notation.",
+      "Prenez connaissance des règles du travail de groupe.",
+      "Utilisez le modèle de rapport fourni. Vérifiez qu'il porte les noms complets et les adresses email de tous les membres du groupe, et qu'il indique pour chacun s'il a réellement contribué au travail.",
+      "Désignez un membre du groupe qui téléversera et déposera le travail au nom de tout le groupe.",
+    ],
+  },
+  pret: {
+    titre: "Au moment de déposer",
+    points: [
+      "Si votre rendu comporte plusieurs fichiers, déposez le rapport PDF séparément de l'archive ZIP contenant les fichiers annexes (tableurs, graphiques, code).",
+      "Assurez-vous que le membre qui dépose a bien téléversé la version finale de votre projet.",
+      "Après la date limite, le rendu ne peut plus être modifié par aucun membre du groupe. Un groupe qui n'a rien déposé ne pourra plus téléverser son travail.",
+    ],
+  },
+} as const;
