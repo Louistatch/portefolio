@@ -7,3 +7,7 @@ vite.config.ts.*
 
 # Supabase
 .env.local
+
+# Canvas de design assemblé — 2,2 Mo, régénéré par script/… ; les sources .dc.html suffisent
+design/canvas/*.html
+!design/canvas/*.dc.html

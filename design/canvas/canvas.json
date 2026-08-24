@@ -1,0 +1,55 @@
+{
+  "artboards": [
+    {
+      "file": "Main.dc.html",
+      "x": 0,
+      "y": 0,
+      "w": 1440,
+      "h": 2220,
+      "title": "Accueil"
+    },
+    {
+      "file": "Formation.dc.html",
+      "x": 1560,
+      "y": 0,
+      "w": 1440,
+      "h": 1760,
+      "title": "Formation (/elearning)"
+    },
+    {
+      "file": "Espace.dc.html",
+      "x": 3120,
+      "y": 0,
+      "w": 1440,
+      "h": 1200,
+      "title": "Espace étudiant"
+    },
+    {
+      "file": "Systeme.dc.html",
+      "x": 3120,
+      "y": 1400,
+      "w": 1040,
+      "h": 1010,
+      "title": "Le système"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "direction",
+      "x": 0,
+      "y": -190,
+      "w": 620,
+      "text": "Direction : crédible devant une ONG ou une banque.\n\nMêmes jetons que le site actuel (Plus Jakarta Sans / Lora, teal 160 84% 20%, rayon 8px) — aucune couleur nouvelle. Ce qui change : densité d'information, tableaux plutôt que cartes, et chaque chiffre daté ou annoncé comme fictif."
+    },
+    {
+      "id": "a-completer",
+      "x": 700,
+      "y": -190,
+      "w": 400,
+      "text": "Deux emplacements à remplir par vous :\n\n• la ligne « Références » de la fiche (bailleurs, ONG)\n• le portrait, en haut à droite de l'accueil\n\nLe reste vient de votre base et de vos cours."
+    }
+  ],
+  "launch": {
+    "view": "canvas"
+  }
+}
