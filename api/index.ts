@@ -3811,6 +3811,106 @@ app.post("/api/admin/academy/test-email", requireAuth, async (req, res) => {
 
 // ══════════════ ADMIN — Gestion école ══════════════
 
+// ══════════════ Messages individuels aux étudiants ══════════════
+//
+// L'administration savait admettre, vérifier, réinitialiser, révoquer — mais pas écrire. Le
+// seul moyen de s'adresser à un étudiant était la newsletter, qui part à tout le monde, ou une
+// boîte personnelle, qui ne laisse aucune trace dans la plateforme.
+//
+// L'écriture et l'envoi sont deux gestes distincts. Un message porte le nom de Louis, annonce
+// souvent une décision, et ne se rattrape pas une fois parti : on l'écrit, on le relit, puis
+// on l'envoie explicitement.
+
+app.get("/api/admin/academy/messages", requireAuth, async (_req, res) => {
+  const { data, error } = await supabase.from("academy_student_messages")
+    .select("*, students(id, full_name, email, email_verified)")
+    .order("created_at", { ascending: false }).limit(100);
+  if (error) return res.status(500).json({ message: error.message });
+  res.json(data ?? []);
+});
+
+app.post("/api/admin/academy/messages", requireAuth, async (req, res) => {
+  const { id, student_id, subject, body } = req.body ?? {};
+  if (!student_id || !String(subject || "").trim() || !String(body || "").trim()) {
+    return res.status(400).json({ message: "Destinataire, objet et message sont requis." });
+  }
+
+  if (id) {
+    // Un message parti ne se réécrit pas : le corps conservé doit rester celui qui a été lu.
+    const { data: actuel } = await supabase.from("academy_student_messages")
+      .select("status").eq("id", id).maybeSingle();
+    if (actuel?.status === "sent") {
+      return res.status(400).json({ message: "Ce message a déjà été envoyé : il n'est plus modifiable." });
+    }
+    const { data, error } = await supabase.from("academy_student_messages")
+      .update({ subject, body, status: "draft", error: null, updated_at: new Date().toISOString() })
+      .eq("id", id).select().single();
+    if (error) return res.status(500).json({ message: error.message });
+    return res.json(data);
+  }
+
+  const { data, error } = await supabase.from("academy_student_messages")
+    .insert({ student_id, subject, body, status: "draft" }).select().single();
+  if (error) return res.status(500).json({ message: error.message });
+  res.json(data);
+});
+
+app.post("/api/admin/academy/messages/:id/send", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { data: msg } = await supabase.from("academy_student_messages")
+    .select("*, students(id, full_name, email)").eq("id", id).maybeSingle();
+  if (!msg) return res.status(404).json({ message: "Message introuvable." });
+  if (msg.status === "sent") {
+    // Renvoyer un message déjà parti ferait un doublon dans la boîte de l'étudiant, sans
+    // qu'aucune erreur ne le signale. On refuse plutôt que de laisser le doute.
+    return res.status(400).json({ message: "Ce message a déjà été envoyé." });
+  }
+  const dest = (msg as any).students;
+  if (!dest?.email) return res.status(400).json({ message: "Cet étudiant n'a pas d'adresse e-mail." });
+
+  const envoi = await sendAcademyEmail({
+    studentId: dest.id, to: dest.email, type: "message_admin",
+    subject: msg.subject,
+    html: studentMessageEmailHtml(dest.full_name, msg.subject, msg.body),
+    dedupeKey: `message_admin:${id}`,
+  });
+
+  if (!envoi.sent) {
+    await supabase.from("academy_student_messages")
+      .update({ status: "failed", error: envoi.reason ?? "inconnu", updated_at: new Date().toISOString() })
+      .eq("id", id);
+    // Dire pourquoi. Un « échec » sans motif laisse l'administrateur sans rien à corriger.
+    const motifs: Record<string, string> = {
+      resend_not_configured: "Le service d'envoi n'est pas configuré (RESEND_API_KEY absente).",
+      no_recipient: "Aucune adresse e-mail pour cet étudiant.",
+      already_sent: "Ce message a déjà été envoyé.",
+      send_failed: "Le service d'envoi a refusé le message.",
+    };
+    return res.status(500).json({
+      message: motifs[envoi.reason ?? ""] ?? `Envoi impossible (${envoi.reason ?? "raison inconnue"}).`,
+      reason: envoi.reason,
+    });
+  }
+
+  const { data } = await supabase.from("academy_student_messages")
+    .update({ status: "sent", error: null, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+    .eq("id", id).select().single();
+  res.json({ sent: true, message: data });
+});
+
+app.delete("/api/admin/academy/messages/:id", requireAuth, async (req, res) => {
+  const { data: msg } = await supabase.from("academy_student_messages")
+    .select("status").eq("id", Number(req.params.id)).maybeSingle();
+  if (msg?.status === "sent") {
+    // La trace de ce qui a été envoyé doit survivre : c'est elle qu'on relit quand un étudiant
+    // écrit « vous m'aviez dit que… ».
+    return res.status(400).json({ message: "Un message envoyé ne peut pas être supprimé." });
+  }
+  const { error } = await supabase.from("academy_student_messages").delete().eq("id", Number(req.params.id));
+  if (error) return res.status(500).json({ message: error.message });
+  res.json({ ok: true });
+});
+
 app.get("/api/admin/academy/students", requireAuth, async (_req, res) => {
   const { data, error } = await supabase.from("students")
     .select("id, full_name, email, phone, country, organization, entry_score, status, created_at, email_verified, admitted_at, admission_expires, final_certificate_no, test_attempts, last_login")
@@ -4258,6 +4358,36 @@ function campaignEmailHtml(name: string | undefined, subject: string, content: s
 
 
 // ══════════════ Templates email Academy ══════════════
+/**
+ * Message individuel écrit depuis l'administration.
+ *
+ * Le corps est composé dans un champ de texte, jamais en HTML libre : on échappe d'abord,
+ * puis on n'autorise que trois marques — paragraphe, gras, puce. Coller du HTML brut dans un
+ * courriel signé Louis TATCHIDA ouvrirait la porte à une injection si le champ venait un jour
+ * à être alimenté autrement que par lui.
+ */
+function studentMessageEmailHtml(nom: string | undefined, sujet: string, corps: string) {
+  const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const enGras = (t: string) => esc(t).replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+  const blocs = corps.split(/\n{2,}/).map(bloc => {
+    const lignes = bloc.split("\n");
+    if (lignes.every(l => l.trim().startsWith("- "))) {
+      return `<ul style="margin:0 0 16px;padding-left:20px">${
+        lignes.map(l => `<li style="margin:0 0 6px">${enGras(l.trim().slice(2))}</li>`).join("")}</ul>`;
+    }
+    return `<p>${lignes.map(enGras).join("<br>")}</p>`;
+  }).join("");
+
+  const g = nom ? `Bonjour ${esc(nom.split(" ")[0])},` : "Bonjour,";
+  return academyEmailLayout(
+    `<div class="hd"><div class="logo"><span>LOUISFARM LEARNING</span></div>`
+    + `<h1>${esc(sujet)}</h1></div>`
+    + `<div class="bd"><p>${g}</p>${blocs}`
+    + `<p style="margin-top:24px">Bien à vous,<br><strong>Louis TATCHIDA</strong></p></div>`
+  );
+}
+
 // ── Layout email dédié DataMEAL Academy ──
 function academyEmailLayout(content: string) {
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">

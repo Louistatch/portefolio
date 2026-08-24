@@ -48,6 +48,7 @@ import AdminNewsletter from "@/pages/admin/newsletter-admin";
 import AdminTestimonials from "@/pages/admin/testimonials-admin";
 import AdminStudents from "@/pages/admin/students-admin";
 import AdminMeetings from "@/pages/admin/meetings-admin";
+import AdminStudentMessages from "@/pages/admin/student-messages-admin";
 import AdminGroupWork from "@/pages/admin/group-work-admin";
 import Stats from "@/pages/stats";
 import { getToken } from "@/lib/admin";
@@ -103,6 +104,7 @@ function App() {
             <Route path="/admin/testimonials">{() => <RequireAuth><AdminTestimonials /></RequireAuth>}</Route>
             <Route path="/admin/students">{() => <RequireAuth><AdminStudents /></RequireAuth>}</Route>
             <Route path="/admin/meetings">{() => <RequireAuth><AdminMeetings /></RequireAuth>}</Route>
+            <Route path="/admin/student-messages">{() => <RequireAuth><AdminStudentMessages /></RequireAuth>}</Route>
             <Route path="/admin/group-work">{() => <RequireAuth><AdminGroupWork /></RequireAuth>}</Route>
 
             {/* DataMEAL Academy — espace étudiant (pas de Layout admin) */}

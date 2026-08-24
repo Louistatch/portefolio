@@ -5,7 +5,7 @@ import { adminFetch, clearToken } from "@/lib/admin";
 import {
   LayoutDashboard, GraduationCap, Calendar, Video, Mail, MessageSquare,
   Newspaper, Users, Star, FileText, BookOpen, UserCircle,
-  LogOut, Menu, X, Search, Bell, Sun, Moon, ExternalLink, ChevronRight,
+  LogOut, Menu, X, Search, Bell, Sun, Moon, ExternalLink, ChevronRight, Send,
 } from "lucide-react";
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
@@ -34,6 +34,7 @@ const SECTIONS: Section[] = [
     titre: "Academy",
     items: [
       { href: "/admin/students", label: "Étudiants", icon: GraduationCap, badge: "emailsNonVerifies" },
+      { href: "/admin/student-messages", label: "Écrire à un étudiant", icon: Send },
       { href: "/admin/meetings", label: "Rencontres en ligne", icon: Video },
       { href: "/admin/group-work", label: "Travaux de groupe", icon: Users },
     ],
