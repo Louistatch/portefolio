@@ -277,7 +277,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
             </button>
 
             <button onClick={() => setPaletteOuverte(true)}
-              className="flex items-center gap-2.5 h-9 px-3 rounded-xl border border-border/60 bg-muted/40 hover:bg-muted text-sm text-muted-foreground transition-colors flex-1 max-w-md">
+              className="flex items-center gap-2.5 h-9 px-3 rounded-xl border border-border/60 bg-muted/40 hover:bg-muted text-sm text-muted-foreground transition-colors flex-1 min-w-0 max-w-md">
               <Search className="w-4 h-4 shrink-0" />
               <span className="truncate">Rechercher un cours, une leçon…</span>
               <kbd className="ml-auto hidden sm:inline text-[10px] font-mono px-1.5 py-0.5 rounded border border-border/60 bg-background shrink-0">

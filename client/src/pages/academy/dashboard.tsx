@@ -85,34 +85,67 @@ export default function AcademyDashboard() {
     <div className="max-w-6xl mx-auto space-y-6">
       <SEO title="Mon espace — DataMEAL Academy" description="Tableau de bord étudiant." />
 
-      {/* ───── Hero header ───── */}
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-teal-700 p-6 sm:p-8 text-white" style={{ transform: "translateZ(0)", isolation: "isolate", WebkitBackfaceVisibility: "hidden" }}>
-        <div className="absolute -right-8 -top-8 w-44 h-44 rounded-full bg-white/10" />
-        <div className="absolute -right-16 top-12 w-56 h-56 rounded-full bg-white/5" />
-        <div className="relative flex items-center justify-between flex-wrap gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center text-2xl font-bold border border-white/30">
+      {/* ───── En-tête ─────
+          Sobre plutôt qu'en aplat dégradé, et surtout : il porte l'ÉCHÉANCE. Un étudiant
+          ouvre son espace pour savoir ce qu'il lui reste à faire et combien de temps il
+          lui reste pour le faire ; la fenêtre d'admission de trois mois décidait de tout
+          sans être affichée nulle part. Le prénom et la salutation restent, mais ils ne
+          sont plus ce que l'écran met en avant. */}
+      <div className="bg-card rounded-2xl border border-border/60 p-5 sm:p-6">
+        <div className="flex items-start justify-between flex-wrap gap-5">
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="w-14 h-14 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-lg font-bold shrink-0">
               {initials}
             </div>
-            <div>
-              <p className="text-white/70 text-sm">Bon retour,</p>
-              <h1 className="text-2xl sm:text-3xl font-bold">{firstName} 👋</h1>
-              {testStatus?.passed && (
-                <span className="inline-flex items-center gap-1.5 mt-1.5 text-xs bg-white/15 px-2.5 py-1 rounded-full">
-                  <ShieldCheck className="w-3.5 h-3.5" /> Admis(e) · {creds.length} credential{creds.length > 1 ? "s" : ""}
-                </span>
-              )}
+            <div className="min-w-0">
+              <h1 className="font-serif text-xl sm:text-2xl font-semibold leading-tight">{firstName}</h1>
+              <p className="text-[13px] text-muted-foreground mt-1">
+                {testStatus?.passed
+                  ? <>Admis · {creds.length} credential{creds.length > 1 ? "s" : ""} au relevé</>
+                  : "En attente d'admission"}
+              </p>
             </div>
           </div>
+
+          {/* La fenêtre d'admission, sur la même ligne que l'identité : c'est elle qui
+              cadence tout le parcours, y compris la date des travaux de groupe. */}
+          {testStatus?.passed && bord?.etudiant?.admissionExpire && (() => {
+            const fin = new Date(bord.etudiant.admissionExpire).getTime();
+            const restant = Math.max(0, Math.ceil((fin - Date.now()) / 86400000));
+            const total = 13 * 7;
+            const ecoule = Math.min(total, Math.max(0, total - restant));
+            const semaine = Math.min(13, Math.floor(ecoule / 7) + 1);
+            return (
+              <div className="min-w-[220px]">
+                <div className="flex items-baseline justify-between mb-1.5">
+                  <span className="text-[11px] tracking-[0.1em] uppercase text-muted-foreground font-bold">
+                    Fin d'admission
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">semaine {semaine} / 13</span>
+                </div>
+                <div className="font-serif text-lg font-semibold mb-2">
+                  {new Date(bord.etudiant.admissionExpire).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
+                </div>
+                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+                  <div className="h-full bg-primary rounded-full transition-all"
+                    style={{ width: `${Math.round((ecoule / total) * 100)}%` }} />
+                </div>
+                <p className="text-[11px] text-muted-foreground mt-1.5">
+                  {restant} jour{restant > 1 ? "s" : ""} restant{restant > 1 ? "s" : ""}
+                </p>
+              </div>
+            );
+          })()}
+
           {nextLesson ? (
             <button onClick={() => navigate(`/academy/classroom/${nextLesson.course_id}?lesson=${nextLesson.lesson_id}`)}
-              className="bg-white text-primary rounded-2xl px-5 py-3 text-left hover:bg-white/95 transition-colors shadow-lg">
-              <p className="text-[11px] uppercase tracking-wide text-primary/60 font-semibold">Cette semaine</p>
-              <p className="font-bold text-sm max-w-[200px] truncate">{nextLesson.sms_lessons?.title || "Leçon disponible"}</p>
+              className="bg-primary text-primary-foreground rounded-lg px-5 py-3 text-left hover:bg-primary/90 transition-colors">
+              <p className="text-[11px] uppercase tracking-wide text-primary-foreground/70 font-semibold">À faire maintenant</p>
+              <p className="font-bold text-sm max-w-[220px] truncate">{nextLesson.sms_lessons?.title || "Leçon disponible"}</p>
               <span className="text-xs flex items-center gap-1 mt-0.5">Continuer <ChevronRight className="w-3 h-3" /></span>
             </button>
           ) : !testStatus?.passed ? (
-            <Button onClick={() => navigate("/elearning")} className="bg-white text-primary hover:bg-white/95 gap-2 shadow-lg">
+            <Button onClick={() => navigate("/elearning")} className="gap-2">
               <Target className="w-4 h-4" /> Passer le test d'admission
             </Button>
           ) : null}
