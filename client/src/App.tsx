@@ -31,6 +31,7 @@ import AcademyProfile from "@/pages/academy/profile";
 import VerifyCertificate from "@/pages/academy/verify-certificate";
 import AcademyLive from "@/pages/academy/live";
 import AcademyParcours from "@/pages/academy/parcours";
+import AcademyProgramTest from "@/pages/academy/program-test";
 
 // Admin
 import AdminLogin from "@/pages/admin/login";
@@ -112,6 +113,7 @@ function App() {
             <Route path="/academy/login">{() => <Layout><AcademyLogin /></Layout>}</Route>
             <Route path="/academy/dashboard">{() => <RequireStudentAuth><AcademyLayout><AcademyDashboard /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/classroom/:id">{() => <Layout><RequireStudentAuth><AcademyClassroom /></RequireStudentAuth></Layout>}</Route>
+            <Route path="/academy/test/:id">{() => <RequireStudentAuth><AcademyLayout><AcademyProgramTest /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/parcours/:id">{() => <RequireStudentAuth><AcademyLayout><AcademyParcours /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/group-work">{() => <RequireStudentAuth><AcademyLayout><AcademyGroupWork /></AcademyLayout></RequireStudentAuth>}</Route>
             {/* Publique : le lien de validation arrive par email et s'ouvre souvent sur un autre

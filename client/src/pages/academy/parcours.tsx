@@ -156,7 +156,11 @@ export default function AcademyParcours() {
               </p>
               <Button size="sm" className="mt-3 gap-1.5 border-0 text-white"
                 style={{ background: parcours.accent }}
-                onClick={() => navigate("/elearning")}>
+                onClick={() => navigate(
+                  // Le cursus MEAL garde son test historique sur la page publique ; les autres
+                  // parcours ont le leur, à leur propre adresse.
+                  programId === "meal" ? "/elearning" : `/academy/test/${programId}`
+                )}>
                 Passer le test d'admission <ChevronRight className="w-3.5 h-3.5" />
               </Button>
             </div>

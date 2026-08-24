@@ -14,9 +14,8 @@ import fs from "fs";
 // l'extension d'un import relatif. Sans elle, le chargement de la fonction échoue en
 // production (ERR_MODULE_NOT_FOUND) alors que le build, lui, passe sans broncher.
 import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises.js";
-import { programOf, programById, PROGRAMS } from "../shared/programs.js";
-import { QUESTIONS_TOF } from "../shared/tof-test.js";
-import { TOF_ANSWER_KEY } from "./tof-answers.js";
+import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
+import { TESTS_PARCOURS, type TestParcours } from "./program-tests.js";
 import {
   GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_MAX_MEMBERS,
   GROUP_WORK_ELIGIBILITY_WEEKS, GROUP_FORMATION_LEAD_WEEKS,
@@ -1916,8 +1915,6 @@ async function grantAdmission(sid: number, score: number, now: Date, previousAdm
 // trente questions sur pandas et QGIS pour accéder à un cours de gestion financière paysanne.
 // Ce parcours a désormais sa porte : quinze questions sur son propre métier.
 
-const TOF = programById("tof");
-
 /** Admission de l'étudiant à un parcours porté par academy_program_admissions. */
 async function admissionParcours(sid: number, programId: string) {
   const { data } = await supabase.from("academy_program_admissions")
@@ -1966,12 +1963,49 @@ async function grantProgramAdmission(sid: number, programId: string, score: numb
   return { ok: true, admissionExpires };
 }
 
-app.get("/api/academy/tof/test-status", requireStudent, async (req, res) => {
+/**
+ * Routes d'admission génériques, valables pour tout parcours ayant sa propre porte.
+ *
+ * Elles étaient d'abord écrites pour la seule formation de formateurs, chemin « /tof/ » et
+ * identifiant en dur. Le troisième parcours aurait imposé une copie, et une copie est
+ * exactement ce qui finit par diverger : un correctif appliqué à l'une, oublié dans l'autre.
+ * Le parcours est donc devenu un paramètre, et la banque de questions se lit dans un registre.
+ */
+
+type ResolutionParcours =
+  | { ok: true; parcours: Program; test: TestParcours; statut?: undefined; message?: undefined }
+  | { ok: false; statut: number; message: string; parcours?: undefined; test?: undefined };
+
+/** Parcours demandé, sa configuration et son test — ou l'erreur à renvoyer. */
+function parcoursAvecTest(id: string): ResolutionParcours {
+  let parcours: Program;
+  try { parcours = programById(id); }
+  catch { return { ok: false, statut: 404, message: "Parcours inconnu." }; }
+
+  if (parcours.admission.surStudents) {
+    return { ok: false, statut: 400, message: "Ce parcours passe par le test d'admission général." };
+  }
+  const test = TESTS_PARCOURS[id];
+  // Un parcours déclaré sans banque de questions ne doit pas répondre « 0 sur 0 réussi » :
+  // on refuse explicitement, plutôt que d'admettre tout le monde par accident.
+  if (!test || test.questions.length !== parcours.admission.nbQuestions
+      || test.cle.length !== test.questions.length) {
+    return { ok: false, statut: 503, message: "Le test de ce parcours n'est pas encore disponible." };
+  }
+  return { ok: true, parcours, test };
+}
+
+app.get("/api/academy/programs/:id/test-status", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const a = await admissionParcours(sid, "tof");
+  const programId = String(req.params.id);
+  const r = parcoursAvecTest(programId);
+  if (!r.ok) return res.status(r.statut!).json({ message: r.message });
+
+  const a = await admissionParcours(sid, programId);
   const expiree = !!a?.admission_expires && new Date(a.admission_expires) < new Date();
   const attente = a?.next_test_allowed ? new Date(a.next_test_allowed) : null;
   res.json({
+    programId: r.parcours!.id,
     passed: !!a?.admitted_at && !expiree,
     score: a?.entry_score ?? null,
     attempts: a?.test_attempts ?? 0,
@@ -1979,24 +2013,31 @@ app.get("/api/academy/tof/test-status", requireStudent, async (req, res) => {
     admissionExpires: a?.admission_expires ?? null,
     nextTestAllowed: a?.next_test_allowed ?? null,
     canRetry: !attente || attente <= new Date(),
-    nbQuestions: TOF.admission.nbQuestions,
-    seuil: TOF.admission.seuil,
-    credential: TOF.credential,
+    nbQuestions: r.parcours!.admission.nbQuestions,
+    seuil: r.parcours!.admission.seuil,
+    credential: r.parcours!.credential,
+    title: r.parcours!.title,
   });
 });
 
-app.post("/api/academy/tof/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
+app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  // ANTI-TRICHE : le client envoie ses choix, le serveur corrige. La clé vit dans
-  // api/tof-answers.ts, qui ne part jamais dans le navigateur.
+  const programId = String(req.params.id);
+  const r = parcoursAvecTest(programId);
+  if (!r.ok) return res.status(r.statut!).json({ message: r.message });
+  const parcours = r.parcours!;
+  const test = r.test!;
+
+  // ANTI-TRICHE : le client envoie ses choix, le serveur corrige. La clé vit sous api/,
+  // qui ne part jamais dans le navigateur.
   const { answers } = req.body;
   if (!Array.isArray(answers)) return res.status(400).json({ message: "Réponses requises (answers)." });
 
-  const a = await admissionParcours(sid, "tof");
+  const a = await admissionParcours(sid, programId);
   const now = new Date();
   const expiree = !!a?.admission_expires && new Date(a.admission_expires) < now;
   if (a?.admitted_at && !expiree) {
-    return res.status(400).json({ message: "Vous êtes déjà admis(e) à la formation de formateurs." });
+    return res.status(400).json({ message: `Vous êtes déjà admis(e) au parcours « ${parcours.title} ».` });
   }
   if (a?.next_test_allowed && new Date(a.next_test_allowed) > now) {
     return res.status(400).json({
@@ -2007,31 +2048,33 @@ app.post("/api/academy/tof/submit-test", rateLimit(10, 10 * 60 * 1000), requireS
 
   const correct: boolean[] = [];
   let score = 0;
-  for (let i = 0; i < TOF_ANSWER_KEY.length; i++) {
-    const bon = Number(answers[i]) === TOF_ANSWER_KEY[i];
+  for (let i = 0; i < test.cle.length; i++) {
+    const bon = Number(answers[i]) === test.cle[i];
     correct.push(bon);
     if (bon) score++;
   }
-  const passed = score >= TOF.admission.seuil;
+  const passed = score >= parcours.admission.seuil;
   const tentatives = (a?.test_attempts ?? 0) + 1;
+  const prochainEssai = new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
 
   await supabase.from("academy_program_admissions").upsert({
-    student_id: sid, program_id: "tof",
+    student_id: sid, program_id: programId,
     entry_score: score, test_attempts: tentatives, last_test_at: now.toISOString(),
-    next_test_allowed: passed ? null
-      : new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+    next_test_allowed: passed ? null : prochainEssai,
   }, { onConflict: "student_id,program_id" }).then(() => {}, () => {});
 
   await supabase.from("grades").insert({
-    student_id: sid, title: "Test d'admission — Formation de formateurs",
-    score, max_score: TOF.admission.nbQuestions, type: "entry_test",
+    student_id: sid, title: `Test d'admission — ${parcours.title}`,
+    score, max_score: parcours.admission.nbQuestions, type: "entry_test",
   }).then(() => {}, () => {});
 
   let admissionExpires: string | null = null;
   if (passed) {
-    const octroi = await grantProgramAdmission(sid, "tof", score, now);
+    const octroi = await grantProgramAdmission(sid, programId, score, now);
     admissionExpires = octroi.admissionExpires;
     if (!octroi.ok) {
+      // Dire l'échec plutôt que de renvoyer un succès qui laisserait l'étudiant devant des
+      // cours verrouillés après avoir réussi son test — la panne qu'a déjà connue le MEAL.
       return res.status(500).json({
         passed, score, correct,
         message: "Votre score est enregistré mais l'ouverture de vos cours a échoué. Rechargez votre tableau de bord, ou contactez l'administration.",
@@ -2042,96 +2085,14 @@ app.post("/api/academy/tof/submit-test", rateLimit(10, 10 * 60 * 1000), requireS
 
   res.json({
     passed, score, correct,
-    seuil: TOF.admission.seuil,
-    nbQuestions: TOF.admission.nbQuestions,
+    programId, title: parcours.title, credential: parcours.credential,
+    seuil: parcours.admission.seuil,
+    nbQuestions: parcours.admission.nbQuestions,
     admissionExpires,
-    nextTestAllowed: passed ? null
-      : new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString(),
+    nextTestAllowed: passed ? null : prochainEssai,
   });
 });
 
-app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
-  const sid = (req as any).student.sid;
-  // ANTI-TRICHE : le client envoie ses réponses choisies, le serveur calcule le score.
-  const { answers } = req.body;
-
-  // Vérifier le délai de re-tentative (1 semaine après échec)
-  const { data: stud } = await supabase.from("students")
-    .select("admitted_at, admission_expires, next_test_allowed, test_attempts, status, email_verified").eq("id", sid).single();
-  // L'email non vérifié ne bloque plus le test : quand l'envoi d'email échoue (domaine
-  // d'expédition non validé, quota, boîte inexistante), l'étudiant était enfermé dans une
-  // impasse dont aucune action de sa part ne pouvait le sortir. La vérification reste exigée
-  // au moment de délivrer un document officiel (attestation, certificat).
-  // Une admission expirée peut être repassée (sinon un étudiant dont les 3 mois sont écoulés
-  // resterait bloqué pour toujours puisqu'admitted_at reste défini).
-  const admissionExpired = !!stud?.admission_expires && new Date(stud.admission_expires) < new Date();
-  if (stud?.admitted_at && !admissionExpired) {
-    return res.status(403).json({ message: "Vous êtes déjà admis(e). Le test ne peut pas être repassé.", alreadyAdmitted: true });
-  }
-  if (stud?.next_test_allowed && new Date(stud.next_test_allowed) > new Date()) {
-    return res.status(403).json({ message: "Vous devez attendre avant de repasser le test.", nextAllowed: stud.next_test_allowed });
-  }
-
-  // Calcul du score CÔTÉ SERVEUR à partir des réponses
-  let score: number;
-  const correct: boolean[] = [];
-  if (Array.isArray(answers)) {
-    score = 0;
-    for (let i = 0; i < ADMISSION_ANSWER_KEY.length; i++) {
-      const isCorrect = Number(answers[i]) === ADMISSION_ANSWER_KEY[i];
-      correct.push(isCorrect);
-      if (isCorrect) score++;
-    }
-  } else {
-    return res.status(400).json({ message: "Réponses requises (answers)." });
-  }
-
-  const passed = score >= ADMISSION_PASS_SCORE;
-  const now = new Date();
-  const attempts = (stud?.test_attempts ?? 0) + 1;
-
-  const update: any = {
-    entry_score: score, test_attempts: attempts, last_test_at: now.toISOString(),
-    status: passed ? "active" : "pending_test",
-  };
-  if (!passed) {
-    update.next_test_allowed = new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
-  }
-  await supabase.from("students").update(update).eq("id", sid);
-
-  // Note du test
-  const { data: existingTest } = await supabase.from("grades")
-    .select("id").eq("student_id", sid).eq("type", "entry_test").maybeSingle();
-  if (existingTest) {
-    await supabase.from("grades").update({ score, graded_at: now.toISOString() }).eq("id", existingTest.id);
-  } else {
-    await supabase.from("grades").insert({ student_id: sid, title: "Test d'admission MEAL", score, max_score: 30, type: "entry_test" });
-  }
-
-  let admissionExpires: string | null = null;
-  if (passed) {
-    const granted = await grantAdmission(sid, score, now, stud?.admitted_at ?? null);
-    admissionExpires = granted.admissionExpires;
-    if (!granted.ok) {
-      // L'admission n'a pas pu être octroyée : le dire, plutôt que de renvoyer un
-      // succès qui laisserait l'étudiant devant des cours verrouillés sans recours.
-      return res.status(500).json({
-        passed, score, correct, status: "active",
-        message: "Votre score est enregistré mais l'ouverture de vos cours a échoué. Rechargez votre tableau de bord, ou contactez l'administration.",
-        admissionFailed: true,
-      });
-    }
-  }
-
-  res.json({
-    passed, score, correct,
-    status: passed ? "active" : "pending_test",
-    admissionExpires: passed ? admissionExpires : null,
-    nextTestAllowed: passed ? null : update.next_test_allowed,
-  });
-});
-
-// ── Statut du test / admission pour l'étudiant connecté ──
 app.get("/api/academy/test-status", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   let { data } = await supabase.from("students")
