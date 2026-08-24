@@ -21,7 +21,7 @@ export function Section({ id, titre, sousTitre, children, fond = false, vert = f
 }) {
   return (
     <section id={id}
-      className={`scroll-mt-20 py-14 sm:py-20 ${vert ? "bg-primary/5" : fond ? "bg-muted/40" : ""}`}>
+      className={`scroll-mt-28 py-14 sm:py-20 ${vert ? "bg-primary/5" : fond ? "bg-muted/40" : ""}`}>
       <div className="max-w-6xl mx-auto px-5 sm:px-6">
         {titre && (
           <div className="text-center mb-10 sm:mb-14">

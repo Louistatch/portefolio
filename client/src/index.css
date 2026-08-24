@@ -95,6 +95,17 @@
   .glass-nav {
     @apply bg-background/80 backdrop-blur-lg border-b border-border/50 supports-[backdrop-filter]:bg-background/60;
   }
+
+  /* Rail qui défile horizontalement sans afficher sa barre de défilement.
+     Tailwind ne fournit pas cette utilitaire : sans cette règle, la classe n'existe pas et
+     n'émet aucun style, en silence — le rail des sections garderait une barre grise. */
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
   
   .hover-elevate {
     @apply transition-all duration-300 ease-out hover:-translate-y-1 hover:shadow-lg hover:shadow-primary/10;

@@ -4,8 +4,8 @@ import { SEO } from "@/components/seo";
 import {
   GraduationCap, ChevronRight, ChevronLeft, CheckCircle2,
   Lock, BookOpen, ArrowRight, ClipboardCheck,
-  Download, X, Clock, Menu, Target, Users, Award, Sprout,
-  MapPin, Rocket, CalendarDays, Info, LayoutDashboard } from "lucide-react";
+  Download, X, Clock, Target, Users, Award, Sprout,
+  MapPin, Rocket, CalendarDays, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SocialShare } from "@/components/social-share";
 import { isStudentLoggedIn, getStudent, studentFetch, downloadStudentFile } from "@/lib/student";
@@ -70,7 +70,6 @@ export default function ELearning() {
   const topRef = useRef<HTMLDivElement>(null);
   const [pageData, setPageData] = useState<any>(null);
   const [pageEtat, setPageEtat] = useState<"chargement" | "ok" | "erreur">("chargement");
-  const [menuOuvert, setMenuOuvert] = useState(false);
   const [compact, setCompact] = useState(false);
   const [moduleDetail, setModuleDetail] = useState<any>(null);
 
@@ -166,95 +165,53 @@ export default function ELearning() {
 
   // ─────────────────── RENDER HELPERS ──────────────────────────────────────
 
-  // ── Barre de navigation de la page ──
-  // Le site a déjà son en-tête fixe : celui-ci se glisse dessous et sert à circuler entre les
-  // sections d'une page longue, avec les deux actions toujours à portée. Chaque entrée pointe
-  // vers quelque chose qui existe — pas de lien décoratif qui ne mène nulle part.
-  const ANCRES: { label: string; vers: string; externe?: boolean }[] = [
-    { label: "Accueil", vers: "/", externe: true },
-    { label: "Modules", vers: "modules" },
-    { label: "Parcours", vers: "parcours" },
-    { label: "Sessions", vers: "sessions" },
-    { label: "Ressources", vers: "/publications", externe: true },
-    { label: "À propos", vers: "/about", externe: true },
+  // Le rail ne liste que les sections de CETTE page. Accueil, Ressources et « à propos »
+  // vivent dans l'en-tête du site, juste au-dessus : les répéter ici brouillerait la
+  // frontière entre naviguer dans le site et naviguer dans la page.
+  const ANCRES = [
+    { label: "Modules", id: "modules" },
+    { label: "Pourquoi nous", id: "pourquoi" },
+    { label: "Sessions", id: "sessions" },
+    { label: "Parcours", id: "parcours" },
   ];
 
   function versSection(id: string) {
-    setMenuOuvert(false);
     document.getElementById(id)?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
-  function allerA(a: { vers: string; externe?: boolean }) {
-    if (a.externe) { setMenuOuvert(false); navigate(a.vers); return; }
-    versSection(a.vers);
-  }
-
+  /**
+   * Rail des sections de la page.
+   *
+   * Ce n'est délibérément PAS un en-tête : ni marque, ni menu hamburger, ni bouton de
+   * connexion. L'en-tête du site, juste au-dessus, porte déjà tout cela, et empiler les deux
+   * donnait deux marques et deux hamburgers l'un sur l'autre. Il ne reste ici que ce que
+   * l'en-tête du site ne peut pas offrir : circuler entre les sections d'une page longue, et
+   * l'inscription toujours à portée de pouce.
+   *
+   * Sur petit écran les ancres défilent horizontalement plutôt que de se replier dans un
+   * menu — un rail qui glisse se comprend d'un coup d'œil, là où un second hamburger sous
+   * celui du site sème le doute sur lequel des deux fait quoi.
+   */
   function renderNav() {
     return (
-      <div className={`sticky top-0 z-40 transition-shadow ${compact ? "shadow-sm" : ""}`}>
-        <div className="bg-background/85 backdrop-blur-md border-b border-border/50">
-          <div className="max-w-6xl mx-auto px-5 sm:px-6 h-14 flex items-center justify-between gap-4">
-            <button onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
-              className="flex items-center gap-2 shrink-0 text-left">
-              <span className="w-8 h-8 rounded-xl bg-primary text-primary-foreground grid place-items-center shrink-0">
-                <Sprout className="w-[18px] h-[18px]" />
-              </span>
-              <span className="font-bold text-sm leading-tight flex items-center gap-1.5">
-                LouisFarm
-                <span className="text-[9px] font-bold tracking-wider px-1.5 py-0.5 rounded bg-primary text-primary-foreground">
-                  LEARNING
-                </span>
-              </span>
-            </button>
-
-            <nav className="hidden lg:flex items-center gap-0.5" aria-label="Navigation de la formation">
+      <div className={`sticky top-[60px] z-30 -mt-6 transition-shadow ${compact ? "shadow-sm" : ""}`}>
+        <div className="bg-background/85 backdrop-blur-md border-y border-border/50">
+          <div className="max-w-6xl mx-auto pl-5 pr-3 sm:px-6 h-12 flex items-center gap-3">
+            <nav aria-label="Sections de la page"
+              className="flex-1 min-w-0 flex items-center gap-1 overflow-x-auto no-scrollbar">
               {ANCRES.map(a => (
-                <button key={a.label} onClick={() => allerA(a)}
-                  className="px-3 py-1.5 rounded-full text-sm text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
+                <button key={a.label} onClick={() => versSection(a.id)}
+                  className="shrink-0 px-3 py-1.5 rounded-full text-[13px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors">
                   {a.label}
                 </button>
               ))}
             </nav>
 
-            <div className="flex items-center gap-2 shrink-0">
-              {isStudentLoggedIn() ? (
-                <Button size="sm" variant="outline" className="hidden sm:inline-flex gap-1.5"
-                  onClick={() => navigate("/academy/dashboard")}>
-                  <LayoutDashboard className="w-3.5 h-3.5" /> Mon espace
-                </Button>
-              ) : (
-                <Button size="sm" variant="outline" className="hidden sm:inline-flex"
-                  onClick={() => navigate("/academy/login")}>
-                  Se connecter
-                </Button>
-              )}
-              <Button size="sm" onClick={startTest} className="gap-1.5">
-                {isStudentLoggedIn() ? "Passer le test" : "S'inscrire"}
-                <ArrowRight className="w-3.5 h-3.5" />
-              </Button>
-              <button onClick={() => setMenuOuvert(o => !o)}
-                aria-label={menuOuvert ? "Fermer le menu" : "Ouvrir le menu"} aria-expanded={menuOuvert}
-                className="lg:hidden w-9 h-9 rounded-xl border border-border/60 grid place-items-center">
-                {menuOuvert ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
-              </button>
-            </div>
+            <Button size="sm" onClick={startTest} className="shrink-0 gap-1.5 h-8 text-[13px]">
+              {isStudentLoggedIn() ? "Passer le test" : "S'inscrire"}
+              <ArrowRight className="w-3.5 h-3.5" />
+            </Button>
           </div>
-
-          {menuOuvert && (
-            <div className="lg:hidden border-t border-border/50 px-5 py-2 bg-background">
-              {ANCRES.map(a => (
-                <button key={a.label} onClick={() => allerA(a)}
-                  className="w-full text-left px-2 py-2.5 rounded-xl text-sm hover:bg-muted transition-colors">
-                  {a.label}
-                </button>
-              ))}
-              <button
-                onClick={() => { setMenuOuvert(false); navigate(isStudentLoggedIn() ? "/academy/dashboard" : "/academy/login"); }}
-                className="w-full text-left px-2 py-2.5 rounded-xl text-sm font-medium text-primary hover:bg-muted transition-colors">
-                {isStudentLoggedIn() ? "Mon espace" : "Se connecter"}
-              </button>
-            </div>
-          )}
         </div>
       </div>
     );
