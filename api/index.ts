@@ -1524,6 +1524,20 @@ async function generateGroupWorkSchedule(sid: number, admittedAt: Date) {
   const gws = (await getGroupWorks()).filter(g => g.is_published !== false);
   if (!gws.length) return;
 
+  // Le dispositif ne s'ouvre qu'à ceux qui n'ont pas franchi leur semaine 2. Sans ce
+  // garde-fou, un étudiant plus avancé voyait les trois GW apparaître dans son planning
+  // et son calendrier, alors qu'il ne serait jamais rattaché à un groupe : trois échéances
+  // qu'il ne pouvait ni tenir ni faire disparaître.
+  //
+  // La règle ne vaut que pour ENTRER : qui a déjà un calendrier le garde, sans quoi tout le
+  // monde en serait sorti au passage de sa propre semaine 2 — deux semaines avant l'ouverture
+  // du premier travail.
+  if (!eligibleAuxTravauxDeGroupe(admittedAt)) {
+    const { count } = await supabase.from("group_work_progress")
+      .select("id", { count: "exact", head: true }).eq("student_id", sid);
+    if (!count) return;
+  }
+
   const voulu = gws.map(gw => {
     const unlock = new Date(admittedAt.getTime() + (gw.week_index - 1) * WEEK_MS);
     const due = new Date(unlock.getTime() + GROUP_WORK_WINDOW_WEEKS * WEEK_MS);
