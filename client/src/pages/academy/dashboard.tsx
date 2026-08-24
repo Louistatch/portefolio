@@ -8,7 +8,7 @@ import {
   Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
   Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink, Send } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
-import { groupByProgram } from "@shared/programs";
+import { groupByProgram, programOf } from "@shared/programs";
 
 interface Cred { id: string; type: string; title: string; subtitle: string; issued_at: string; expires_at: string | null; status: string; certificate_no: string | null; score: number | null; download_url: string | null; skills: string[]; color: string; }
 
@@ -64,8 +64,18 @@ export default function AcademyDashboard() {
 
   // Planning regroupé par semaine. Une liste plate de trente lignes ne se lit pas : sans
   // séparateur, deux parcours qui avancent en parallèle donnent l'impression d'un fouillis.
+  // ── Un planning par parcours ──
+  //
+  // Les parcours ont chacun leur admission, leur rythme et leur certificat : les empiler dans
+  // un même calendrier hebdomadaire donnait, la même semaine, une leçon de cartographie et
+  // une leçon d'animation en milieu rural. L'étudiant lisait cela comme un programme unique
+  // dont il aurait pris du retard sur une moitié.
+  const parcoursDe = (r: any) => programOf(r?.sms_courses?.code)?.id ?? "autres";
+  const planningMeal = schedule.filter((r: any) => parcoursDe(r) === "meal");
+  const planningAutres = schedule.filter((r: any) => parcoursDe(r) !== "meal");
+
   const weeks: { index: number; rows: any[] }[] = [];
-  for (const s of schedule) {
+  for (const s of planningMeal) {
     let w = weeks.find(x => x.index === s.week_index);
     if (!w) { w = { index: s.week_index, rows: [] }; weeks.push(w); }
     w.rows.push(s);
@@ -103,6 +113,16 @@ export default function AcademyDashboard() {
   ]);
   const mesCours = (allCourses as any[]).filter(c => idsAccessibles.has(c.id));
   const programGroups = groupByProgram(mesCours);
+
+  // Les autres parcours, regroupés chacun sous son titre.
+  const autresPlannings = groupByProgram(
+    (allCourses as any[]).filter(c => planningAutres.some((r: any) => r.course_id === c.id))
+  ).map(g => ({
+    parcours: g.program,
+    lignes: planningAutres
+      .filter((r: any) => g.courses.some(c => c.id === r.course_id))
+      .sort((a: any, b: any) => a.week_index - b.week_index),
+  })).filter(x => x.lignes.length > 0);
 
   const initials = student?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "ET";
 
@@ -205,11 +225,56 @@ export default function AcademyDashboard() {
           </div>
         </section>
       )}
+      {/* ───── Planning des autres parcours ─────
+           Chacun sous son titre et à son accent. Un étudiant peut suivre la formation de
+           formateurs sans être au cursus MEAL : ce bloc ne dépend donc pas de l'admission
+           MEAL, contrairement au planning ci-dessus. */}
+      {autresPlannings.map(({ parcours, lignes }) => (
+        <section key={parcours.id}>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold flex items-center gap-2">
+              <Calendar className="w-5 h-5" style={{ color: parcours.accent }} />
+              {parcours.title} — mon planning
+            </h2>
+            <span className="text-xs text-muted-foreground">Parcours indépendant du cursus MEAL</span>
+          </div>
+          <div className="rounded-2xl border border-border/60 bg-card divide-y divide-border/50 overflow-hidden">
+            {lignes.map((r: any) => (
+              <button key={r.id}
+                onClick={() => r.status !== "locked" && navigate(`/academy/classroom/${r.course_id}?lesson=${r.lesson_id}`)}
+                disabled={r.status === "locked"}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
+                  r.status === "locked" ? "opacity-55 cursor-default" : "hover:bg-muted/50"}`}>
+                <span className="text-[10px] font-mono text-muted-foreground w-10 shrink-0">S{r.week_index}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-medium truncate">
+                    {r.sms_lessons?.title || `Leçon ${r.lesson_id}`}
+                  </span>
+                  <span className="block text-[11px] text-muted-foreground truncate">
+                    {r.sms_courses?.title}
+                  </span>
+                </span>
+                <span
+                  className={`text-[10px] font-medium px-2 py-1 rounded-full shrink-0 whitespace-nowrap ${
+                    r.status === "completed" ? "" : "bg-muted text-muted-foreground"}`}
+                  style={r.status === "completed"
+                    ? { background: `${parcours.accent}1A`, color: parcours.accent }
+                    : undefined}>
+                  {r.status === "completed" ? "terminée"
+                    : r.status === "locked" ? "à venir"
+                    : r.status === "missed" ? "en retard" : "à faire"}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
+
       {/* ───── Planning hebdomadaire ───── */}
-      {testStatus?.passed && schedule.length > 0 && (
+      {testStatus?.passed && planningMeal.length > 0 && (
         <section>
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Mon planning</h2>
+            <h2 className="text-lg font-bold flex items-center gap-2"><Calendar className="w-5 h-5 text-primary" /> Cursus MEAL — mon planning</h2>
             <span className="text-xs text-muted-foreground">Rythme conseillé — vous pouvez prendre de l'avance</span>
           </div>
           <div className="space-y-3">
