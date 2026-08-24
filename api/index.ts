@@ -2470,6 +2470,39 @@ const OUTILS: Record<string, { outil: string; objectif: string; competences: str
 // 15 août ne doit pas croire qu'il lui faut attendre six semaines.
 const MOIS_INSCRIPTION = [0, 2, 4, 6, 8, 10]; // janvier, mars, mai, juillet, septembre, novembre
 
+/**
+ * Chiffres de la vitrine — catalogue entier, pas seulement le cursus MEAL.
+ *
+ * `/api/academy/landing` compte volontairement les seuls modules qu'il présente : un
+ * visiteur qui lit « 4 modules » au-dessus de trois cartes compte, et il a raison. La page
+ * d'accueil, elle, parle de toute l'offre, donc d'autres nombres. Deux besoins, deux
+ * routes — plutôt qu'un paramètre qui aurait rendu les deux réponses ambiguës.
+ *
+ * Aucun chiffre n'est écrit en dur dans la page : un cours ajouté se compte tout seul, et
+ * personne ne découvre six mois plus tard que la vitrine annonce un catalogue périmé.
+ */
+app.get("/api/site-figures", async (_req, res) => {
+  try {
+    const [coursQ, leconsQ, etudiantsQ, attestationsQ] = await Promise.all([
+      supabase.from("sms_courses").select("id", { count: "exact", head: true }).eq("is_published", true),
+      supabase.from("sms_lessons").select("id", { count: "exact", head: true }),
+      supabase.from("students").select("id", { count: "exact", head: true }).not("admitted_at", "is", null),
+      supabase.from("attestations").select("id", { count: "exact", head: true }).eq("status", "issued"),
+    ]);
+    res.json({
+      cours: coursQ.count ?? 0,
+      lecons: leconsQ.count ?? 0,
+      admis: etudiantsQ.count ?? 0,
+      attestations: attestationsQ.count ?? 0,
+      // Années d'expérience : la seule valeur qui ne se déduit d'aucune table. Elle vit
+      // ici plutôt que dans le JSX pour se corriger en un endroit.
+      anneesExperience: 12,
+    });
+  } catch {
+    res.json({ cours: 0, lecons: 0, admis: 0, attestations: 0, anneesExperience: 12 });
+  }
+});
+
 app.get("/api/academy/landing", async (_req, res) => {
   const [coursQ, etudiantsQ, leconsQ] = await Promise.all([
     supabase.from("sms_courses").select("id, code, title, description, level, order_index").eq("is_published", true).order("order_index"),
