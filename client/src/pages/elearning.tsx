@@ -457,7 +457,7 @@ export default function ELearning() {
     const prochaine = cal?.prochaine ?? null;
     const seuil = pageData?.seuilAdmission ?? 21;
     const questions = pageData?.questionsTest ?? QUESTIONS.length;
-    const mois = pageData?.moisAcces ?? 6;
+    const mois = pageData?.moisAcces ?? 3;   // ADMISSION_MONTHS côté serveur
     const seuilEx = pageData?.seuilExercices ?? 70;
     const connecte = isStudentLoggedIn();
     // Une seule vérité pour le mois de démarrage annoncé : la session ouverte s'il y en a une,
@@ -473,79 +473,160 @@ export default function ELearning() {
         {renderNav()}
         {renderDetailModule()}
 
-        {/* ── Héros ── */}
-        <section className="relative overflow-hidden"
-          style={{ background: `linear-gradient(135deg, ${VERT_FONCE} 0%, ${VERT_FONCE_2} 100%)` }}>
-          <div className="max-w-6xl mx-auto px-5 sm:px-6 py-14 sm:py-20">
-            <div className="grid lg:grid-cols-[1.1fr_1fr] gap-10 lg:gap-14 items-center">
-              <div>
-                <span className="inline-flex items-center gap-2 text-xs font-medium px-3 py-1.5 rounded-full text-white"
-                  style={{ background: "rgba(255,255,255,0.12)" }}>
-                  <Sprout className="w-3.5 h-3.5" /> Suivi · Évaluation · Analyse · Impact
+        {/* ── Héros ──
+            Sobre, et non plus en aplat dégradé vert. La page s'adresse à des agents de
+            crédit et des chargés de suivi-évaluation qui jugent un dispositif, pas à des
+            visiteurs à séduire : ce qui convainc est la règle du jeu, pas la promesse. */}
+        <section className="max-w-6xl mx-auto px-5 sm:px-6 pt-24 pb-12 sm:pt-28">
+          <div className="grid lg:grid-cols-12 gap-8 lg:gap-10">
+            <div className="lg:col-span-7 min-w-0">
+              <div className="flex items-center gap-2.5 mb-5">
+                <span className="w-7 h-px bg-accent" />
+                <span className="text-[11px] tracking-[0.14em] uppercase text-primary font-bold">
+                  DataMEAL Academy
                 </span>
+              </div>
+              <h1 className="font-serif text-3xl sm:text-4xl lg:text-[46px] font-semibold leading-[1.16] tracking-tight mb-5 text-pretty">
+                Une école, pas une bibliothèque de vidéos
+              </h1>
+              <p className="text-base lg:text-[17px] leading-relaxed text-foreground/80 mb-7 max-w-2xl text-pretty">
+                L'entrée se mérite par un test, le rythme est hebdomadaire, chaque leçon est corrigée
+                sur les réponses produites et trois travaux collectifs jalonnent le parcours. Le
+                certificat atteste d'un relevé de notes, pas d'une inscription.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button onClick={startTest}
+                  className="inline-flex items-center px-6 py-3.5 text-[15px] font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+                  Passer le test d'admission
+                </button>
+                <a href="/academy/verify-certificate"
+                  className="inline-flex items-center px-6 py-3.5 text-[15px] font-semibold border border-border rounded-lg hover:bg-muted transition-colors">
+                  Vérifier un certificat
+                </a>
+              </div>
+            </div>
 
-                <h1 className="text-white text-3xl sm:text-4xl lg:text-[2.85rem] font-bold leading-[1.12] tracking-tight mt-5">
-                  Maîtrisez les outils numériques pour des projets{" "}
-                  <span style={{ color: VERT_CLAIR }}>MEAL performants</span>
-                </h1>
-
-                <p className="text-base sm:text-lg text-white/75 mt-5 max-w-xl leading-relaxed">
-                  Apprenez KoboCollect, Python et QGIS pour collecter, traiter, analyser et
-                  visualiser des données fiables au service de projets à impact social et
-                  environnemental.
-                </p>
-
-                <div className="flex flex-wrap items-center gap-3 mt-8">
-                  <Button size="lg" className="gap-2 border-0"
-                    style={{ background: VERT_CLAIR, color: VERT_FONCE }} onClick={startTest}>
-                    {connecte ? "Passer le test d'admission" : "Commencer mon apprentissage"}
-                    <ArrowRight className="w-4 h-4" />
-                  </Button>
-                  <Button size="lg" variant="outline"
-                    className="gap-2 bg-transparent text-white border-white/30 hover:bg-white/10 hover:text-white"
-                    onClick={() => versSection("modules")}>
-                    Découvrir les modules <ChevronRight className="w-4 h-4" />
-                  </Button>
+            {/* Le dispositif en chiffres : les règles auxquelles l'étudiant s'engage. */}
+            <div className="lg:col-span-5 min-w-0">
+              <div className="border border-border rounded-lg bg-card p-6">
+                <div className="text-[11px] tracking-[0.1em] uppercase text-muted-foreground font-bold mb-4">
+                  Le dispositif en bref
                 </div>
-
-                {connecte ? (
-                  <p className="flex items-center gap-2 text-sm text-white/70 mt-5">
-                    <CheckCircle2 className="w-4 h-4 shrink-0" style={{ color: VERT_CLAIR }} />
-                    Connecté en tant que <span className="font-medium text-white">{getStudent()?.full_name}</span>
-                  </p>
-                ) : (
-                  <p className="text-sm text-white/60 mt-5">
-                    Déjà inscrit(e) ?{" "}
-                    <button onClick={() => navigate("/academy/login")}
-                      className="font-medium hover:underline" style={{ color: VERT_CLAIR }}>
-                      Se connecter
-                    </button>
-                  </p>
-                )}
-
-                {/* Chiffres réels, comptés en base — pas des nombres ronds décoratifs. */}
-                <div className="mt-8 pt-6 border-t border-white/15">
-                  {pageEtat === "chargement" ? (
-                    <div className="grid grid-cols-4 gap-4 animate-pulse max-w-sm" aria-busy="true">
-                      {[0, 1, 2, 3].map(i => (
-                        <div key={i} className="space-y-2">
-                          <div className="h-6 w-10 rounded bg-white/15 mx-auto" />
-                          <div className="h-2.5 w-full rounded bg-white/10" />
-                        </div>
-                      ))}
+                <div className="flex flex-col gap-3.5">
+                  {[
+                    [`${mois} mois`, "fenêtre d'admission pour terminer un parcours"],
+                    ["1 sem.", "par leçon — le rythme est conseillé, jamais un couperet"],
+                    ["3 GW", "travaux de groupe, équipe tirée au sort à chaque fois"],
+                    [`${Math.round((seuil / questions) * 100)} %`, "seuil d'admission, corrigé côté serveur"],
+                  ].map(([valeur, texte]) => (
+                    <div key={texte} className="flex gap-3 items-baseline">
+                      <span className="font-serif text-xl font-semibold text-primary w-[74px] shrink-0">{valeur}</span>
+                      <span className="text-[13px] text-foreground/80 leading-snug">{texte}</span>
                     </div>
-                  ) : c ? (
-                    <div className="grid grid-cols-4 gap-4 max-w-sm">
-                      <Chiffre clair valeur={c.cours} libelle="modules" />
-                      <Chiffre clair valeur={c.lecons} libelle="leçons" />
-                      <Chiffre clair valeur={c.exercices} libelle="exercices" />
-                      <Chiffre clair valeur={c.admis} libelle="admis" />
-                    </div>
-                  ) : null}
+                  ))}
                 </div>
               </div>
+            </div>
+          </div>
+        </section>
 
-              <VisuelHeros />
+        {/* ── Trois parcours ──
+            FCA-01 n'apparaissait nulle part sur cette page alors que le cours existe et est
+            publié. Il est présenté ici, mais sans bouton de test : sa banque de questions
+            n'est pas écrite, et proposer une porte qui ne s'ouvre pas est pire que rien. */}
+        <section className="max-w-6xl mx-auto px-5 sm:px-6 pb-14">
+          <div className="flex items-baseline gap-4 mb-6">
+            <h2 className="font-serif text-2xl sm:text-[28px] font-semibold tracking-tight">
+              Trois parcours, trois portes d'entrée
+            </h2>
+            <span className="flex-1 h-px bg-border" />
+          </div>
+          <div className="grid md:grid-cols-3 gap-6">
+            {[
+              {
+                code: "MEAL-01 · 02 · 03", teinte: "#0D9488", titre: "Cursus MEAL",
+                texte: "Concevoir une collecte, cartographier les résultats, automatiser le reporting. Trois projets terrain enchaînés.",
+                lignes: [["Leçons", "20"], ["Rythme", "2 / semaine"], ["Test d'entrée", "30 questions · 21"], ["Prérequis", "Aucun code"]],
+                titreDelivre: "Certificat Super-Expert MEAL", fond: "bg-primary/5", encre: "text-primary",
+                action: { libelle: "Passer le test", onClick: () => demarrerTest("meal") },
+              },
+              {
+                code: "FCA-01", teinte: "#B45309", titre: "Finance climatique agricole",
+                texte: "Calculer une perte attendue, mesurer une concentration, auditer un produit indiciel, écrire la note qui débloque un financement.",
+                lignes: [["Leçons", "6"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"], ["Public", "Agents de crédit"]],
+                titreDelivre: "Certificat d'Analyste du Risque Climatique Agricole",
+                fond: "bg-amber-50 dark:bg-amber-950/30", encre: "text-amber-800 dark:text-amber-300",
+                action: null,
+              },
+              {
+                code: "TOF-FIN-01", teinte: "#7C3AED", titre: "Formation de formateurs",
+                texte: "Concevoir et animer des sessions de gestion financière adaptées aux réalités paysannes, avec les outils du terrain.",
+                lignes: [["Leçons", "12"], ["Rythme", "1 / semaine"], ["Test d'entrée", "15 questions · 11"], ["Public", "Animateurs ruraux"]],
+                titreDelivre: "Attestation de fin de parcours",
+                fond: "bg-violet-50 dark:bg-violet-950/30", encre: "text-violet-800 dark:text-violet-300",
+                action: { libelle: "Passer le test", onClick: () => demarrerTest("tof") },
+              },
+            ].map(p => (
+              <div key={p.code} className="border border-border rounded-lg bg-card overflow-hidden flex flex-col">
+                <div className="h-1" style={{ background: p.teinte }} />
+                <div className="p-6 flex flex-col flex-1">
+                  <div className="font-mono text-xs text-muted-foreground tracking-wide">{p.code}</div>
+                  <h3 className="font-serif text-xl font-semibold mt-2 mb-2.5 leading-snug">{p.titre}</h3>
+                  <p className="text-sm leading-relaxed text-foreground/80 mb-4">{p.texte}</p>
+                  <table className="w-full text-[13px] mb-4">
+                    <tbody>
+                      {p.lignes.map(([cle, val]) => (
+                        <tr key={cle} className="border-t border-muted">
+                          <td className="py-2 text-muted-foreground">{cle}</td>
+                          <td className="py-2 text-right font-semibold">{val}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className={`rounded-md px-3.5 py-3 text-xs leading-snug font-semibold ${p.fond} ${p.encre}`}>
+                    {p.titreDelivre}
+                  </div>
+                  <div className="mt-4 pt-1">
+                    {p.action ? (
+                      <button onClick={p.action.onClick}
+                        className="w-full py-2.5 text-[13px] font-semibold border border-border rounded-lg hover:bg-muted transition-colors">
+                        {p.action.libelle}
+                      </button>
+                    ) : (
+                      <p className="text-xs text-muted-foreground text-center py-2.5">
+                        Test d'admission en préparation
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* ── Comment on est évalué ──
+            La question que pose tout employeur devant une attestation en ligne. Y répondre
+            en quatre points est ce qui sépare un certificat d'un badge. */}
+        <section className="max-w-6xl mx-auto px-5 sm:px-6 pb-14">
+          <div className="border border-border rounded-lg bg-card overflow-hidden">
+            <div className="px-6 py-5 border-b border-border bg-muted/40">
+              <h2 className="font-serif text-xl sm:text-[22px] font-semibold">Comment un étudiant est évalué</h2>
+              <p className="text-[13px] text-muted-foreground mt-1.5">
+                Chaque note figure sur le relevé, vérifiable par un tiers avec le numéro de certificat.
+              </p>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 lg:divide-x divide-border">
+              {[
+                ["1 · Admission", `Test corrigé côté serveur — la clé de réponses ne quitte jamais le serveur. Échec : une nouvelle tentative après sept jours.`],
+                ["2 · Leçons", `Exercices « faire faire », corrigés à la réponse produite, ${seuilEx} % pour valider. Une leçon ne se valide pas en cliquant.`],
+                ["3 · Travaux de groupe", "Trois rendus collectifs notés sur 100 par grille, plus l'évaluation des coéquipiers sur quatre critères."],
+                ["4 · Certificat", "Numéro unique et page de vérification publique. Un recruteur contrôle sans passer par vous."],
+              ].map(([titre, texte]) => (
+                <div key={titre} className="p-6">
+                  <div className="text-[11px] tracking-[0.1em] uppercase text-muted-foreground font-bold mb-2.5">{titre}</div>
+                  <p className="text-[13px] leading-relaxed text-foreground/80">{texte}</p>
+                </div>
+              ))}
             </div>
           </div>
         </section>
