@@ -55,6 +55,17 @@ Image Open Graph (1200 × 630) affichée quand le lien de la formation est coll�
 WhatsApp, Facebook, LinkedIn ou Telegram. Publiée en PNG dans
 `client/public/academy/partage-elearning.png`.
 
+Elle annonce les **trois parcours** — cursus MEAL, formation de formateurs, finance
+climatique agricole — avec les couleurs déclarées dans `shared/programs.ts`. Elle n'a
+longtemps montré que le cursus MEAL et ses outils : partager le lien faisait alors la
+promotion d'un tiers de l'offre. À l'ouverture d'un quatrième parcours, c'est ici **et**
+dans `script/pages-partage.mjs` (titre et description annoncés) qu'il faut l'ajouter.
+
+La composition a été mise au point dans Canva, puis reportée dans le SVG. Le SVG reste la
+source : c'est lui que la commande ci-dessous lit, et le PNG n'est jamais retouché à la
+main. Si le design Canva devient la référence, il faudra supprimer ce SVG plutôt que
+maintenir deux sources qui divergeront.
+
 ### Pourquoi une page dédiée est nécessaire
 
 Le site est une application React : les balises posées par le composant `<SEO>` sont
