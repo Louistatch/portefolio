@@ -24,6 +24,28 @@ base. Lisez cette page avant d'en lancer un.
 | 13 | `academy_exercises_meal02_meal03.sql` | Exercices notés de MEAL-02 et MEAL-03 (52 exercices) |
 | 14 | `academy_student_names.sql` | État civil décomposé (prénom / deuxième prénom / nom) |
 | 15 | `academy_reorder_lessons.sql` | Remise en ordre des cellules : cours d'abord, exercices notés en fin de leçon |
+| 16 | `academy_group_work.sql` | Travaux de groupe (modèle WQU) : groupes, énoncés des 3 GW, rendus collectifs, calendrier individuel |
+
+## Les travaux de groupe (GW)
+
+`academy_group_work.sql` ne crée que des tables **vides**. Les trois énoncés sont semés par
+l'API au premier chargement de `/api/academy/group-work` (ou du tableau de bord), à partir de
+`shared/groupwork.ts` ; une fois en base, c'est la base qui fait foi et les énoncés se
+modifient depuis `/admin/group-work`, sans redéploiement.
+
+Le calendrier est individuel : GW1 s'ouvre 4 semaines après l'admission de l'étudiant, GW2
+après 8, GW3 après 12, avec deux semaines pour rendre chacun. Les groupes, eux, se forment
+par **cohorte** — le mois d'admission — pour que les coéquipiers aient des échéances proches.
+La répartition est automatique à l'ouverture du premier GW (on remplit un groupe jusqu'à
+4 membres avant d'en ouvrir un autre) et se rectifie à la main dans l'administration.
+
+Une note de GW est écrite dans `grades` pour **chaque membre**, avec `type = 'group_work'` et
+`course_id` nul : elle compte dans la moyenne et le relevé comme une évaluation ordinaire,
+mais n'appartient à aucun cours et ne joue donc pas sur `enrollments.progress`. L'intitulé
+commence toujours par `GW1 `, `GW2 ` ou `GW3 ` — c'est ce repère qui permet à une correction
+rejouée de remplacer la précédente au lieu de la doubler.
+
+Ce script n'est pas destructif : il ne contient que des `CREATE TABLE IF NOT EXISTS`.
 
 ## L'ordre des cellules d'une leçon
 

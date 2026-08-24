@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { studentFetch, getStudent, clearStudentSession } from "@/lib/student";
 import {
-  Home, Route as RouteIcon, BookOpen, Award, FolderOpen,
+  Home, Route as RouteIcon, BookOpen, Award, FolderOpen, Users,
   Menu, X, Search, Bell, LogOut, LifeBuoy, GraduationCap, UserCircle, ChevronRight,
 } from "lucide-react";
 import {
@@ -28,6 +28,7 @@ const NAV: Item[] = [
   { href: "/academy/dashboard", label: "Accueil", icon: Home, exact: true },
   { href: "/academy/dashboard#parcours", label: "Mon parcours", icon: RouteIcon },
   { href: "/academy/dashboard#cours", label: "Mes cours", icon: BookOpen },
+  { href: "/academy/group-work", label: "Travaux de groupe", icon: Users, exact: true },
   { href: "/academy/dashboard#credentials", label: "Certifications", icon: Award },
   { href: "/academy/dashboard#ressources", label: "Ressources", icon: FolderOpen },
 ];
@@ -143,7 +144,8 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
   // ne mérite pas d'attirer l'œil en permanence.
   const aSignaler =
     (bord?.etudiant?.emailVerifie === false ? 1 : 0) +
-    (bord?.calendrier || []).filter((e: any) => e.type === "echeance" && e.statut === "missed").length;
+    (bord?.calendrier || []).filter((e: any) =>
+      (e.type === "echeance" || e.type === "travail_groupe") && e.statut === "missed").length;
 
   const nom = bord?.etudiant?.nom || etudiant?.full_name;
 
@@ -302,6 +304,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
               <ChevronRight className="w-3 h-3" />
               <span className="text-foreground font-medium">
                 {location.startsWith("/academy/classroom") ? "Salle de cours"
+                  : location === "/academy/group-work" ? "Travaux de groupe"
                   : location === "/academy/profile" ? "Mon profil"
                   : location.startsWith("/academy/live") ? "Rencontre en ligne" : "Page"}
               </span>
