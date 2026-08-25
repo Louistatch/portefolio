@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { adminFetch, clearToken } from "@/lib/admin";
+import { adminFetch, clearToken, ADMIN_BASE } from "@/lib/admin";
 import {
   LayoutDashboard, GraduationCap, Calendar, Video, Mail, MessageSquare,
   Newspaper, Users, Star, FileText, BookOpen, UserCircle,
@@ -28,43 +28,43 @@ type Section = { titre: string | null; items: Item[] };
 const SECTIONS: Section[] = [
   {
     titre: null,
-    items: [{ href: "/admin", label: "Tableau de bord", icon: LayoutDashboard }],
+    items: [{ href: ADMIN_BASE, label: "Tableau de bord", icon: LayoutDashboard }],
   },
   {
     titre: "Academy",
     items: [
-      { href: "/admin/students", label: "Étudiants", icon: GraduationCap, badge: "emailsNonVerifies" },
-      { href: "/admin/student-messages", label: "Écrire à un étudiant", icon: Send },
-      { href: "/admin/meetings", label: "Rencontres en ligne", icon: Video },
-      { href: "/admin/group-work", label: "Travaux de groupe", icon: Users },
+      { href: `${ADMIN_BASE}/students`, label: "Étudiants", icon: GraduationCap, badge: "emailsNonVerifies" },
+      { href: `${ADMIN_BASE}/student-messages`, label: "Écrire à un étudiant", icon: Send },
+      { href: `${ADMIN_BASE}/meetings`, label: "Rencontres en ligne", icon: Video },
+      { href: `${ADMIN_BASE}/group-work`, label: "Travaux de groupe", icon: Users },
     ],
   },
   {
     titre: "Échanges",
     items: [
-      { href: "/admin/messages", label: "Messages", icon: Mail, badge: "messagesNonLus" },
-      { href: "/admin/comments", label: "Commentaires", icon: MessageSquare, badge: "commentairesEnAttente" },
-      { href: "/admin/appointments", label: "Rendez-vous", icon: Calendar, badge: "rendezVousEnAttente" },
-      { href: "/admin/testimonials", label: "Témoignages", icon: Star },
+      { href: `${ADMIN_BASE}/messages`, label: "Messages", icon: Mail, badge: "messagesNonLus" },
+      { href: `${ADMIN_BASE}/comments`, label: "Commentaires", icon: MessageSquare, badge: "commentairesEnAttente" },
+      { href: `${ADMIN_BASE}/appointments`, label: "Rendez-vous", icon: Calendar, badge: "rendezVousEnAttente" },
+      { href: `${ADMIN_BASE}/testimonials`, label: "Témoignages", icon: Star },
     ],
   },
   {
     titre: "Diffusion",
     items: [
-      { href: "/admin/newsletter", label: "Newsletter", icon: Newspaper },
-      { href: "/admin/subscribers", label: "Abonnés", icon: Users },
+      { href: `${ADMIN_BASE}/newsletter`, label: "Newsletter", icon: Newspaper },
+      { href: `${ADMIN_BASE}/subscribers`, label: "Abonnés", icon: Users },
     ],
   },
   {
     titre: "Contenu",
     items: [
-      { href: "/admin/posts", label: "Articles", icon: FileText },
-      { href: "/admin/publications", label: "Publications", icon: BookOpen },
+      { href: `${ADMIN_BASE}/posts`, label: "Articles", icon: FileText },
+      { href: `${ADMIN_BASE}/publications`, label: "Publications", icon: BookOpen },
     ],
   },
   {
     titre: "Paramètres",
-    items: [{ href: "/admin/profile", label: "Profil & CV", icon: UserCircle }],
+    items: [{ href: `${ADMIN_BASE}/profile`, label: "Profil & CV", icon: UserCircle }],
   },
 ];
 
@@ -150,7 +150,7 @@ function Palette({ ouvert, setOuvert }: { ouvert: boolean; setOuvert: (v: boolea
             {trouves.length > 0 && (
               <CommandGroup heading="Étudiants">
                 {trouves.map(e => (
-                  <CommandItem key={e.id} value={`etu-${e.id}`} onSelect={() => aller("/admin/students")} className="gap-2.5">
+                  <CommandItem key={e.id} value={`etu-${e.id}`} onSelect={() => aller(`${ADMIN_BASE}/students`)} className="gap-2.5">
                     <GraduationCap className="w-4 h-4 text-muted-foreground shrink-0" />
                     <span className="truncate">{(e.full_name || "").trim() || e.email}</span>
                     <span className="ml-auto text-[11px] text-muted-foreground truncate max-w-[45%]">{e.email}</span>
@@ -194,13 +194,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
   // l'écran que l'on vient de demander.
   useEffect(() => { setMenuOuvert(false); }, [location]);
 
-  const deconnexion = () => { clearToken(); navigate("/admin/login"); };
+  const deconnexion = () => { clearToken(); navigate(`${ADMIN_BASE}/login`); };
   const titreCourant = TOUS_LES_ITEMS.find(i => i.href === location)?.label;
 
   const nav = (
     <>
       <div className="px-3 pt-1 pb-5">
-        <Link href="/admin" className="flex items-center gap-2.5">
+        <Link href={ADMIN_BASE} className="flex items-center gap-2.5">
           <span className="w-9 h-9 rounded-xl bg-primary text-primary-foreground grid place-items-center shrink-0">
             <GraduationCap className="w-5 h-5" />
           </span>
@@ -312,7 +312,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 {sombre ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
               </button>
 
-              <Link href="/admin/messages" aria-label="Notifications"
+              <Link href={`${ADMIN_BASE}/messages`} aria-label="Notifications"
                 className="relative w-9 h-9 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-foreground">
                 <Bell className="w-[18px] h-[18px]" />
                 {(badges?.total ?? 0) > 0 && (
@@ -322,7 +322,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 )}
               </Link>
 
-              <Link href="/admin/profile" aria-label="Mon profil" className="ml-1">
+              <Link href={`${ADMIN_BASE}/profile`} aria-label="Mon profil" className="ml-1">
                 {profil?.photo_url
                   ? <img src={profil.photo_url} alt="" className="w-9 h-9 rounded-full object-cover ring-2 ring-border/60" />
                   : <span className="w-9 h-9 rounded-full bg-primary/15 text-primary grid place-items-center text-xs font-bold">LT</span>}
@@ -332,7 +332,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
 
           {titreCourant && titreCourant !== "Tableau de bord" && (
             <div className="px-4 sm:px-6 pb-2.5 -mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <Link href="/admin" className="hover:text-foreground">Administration</Link>
+              <Link href={ADMIN_BASE} className="hover:text-foreground">Administration</Link>
               <ChevronRight className="w-3 h-3" />
               <span className="text-foreground font-medium">{titreCourant}</span>
             </div>

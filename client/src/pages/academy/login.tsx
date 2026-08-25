@@ -105,12 +105,11 @@ export default function AcademyLogin() {
           </p>
         </div>
 
-        <p className="text-xs text-muted-foreground/80 text-center mt-6">
-          Espace formateur&nbsp;?{" "}
-          <button onClick={() => navigate("/admin/login")} className="hover:text-foreground underline underline-offset-2">
-            Connexion administration
-          </button>
-        </p>
+        {/* Il y avait ici un lien « Espace formateur ? Connexion administration ». Il a été
+            retiré avec le renommage du chemin d'administration : le montrer à chaque
+            visiteur de la page de connexion étudiante donnait l'adresse exacte de la porte
+            que ce renommage sert justement à ne plus annoncer. Louis y accède par son
+            signet. */}
       </AuthShell>
     </>
   );

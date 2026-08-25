@@ -54,7 +54,7 @@ const AdminMeetings = lazy(() => import("@/pages/admin/meetings-admin"));
 const AdminStudentMessages = lazy(() => import("@/pages/admin/student-messages-admin"));
 const AdminGroupWork = lazy(() => import("@/pages/admin/group-work-admin"));
 const Stats = lazy(() => import("@/pages/stats"));
-import { getToken } from "@/lib/admin";
+import { getToken, ADMIN_BASE } from "@/lib/admin";
 import { isStudentLoggedIn } from "@/lib/student";
 import { useEffect } from "react";
 import { CookieConsent } from "@/components/cookie-consent";
@@ -71,7 +71,7 @@ function RequireGuard({ isAuthed, loginPath, children }: { isAuthed: () => unkno
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   return (
-    <RequireGuard isAuthed={getToken} loginPath="/admin/login">
+    <RequireGuard isAuthed={getToken} loginPath={`${ADMIN_BASE}/login`}>
       <AdminLayout>{children}</AdminLayout>
     </RequireGuard>
   );
@@ -101,22 +101,25 @@ function App() {
             </div>
           }>
           <Switch>
-            {/* Admin routes — must be before public catch-all */}
-            <Route path="/admin/login" component={AdminLogin} />
-            <Route path="/admin">{() => <RequireAuth><Dashboard /></RequireAuth>}</Route>
-            <Route path="/admin/profile">{() => <RequireAuth><AdminProfile /></RequireAuth>}</Route>
-            <Route path="/admin/posts">{() => <RequireAuth><AdminPosts /></RequireAuth>}</Route>
-            <Route path="/admin/publications">{() => <RequireAuth><AdminPublications /></RequireAuth>}</Route>
-            <Route path="/admin/appointments">{() => <RequireAuth><AdminAppointments /></RequireAuth>}</Route>
-            <Route path="/admin/messages">{() => <RequireAuth><AdminMessages /></RequireAuth>}</Route>
-            <Route path="/admin/subscribers">{() => <RequireAuth><AdminSubscribers /></RequireAuth>}</Route>
-            <Route path="/admin/comments">{() => <RequireAuth><AdminComments /></RequireAuth>}</Route>
-            <Route path="/admin/newsletter">{() => <RequireAuth><AdminNewsletter /></RequireAuth>}</Route>
-            <Route path="/admin/testimonials">{() => <RequireAuth><AdminTestimonials /></RequireAuth>}</Route>
-            <Route path="/admin/students">{() => <RequireAuth><AdminStudents /></RequireAuth>}</Route>
-            <Route path="/admin/meetings">{() => <RequireAuth><AdminMeetings /></RequireAuth>}</Route>
-            <Route path="/admin/student-messages">{() => <RequireAuth><AdminStudentMessages /></RequireAuth>}</Route>
-            <Route path="/admin/group-work">{() => <RequireAuth><AdminGroupWork /></RequireAuth>}</Route>
+            {/* Administration — avant le fourre-tout public. Le préfixe vient de ADMIN_BASE
+                (client/src/lib/admin.ts) : l'ancien chemin `/admin` n'est volontairement
+                plus servi du tout, pas même en redirection, sinon le renommage n'aurait
+                rien renommé. */}
+            <Route path={`${ADMIN_BASE}/login`} component={AdminLogin} />
+            <Route path={ADMIN_BASE}>{() => <RequireAuth><Dashboard /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/profile`}>{() => <RequireAuth><AdminProfile /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/posts`}>{() => <RequireAuth><AdminPosts /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/publications`}>{() => <RequireAuth><AdminPublications /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/appointments`}>{() => <RequireAuth><AdminAppointments /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/messages`}>{() => <RequireAuth><AdminMessages /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/subscribers`}>{() => <RequireAuth><AdminSubscribers /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/comments`}>{() => <RequireAuth><AdminComments /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/newsletter`}>{() => <RequireAuth><AdminNewsletter /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/testimonials`}>{() => <RequireAuth><AdminTestimonials /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/students`}>{() => <RequireAuth><AdminStudents /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/meetings`}>{() => <RequireAuth><AdminMeetings /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/student-messages`}>{() => <RequireAuth><AdminStudentMessages /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/group-work`}>{() => <RequireAuth><AdminGroupWork /></RequireAuth>}</Route>
 
             {/* LouisFarm Learning — espace étudiant (pas de Layout admin) */}
             <Route path="/academy/register">{() => <Layout><AcademyRegister /></Layout>}</Route>

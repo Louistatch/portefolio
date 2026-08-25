@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { adminFetch } from "@/lib/admin";
+import { adminFetch, ADMIN_BASE } from "@/lib/admin";
 import { Link } from "wouter";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -152,16 +152,16 @@ export default function Dashboard() {
       {/* ── Indicateurs clés ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <CarteKpi titre="Étudiants" valeur={k.etudiants.valeur} tendance={k.etudiants.tendance}
-          icone={Users} teinte="bg-primary/10 text-primary" href="/admin/students"
+          icone={Users} teinte="bg-primary/10 text-primary" href={`${ADMIN_BASE}/students`}
           note={`${k.etudiants.surPeriode} sur la période`} />
         <CarteKpi titre="Admis" valeur={k.admis.valeur} tendance={k.admis.tendance}
-          icone={UserCheck} teinte="bg-emerald-500/10 text-emerald-600" href="/admin/students"
+          icone={UserCheck} teinte="bg-emerald-500/10 text-emerald-600" href={`${ADMIN_BASE}/students`}
           note="admission en cours" />
         <CarteKpi titre="En attente" valeur={k.enAttente.valeur} tendance={k.enAttente.tendance}
-          icone={Clock} teinte="bg-amber-500/10 text-amber-600" href="/admin/students"
+          icone={Clock} teinte="bg-amber-500/10 text-amber-600" href={`${ADMIN_BASE}/students`}
           note="test non réussi" />
         <CarteKpi titre="Certifiés" valeur={k.certifies.valeur} tendance={k.certifies.tendance}
-          icone={Award} teinte="bg-violet-500/10 text-violet-600" href="/admin/students"
+          icone={Award} teinte="bg-violet-500/10 text-violet-600" href={`${ADMIN_BASE}/students`}
           note="Super-Expert MEAL" />
       </div>
 
@@ -257,7 +257,7 @@ export default function Dashboard() {
       {/* ── Étudiants récents + activité ── */}
       <div className="grid lg:grid-cols-5 gap-4">
         <Panneau titre="Derniers inscrits" className="lg:col-span-3"
-          action={<Link href="/admin/students" className="text-xs text-primary hover:underline inline-flex items-center gap-0.5">
+          action={<Link href={`${ADMIN_BASE}/students`} className="text-xs text-primary hover:underline inline-flex items-center gap-0.5">
             Voir tous <ChevronRight className="w-3 h-3" />
           </Link>}>
           {data.etudiantsRecents.length === 0 ? (
@@ -331,10 +331,10 @@ export default function Dashboard() {
           <Panneau titre="Accès rapides">
             <div className="grid grid-cols-2 gap-2 p-3">
               {[
-                { href: "/admin/students", icone: GraduationCap, l: "Étudiants" },
-                { href: "/admin/newsletter", icone: Send, l: "Newsletter" },
-                { href: "/admin/meetings", icone: Video, l: "Rencontre" },
-                { href: "/admin/posts", icone: FileText, l: "Article" },
+                { href: `${ADMIN_BASE}/students`, icone: GraduationCap, l: "Étudiants" },
+                { href: `${ADMIN_BASE}/newsletter`, icone: Send, l: "Newsletter" },
+                { href: `${ADMIN_BASE}/meetings`, icone: Video, l: "Rencontre" },
+                { href: `${ADMIN_BASE}/posts`, icone: FileText, l: "Article" },
               ].map(a => (
                 <Link key={a.href} href={a.href}
                   className="flex items-center gap-2.5 px-3 py-3 rounded-xl border border-border/50 hover:border-primary/40 hover:bg-primary/5 transition-colors">
@@ -379,7 +379,7 @@ export default function Dashboard() {
         </Panneau>
 
         <Panneau titre="Origine des abonnés"
-          action={<Link href="/admin/subscribers" className="text-xs text-primary hover:underline">Gérer</Link>}>
+          action={<Link href={`${ADMIN_BASE}/subscribers`} className="text-xs text-primary hover:underline">Gérer</Link>}>
           {data.sources.length === 0 ? (
             <p className="text-sm text-muted-foreground text-center py-10">Aucun abonné.</p>
           ) : (

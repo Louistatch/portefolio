@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useLocation, Link } from "wouter";
 import { Button } from "@/components/ui/button";
-import { setToken } from "@/lib/admin";
+import { setToken, ADMIN_BASE } from "@/lib/admin";
 import { Loader2, ShieldCheck, AlertCircle, Eye, EyeOff } from "lucide-react";
 
 // Connexion à l'administration.
@@ -41,7 +41,7 @@ export default function AdminLogin() {
       }
       const { token } = await res.json();
       setToken(token);
-      navigate("/admin");
+      navigate(ADMIN_BASE);
     } catch {
       setError("Connexion au serveur impossible. Réessayez dans un instant.");
     } finally {
