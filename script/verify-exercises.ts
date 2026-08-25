@@ -1,18 +1,25 @@
 /**
- * Vérifie le moteur d'exercices ET le contenu pédagogique livré en SQL.
+ * Vérifie le moteur d'exercices ET tout le contenu pédagogique livré.
  *
  *   npm run verify:exercises
  *
- * À relancer après avoir écrit les exercices d'un nouveau cours : le script relit les
- * blocs JSON des fichiers supabase/academy_exercises_*.sql, refuse un corrigé mal formé
- * (option hors bornes, tolérance manquante, identifiants en double) et rejoue la
+ * À relancer après avoir écrit les exercices d'un nouveau cours. Le script refuse un corrigé
+ * mal formé (option hors bornes, tolérance manquante, identifiants en double) et rejoue la
  * correction sur des copies parfaites, vides et approximatives.
+ *
+ * Deux sources, mêmes contrôles : les blocs JSON des fichiers
+ * supabase/academy_exercises_*.sql, et les cours écrits en TypeScript, dont le SQL n'est
+ * qu'une projection. **Ajouter un cours TypeScript à la liste `coursTs` fait partie de sa
+ * livraison** : FCA-01 est resté hors contrôle parce que son fichier SQL s'appelle
+ * academy_cours_fca_01.sql et ne correspondait à aucun motif surveillé — vingt-deux
+ * exercices vérifiés une seule fois, à la génération, puis plus jamais.
  */
 import { readFileSync, readdirSync } from "fs";
 import { join } from "path";
 import {
   gradeLessonExercises, isExerciseCorrect, stripExerciseAnswers, EXERCISE_PASS_PCT,
 } from "../shared/exercises";
+import { LECONS_FCA_01 } from "../shared/fca-01";
 
 let pass = 0;
 const failures: string[] = [];
@@ -21,7 +28,55 @@ function check(label: string, cond: boolean) {
   else failures.push(label);
 }
 
-// ── Contenu réel : blocs JSON des migrations d'exercices ──
+/**
+ * Batterie appliquée à une leçon, quelle que soit sa provenance.
+ *
+ * Elle est écrite une fois et appelée deux fois : le contenu pédagogique arrive tantôt en
+ * SQL, tantôt en TypeScript, et deux copies de ces contrôles auraient fini par diverger —
+ * c'est exactement ainsi que les exercices du cours FCA-01 sont restés hors contrôle.
+ */
+function verifierLecon(where: string, cells: any[]) {
+  const lesson = { cells };
+  const exs = cells.filter(c => c.type === "exercise");
+  check(`${where} : contient des exercices`, exs.length > 0);
+
+  const ids = exs.map((e, i) => e.id || `ex${i + 1}`);
+  check(`${where} : identifiants uniques`, new Set(ids).size === ids.length);
+
+  for (const ex of exs) {
+    const id = `${where} / ${ex.id}`;
+    check(`${id} : énoncé présent`, !!ex.prompt);
+    check(`${id} : correction pédagogique présente`, !!ex.explain);
+    check(`${id} : type connu`, ["choice", "number", "text"].includes(ex.kind));
+    if (ex.kind === "choice") {
+      check(`${id} : options fournies`, Array.isArray(ex.opts) && ex.opts.length >= 2);
+      check(`${id} : réponse dans les bornes`, Number.isInteger(ex.answer) && ex.answer >= 0 && ex.answer < (ex.opts?.length ?? 0));
+    }
+    if (ex.kind === "number") {
+      check(`${id} : réponse numérique`, typeof ex.answer === "number" && Number.isFinite(ex.answer));
+      check(`${id} : tolérance définie`, typeof ex.tolerance === "number");
+    }
+    if (ex.kind === "text") check(`${id} : réponse textuelle non vide`, typeof ex.answer === "string" && ex.answer.length > 0);
+  }
+
+  // Copie parfaite → 100 % ; copie vide → 0 % et refusée.
+  const perfect = Object.fromEntries(exs.map((e, i) => [e.id || `ex${i + 1}`, e.answer]));
+  const gp = gradeLessonExercises(lesson, perfect)!;
+  check(`${where} : copie parfaite = 100 %`, gp.scorePct === 100 && gp.passed);
+  const ge = gradeLessonExercises(lesson, {})!;
+  check(`${where} : copie vide = 0 % et refusée`, ge.scorePct === 0 && !ge.passed);
+
+  // Le corrigé ne doit jamais partir vers le navigateur.
+  const sent = JSON.stringify(stripExerciseAnswers(lesson));
+  check(`${where} : corrigé absent de la réponse HTTP`,
+    !sent.includes('"answer"') && !sent.includes('"accept"')
+    && !sent.includes('"tolerance"') && !sent.includes('"explain"'));
+  const kept = stripExerciseAnswers(lesson).cells.filter((c: any) => c.type === "exercise");
+  check(`${where} : énoncés et options conservés`,
+    kept.every((c: any) => c.prompt && (c.kind !== "choice" || Array.isArray(c.opts))));
+}
+
+// ── Contenu livré en SQL : blocs JSON des migrations d'exercices ──
 const sqlDir = join(process.cwd(), "supabase");
 const files = readdirSync(sqlDir).filter(f => /^academy_exercises_.*\.sql$/.test(f));
 if (!files.length) console.warn("Aucun fichier academy_exercises_*.sql trouvé.");
@@ -40,44 +95,24 @@ for (const file of files) {
       failures.push(`${where} : JSON invalide (${e.message})`);
       return;
     }
-    const lesson = { cells };
-    const exs = cells.filter(c => c.type === "exercise");
-    check(`${where} : contient des exercices`, exs.length > 0);
+    verifierLecon(where, cells);
+  });
+}
 
-    const ids = exs.map((e, i) => e.id || `ex${i + 1}`);
-    check(`${where} : identifiants uniques`, new Set(ids).size === ids.length);
+// ── Contenu écrit en TypeScript ──
+//
+// FCA-01 vit dans shared/fca-01.ts et n'est projeté en SQL que par un script. Son fichier
+// s'appelle academy_cours_fca_01.sql, qui ne correspond pas au motif ci-dessus : ses vingt-
+// deux exercices n'étaient donc contrôlés qu'au moment de la génération, jamais ensuite.
+// C'est la source TypeScript qu'on vérifie, puisque c'est elle qu'on édite.
+const coursTs: { nom: string; lecons: { titre: string; cellules: any[] }[] }[] = [
+  { nom: "shared/fca-01.ts", lecons: LECONS_FCA_01 as any },
+];
 
-    for (const ex of exs) {
-      const id = `${where} / ${ex.id}`;
-      check(`${id} : énoncé présent`, !!ex.prompt);
-      check(`${id} : correction pédagogique présente`, !!ex.explain);
-      check(`${id} : type connu`, ["choice", "number", "text"].includes(ex.kind));
-      if (ex.kind === "choice") {
-        check(`${id} : options fournies`, Array.isArray(ex.opts) && ex.opts.length >= 2);
-        check(`${id} : réponse dans les bornes`, Number.isInteger(ex.answer) && ex.answer >= 0 && ex.answer < (ex.opts?.length ?? 0));
-      }
-      if (ex.kind === "number") {
-        check(`${id} : réponse numérique`, typeof ex.answer === "number" && Number.isFinite(ex.answer));
-        check(`${id} : tolérance définie`, typeof ex.tolerance === "number");
-      }
-      if (ex.kind === "text") check(`${id} : réponse textuelle non vide`, typeof ex.answer === "string" && ex.answer.length > 0);
-    }
-
-    // Copie parfaite → 100 % ; copie vide → 0 % et refusée.
-    const perfect = Object.fromEntries(exs.map((e, i) => [e.id || `ex${i + 1}`, e.answer]));
-    const gp = gradeLessonExercises(lesson, perfect)!;
-    check(`${where} : copie parfaite = 100 %`, gp.scorePct === 100 && gp.passed);
-    const ge = gradeLessonExercises(lesson, {})!;
-    check(`${where} : copie vide = 0 % et refusée`, ge.scorePct === 0 && !ge.passed);
-
-    // Le corrigé ne doit jamais partir vers le navigateur.
-    const sent = JSON.stringify(stripExerciseAnswers(lesson));
-    check(`${where} : corrigé absent de la réponse HTTP`,
-      !sent.includes('"answer"') && !sent.includes('"accept"')
-      && !sent.includes('"tolerance"') && !sent.includes('"explain"'));
-    const kept = stripExerciseAnswers(lesson).cells.filter((c: any) => c.type === "exercise");
-    check(`${where} : énoncés et options conservés`,
-      kept.every((c: any) => c.prompt && (c.kind !== "choice" || Array.isArray(c.opts))));
+for (const cours of coursTs) {
+  check(`${cours.nom} : au moins une leçon`, cours.lecons.length > 0);
+  cours.lecons.forEach((l, i) => {
+    verifierLecon(`${cours.nom} leçon ${i + 1} « ${l.titre.slice(0, 40)} »`, l.cellules);
   });
 }
 
@@ -120,4 +155,5 @@ if (failures.length) {
   console.error(`\n${pass} assertions passées, ${failures.length} échec(s)`);
   process.exit(1);
 }
-console.log(`✓ ${pass} assertions passées — moteur d'exercices et contenu ${files.join(", ")} valides.`);
+console.log(`✓ ${pass} assertions passées — moteur d'exercices et contenu `
+  + `${[...files, ...coursTs.map(c => c.nom)].join(", ")} valides.`);

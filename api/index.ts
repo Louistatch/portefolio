@@ -2036,11 +2036,18 @@ app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000),
   const a = await admissionParcours(sid, programId);
   const now = new Date();
   const expiree = !!a?.admission_expires && new Date(a.admission_expires) < now;
+  // 403 et non 400 : la requête est bien formée, c'est le dossier de l'étudiant qui interdit
+  // de la satisfaire. C'est aussi le code que renvoie la route historique du MEAL dans les
+  // deux mêmes situations — deux codes différents pour un même refus se paieraient le jour
+  // où un client traitera l'un et pas l'autre.
   if (a?.admitted_at && !expiree) {
-    return res.status(400).json({ message: `Vous êtes déjà admis(e) au parcours « ${parcours.title} ».` });
+    return res.status(403).json({
+      message: `Vous êtes déjà admis(e) au parcours « ${parcours.title} ».`,
+      alreadyAdmitted: true,
+    });
   }
   if (a?.next_test_allowed && new Date(a.next_test_allowed) > now) {
-    return res.status(400).json({
+    return res.status(403).json({
       message: `Vous pourrez repasser ce test à partir du ${new Date(a.next_test_allowed).toLocaleDateString("fr-FR")}.`,
       nextTestAllowed: a.next_test_allowed,
     });

@@ -17,7 +17,27 @@ import {
   CHAPITRES, LIVRET_TITRE, LIVRET_SOUS_TITRE, LIVRET_AUTEUR, LIVRET_FONCTION, LIVRET_FICHIER,
 } from "@shared/revision";
 import { QUESTIONS_TOF } from "@shared/tof-test";
+import { QUESTIONS_FCA } from "@shared/fca-test";
 import { programById } from "@shared/programs";
+
+/**
+ * Banques de questions des parcours ayant leur porte propre.
+ *
+ * Le cursus MEAL n'y figure pas : son test vit dans QUESTIONS, plus bas, et son admission
+ * sur les colonnes de `students` plutôt que dans academy_program_admissions.
+ *
+ * Un registre plutôt qu'un booléen. La page ne connaissait que deux parcours, distingués
+ * par un `surTof` ; le troisième aurait demandé un second booléen, le quatrième un
+ * troisième, et chaque ajout aurait touché une dizaine d'endroits. Ici, ouvrir un parcours
+ * revient à ajouter une ligne.
+ *
+ * Hors du composant : ce tableau ne dépend d'aucun état et le reconstruire à chaque rendu
+ * ne servirait à rien.
+ */
+const BANQUES_PARCOURS: Record<string, { domain: string; q: string; opts: string[] }[]> = {
+  tof: QUESTIONS_TOF.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
+  fca: QUESTIONS_FCA.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
+};
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 // Le parcours réel (cours, progression, attestations) vit dans /academy/* : cette page
@@ -77,21 +97,21 @@ export default function ELearning() {
   const [pageEtat, setPageEtat] = useState<"chargement" | "ok" | "erreur">("chargement");
   const [compact, setCompact] = useState(false);
   const [moduleDetail, setModuleDetail] = useState<any>(null);
-  // Deux parcours, deux tests, un seul moteur. Dupliquer l'écran de QCM aurait fait deux
-  // corrections d'affichage à porter à chaque fois — et une des deux aurait fini par être
-  // oubliée. Le parcours en cours d'examen commande la banque de questions et l'adresse
-  // d'envoi ; tout le reste est commun.
-  const [parcoursTest, setParcoursTest] = useState<"meal" | "tof">("meal");
-  const [statutTof, setStatutTof] = useState<any>(null);
+  // Trois parcours, trois tests, un seul moteur. Dupliquer l'écran de QCM aurait fait
+  // autant de corrections d'affichage à porter à chaque fois — et l'une d'elles aurait fini
+  // par être oubliée. Le parcours en cours d'examen commande la banque de questions et
+  // l'adresse d'envoi ; tout le reste est commun.
+  const [parcoursTest, setParcoursTest] = useState<string>("meal");
+  const [statutsParcours, setStatutsParcours] = useState<Record<string, any>>({});
 
   const TOF = programById("tof");
-  const surTof = parcoursTest === "tof";
-  // Les deux banques exposent la même forme au moteur : domaine, énoncé, options.
-  const BANQUE: { domain: string; q: string; opts: string[] }[] = surTof
-    ? QUESTIONS_TOF.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts }))
-    : QUESTIONS;
-  const SEUIL = surTof ? TOF.admission.seuil : 21;
-  const statutCourant = surTof ? statutTof : testStatus;
+  const surMeal = parcoursTest === "meal";
+  // Toutes les banques exposent la même forme au moteur : domaine, énoncé, options.
+  const BANQUE: { domain: string; q: string; opts: string[] }[] =
+    surMeal ? QUESTIONS : (BANQUES_PARCOURS[parcoursTest] ?? []);
+  // Le seuil du MEAL reste écrit ici : il vit dans l'API historique, pas dans le registre.
+  const SEUIL = surMeal ? 21 : programById(parcoursTest).admission.seuil;
+  const statutCourant = surMeal ? testStatus : statutsParcours[parcoursTest];
 
   const passed = statutCourant?.passed === true || (score !== null && score >= SEUIL);
   const answeredCount = Object.keys(answers).length;
@@ -104,10 +124,14 @@ export default function ELearning() {
     if (!isStudentLoggedIn()) return;
     studentFetch("/api/academy/test-status").then(r => r.json()).then(setTestStatus).catch(() => {});
     // Le MEAL garde sa route historique ; les autres parcours passent par la route générique
-    // /api/academy/programs/:id/*, qui sert aussi bien la formation de formateurs que la
-    // finance climatique agricole.
-    studentFetch(`/api/academy/programs/${TOF.id}/test-status`)
-      .then(r => r.json()).then(setStatutTof).catch(() => {});
+    // /api/academy/programs/:id/*. Les statuts sont lus tous ensemble : sans quoi la page ne
+    // saurait pas dire à un étudiant admis au MEAL quels tests il lui reste à passer.
+    for (const id of Object.keys(BANQUES_PARCOURS)) {
+      studentFetch(`/api/academy/programs/${id}/test-status`)
+        .then(r => (r.ok ? r.json() : null))
+        .then(d => { if (d) setStatutsParcours(s => ({ ...s, [id]: d })); })
+        .catch(() => {});
+    }
   }
   useEffect(() => { rafraichirStatuts(); }, []);
 
@@ -142,9 +166,9 @@ export default function ELearning() {
     setSubmitting(true);
     setView("test-result");
     try {
-      const res = await studentFetch(surTof
-        ? `/api/academy/programs/${TOF.id}/submit-test`
-        : "/api/academy/submit-test", {
+      const res = await studentFetch(surMeal
+        ? "/api/academy/submit-test"
+        : `/api/academy/programs/${parcoursTest}/submit-test`, {
         method: "POST",
         body: JSON.stringify({ answers: answerArray }),
       });
@@ -182,12 +206,12 @@ export default function ELearning() {
   //
   // Chaque parcours a sa porte. Une seule fonction les ouvre, pour que les vérifications
   // — compte requis, admission déjà obtenue, délai de reprise — ne s'écrivent qu'une fois.
-  function demarrerTest(parcours: "meal" | "tof") {
+  function demarrerTest(parcours: string) {
     if (!isStudentLoggedIn()) {
       navigate("/academy/register");
       return;
     }
-    const statut = parcours === "tof" ? statutTof : testStatus;
+    const statut = parcours === "meal" ? testStatus : statutsParcours[parcours];
     if (statut?.passed) { navigate("/academy/dashboard"); return; }
 
     // Changer de banque remet le questionnaire à zéro. Sans cela, les réponses données au
@@ -537,9 +561,9 @@ export default function ELearning() {
         </section>
 
         {/* ── Trois parcours ──
-            FCA-01 n'apparaissait nulle part sur cette page alors que le cours existe et est
-            publié. Il est présenté ici, mais sans bouton de test : sa banque de questions
-            n'est pas écrite, et proposer une porte qui ne s'ouvre pas est pire que rien. */}
+            Les trois portes s'ouvrent : chaque parcours a sa banque de questions et sa
+            route d'admission. FCA-01 est resté un temps sans bouton, sa banque n'étant pas
+            écrite — proposer une porte qui ne s'ouvre pas est pire que ne rien proposer. */}
         <section className="max-w-6xl mx-auto px-5 sm:px-6 pb-14">
           <div className="flex items-baseline gap-4 mb-6">
             <h2 className="font-serif text-2xl sm:text-[28px] font-semibold tracking-tight">
@@ -562,7 +586,7 @@ export default function ELearning() {
                 lignes: [["Leçons", "6"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"], ["Public", "Agents de crédit"]],
                 titreDelivre: "Certificat d'Analyste du Risque Climatique Agricole",
                 fond: "bg-amber-50 dark:bg-amber-950/30", encre: "text-amber-800 dark:text-amber-300",
-                action: null,
+                action: { libelle: "Passer le test", onClick: () => demarrerTest("fca") },
               },
               {
                 code: "TOF-FIN-01", teinte: "#7C3AED", titre: "Formation de formateurs",
@@ -849,7 +873,7 @@ export default function ELearning() {
                   {/* L'état de l'admission à CE parcours, jamais celui du MEAL : un étudiant
                       admis au cursus MEAL n'est pas admis ici, et le lui laisser croire le
                       renverrait vers un tableau de bord sans ce cours. */}
-                  {statutTof?.passed ? (
+                  {statutsParcours.tof?.passed ? (
                     <div className="mt-5">
                       <p className="flex items-center gap-2 text-[13px] font-medium"
                         style={{ color: TOF.accent }}>
