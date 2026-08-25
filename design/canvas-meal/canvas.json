@@ -1,0 +1,44 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 1720, "title": "Leçon guidée — proposition" },
+    { "file": "FilContinu.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 1420, "title": "Alternative — fil enrichi" }
+  ],
+  "annotations": [
+    {
+      "id": "constat",
+      "x": 0,
+      "y": -420,
+      "w": 660,
+      "text": "CE QUE DISENT LES DONNÉES\n\nJ'ai compté les cellules des vingt leçons MEAL en base :\n\n  MEAL-01 (KoboCollect)  19 à 40 cellules   12 captures   6 à 8 exercices\n  MEAL-02 (QGIS)         10 à 12 cellules    0 capture    4 exercices\n  MEAL-03 (Python)        9 à 11 cellules    0 capture    4 exercices\n\nMEAL-01 est dense et illustré. MEAL-02 enseigne QGIS — un logiciel entièrement visuel — sans une seule capture d'écran. MEAL-03 enseigne l'automatisation Python sans une seule cellule de code, alors que le site sait maintenant exécuter Python dans le navigateur.\n\nCe canevas porte sur la PRÉSENTATION. Le manque de captures et de code relève du contenu : c'est un autre chantier, et le plus lourd des deux."
+    },
+    {
+      "id": "ajouts",
+      "x": 700,
+      "y": -420,
+      "w": 620,
+      "text": "TROIS AJOUTS, ET CE QU'ILS CORRIGENT\n\n1. L'OBJECTIF, AVANT TOUT. L'écran actuel ouvre sur « 20 points · Non complétée » — un compteur, pas un apprentissage. On annonce ce qu'on saura faire, le temps à y passer, et ce qu'il faut avoir sous la main avant de commencer.\n\n2. TROIS ÉTAPES NOMMÉES. Les cellules défilent aujourd'hui sans repère : la leçon 5 de MEAL-01 en aligne quarante d'affilée. Comprendre / Décider / Pratiquer dit où l'on est et ce qui reste.\n\n3. UNE RÉCAPITULATION. La leçon s'arrête aujourd'hui sur un bouton. Nommer l'acquis et annoncer la marche suivante referme la boucle ouverte par l'objectif.\n\nLe reste ne bouge pas : mêmes jetons, même barre latérale, mêmes cartes."
+    },
+    {
+      "id": "arbitrage",
+      "x": 1560,
+      "y": -420,
+      "w": 620,
+      "text": "L'ARBITRAGE ENTRE LES DEUX\n\nÀ GAUCHE, la leçon est découpée en trois étapes. C'est la présentation la plus lisible — mais elle suppose de RANGER le contenu existant : dire, pour chacune des vingt leçons MEAL, quelle cellule appartient à quelle étape. C'est une reprise de contenu, pas seulement d'affichage.\n\nÀ DROITE, le fil reste tel quel. On ajoute un bandeau d'objectif collant — visible pendant tout le défilement — des repères de section dans la marge, et un temps restant estimé. Rien à réécrire : ça marche sur les vingt leçons dès demain.\n\nLa question n'est donc pas laquelle est la plus belle, mais si vous voulez reprendre le contenu maintenant ou plus tard."
+    },
+    {
+      "id": "contenu",
+      "x": 0,
+      "y": 1790,
+      "w": 700,
+      "text": "LE CONTENU EST RÉEL\n\nTout ce qui s'affiche vient de la leçon 6 de MEAL-02, telle qu'elle est en base : « Une carte se lit en 3 secondes », les trois modes de classification, la question rapide, et les points d'eau du district de la Kozah — 87 relevés GPS, 1 240 ménages.\n\nDeux choses sont de moi, marquées comme telles : l'objectif d'apprentissage et la récapitulation, qui n'existent nulle part dans le contenu actuel. Ce sont justement les deux pièces à écrire, leçon par leçon, si vous retenez cette direction. Les durées (35–45 min, 18 min restantes) sont des exemples : rien en base ne mesure le temps d'une leçon."
+    },
+    {
+      "id": "suite",
+      "x": 1560,
+      "y": 1490,
+      "w": 620,
+      "text": "MAQUETTES STATIQUES\n\nRien n'est cliquable : deux propositions à regarder et à trancher, pas un prototype.\n\nSi vous retenez une direction, dites-le et je l'implémente dans client/src/pages/academy/classroom.tsx — l'écran est commun aux quatre parcours, donc le changement profitera aussi à la finance climatique et à la formation de formateurs."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

@@ -1,0 +1,166 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #085e41; text-decoration: none; } a:hover { color: #16a260; }
+    .serif { font-family: 'Lora', Georgia, serif; }
+    .carte { background: #ffffff; border: 1px solid rgba(225,231,239,0.5); border-radius: 16px; }
+    .h2 { font-family: 'Lora', Georgia, serif; font-size: 18px; font-weight: 600; margin: 0; }
+    .p { font-size: 14px; line-height: 1.65; color: #65758b; margin: 0; }
+    /* Repère de section dans la marge : un point sur un filet vertical. */
+    .repere { position: relative; padding-left: 26px; }
+    .repere::before { content: ""; position: absolute; left: 4px; top: 8px; bottom: -18px; width: 1px; background: #e1e7ef; }
+    .repere::after { content: ""; position: absolute; left: 0; top: 6px; width: 9px; height: 9px;
+                     border-radius: 50%; background: #ffffff; border: 2px solid #cbd5e1; }
+    .repere.actif::after { border-color: #0d9488; background: #0d9488; }
+  </style>
+</helmet>
+
+<div style="display: flex; width: 1440px; height: 1420px; background: #fcfcfd; color: #0f1729; overflow: hidden;">
+
+  <aside style="width: 256px; flex-shrink: 0; border-right: 1px solid rgba(225,231,239,0.5); background: rgba(241,245,249,0.2); padding: 24px 16px 0;">
+    <div style="font-size: 12px; font-family: ui-monospace, monospace; color: #085e41; margin-bottom: 4px; padding: 0 8px;">MEAL-02</div>
+    <div style="font-size: 14px; font-weight: 600; margin-bottom: 16px; padding: 0 8px; line-height: 1.35;">Cartographie des bénéficiaires WASH</div>
+    <div style="height: 6px; background: #f1f5f9; border-radius: 3px; margin: 0 8px 4px;">
+      <div style="height: 100%; width: 71%; background: #085e41; border-radius: 3px;"></div>
+    </div>
+    <div style="font-size: 12px; color: #65758b; margin: 0 8px 20px;">71 % complété</div>
+    <div style="padding: 0 8px; font-size: 13px; color: #65758b; line-height: 1.6;">
+      La liste des sept leçons reste identique à l'écran actuel : cette piste ne touche pas
+      à la navigation.
+    </div>
+  </aside>
+
+  <main style="flex: 1; min-width: 0; display: flex; justify-content: center; padding: 0 24px 32px;">
+    <div style="width: 768px;">
+
+      <!-- ── Bandeau d'objectif, collant en haut ──
+           Il reste visible pendant tout le défilement : dans un fil de trente cellules,
+           l'étudiant sait toujours pourquoi il lit ce qu'il lit, et combien il en reste. -->
+      <div style="position: sticky; top: 0; background: rgba(252,252,253,0.94); padding: 20px 0 14px; border-bottom: 1px solid rgba(225,231,239,0.7); margin-bottom: 26px;">
+        <div style="display: flex; align-items: flex-start; gap: 14px;">
+          <span style="width: 4px; align-self: stretch; background: #0d9488; border-radius: 2px; flex-shrink: 0;"></span>
+          <div style="flex: 1; min-width: 0;">
+            <h1 class="serif" style="margin: 0; font-size: 22px; font-weight: 600;">Symbologie : faire parler la carte</h1>
+            <p style="margin: 7px 0 0; font-size: 14px; line-height: 1.5;">
+              <span style="color: #0d9488; font-weight: 600;">Objectif —</span>
+              <span style="color: #65758b;">choisir un mode de classification, et défendre votre choix de couleurs devant un partenaire.</span>
+            </p>
+          </div>
+          <div style="text-align: right; flex-shrink: 0;">
+            <div style="font-size: 13px; font-weight: 600;">≈ 18 min restantes</div>
+            <div style="height: 4px; width: 120px; background: #e1e7ef; border-radius: 2px; margin-top: 7px;">
+              <div style="height: 100%; width: 45%; background: #0d9488; border-radius: 2px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 22px;">
+
+        <div class="repere actif">
+          <h2 class="h2">Une carte se lit en 3 secondes</h2>
+          <p class="p" style="margin-top: 10px;">
+            Une carte efficace fait comprendre la situation <strong style="color: #0f1729; font-weight: 600;">instantanément</strong>.
+            L'outil : la <strong style="color: #0f1729; font-weight: 600;">symbologie graduée</strong>, qui colore les objets selon
+            une valeur — rouge pour critique, vert pour correct.
+          </p>
+        </div>
+
+        <div class="repere">
+          <figure class="carte" style="margin: 0; overflow: hidden;">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid rgba(225,231,239,0.5); background: rgba(241,245,249,0.3);">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#085e41" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.5-4.5L9 18"/></svg>
+              <span style="font-size: 12px; font-weight: 500;">Symbologie graduée par prévalence</span>
+            </div>
+            <div style="padding: 18px; background: #ffffff;">
+              <svg viewBox="0 0 660 150" width="100%" height="150" style="display: block;">
+                <rect x="0" y="0" width="660" height="150" fill="#f8fafc"/>
+                <path d="M40 125 L115 55 L200 92 L285 38 L380 82 L470 42 L560 100 L620 64" fill="none" stroke="#cbd5e1" stroke-width="1.5"/>
+                <circle cx="115" cy="55" r="8"  fill="#16a34a"/><circle cx="200" cy="92" r="12" fill="#eab308"/>
+                <circle cx="285" cy="38" r="7"  fill="#16a34a"/><circle cx="380" cy="82" r="16" fill="#dc2626"/>
+                <circle cx="470" cy="42" r="10" fill="#eab308"/><circle cx="560" cy="100" r="14" fill="#dc2626"/>
+                <g transform="translate(408,104)">
+                  <rect x="0" y="0" width="232" height="36" rx="6" fill="#ffffff" stroke="#e1e7ef"/>
+                  <circle cx="20" cy="18" r="5" fill="#16a34a"/><text x="31" y="22" font-size="11" fill="#65758b" font-family="system-ui">&lt; 10 %</text>
+                  <circle cx="94" cy="18" r="7" fill="#eab308"/><text x="107" y="22" font-size="11" fill="#65758b" font-family="system-ui">10 – 25 %</text>
+                  <circle cx="178" cy="18" r="9" fill="#dc2626"/><text x="192" y="22" font-size="11" fill="#65758b" font-family="system-ui">&gt; 25 %</text>
+                </g>
+              </svg>
+            </div>
+          </figure>
+        </div>
+
+        <div class="repere">
+          <h2 class="h2">Choisir ses classes</h2>
+          <p class="p" style="margin-top: 10px;">
+            QGIS propose plusieurs modes : <strong style="color: #0f1729; font-weight: 600;">intervalles égaux</strong>,
+            <strong style="color: #0f1729; font-weight: 600;">quantiles</strong>, ou des
+            <strong style="color: #0f1729; font-weight: 600;">seuils manuels</strong> — recommandés pour le MEAL : alignez vos
+            classes sur les seuils de votre bailleur, pas sur la statistique.
+          </p>
+        </div>
+
+        <div class="repere">
+          <div class="carte" style="padding: 16px 18px;">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#085e41" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
+              <span style="font-size: 14px; font-weight: 500;">Question rapide</span>
+            </div>
+            <p style="margin: 0 0 12px; font-size: 14px;">Pour colorer une carte en rouge/orange/vert selon un niveau de risque, on utilise :</p>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <span style="padding: 10px 16px; border-radius: 12px; border: 1px solid #e1e7ef; font-size: 14px;"><span style="font-family: ui-monospace, monospace; font-size: 12px; color: #65758b; margin-right: 8px;">A.</span>Un symbole unique</span>
+              <span style="padding: 10px 16px; border-radius: 12px; border: 1px solid #085e41; background: rgba(8,94,65,0.10); color: #085e41; font-size: 14px;"><span style="font-family: ui-monospace, monospace; font-size: 12px; margin-right: 8px;">B.</span>Une symbologie graduée</span>
+              <span style="padding: 10px 16px; border-radius: 12px; border: 1px solid #e1e7ef; font-size: 14px;"><span style="font-family: ui-monospace, monospace; font-size: 12px; color: #65758b; margin-right: 8px;">C.</span>Une couche de tuiles</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="repere">
+          <h2 class="h2">À vous de jouer</h2>
+          <p class="p" style="margin-top: 10px;">
+            Vous cartographiez les points d'eau du district de la Kozah, dans la région de la Kara.
+            87 points relevés au GPS, 1 240 ménages recensés.
+          </p>
+        </div>
+
+        <div class="repere">
+          <div class="carte" style="padding: 16px 18px; border-color: rgba(234,179,8,0.4);">
+            <div style="display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 10px;">
+              <span style="font-size: 14px; font-weight: 600;">Symboliser un statut</span>
+              <span style="font-size: 11px; color: #65758b;">exercice 1 sur 4</span>
+            </div>
+            <p style="margin: 0 0 12px; font-size: 14px; color: #65758b; line-height: 1.6;">
+              Chaque point d'eau porte un champ <span style="font-family: ui-monospace, monospace; font-size: 12px; background: #f1f5f9; padding: 2px 6px; border-radius: 4px;">statut</span>
+              valant « fonctionnel », « en panne » ou « abandonné ». Quel mode de symbologie retenez-vous ?
+            </p>
+            <div style="display: flex; gap: 10px;">
+              <span style="flex: 1; padding: 10px 14px; border-radius: 12px; border: 1px solid #e1e7ef; font-size: 13px; text-align: center;">Graduée</span>
+              <span style="flex: 1; padding: 10px 14px; border-radius: 12px; border: 1px solid #e1e7ef; font-size: 13px; text-align: center;">Catégorisée</span>
+              <span style="flex: 1; padding: 10px 14px; border-radius: 12px; border: 1px solid #e1e7ef; font-size: 13px; text-align: center;">Symbole unique</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 30px;">
+        <span style="padding: 10px 18px; border-radius: 12px; border: 1px solid #e1e7ef; font-size: 14px; color: #65758b;">Précédente</span>
+        <span style="font-size: 13px; color: #65758b;">1 exercice sur 4 renseigné</span>
+        <span style="padding: 10px 20px; border-radius: 12px; background: #085e41; color: #ffffff; font-size: 14px; font-weight: 600;">Valider la leçon · 20 points</span>
+      </div>
+
+    </div>
+  </main>
+</div>
+</x-dc>
+</body>
+</html>
