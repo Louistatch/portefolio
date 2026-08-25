@@ -189,7 +189,7 @@ export default function Home() {
               <div className="text-[11px] tracking-[0.14em] uppercase text-accent font-bold mb-3.5">
                 Note de veille — juin 2026
               </div>
-              <h2 className="font-serif text-2xl lg:text-3xl font-semibold leading-tight mb-4 text-pretty">
+              <h2 className="font-serif text-2xl lg:text-3xl font-semibold leading-tight mb-4 text-pretty text-background">
                 Le plafond d'usure passe de 27&nbsp;% à 24&nbsp;%
               </h2>
               <p className="text-sm leading-relaxed text-background/60">
