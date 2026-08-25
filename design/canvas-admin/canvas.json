@@ -1,0 +1,37 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 1180, "title": "Tableau de bord — proposition" },
+    { "file": "Console.dc.html", "x": 1560, "y": 0, "w": 1440, "h": 1180, "title": "Direction alternative — console" }
+  ],
+  "annotations": [
+    {
+      "id": "lecture",
+      "x": 0,
+      "y": -290,
+      "w": 640,
+      "text": "CE QUI CHANGE, ET POURQUOI\n\nL'admin actuel ouvre sur quatre compteurs identiques : Étudiants, Admis, En attente, Certifiés. En interrogeant la base ce matin, presque tous les compteurs d'attention sont à zéro — 0 message non lu, 0 rendez-vous, 0 brouillon. Un tableau de bord qui affiche une rangée de zéros ne vous apprend rien.\n\nTrois corrections :\n\n1. Une ligne d'action remplace les quatre compteurs. Elle dit ce qui reste à faire (5 e-mails non vérifiés) et affiche le calme comme un état, pas comme un vide.\n\n2. Les chiffres sont ventilés PAR PARCOURS. Le tableau de bord agrégeait les trois — il cachait donc exactement ce que vous avez besoin de voir depuis que LouisFarm délivre trois certificats.\n\n3. Le reste ne bouge pas : mêmes jetons, mêmes rayons, même barre latérale."
+    },
+    {
+      "id": "alternative",
+      "x": 1560,
+      "y": -290,
+      "w": 600,
+      "text": "DIRECTION ALTERNATIVE — CONSOLE\n\nMême contenu, principe d'organisation opposé : un registre réglé, sans cartes, chiffres alignés en colonnes.\n\nCe qu'elle gagne : tout tient sur un écran, les trois parcours se comparent colonne par colonne, et le ton rejoint la direction institutionnelle prise par le site public — « tableaux plutôt que cartes ».\n\nCe qu'elle perd : plus rien ne ressort. Sans hiérarchie visuelle, l'action requise a le même poids qu'une ligne de total. C'est un outil pour quelqu'un qui connaît déjà ses données par cœur.\n\nÀ choisir selon l'usage réel : pilotage quotidien (gauche) ou lecture de contrôle (droite)."
+    },
+    {
+      "id": "chiffres",
+      "x": 0,
+      "y": 1250,
+      "w": 700,
+      "text": "TOUS LES CHIFFRES SONT RÉELS\n\nRelevés dans votre base le 25 août 2026 : 27 étudiants, 22 comptes créés sur 30 jours, 20 admis au MEAL, 7 en attente, 2 admis à la formation de formateurs, 1 en finance climatique, 5 e-mails non vérifiés.\n\nDeux exceptions, marquées comme telles : la forme de la courbe est illustrative (seuls les totaux sont exacts), et la troisième ligne de « Derniers inscrits » porte [Nom de l'étudiant] — je n'affiche pas un nom réel sur un compte non confirmé."
+    },
+    {
+      "id": "suite",
+      "x": 1560,
+      "y": 1250,
+      "w": 600,
+      "text": "MAQUETTES STATIQUES\n\nRien n'est cliquable ici : ce sont deux propositions à regarder et à trancher, pas un prototype. Dites-moi laquelle vous retenez et je l'implémente dans client/src/pages/admin/dashboard.tsx.\n\nCe qui manque encore, et qu'aucune des deux ne résout : le tableau de bord ne montre nulle part où en sont les étudiants DANS leur parcours — leçons rendues, retards, travaux de groupe à corriger. C'est le prochain vrai manque, si vous voulez qu'on l'ajoute."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

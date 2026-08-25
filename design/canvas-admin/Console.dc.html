@@ -1,0 +1,219 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    a { color: #085e41; text-decoration: none; } a:hover { color: #16a260; }
+    .serif { font-family: 'Lora', Georgia, serif; }
+    .num { font-variant-numeric: tabular-nums; }
+    .th { font-size: 11px; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; color: #65758b; }
+    .rule { border-top: 1px solid #e1e7ef; }
+    .navi { display: flex; align-items: center; justify-content: space-between;
+            padding: 7px 12px; font-size: 13px; color: #65758b; border-radius: 6px; }
+    .navi.on { background: #f1f5f9; color: #0f1729; font-weight: 600; }
+  </style>
+</helmet>
+
+<div style="display: flex; width: 1440px; height: 1180px; background: #ffffff; color: #0f1729; overflow: hidden;">
+
+  <!-- Rail de navigation, plus étroit et sans ornement -->
+  <aside style="width: 216px; flex-shrink: 0; border-right: 1px solid #e1e7ef; display: flex; flex-direction: column; padding: 20px 12px;">
+    <div style="padding: 0 12px 20px;">
+      <p class="serif" style="margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em;">LouisFarm</p>
+      <p style="margin: 2px 0 0; font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: #65758b;">Administration</p>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 1px;">
+      <span class="navi on">Tableau de bord</span>
+    </div>
+
+    <p class="th" style="margin: 20px 0 6px; padding: 0 12px;">Academy</p>
+    <div style="display: flex; flex-direction: column; gap: 1px;">
+      <span class="navi"><span>Étudiants</span><span class="num" style="font-size: 12px; font-weight: 600; color: #b45309;">5</span></span>
+      <span class="navi"><span>Écrire à un étudiant</span></span>
+      <span class="navi"><span>Rencontres en ligne</span></span>
+      <span class="navi"><span>Travaux de groupe</span></span>
+    </div>
+
+    <p class="th" style="margin: 20px 0 6px; padding: 0 12px;">Échanges</p>
+    <div style="display: flex; flex-direction: column; gap: 1px;">
+      <span class="navi"><span>Messages</span></span>
+      <span class="navi"><span>Commentaires</span></span>
+      <span class="navi"><span>Rendez-vous</span></span>
+      <span class="navi"><span>Témoignages</span></span>
+    </div>
+
+    <p class="th" style="margin: 20px 0 6px; padding: 0 12px;">Diffusion</p>
+    <div style="display: flex; flex-direction: column; gap: 1px;">
+      <span class="navi"><span>Newsletter</span></span>
+      <span class="navi"><span>Abonnés</span></span>
+    </div>
+
+    <p class="th" style="margin: 20px 0 6px; padding: 0 12px;">Contenu</p>
+    <div style="display: flex; flex-direction: column; gap: 1px;">
+      <span class="navi"><span>Articles</span></span>
+      <span class="navi"><span>Publications</span></span>
+      <span class="navi"><span>Profil &amp; CV</span></span>
+    </div>
+
+    <div style="margin-top: auto; padding-top: 16px; border-top: 1px solid #e1e7ef; display: flex; flex-direction: column; gap: 1px;">
+      <span class="navi"><span>Voir le site</span></span>
+      <span class="navi" style="color: #ef4343;"><span>Déconnexion</span></span>
+    </div>
+  </aside>
+
+  <div style="flex: 1; display: flex; flex-direction: column; min-width: 0;">
+
+    <header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #e1e7ef; display: flex; align-items: center; gap: 16px; padding: 0 28px;">
+      <span style="font-size: 13px; color: #65758b;">Administration</span>
+      <span style="font-size: 13px; color: #cbd5e1;">/</span>
+      <span style="font-size: 13px; font-weight: 600;">Tableau de bord</span>
+      <span style="margin-left: auto; font-size: 12px; color: #65758b;">Ctrl K pour rechercher</span>
+      <span style="width: 30px; height: 30px; border-radius: 50%; background: #f1f5f9; color: #65758b; display: grid; place-items: center; font-size: 11px; font-weight: 700;">LT</span>
+    </header>
+
+    <main style="flex: 1; padding: 28px; display: flex; flex-direction: column; gap: 24px; overflow: hidden;">
+
+      <div style="display: flex; align-items: baseline; justify-content: space-between;">
+        <h1 class="serif" style="margin: 0; font-size: 26px; font-weight: 600;">Mardi 25 août 2026</h1>
+        <span style="font-size: 13px; color: #65758b;">Période&nbsp;: 30 derniers jours</span>
+      </div>
+
+      <!-- Bandeau d'état : une ligne réglée, pas une carte -->
+      <div style="border-top: 2px solid #0f1729; border-bottom: 1px solid #e1e7ef; padding: 14px 0; display: flex; align-items: center; gap: 28px;">
+        <span style="font-size: 13px;"><strong style="font-weight: 600;">1 action requise</strong> · 5 e-mails non vérifiés</span>
+        <span style="width: 1px; height: 16px; background: #e1e7ef;"></span>
+        <span style="font-size: 13px; color: #65758b;">0 message · 0 commentaire · 0 rendez-vous · 0 brouillon</span>
+        <span style="margin-left: auto; font-size: 13px; font-weight: 600; color: #085e41;">Relancer les 5 →</span>
+      </div>
+
+      <!-- Le registre des parcours : un tableau, pas trois cartes -->
+      <section>
+        <div style="display: grid; grid-template-columns: minmax(0, 2fr) 88px 88px 88px 96px minmax(0, 1.1fr); gap: 12px; padding-bottom: 8px;">
+          <span class="th">Parcours</span>
+          <span class="th" style="text-align: right;">Admis</span>
+          <span class="th" style="text-align: right;">Attente</span>
+          <span class="th" style="text-align: right;">Leçons</span>
+          <span class="th" style="text-align: right;">Seuil</span>
+          <span class="th">Certificat</span>
+        </div>
+        <div class="rule" style="border-top-color: #0f1729; border-top-width: 1.5px;"></div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 2fr) 88px 88px 88px 96px minmax(0, 1.1fr); gap: 12px; padding: 13px 0; align-items: center;" class="rule">
+          <span style="display: flex; align-items: center; gap: 10px;">
+            <span style="width: 3px; height: 22px; background: #0d9488; border-radius: 2px;"></span>
+            <span>
+              <span style="display: block; font-size: 14px; font-weight: 600;">Cursus MEAL</span>
+              <span style="display: block; font-size: 11px; font-family: ui-monospace, monospace; color: #65758b;">MEAL-01 · 02 · 03</span>
+            </span>
+          </span>
+          <span class="num" style="text-align: right; font-size: 17px; font-weight: 600;">20</span>
+          <span class="num" style="text-align: right; font-size: 17px; color: #b45309;">7</span>
+          <span class="num" style="text-align: right; font-size: 14px; color: #65758b;">20</span>
+          <span class="num" style="text-align: right; font-size: 14px; color: #65758b;">21 / 30</span>
+          <span style="font-size: 12px; color: #65758b;">Super-Expert MEAL</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 2fr) 88px 88px 88px 96px minmax(0, 1.1fr); gap: 12px; padding: 13px 0; align-items: center;" class="rule">
+          <span style="display: flex; align-items: center; gap: 10px;">
+            <span style="width: 3px; height: 22px; background: #7c3aed; border-radius: 2px;"></span>
+            <span>
+              <span style="display: block; font-size: 14px; font-weight: 600;">Formation de formateurs</span>
+              <span style="display: block; font-size: 11px; font-family: ui-monospace, monospace; color: #65758b;">TOF-FIN-01</span>
+            </span>
+          </span>
+          <span class="num" style="text-align: right; font-size: 17px; font-weight: 600;">2</span>
+          <span class="num" style="text-align: right; font-size: 17px; color: #65758b;">0</span>
+          <span class="num" style="text-align: right; font-size: 14px; color: #65758b;">12</span>
+          <span class="num" style="text-align: right; font-size: 14px; color: #65758b;">11 / 15</span>
+          <span style="font-size: 12px; color: #65758b;">Formateur en gestion financière</span>
+        </div>
+
+        <div style="display: grid; grid-template-columns: minmax(0, 2fr) 88px 88px 88px 96px minmax(0, 1.1fr); gap: 12px; padding: 13px 0; align-items: center;" class="rule">
+          <span style="display: flex; align-items: center; gap: 10px;">
+            <span style="width: 3px; height: 22px; background: #b45309; border-radius: 2px;"></span>
+            <span>
+              <span style="display: block; font-size: 14px; font-weight: 600;">Finance climatique agricole</span>
+              <span style="display: block; font-size: 11px; font-family: ui-monospace, monospace; color: #65758b;">FCA-01 · ouvert le 25 août</span>
+            </span>
+          </span>
+          <span class="num" style="text-align: right; font-size: 17px; font-weight: 600;">1</span>
+          <span class="num" style="text-align: right; font-size: 17px; color: #65758b;">0</span>
+          <span class="num" style="text-align: right; font-size: 14px; color: #65758b;">6</span>
+          <span class="num" style="text-align: right; font-size: 14px; color: #65758b;">14 / 20</span>
+          <span style="font-size: 12px; color: #65758b;">Analyste du risque climatique</span>
+        </div>
+
+        <div class="rule" style="border-top-color: #0f1729;"></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 2fr) 88px 88px 88px 96px minmax(0, 1.1fr); gap: 12px; padding: 11px 0;">
+          <span style="font-size: 13px; font-weight: 600;">Total</span>
+          <span class="num" style="text-align: right; font-size: 15px; font-weight: 700;">23</span>
+          <span class="num" style="text-align: right; font-size: 15px; font-weight: 700;">7</span>
+          <span class="num" style="text-align: right; font-size: 13px; color: #65758b;">38</span>
+          <span></span><span></span>
+        </div>
+      </section>
+
+      <!-- Courbe seule, sans carte -->
+      <section style="flex: 1; min-height: 0; display: flex; flex-direction: column;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 10px;">
+          <h2 style="margin: 0; font-size: 14px; font-weight: 600;">Inscriptions</h2>
+          <span style="font-size: 12px; color: #65758b;">22 comptes créés sur 30 jours · 27 au total</span>
+        </div>
+        <div class="rule" style="border-top-color: #0f1729; border-top-width: 1.5px;"></div>
+        <div style="flex: 1; min-height: 0; padding-top: 14px;">
+          <svg viewBox="0 0 1130 200" width="100%" height="100%" preserveAspectRatio="none" style="display: block;">
+            <line x1="0" y1="16"  x2="1130" y2="16"  stroke="#f1f5f9" stroke-width="1"/>
+            <line x1="0" y1="76"  x2="1130" y2="76"  stroke="#f1f5f9" stroke-width="1"/>
+            <line x1="0" y1="136" x2="1130" y2="136" stroke="#f1f5f9" stroke-width="1"/>
+            <line x1="0" y1="180" x2="1130" y2="180" stroke="#cbd5e1" stroke-width="1"/>
+            <path d="M0,172 L125,164 L251,144 L377,152 L502,114 L628,90 L754,98 L879,56 L1005,40 L1130,24"
+                  fill="none" stroke="#085e41" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <circle cx="1130" cy="24" r="4" fill="#085e41"/>
+          </svg>
+        </div>
+        <div style="display: flex; justify-content: space-between; padding-top: 8px; font-size: 11px; color: #65758b;">
+          <span>27 juillet</span><span>3 août</span><span>10 août</span><span>17 août</span><span>25 août</span>
+        </div>
+      </section>
+
+      <!-- Dernières entrées, en registre -->
+      <section style="flex-shrink: 0;">
+        <div style="display: flex; align-items: baseline; justify-content: space-between; padding-bottom: 10px;">
+          <h2 style="margin: 0; font-size: 14px; font-weight: 600;">Dernières entrées</h2>
+          <span style="font-size: 12px; color: #65758b;">Voir les 27 →</span>
+        </div>
+        <div class="rule" style="border-top-color: #0f1729; border-top-width: 1.5px;"></div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr) minmax(0, 1.2fr) 104px; gap: 16px; padding: 11px 0; align-items: center;" class="rule">
+          <span style="font-size: 13px; font-weight: 500;">Louis Tatchida</span>
+          <span style="font-size: 13px; color: #65758b;">Finance climatique agricole</span>
+          <span style="font-size: 13px; color: #085e41; font-weight: 600;">Admis · 18/20</span>
+          <span style="text-align: right; font-size: 12px; color: #65758b;">il y a 20 min</span>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr) minmax(0, 1.2fr) 104px; gap: 16px; padding: 11px 0; align-items: center;" class="rule">
+          <span style="font-size: 13px; font-weight: 500;">Eméraude TEÏ</span>
+          <span style="font-size: 13px; color: #65758b;">Formation de formateurs</span>
+          <span style="font-size: 13px; color: #085e41; font-weight: 600;">Admise</span>
+          <span style="text-align: right; font-size: 12px; color: #65758b;">21 août</span>
+        </div>
+        <div style="display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.4fr) minmax(0, 1.2fr) 104px; gap: 16px; padding: 11px 0; align-items: center;" class="rule">
+          <span style="font-size: 13px; font-weight: 500;">[Nom de l'étudiant]</span>
+          <span style="font-size: 13px; color: #65758b;">Cursus MEAL</span>
+          <span style="font-size: 13px; color: #b45309; font-weight: 600;">E-mail à vérifier</span>
+          <span style="text-align: right; font-size: 12px; color: #65758b;">23 août</span>
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

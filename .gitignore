@@ -8,6 +8,10 @@ vite.config.ts.*
 # Supabase
 .env.local
 
-# Canvas de design assemblé — 2,2 Mo, régénéré par script/… ; les sources .dc.html suffisent
-design/canvas/*.html
-!design/canvas/*.dc.html
+# Canvas de design assemblés — plusieurs Mo chacun : l'éditeur y est empaqueté avec le
+# contenu. C'est une sortie, pas une source. Elle se régénère depuis les .dc.html et le
+# canvas.json du même dossier, qui eux sont versionnés.
+# Le motif couvre design/canvas/, design/canvas-admin/ et les suivants : une règle par
+# dossier finirait par en oublier un, et le dépôt gagnerait 2 Mo sans que personne ne le voie.
+design/canvas*/*.html
+!design/canvas*/*.dc.html
