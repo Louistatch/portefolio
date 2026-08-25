@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Plus+Jakarta+Sans:wght@200..800&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    a { color: #085E41; text-decoration: none; }
+    a:hover { color: #16A260; }
+    .lora { font-family: 'Lora', Georgia, serif; }
+  </style>
+</helmet>
+
+<!-- Connexion sur téléphone.
+     La plupart de vos étudiants ouvrent le lien reçu par email depuis leur téléphone. Le
+     panneau de contexte du desktop ne peut pas y tenir : il se réduit à un bandeau et à
+     une seule ligne — celle qui dit ce qui attend derrière la connexion. Les champs font
+     50 px de haut, au-dessus de la cible tactile minimale. -->
+<div style="width: 390px; min-height: 844px; background: #FCFCFD; color: #0F172A; display: flex; flex-direction: column;">
+
+  <!-- Bandeau d'identité, compact -->
+  <div style="background: #0F172A; padding: 22px 24px 24px;">
+    <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 18px;">
+      <span style="width: 32px; height: 32px; border-radius: 8px; background: #085E41; display: grid; place-items: center;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3L2 8l10 5 10-5-10-5z"></path><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"></path>
+        </svg>
+      </span>
+      <span>
+        <span style="display: block; font-size: 13px; font-weight: 700; color: #FFFFFF; line-height: 1.2;">DataMEAL</span>
+        <span style="display: block; font-size: 9px; letter-spacing: 0.14em; color: #64748B;">ACADEMY</span>
+      </span>
+    </div>
+    <h1 class="lora" style="font-size: 22px; line-height: 1.3; font-weight: 600; color: #FFFFFF; margin: 0 0 6px;">
+      Votre relevé de notes vous attend
+    </h1>
+    <p style="font-size: 13px; line-height: 1.55; color: #94A3B8; margin: 0;">
+      Leçons, travaux de groupe, échéances et certificats.
+    </p>
+  </div>
+
+  <!-- Formulaire -->
+  <div style="padding: 28px 24px; flex: 1;">
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <div>
+        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 8px;">Adresse email</label>
+        <input type="email" placeholder="vous@organisation.org" inputmode="email"
+          style="width: 100%; box-sizing: border-box; height: 50px; padding: 0 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; font-size: 16px; font-family: inherit;">
+      </div>
+
+      <div>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px;">
+          <label style="font-size: 13px; font-weight: 600;">Mot de passe</label>
+          <a href="#" style="font-size: 12px;">Oublié&nbsp;?</a>
+        </div>
+        <div style="position: relative;">
+          <input type="password" placeholder="Votre mot de passe"
+            style="width: 100%; box-sizing: border-box; height: 50px; padding: 0 48px 0 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; font-size: 16px; font-family: inherit;">
+          <span style="position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; display: grid; place-items: center;">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </span>
+        </div>
+      </div>
+
+      <button style="width: 100%; height: 52px; margin-top: 4px; border: 0; border-radius: 8px; background: #085E41; color: #FFFFFF; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">
+        Se connecter
+      </button>
+    </div>
+
+    <div style="display: flex; align-items: center; gap: 12px; margin: 26px 0;">
+      <span style="flex: 1; height: 1px; background: #E2E8F0;"></span>
+      <span style="font-size: 12px; color: #94A3B8;">ou</span>
+      <span style="flex: 1; height: 1px; background: #E2E8F0;"></span>
+    </div>
+
+    <button style="width: 100%; height: 52px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #0F172A; font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer;">
+      Créer un compte
+    </button>
+
+    <p style="font-size: 12px; color: #64748B; margin: 22px 0 0; line-height: 1.65;">
+      L'inscription est libre. L'accès aux cours passe ensuite par un test d'admission de
+      trente minutes, repassable après sept jours en cas d'échec.
+    </p>
+  </div>
+
+  <div style="padding: 18px 24px 24px; border-top: 1px solid #E2E8F0; font-size: 12px; color: #94A3B8; text-align: center;">
+    Une question&nbsp;? <a href="mailto:tatchida@gmail.com" style="color: #64748B;">tatchida@gmail.com</a>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

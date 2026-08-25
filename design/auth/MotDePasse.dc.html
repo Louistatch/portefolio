@@ -1,0 +1,140 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Plus+Jakarta+Sans:wght@200..800&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    a { color: #085E41; text-decoration: none; }
+    a:hover { color: #16A260; }
+    .lora { font-family: 'Lora', Georgia, serif; }
+  </style>
+</helmet>
+
+<!-- Mot de passe oublié, puis réinitialisation.
+     Une règle tient les deux écrans : la demande répond TOUJOURS la même chose, que
+     l'adresse existe ou non. Confirmer qu'un compte existe donnerait à n'importe qui la
+     liste des inscrits, une adresse à la fois. -->
+<div style="width: 1440px; box-sizing: border-box; background: #FCFCFD; color: #0F172A; padding: 40px 48px;">
+
+  <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 28px;">
+    <h1 class="lora" style="font-size: 24px; font-weight: 600; margin: 0;">Mot de passe oublié</h1>
+    <span style="flex: 1; height: 1px; background: #E2E8F0;"></span>
+    <span style="font-size: 12px; color: #64748B;">Demande, accusé, réinitialisation</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px;">
+
+    <!-- ── 1. La demande ── -->
+    <div style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; overflow: hidden;">
+      <div style="padding: 10px 18px; background: #F1F5F9; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; font-weight: 700;">
+        1 · Demande
+      </div>
+      <div style="padding: 32px 32px 36px;">
+        <span style="width: 44px; height: 44px; border-radius: 8px; background: #F1F5F9; display: grid; place-items: center;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 018 0v3"></path>
+          </svg>
+        </span>
+        <h2 class="lora" style="font-size: 21px; font-weight: 600; margin: 18px 0 8px; line-height: 1.3;">Réinitialiser le mot de passe</h2>
+        <p style="font-size: 13px; line-height: 1.65; color: #64748B; margin: 0 0 22px;">
+          Indiquez l'adresse de votre compte. Nous vous envoyons un lien valable une heure.
+        </p>
+
+        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px;">Adresse email</label>
+        <input type="email" placeholder="vous@organisation.org"
+          style="width: 100%; box-sizing: border-box; height: 46px; padding: 0 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; font-size: 14px; font-family: inherit; margin-bottom: 18px;">
+
+        <button style="width: 100%; height: 46px; border: 0; border-radius: 8px; background: #085E41; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">
+          Envoyer le lien
+        </button>
+        <p style="font-size: 12px; color: #64748B; margin: 16px 0 0; text-align: center;">
+          <a href="#">Retour à la connexion</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- ── 2. L'accusé, volontairement neutre ── -->
+    <div style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; overflow: hidden;">
+      <div style="padding: 10px 18px; background: #F0FDF4; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #085E41; font-weight: 700;">
+        2 · Demande enregistrée
+      </div>
+      <div style="padding: 32px 32px 36px;">
+        <span style="width: 44px; height: 44px; border-radius: 8px; background: #F0FDF4; display: grid; place-items: center;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#085E41" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M2 7l10 6 10-6"></path>
+          </svg>
+        </span>
+        <h2 class="lora" style="font-size: 21px; font-weight: 600; margin: 18px 0 8px; line-height: 1.3;">Vérifiez votre boîte mail</h2>
+        <p style="font-size: 13px; line-height: 1.65; color: #64748B; margin: 0 0 20px;">
+          Si un compte existe pour <strong style="color: #0F172A;">rosetchande@gmail.com</strong>,
+          un lien de réinitialisation vient d'y être envoyé. Il est valable une heure.
+        </p>
+
+        <div style="border-left: 2px solid #E2E8F0; padding-left: 14px; margin-bottom: 22px;">
+          <p style="font-size: 12px; color: #64748B; margin: 0; line-height: 1.65;">
+            Ce message est le même que l'adresse existe ou non. Confirmer l'existence d'un
+            compte reviendrait à livrer la liste des inscrits, une adresse à la fois.
+          </p>
+        </div>
+
+        <button style="width: 100%; height: 46px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; color: #0F172A; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">
+          Retour à la connexion
+        </button>
+        <p style="font-size: 12px; color: #64748B; margin: 16px 0 0; text-align: center;">
+          Rien après cinq minutes&nbsp;? <a href="#">Réessayer</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- ── 3. Le nouveau mot de passe ── -->
+    <div style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; overflow: hidden;">
+      <div style="padding: 10px 18px; background: #F1F5F9; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; font-weight: 700;">
+        3 · Nouveau mot de passe
+      </div>
+      <div style="padding: 32px 32px 36px;">
+        <span style="width: 44px; height: 44px; border-radius: 8px; background: #F1F5F9; display: grid; place-items: center;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#334155" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4" y="10" width="16" height="11" rx="2"></rect><path d="M8 10V7a4 4 0 018 0v3"></path><path d="M12 14v3"></path>
+          </svg>
+        </span>
+        <h2 class="lora" style="font-size: 21px; font-weight: 600; margin: 18px 0 8px; line-height: 1.3;">Choisir un nouveau mot de passe</h2>
+        <p style="font-size: 13px; line-height: 1.65; color: #64748B; margin: 0 0 22px;">
+          Huit caractères minimum. Vos sessions ouvertes ailleurs seront fermées.
+        </p>
+
+        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px;">Nouveau mot de passe</label>
+        <div style="position: relative; margin-bottom: 9px;">
+          <input type="password" placeholder="8 caractères minimum"
+            style="width: 100%; box-sizing: border-box; height: 46px; padding: 0 44px 0 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; font-size: 14px; font-family: inherit;">
+          <span style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%);">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"></path><circle cx="12" cy="12" r="3"></circle>
+            </svg>
+          </span>
+        </div>
+        <div style="display: flex; gap: 4px; margin-bottom: 18px;">
+          <span style="flex: 1; height: 3px; border-radius: 2px; background: #16A260;"></span>
+          <span style="flex: 1; height: 3px; border-radius: 2px; background: #16A260;"></span>
+          <span style="flex: 1; height: 3px; border-radius: 2px; background: #16A260;"></span>
+        </div>
+
+        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 7px;">Confirmer</label>
+        <input type="password" placeholder="Retapez le mot de passe"
+          style="width: 100%; box-sizing: border-box; height: 46px; padding: 0 14px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; font-size: 14px; font-family: inherit; margin-bottom: 18px;">
+
+        <button style="width: 100%; height: 46px; border: 0; border-radius: 8px; background: #085E41; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">
+          Enregistrer et me connecter
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

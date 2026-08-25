@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Plus+Jakarta+Sans:wght@200..800&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    a { color: #085E41; text-decoration: none; }
+    a:hover { color: #16A260; }
+    .lora { font-family: 'Lora', Georgia, serif; }
+    .mono { font-family: 'Geist Mono', ui-monospace, 'SF Mono', monospace; }
+  </style>
+</helmet>
+
+<!-- Confirmation de l'adresse email — les trois états sur une même planche.
+     Le lien reçu par email s'ouvre souvent sur un autre appareil que celui où l'on s'est
+     inscrit ; le code à six chiffres existe précisément pour ce cas, mais il faut le dire.
+     Et un compte non confirmé n'empêche pas d'apprendre : il empêche de recevoir un
+     certificat. Cette nuance décide de l'urgence du message. -->
+<div style="width: 1440px; box-sizing: border-box; background: #FCFCFD; color: #0F172A; padding: 40px 48px;">
+
+  <div style="display: flex; align-items: baseline; gap: 14px; margin-bottom: 28px;">
+    <h1 class="lora" style="font-size: 24px; font-weight: 600; margin: 0;">Confirmation de l'adresse email</h1>
+    <span style="flex: 1; height: 1px; background: #E2E8F0;"></span>
+    <span style="font-size: 12px; color: #64748B;">Trois états</span>
+  </div>
+
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 28px;">
+
+    <!-- ── État 1 : en attente du code ── -->
+    <div style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; overflow: hidden;">
+      <div style="padding: 10px 18px; background: #F1F5F9; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; font-weight: 700;">
+        En attente
+      </div>
+      <div style="padding: 32px 32px 36px;">
+        <span style="width: 44px; height: 44px; border-radius: 8px; background: #F0FDF4; display: grid; place-items: center;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#085E41" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M2 7l10 6 10-6"></path>
+          </svg>
+        </span>
+        <h2 class="lora" style="font-size: 21px; font-weight: 600; margin: 18px 0 8px; line-height: 1.3;">Vérifiez votre boîte mail</h2>
+        <p style="font-size: 13px; line-height: 1.65; color: #64748B; margin: 0 0 22px;">
+          Un code à six chiffres a été envoyé à<br>
+          <strong style="color: #0F172A;">rosetchande@gmail.com</strong>
+        </p>
+
+        <label style="display: block; font-size: 13px; font-weight: 600; margin-bottom: 9px;">Code de confirmation</label>
+        <div style="display: flex; gap: 8px; margin-bottom: 18px;">
+          <span class="mono" style="flex: 1; height: 52px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; display: grid; place-items: center; font-size: 20px; font-weight: 600;">4</span>
+          <span class="mono" style="flex: 1; height: 52px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; display: grid; place-items: center; font-size: 20px; font-weight: 600;">1</span>
+          <span class="mono" style="flex: 1; height: 52px; border: 1px solid #CBD5E1; border-radius: 8px; background: #FFFFFF; display: grid; place-items: center; font-size: 20px; font-weight: 600;">7</span>
+          <span class="mono" style="flex: 1; height: 52px; border: 1.5px solid #085E41; border-radius: 8px; background: #FFFFFF; display: grid; place-items: center; font-size: 20px; font-weight: 600; color: #94A3B8;">|</span>
+          <span class="mono" style="flex: 1; height: 52px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF;"></span>
+          <span class="mono" style="flex: 1; height: 52px; border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF;"></span>
+        </div>
+
+        <button style="width: 100%; height: 46px; border: 0; border-radius: 8px; background: #085E41; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">
+          Confirmer mon adresse
+        </button>
+
+        <p style="font-size: 12px; color: #64748B; margin: 16px 0 0; line-height: 1.6;">
+          Rien reçu&nbsp;? Regardez dans les indésirables, puis
+          <a href="#">renvoyez le code</a>.
+        </p>
+      </div>
+    </div>
+
+    <!-- ── État 2 : confirmé ── -->
+    <div style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; overflow: hidden;">
+      <div style="padding: 10px 18px; background: #F0FDF4; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #085E41; font-weight: 700;">
+        Confirmée
+      </div>
+      <div style="padding: 32px 32px 36px;">
+        <span style="width: 44px; height: 44px; border-radius: 8px; background: #085E41; display: grid; place-items: center;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6L9 17l-5-5"></path>
+          </svg>
+        </span>
+        <h2 class="lora" style="font-size: 21px; font-weight: 600; margin: 18px 0 8px; line-height: 1.3;">Adresse confirmée</h2>
+        <p style="font-size: 13px; line-height: 1.65; color: #64748B; margin: 0 0 22px;">
+          Votre compte peut désormais recevoir vos attestations et votre certificat.
+          Il reste une étape avant d'accéder aux cours.
+        </p>
+
+        <!-- Ne jamais laisser un écran de succès sans la suite : c'est là qu'on perd
+             l'étudiant, au moment précis où il est prêt à continuer. -->
+        <div style="border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; background: #F8FAFC; margin-bottom: 20px;">
+          <div style="font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; font-weight: 700; margin-bottom: 6px;">Étape suivante</div>
+          <p style="font-size: 13px; line-height: 1.6; color: #0F172A; margin: 0;">
+            <strong>Le test d'admission</strong> — trente minutes, sur votre métier.
+            Résultat immédiat.
+          </p>
+        </div>
+
+        <button style="width: 100%; height: 46px; border: 0; border-radius: 8px; background: #085E41; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">
+          Passer le test d'admission
+        </button>
+        <p style="font-size: 12px; color: #64748B; margin: 16px 0 0; text-align: center;">
+          <a href="#">Plus tard — aller à mon espace</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- ── État 3 : lien expiré ── -->
+    <div style="border: 1px solid #E2E8F0; border-radius: 8px; background: #FFFFFF; overflow: hidden;">
+      <div style="padding: 10px 18px; background: #FFFBEB; font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: #92400E; font-weight: 700;">
+        Lien expiré
+      </div>
+      <div style="padding: 32px 32px 36px;">
+        <span style="width: 44px; height: 44px; border-radius: 8px; background: #FFFBEB; display: grid; place-items: center;">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#B45309" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="9"></circle><path d="M12 7v5l3 2"></path>
+          </svg>
+        </span>
+        <h2 class="lora" style="font-size: 21px; font-weight: 600; margin: 18px 0 8px; line-height: 1.3;">Ce lien n'est plus valable</h2>
+        <p style="font-size: 13px; line-height: 1.65; color: #64748B; margin: 0 0 22px;">
+          Les liens de confirmation expirent au bout de vingt-quatre heures. Ce n'est pas
+          grave&nbsp;: demandez-en un nouveau, votre compte et vos données sont intacts.
+        </p>
+
+        <button style="width: 100%; height: 46px; border: 0; border-radius: 8px; background: #085E41; color: #FFFFFF; font-family: inherit; font-size: 14px; font-weight: 600; cursor: pointer;">
+          Renvoyer un lien de confirmation
+        </button>
+
+        <div style="margin-top: 20px; padding-top: 18px; border-top: 1px solid #E2E8F0;">
+          <p style="font-size: 12px; color: #64748B; margin: 0; line-height: 1.65;">
+            Un compte non confirmé <strong style="color: #0F172A;">n'empêche pas de suivre les
+            cours</strong> — il empêche seulement la délivrance des attestations et du certificat.
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
