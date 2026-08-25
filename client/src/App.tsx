@@ -1,4 +1,6 @@
+import { lazy, Suspense } from "react";
 import { Switch, Route, useLocation } from "wouter";
+import { Loader2 } from "lucide-react";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -8,50 +10,50 @@ import NotFound from "@/pages/not-found";
 
 import { Layout } from "@/components/layout";
 import Home from "@/pages/home";
-import About from "@/pages/about";
-import Research from "@/pages/research";
-import BlogList from "@/pages/blog";
-import BlogPost from "@/pages/post";
-import Publications from "@/pages/publications";
-import FAQ from "@/pages/faq";
-import Booking from "@/pages/booking";
-import Contact from "@/pages/contact";
-import ELearning from "@/pages/elearning";
+const About = lazy(() => import("@/pages/about"));
+const Research = lazy(() => import("@/pages/research"));
+const BlogList = lazy(() => import("@/pages/blog"));
+const BlogPost = lazy(() => import("@/pages/post"));
+const Publications = lazy(() => import("@/pages/publications"));
+const FAQ = lazy(() => import("@/pages/faq"));
+const Booking = lazy(() => import("@/pages/booking"));
+const Contact = lazy(() => import("@/pages/contact"));
+const ELearning = lazy(() => import("@/pages/elearning"));
 
 // LouisFarm Learning
-import AcademyRegister from "@/pages/academy/register";
-import AcademyLogin from "@/pages/academy/login";
-import AcademyDashboard from "@/pages/academy/dashboard";
-import AcademyClassroom from "@/pages/academy/classroom";
-import AcademyGroupWork from "@/pages/academy/group-work";
-import AcademyVerify from "@/pages/academy/verify";
-import AcademyForgotPassword from "@/pages/academy/forgot-password";
-import AcademyResetPassword from "@/pages/academy/reset-password";
-import AcademyProfile from "@/pages/academy/profile";
-import VerifyCertificate from "@/pages/academy/verify-certificate";
-import AcademyLive from "@/pages/academy/live";
-import AcademyParcours from "@/pages/academy/parcours";
-import AcademyProgramTest from "@/pages/academy/program-test";
+const AcademyRegister = lazy(() => import("@/pages/academy/register"));
+const AcademyLogin = lazy(() => import("@/pages/academy/login"));
+const AcademyDashboard = lazy(() => import("@/pages/academy/dashboard"));
+const AcademyClassroom = lazy(() => import("@/pages/academy/classroom"));
+const AcademyGroupWork = lazy(() => import("@/pages/academy/group-work"));
+const AcademyVerify = lazy(() => import("@/pages/academy/verify"));
+const AcademyForgotPassword = lazy(() => import("@/pages/academy/forgot-password"));
+const AcademyResetPassword = lazy(() => import("@/pages/academy/reset-password"));
+const AcademyProfile = lazy(() => import("@/pages/academy/profile"));
+const VerifyCertificate = lazy(() => import("@/pages/academy/verify-certificate"));
+const AcademyLive = lazy(() => import("@/pages/academy/live"));
+const AcademyParcours = lazy(() => import("@/pages/academy/parcours"));
+const AcademyProgramTest = lazy(() => import("@/pages/academy/program-test"));
 
 // Admin
-import AdminLogin from "@/pages/admin/login";
-import Dashboard from "@/pages/admin/dashboard";
+const AdminLogin = lazy(() => import("@/pages/admin/login"));
+const Dashboard = lazy(() => import("@/pages/admin/dashboard"));
 import { AdminLayout } from "@/components/admin/admin-layout";
 import { AcademyLayout } from "@/components/academy/academy-layout";
-import AdminPosts from "@/pages/admin/posts";
-import AdminPublications from "@/pages/admin/publications-admin";
-import AdminAppointments from "@/pages/admin/appointments-admin";
-import AdminMessages from "@/pages/admin/messages-admin";
-import AdminSubscribers from "@/pages/admin/subscribers-admin";
-import AdminComments from "@/pages/admin/comments-admin";
-import AdminProfile from "@/pages/admin/profile-admin";
-import AdminNewsletter from "@/pages/admin/newsletter-admin";
-import AdminTestimonials from "@/pages/admin/testimonials-admin";
-import AdminStudents from "@/pages/admin/students-admin";
-import AdminMeetings from "@/pages/admin/meetings-admin";
-import AdminStudentMessages from "@/pages/admin/student-messages-admin";
-import AdminGroupWork from "@/pages/admin/group-work-admin";
-import Stats from "@/pages/stats";
+const AdminPosts = lazy(() => import("@/pages/admin/posts"));
+const AdminPublications = lazy(() => import("@/pages/admin/publications-admin"));
+const AdminAppointments = lazy(() => import("@/pages/admin/appointments-admin"));
+const AdminMessages = lazy(() => import("@/pages/admin/messages-admin"));
+const AdminSubscribers = lazy(() => import("@/pages/admin/subscribers-admin"));
+const AdminComments = lazy(() => import("@/pages/admin/comments-admin"));
+const AdminProfile = lazy(() => import("@/pages/admin/profile-admin"));
+const AdminNewsletter = lazy(() => import("@/pages/admin/newsletter-admin"));
+const AdminTestimonials = lazy(() => import("@/pages/admin/testimonials-admin"));
+const AdminStudents = lazy(() => import("@/pages/admin/students-admin"));
+const AdminMeetings = lazy(() => import("@/pages/admin/meetings-admin"));
+const AdminStudentMessages = lazy(() => import("@/pages/admin/student-messages-admin"));
+const AdminGroupWork = lazy(() => import("@/pages/admin/group-work-admin"));
+const Stats = lazy(() => import("@/pages/stats"));
 import { getToken } from "@/lib/admin";
 import { isStudentLoggedIn } from "@/lib/student";
 import { useEffect } from "react";
@@ -90,6 +92,14 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <CookieConsent />
+          {/* Chaque page arrive à la demande. Sans ce découpage, ouvrir la page d'accueil
+              téléchargeait aussi les quinze écrans d'administration, la salle de cours et la
+              salle de réunion en direct — 863 Ko pour en utiliser une fraction. */}
+          <Suspense fallback={
+            <div className="min-h-screen flex items-center justify-center">
+              <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            </div>
+          }>
           <Switch>
             {/* Admin routes — must be before public catch-all */}
             <Route path="/admin/login" component={AdminLogin} />
@@ -142,6 +152,7 @@ function App() {
 
             <Route>{() => <Layout><NotFound /></Layout>}</Route>
           </Switch>
+          </Suspense>
         </TooltipProvider>
       </QueryClientProvider>
     </HelmetProvider>

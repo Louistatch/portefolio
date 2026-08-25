@@ -6,14 +6,15 @@
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx server/index.ts",
     "build": "tsx script/build.ts",
-    "build:vercel": "vite build --config vite.config.ts && node script/pages-partage.mjs",
+    "build:vercel": "vite build --config vite.config.ts && node script/pages-partage.mjs && node script/verify-poids.mjs",
     "start": "cross-env NODE_ENV=production node dist/index.cjs",
     "check": "tsc",
     "verify:exercises": "tsx script/verify-exercises.ts",
     "verify:routes": "node script/verify-routes.mjs",
     "verify:tests": "tsx script/verify-program-tests.ts",
     "db:push": "drizzle-kit push",
-    "verify:python": "node script/verify-python.mjs"
+    "verify:python": "node script/verify-python.mjs",
+    "verify:poids": "node script/verify-poids.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

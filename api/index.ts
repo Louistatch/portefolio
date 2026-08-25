@@ -6,9 +6,6 @@ import { Resend } from "resend";
 import multer from "multer";
 import crypto from "crypto";
 import path from "path";
-import sharp from "sharp";
-import { PDFDocument, rgb } from "pdf-lib";
-import fontkit from "@pdf-lib/fontkit";
 import fs from "fs";
 // Extension .js obligatoire : le paquet est en "type": "module", et Node ESM ne devine pas
 // l'extension d'un import relatif. Sans elle, le chargement de la fonction échoue en
@@ -841,6 +838,9 @@ app.get("/api/og-image", async (req, res) => {
     if (!response.ok) return res.status(404).send("Image not found");
     const arrayBuffer = await response.arrayBuffer();
     const inputBuffer = Buffer.from(arrayBuffer);
+
+    // Même raison qu'au certificat : sharp ne sert qu'ici et à la vignette du certificat.
+    const sharp = (await import("sharp")).default;
 
     // Convert to 1200x630 JPEG
     const outputBuffer = await sharp(inputBuffer)
@@ -4803,6 +4803,16 @@ function certificateFonts() {
 }
 
 async function certificatePdf(opts: Parameters<typeof certificateSvg>[0]): Promise<Buffer> {
+  // Chargés ici et pas en tête de fichier. L'API est UNE seule fonction serverless : tout ce
+  // qui est importé au sommet est chargé à chaque démarrage à froid, y compris pour une
+  // requête qui n'a rien à voir. pdf-lib, fontkit et leurs polices pèsent 2,45 Mo — mesurés —
+  // sur les 5,7 Mo de la fonction, et ne servent qu'ici, quelques fois par mois. Les
+  // basculer en import dynamique retire ce poids de la connexion, du tableau de bord et de
+  // l'ouverture d'une leçon, qui eux arrivent tous les jours.
+  const { PDFDocument, rgb } = await import("pdf-lib");
+  const fontkit = (await import("@pdf-lib/fontkit")).default;
+  const sharp = (await import("sharp")).default;
+
   const isFinal = opts.type === "final";
   const accent = isFinal ? rgb(0.486, 0.227, 0.929) : rgb(0.051, 0.580, 0.533);
   const slate900 = rgb(0.059, 0.090, 0.165);
