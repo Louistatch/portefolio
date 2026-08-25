@@ -18,6 +18,7 @@ import {
 } from "@shared/revision";
 import { QUESTIONS_TOF } from "@shared/tof-test";
 import { QUESTIONS_FCA } from "@shared/fca-test";
+import { QUESTIONS_FCQ } from "@shared/fcq-test";
 import { programById } from "@shared/programs";
 
 /**
@@ -37,6 +38,7 @@ import { programById } from "@shared/programs";
 const BANQUES_PARCOURS: Record<string, { domain: string; q: string; opts: string[] }[]> = {
   tof: QUESTIONS_TOF.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
   fca: QUESTIONS_FCA.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
+  fcq: QUESTIONS_FCQ.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
 };
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -567,11 +569,11 @@ export default function ELearning() {
         <section className="max-w-6xl mx-auto px-5 sm:px-6 pb-14">
           <div className="flex items-baseline gap-4 mb-6">
             <h2 className="font-serif text-2xl sm:text-[28px] font-semibold tracking-tight">
-              Trois parcours, trois portes d'entrée
+              Quatre parcours, quatre portes d'entrée
             </h2>
             <span className="flex-1 h-px bg-border" />
           </div>
-          <div className="grid md:grid-cols-3 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
                 code: "MEAL-01 · 02 · 03", teinte: "#0D9488", titre: "Cursus MEAL",
@@ -587,6 +589,14 @@ export default function ELearning() {
                 titreDelivre: "Certificat d'Analyste du Risque Climatique Agricole",
                 fond: "bg-amber-50 dark:bg-amber-950/30", encre: "text-amber-800 dark:text-amber-300",
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("fca") },
+              },
+              {
+                code: "FCQ-01", teinte: "#7C2D12", titre: "Finance climatique quantitative",
+                texte: "Le même portefeuille que le parcours analyste, prêt par prêt : simuler une distribution de pertes, chiffrer l'effet de la corrélation, auditer le risque de base d'un produit indiciel.",
+                lignes: [["Leçons", "7"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"], ["Prérequis", "Python"]],
+                titreDelivre: "Certificat de Quantitativiste du Risque Climatique Agricole",
+                fond: "bg-amber-100/70 dark:bg-amber-950/50", encre: "text-amber-900 dark:text-amber-200",
+                action: { libelle: "Passer le test", onClick: () => demarrerTest("fcq") },
               },
               {
                 code: "TOF-FIN-01", teinte: "#7C3AED", titre: "Formation de formateurs",

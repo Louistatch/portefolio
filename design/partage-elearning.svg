@@ -5,13 +5,17 @@
 
     Elle est lue en tout petit dans une conversation WhatsApp : c'est ce qui commande la
     composition. Peu de mots, très gros, et trois blocs dont la couleur suffit à distinguer
-    les parcours même quand le texte devient illisible. Les couleurs sont celles déclarées
+    les disciplines même quand le texte devient illisible. Les couleurs sont celles déclarées
     dans shared/programs.ts, pour qu'on retrouve la même chose en arrivant sur le site.
 
     Elle annonçait auparavant le seul cursus MEAL et ses trois outils — KoboCollect, QGIS,
-    Python. LouisFarm délivre depuis trois certificats distincts : partager le lien faisait
-    la promotion d'un tiers de l'offre, et les deux parcours les plus récents restaient
-    invisibles au moment précis où le lien circule dans un groupe.
+    Python. LouisFarm délivre depuis quatre certificats distincts : partager le lien faisait
+    la promotion d'un quart de l'offre, et les parcours les plus récents restaient invisibles
+    au moment précis où le lien circule dans un groupe.
+
+    Trois blocs pour quatre parcours : la finance climatique compte deux niveaux — analyste
+    puis quantitatif — et quatre pastilles deviennent illisibles réduites à 300 px de large.
+    Un bloc par discipline, le niveau en sous-titre.
 
     La composition a été mise au point dans Canva (design « Professional digital card
     design for LouisFarm Learning ») puis reportée ici, parce que c'est ce fichier que le
@@ -46,9 +50,9 @@
   </g>
 
   <!-- ── Accroche ──
-       Sur deux lignes plutôt qu'une : « Trois parcours certifiants » d'un seul tenant
-       imposerait un corps de 44, deux fois plus petit, illisible en vignette. -->
-  <text x="70" y="222" font-size="66" font-weight="bold" fill="#ffffff">Trois parcours</text>
+       Sur deux lignes plutôt qu'une : « Quatre parcours certifiants » d'un seul tenant
+       imposerait un corps de 42, deux fois plus petit, illisible en vignette. -->
+  <text x="70" y="222" font-size="66" font-weight="bold" fill="#ffffff">Quatre parcours</text>
   <text x="70" y="300" font-size="66" font-weight="bold" fill="#5ce6a2">certifiants</text>
 
   <text x="70" y="352" font-size="26" fill="#ffffff" fill-opacity="0.72">100 % gratuits · Afrique de l'Ouest</text>
@@ -70,7 +74,7 @@
     <g transform="translate(720,0)">
       <rect width="340" height="92" rx="16" fill="#b45309"/>
       <text x="18" y="38" font-size="19" font-weight="bold" fill="#ffffff">Finance climatique agricole</text>
-      <text x="18" y="66" font-size="15" fill="#ffffff" fill-opacity="0.82">Risque climatique et crédit</text>
+      <text x="18" y="66" font-size="15" fill="#ffffff" fill-opacity="0.82">Analyste, puis quantitatif (Python)</text>
     </g>
   </g>
 

@@ -87,6 +87,32 @@ export const PROGRAMS: Program[] = [
     // et l'arithmétique financière, pas sur Python. Vingt questions, seuil à 70 %.
     admission: { nbQuestions: 20, seuil: 14, surStudents: false },
   },
+  {
+    id: "fcq",
+    prefix: "FCQ-",
+    title: "Finance climatique quantitative",
+    subtitle: "Le portefeuille prêt par prêt : simulation, corrélation, risque de base",
+    // Second niveau de la même discipline que « fca », et non un quatrième domaine. Deux
+    // conséquences assumées :
+    //
+    //   — l'accent est un cran plus sombre du MÊME ambre. Une quatrième teinte catégorielle
+    //     se séparant des trois autres sous daltonisme n'existe pas une fois teal, violet et
+    //     ambre pris : toutes les candidates échouent au contrôle de séparation. Regrouper
+    //     les deux niveaux d'une même discipline est la sortie honnête, et c'est aussi la
+    //     plus juste — ce sont bien deux niveaux, pas deux domaines ;
+    //
+    //   — c'est malgré tout un PARCOURS à part, pas un cours de plus sous « fca ».
+    //     grantProgramAdmission inscrit à tous les cours portant le préfixe du parcours : un
+    //     cours Python nommé FCA-02 s'ouvrirait donc automatiquement à quiconque a réussi un
+    //     test explicitement sans code.
+    credential: "Certificat de Quantitativiste du Risque Climatique Agricole",
+    outcome: "Simuler une distribution de pertes, chiffrer l'effet de la corrélation entre zones, auditer le risque de base d'un produit indiciel, produire un notebook auditable.",
+    accent: "#7c2d12",
+    lessonsPerWeek: 1,
+    // Python est un PRÉREQUIS, pas un objectif : le test porte sur ce qu'il faut déjà
+    // savoir faire — lire du pandas, une probabilité, un quantile. Vingt questions, 70 %.
+    admission: { nbQuestions: 20, seuil: 14, surStudents: false },
+  },
 ];
 
 /** Parcours auquel appartient un cours, d'après son code. */

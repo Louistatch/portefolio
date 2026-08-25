@@ -1,0 +1,1122 @@
+/**
+ * Contenu du cours FCQ-01 — Portefeuille agricole en Python : simulation, corrélation,
+ * risque de base.
+ *
+ * Second niveau de la finance climatique agricole. Le parcours « analyste » (FCA-01) calcule
+ * à la main ou dans un tableur ; celui-ci reprend LE MÊME portefeuille et va là où le calcul
+ * à la main ne peut pas aller.
+ *
+ * ── Pourquoi un second cours, et pas six leçons de plus dans le premier ──
+ *
+ * Les deux s'adressent à des gens différents. FCA-01 vise l'agent de crédit et le chargé de
+ * portefeuille d'un SFD : son test d'admission ne demande aucun code, délibérément. Ce
+ * cours-ci demande Python en prérequis. Le mécanisme d'inscription tranche d'ailleurs la
+ * question à lui seul : `grantProgramAdmission` inscrit à TOUS les cours dont le code porte
+ * le préfixe du parcours. Un cours Python nommé FCA-02 s'ouvrirait donc automatiquement à
+ * quiconque a réussi un test sans code — on mettrait du Python devant des gens qui ne l'ont
+ * jamais demandé.
+ *
+ * ── Ce que le code apporte, et que le tableur ne peut pas ──
+ *
+ * Trois choses, et le cours est construit autour d'elles :
+ *
+ *   1. LA DISTRIBUTION, pas le scénario. FCA-01 répond « une mauvaise saison coûte 13,5 % ».
+ *      Un comité de crédit demande ensuite : « et quel capital immobiliser ? » Cette
+ *      question n'a de réponse que dans une distribution de pertes, donc par simulation.
+ *   2. LA CORRÉLATION. Mille deux cents prêts dans trois zones ne font pas mille deux cents
+ *      risques. Le tableur ne sait pas le montrer ; dix lignes de code le chiffrent.
+ *   3. LE RISQUE DE BASE, dans les deux sens. Un produit indiciel qui paie quand la perte
+ *      n'a pas eu lieu, et qui ne paie pas quand elle a eu lieu. Le backtest se fait sur
+ *      série longue, pas sur un exemple.
+ *
+ * ── Le même portefeuille que FCA-01 ──
+ *
+ * 480 millions FCFA d'encours, 1 200 prêts, trois zones à 50 / 30 / 20 %. En saison normale
+ * PD 7 % et LGD 60 %, soit une perte attendue de 4,2 % — 20,16 millions FCFA. En saison
+ * déficitaire sur la zone A, PD 18 % et LGD 75 % portent la zone à 13,5 % et l'ensemble à
+ * 8,85 %. Ces chiffres sont ceux du premier cours, à la décimale près : l'étudiant qui a
+ * suivi les deux doit retrouver ses repères, pas réapprendre un cas.
+ *
+ * ── Sur les chiffres, comme dans FCA-01 ──
+ *
+ *   — les données RÉGLEMENTAIRES sont datées et sourcées (taux d'usure UEMOA, 24 % TAEG
+ *     pour les SFD depuis le 1er juin 2026, décision n°19/29-12-2025/CM/UMOA) ;
+ *   — les données de PORTEFEUILLE sont fictives, construites pour être réalistes et
+ *     recalculables. Chaque énoncé le dit.
+ *
+ * ── La plateforme n'exécute pas le code ──
+ *
+ * Les cellules `code` sont statiques : « Exécuter » révèle une sortie enregistrée. Le cours
+ * est écrit en conséquence — l'étudiant fait tourner le code chez lui (Colab suffit), et il
+ * est noté sur les RÉSULTATS et leur lecture, jamais sur la syntaxe qu'il a tapée. Toutes
+ * les sorties affichées ici sont celles du code affiché, avec la graine indiquée.
+ */
+
+export type CelluleFcq =
+  | { type: "md"; content: string }
+  | { type: "callout"; title: string; content: string; variant: "info" | "warning" | "success" | "tip" }
+  | { type: "code"; lang: string; code: string; output?: string }
+  | { type: "quiz"; question: string; opts: string[]; ans: number }
+  | {
+      type: "exercise"; id: string; kind: "number" | "choice" | "text";
+      title: string; prompt: string; answer: any;
+      opts?: string[]; accept?: string[]; tolerance?: number; unit?: string;
+      hint?: string; explain: string;
+    }
+  | { type: "resource"; title: string; url: string; desc: string; provider: string };
+
+export interface LeconFcq {
+  ordre: number;
+  titre: string;
+  points: number;
+  cellules: CelluleFcq[];
+}
+
+export const FCQ_01 = {
+  code: "FCQ-01",
+  titre: "Portefeuille agricole en Python : simulation, corrélation, risque de base",
+  description:
+    "Reprendre un portefeuille de crédit agricole prêt par prêt et répondre aux questions "
+    + "qu'un scénario unique ne permet pas de poser : quel capital immobiliser, ce que vaut "
+    + "la diversification entre zones, et combien de fois une assurance indicielle se trompe. "
+    + "pandas, NumPy, simulation Monte Carlo, backtest. Python est un prérequis, pas un "
+    + "objectif du cours.",
+  niveau: "avance",
+  outils: ["Python", "pandas", "NumPy", "Monte Carlo", "Backtest"],
+};
+
+export const LECONS_FCQ_01: LeconFcq[] = [
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    ordre: 1,
+    titre: "Du tableau à la table : les 1 200 prêts derrière les 480 millions",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Un agrégat cache toujours une distribution\n\n"
+          + "Dans le parcours analyste, le portefeuille tient en trois lignes : zone A 50 % de "
+          + "l'encours, zone B 30 %, zone C 20 %, pour 480 millions FCFA. C'est suffisant pour "
+          + "calculer une perte attendue, et c'est ce qu'on a fait.\n\n"
+          + "Ce n'est plus suffisant dès qu'on demande **combien immobiliser**. Cette question "
+          + "porte sur la queue de la distribution, et une moyenne n'a pas de queue. Il faut "
+          + "redescendre au prêt.\n\n"
+          + "Le portefeuille de ce cours est le même, décomposé :\n\n"
+          + "| Zone | Prêts | Encours | Part |\n"
+          + "|---|---:|---:|---:|\n"
+          + "| A | 600 | 240 000 000 | 50 % |\n"
+          + "| B | 360 | 144 000 000 | 30 % |\n"
+          + "| C | 240 | 96 000 000 | 20 % |\n"
+          + "| **Total** | **1 200** | **480 000 000** | **100 %** |\n\n"
+          + "Portefeuille fictif, construit pour être recalculable. L'encours moyen est de "
+          + "400 000 FCFA dans les trois zones — une simplification assumée, qu'on lèvera en "
+          + "leçon 5.",
+      },
+      {
+        type: "code",
+        lang: "python",
+        code:
+          "import numpy as np\n"
+          + "import pandas as pd\n"
+          + "\n"
+          + "rng = np.random.default_rng(2026)\n"
+          + "\n"
+          + "# Le portefeuille de FCA-01, prêt par prêt.\n"
+          + "zones = {\"A\": 600, \"B\": 360, \"C\": 240}\n"
+          + "pret = pd.DataFrame({\n"
+          + "    \"zone\": np.repeat(list(zones), list(zones.values())),\n"
+          + "    \"ead\": 400_000.0,          # encours restant dû, FCFA\n"
+          + "})\n"
+          + "pret[\"pd_base\"] = 0.07         # probabilité de défaut, saison normale\n"
+          + "pret[\"lgd\"] = 0.60             # perte en cas de défaut\n"
+          + "\n"
+          + "print(pret.groupby(\"zone\")[\"ead\"].agg([\"count\", \"sum\"]))\n"
+          + "print(\"encours total :\", f\"{pret['ead'].sum():,.0f} FCFA\")",
+        output:
+          "      count          sum\n"
+          + "zone                    \n"
+          + "A       600  240000000.0\n"
+          + "B       360  144000000.0\n"
+          + "C       240   96000000.0\n"
+          + "encours total : 480,000,000 FCFA",
+      },
+      {
+        type: "md",
+        content:
+          "## Le premier réflexe : retrouver ce qu'on sait déjà\n\n"
+          + "Avant d'utiliser une table pour répondre à une question neuve, on lui fait "
+          + "recracher un résultat qu'on connaît. Si elle ne retrouve pas les 4,2 % du premier "
+          + "cours, c'est la table qui est fausse, pas le monde.\n\n"
+          + "C'est un contrôle bête et c'est le plus rentable de tout le cours : une erreur "
+          + "d'assemblage introduite ici se propage dans les six leçons suivantes sans jamais "
+          + "lever d'exception.",
+      },
+      {
+        type: "code",
+        lang: "python",
+        code:
+          "pret[\"el\"] = pret[\"ead\"] * pret[\"pd_base\"] * pret[\"lgd\"]\n"
+          + "\n"
+          + "el_total = pret[\"el\"].sum()\n"
+          + "ead_total = pret[\"ead\"].sum()\n"
+          + "\n"
+          + "print(f\"perte attendue : {el_total:,.0f} FCFA\")\n"
+          + "print(f\"en % de l'encours : {el_total / ead_total:.2%}\")",
+        output:
+          "perte attendue : 20,160,000 FCFA\n"
+          + "en % de l'encours : 4.20%",
+      },
+      {
+        type: "callout",
+        title: "20,16 millions, 4,20 % — les chiffres de FCA-01",
+        variant: "success",
+        content:
+          "La table de 1 200 lignes redonne exactement ce que trois lignes de tableur "
+          + "donnaient. C'est normal : tant qu'on ne demande qu'une moyenne, descendre au prêt "
+          + "n'apporte rien. Tout l'intérêt commence à la leçon 4, quand on demandera autre "
+          + "chose qu'une moyenne.",
+      },
+      {
+        type: "exercise",
+        id: "fcq1-ex1",
+        kind: "number",
+        title: "Perte attendue de la zone A seule",
+        prompt:
+          "Avec les paramètres de saison normale (PD 7 %, LGD 60 %) et un encours de "
+          + "240 000 000 FCFA sur la zone A, quelle est la perte attendue de cette zone, en "
+          + "millions de FCFA ?",
+        answer: 10.08,
+        tolerance: 0.05,
+        unit: "millions FCFA",
+        hint: "240 000 000 × 0,07 × 0,60, puis divisé par un million.",
+        explain:
+          "240 000 000 × 0,07 × 0,60 = 10 080 000 FCFA, soit 10,08 millions. La zone A porte "
+          + "la moitié de l'encours, donc la moitié de la perte attendue du portefeuille "
+          + "(20,16 millions) tant que ses paramètres sont ceux des autres zones. C'est "
+          + "précisément cette symétrie que la saison déficitaire va casser.",
+      },
+      {
+        type: "exercise",
+        id: "fcq1-ex2",
+        kind: "choice",
+        title: "À quoi sert le contrôle de retour",
+        prompt:
+          "Vous assemblez la table et elle donne une perte attendue de 4,20 %, conforme au "
+          + "cours précédent. Que prouve exactement ce contrôle ?",
+        opts: [
+          "Que le modèle de risque est juste",
+          "Que la table reproduit bien les hypothèses de départ, rien de plus",
+          "Que les 1 200 prêts sont représentatifs du marché",
+          "Que la perte réelle sera de 4,20 %",
+        ],
+        answer: 1,
+        explain:
+          "Il prouve seulement que l'assemblage ne trahit pas les hypothèses. PD 7 % et "
+          + "LGD 60 % restent des hypothèses : le contrôle ne les valide pas, il vérifie "
+          + "qu'elles traversent le code sans se déformer. Confondre les deux est la manière la "
+          + "plus courante de se croire rigoureux.",
+      },
+      {
+        type: "exercise",
+        id: "fcq1-ex3",
+        kind: "number",
+        title: "Encours moyen de la zone C",
+        prompt:
+          "La zone C compte 240 prêts pour 96 000 000 FCFA d'encours. Quel est l'encours moyen "
+          + "par prêt, en FCFA ?",
+        answer: 400000,
+        tolerance: 1,
+        unit: "FCFA",
+        hint: "Une division.",
+        explain:
+          "96 000 000 / 240 = 400 000 FCFA. Les trois zones partagent le même encours moyen "
+          + "dans cette version du portefeuille — hypothèse simplificatrice que la leçon 5 "
+          + "lèvera, car c'est justement la dispersion des tailles de prêt qui décide de "
+          + "l'effet de concentration.",
+      },
+      {
+        type: "resource",
+        title: "pandas — Group by: split-apply-combine",
+        url: "https://pandas.pydata.org/docs/user_guide/groupby.html",
+        desc:
+          "La documentation officielle du groupby. À lire une fois en entier : la moitié des "
+          + "boucles écrites à la main dans un notebook d'analyse de portefeuille s'y réduisent "
+          + "à une ligne.",
+        provider: "pandas",
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    ordre: 2,
+    titre: "La perte attendue vectorisée, et pourquoi la moyenne ne suffit pas",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Une saison déficitaire, sur la zone A seulement\n\n"
+          + "Le premier cours a établi qu'une saison à déficit marqué porte la zone A de "
+          + "PD 7 % / LGD 60 % à **PD 18 % / LGD 75 %**, soit une perte attendue de 13,5 % sur "
+          + "cette zone. Les zones B et C restent à 4,2 %.\n\n"
+          + "En Python, le scénario ne se recalcule pas : il se **substitue**, sur les lignes "
+          + "concernées, et le total se recompose tout seul.",
+      },
+      {
+        type: "code",
+        lang: "python",
+        code:
+          "stress = pret.copy()\n"
+          + "touche = stress[\"zone\"] == \"A\"\n"
+          + "stress.loc[touche, \"pd_base\"] = 0.18\n"
+          + "stress.loc[touche, \"lgd\"] = 0.75\n"
+          + "stress[\"el\"] = stress[\"ead\"] * stress[\"pd_base\"] * stress[\"lgd\"]\n"
+          + "\n"
+          + "par_zone = stress.groupby(\"zone\").apply(\n"
+          + "    lambda g: pd.Series({\n"
+          + "        \"encours\": g[\"ead\"].sum(),\n"
+          + "        \"perte\": g[\"el\"].sum(),\n"
+          + "        \"el_pct\": g[\"el\"].sum() / g[\"ead\"].sum(),\n"
+          + "    })\n"
+          + ")\n"
+          + "print(par_zone)\n"
+          + "print(f\"\\nportefeuille : {stress['el'].sum() / stress['ead'].sum():.2%}\")",
+        output:
+          "         encours       perte  el_pct\n"
+          + "zone                                \n"
+          + "A     240000000.0  32400000.0   0.135\n"
+          + "B     144000000.0   6048000.0   0.042\n"
+          + "C      96000000.0   4032000.0   0.042\n"
+          + "\n"
+          + "portefeuille : 8.85%",
+      },
+      {
+        type: "callout",
+        title: "8,85 % — encore un chiffre du premier cours",
+        variant: "success",
+        content:
+          "Une zone à 13,5 % et deux zones à 4,2 % donnent 8,85 % au niveau du portefeuille. "
+          + "Le seuil finançable est à 7 % : le portefeuille passe au-dessus, mais moins "
+          + "spectaculairement que les 13,5 % de la zone A prise seule. Citer 13,5 % pour "
+          + "décrire l'ensemble serait faux — et un analyste en face le verra.",
+      },
+      {
+        type: "exercise",
+        id: "fcq2-ex1",
+        kind: "number",
+        title: "Le dépassement en francs",
+        prompt:
+          "Le seuil finançable est de 7 % de l'encours. Avec une perte attendue de 8,85 % sur "
+          + "480 millions FCFA, de combien de millions FCFA le portefeuille dépasse-t-il ce "
+          + "seuil ?",
+        answer: 8.88,
+        tolerance: 0.1,
+        unit: "millions FCFA",
+        hint: "L'écart en points de pourcentage, appliqué à l'encours.",
+        explain:
+          "8,85 % − 7 % = 1,85 point. 480 000 000 × 0,0185 = 8 880 000 FCFA, soit "
+          + "8,88 millions. Traduire un écart de points en francs est ce qui fait passer une "
+          + "note d'analyse du registre du constat à celui de la décision : 1,85 point ne "
+          + "parle à personne, 8,88 millions à couvrir parle à tout le monde.",
+      },
+      {
+        type: "md",
+        content:
+          "## Ce que la moyenne ne dit pas\n\n"
+          + "Le calcul ci-dessus répond à « combien perd-on en moyenne si cette saison "
+          + "survient ». Il ne répond à aucune de ces trois questions, que pose n'importe quel "
+          + "comité :\n\n"
+          + "- **À quelle fréquence** une telle saison survient-elle ?\n"
+          + "- Quelle perte ne sera dépassée que dans **1 % des cas** ?\n"
+          + "- Si les trois zones sont frappées **ensemble**, de combien la perte enfle-t-elle ?\n\n"
+          + "Aucune ne se traite avec une multiplication. Toutes les trois se traitent par "
+          + "simulation, et c'est l'objet des leçons 3 à 5.",
+      },
+      {
+        type: "exercise",
+        id: "fcq2-ex2",
+        kind: "choice",
+        title: "Ce qu'un scénario unique ne peut pas produire",
+        prompt:
+          "Votre comité de crédit demande : « quel capital devons-nous immobiliser pour "
+          + "absorber une mauvaise année sur ce portefeuille ? » Pourquoi le calcul de "
+          + "scénario ci-dessus ne suffit-il pas à répondre ?",
+        opts: [
+          "Parce qu'il utilise des données fictives",
+          "Parce qu'il donne une perte moyenne conditionnelle, alors que la question porte sur un quantile de la distribution",
+          "Parce qu'il ne tient pas compte du taux d'usure",
+          "Parce qu'il faudrait plus de 1 200 prêts",
+        ],
+        answer: 1,
+        explain:
+          "Le scénario répond « si cette saison survient, la perte moyenne est de 8,85 % ». La "
+          + "question du capital porte sur un quantile — la perte dépassée seulement 1 fois sur "
+          + "100 — donc sur la forme de toute la distribution, pas sur un de ses points. Aucun "
+          + "raffinement du scénario ne comblera cet écart : c'est un changement d'objet, pas "
+          + "de précision.",
+      },
+      {
+        type: "exercise",
+        id: "fcq2-ex3",
+        kind: "number",
+        title: "Sensibilité à la LGD",
+        prompt:
+          "Restons en saison déficitaire sur la zone A, mais supposons que la garantie soit "
+          + "mieux réalisée : la LGD de la zone A tombe de 75 % à 60 %, la PD restant à 18 %. "
+          + "Quelle devient la perte attendue de la zone A, en pourcentage de son encours ? "
+          + "Répondez en pourcentage, par exemple 12,5 pour 12,5 %.",
+        answer: 10.8,
+        tolerance: 0.1,
+        unit: "%",
+        hint: "PD × LGD.",
+        explain:
+          "0,18 × 0,60 = 10,8 %. Récupérer 15 points de LGD retire 2,7 points de perte "
+          + "attendue sur la zone — davantage que ce que rapporterait une baisse équivalente de "
+          + "la PD, parce que les deux se multiplient. C'est l'argument chiffré en faveur du "
+          + "travail sur les sûretés plutôt que sur la seule sélection des emprunteurs.",
+      },
+      {
+        type: "quiz",
+        question:
+          "Dans ce portefeuille, la zone A pèse 50 % de l'encours. En saison déficitaire sur "
+          + "A seule, quelle part de la perte attendue totale la zone A représente-t-elle ?",
+        opts: ["50 %", "Environ 64 %", "Environ 76 %", "100 %"],
+        ans: 2,
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    ordre: 3,
+    titre: "La saison comme variable aléatoire : de la fréquence à la période de retour",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## « Une mauvaise saison » n'est pas une hypothèse tant qu'on n'a pas dit à quelle fréquence\n\n"
+          + "Le premier cours calcule ce que coûte une saison déficitaire. Il ne dit pas combien "
+          + "de fois elle survient — et sans cette fréquence, le chiffre ne peut ni être "
+          + "provisionné, ni être tarifé, ni être comparé à un autre portefeuille.\n\n"
+          + "On travaille donc avec une **probabilité de saison déficitaire**, notée `p`, tirée "
+          + "d'une série de cumuls pluviométriques : la part des années où le cumul de la "
+          + "période végétative tombe sous le seuil retenu.\n\n"
+          + "La **période de retour** en est l'inverse : `T = 1 / p`. Une saison décennale a "
+          + "p = 0,10 ; une saison quinquennale, p = 0,20.",
+      },
+      {
+        type: "callout",
+        title: "p = 0,20 est une hypothèse de travail, pas un résultat",
+        variant: "warning",
+        content:
+          "Tout ce cours utilise p = 0,20, soit une saison déficitaire tous les cinq ans en "
+          + "moyenne. C'est une valeur plausible pour une zone soudano-sahélienne, et c'est "
+          + "tout : elle n'est pas tirée d'une série publiée. Sur un dossier réel, elle "
+          + "s'estime sur trente ans de données au moins — et elle s'écrit dans la note, avec "
+          + "sa source et la période couverte. Une probabilité sans provenance est un chiffre "
+          + "d'apparence, et c'est exactement ce qu'un comité de diligence cherche.",
+      },
+      {
+        type: "code",
+        lang: "python",
+        code:
+          "# Série fictive de cumuls (mm) sur la période végétative, 30 saisons, zone A.\n"
+          + "cumuls = np.array([\n"
+          + "    612, 548, 701, 466, 585, 634, 512, 398, 672, 559,\n"
+          + "    623, 441, 596, 688, 505, 372, 641, 574, 619, 483,\n"
+          + "    660, 528, 415, 607, 651, 492, 583, 664, 537, 601,\n"
+          + "])\n"
+          + "\n"
+          + "SEUIL = 480          # mm sous lesquels la campagne est réputée déficitaire\n"
+          + "deficit = cumuls < SEUIL\n"
+          + "\n"
+          + "p = deficit.mean()\n"
+          + "print(f\"saisons déficitaires : {deficit.sum()} sur {len(cumuls)}\")\n"
+          + "print(f\"p = {p:.3f}   période de retour = {1/p:.1f} ans\")",
+        output:
+          "saisons déficitaires : 6 sur 30\n"
+          + "p = 0.200   période de retour = 5.0 ans",
+      },
+      {
+        type: "exercise",
+        id: "fcq3-ex1",
+        kind: "number",
+        title: "Période de retour d'une saison décennale",
+        prompt:
+          "Sur une autre zone, la série montre 3 saisons déficitaires sur 30. Quelle est la "
+          + "période de retour, en années ?",
+        answer: 10,
+        tolerance: 0.2,
+        unit: "ans",
+        hint: "p = 3/30, puis T = 1/p.",
+        explain:
+          "p = 3/30 = 0,10, donc T = 1/0,10 = 10 ans. Attention au sens de la phrase : « une "
+          + "saison décennale » ne veut pas dire « une tous les dix ans régulièrement », mais "
+          + "« une chance sur dix chaque année ». Deux saisons décennales peuvent tomber deux "
+          + "années de suite — c'est même beaucoup moins rare qu'on ne le croit : 1 % des "
+          + "paires d'années consécutives.",
+      },
+      {
+        type: "exercise",
+        id: "fcq3-ex2",
+        kind: "number",
+        title: "Deux bonnes saisons de suite",
+        prompt:
+          "Avec p = 0,20 pour une saison déficitaire et des saisons indépendantes d'une année "
+          + "sur l'autre, quelle est la probabilité d'observer deux saisons NORMALES "
+          + "consécutives ? Répondez en pourcentage, par exemple 25 pour 25 %.",
+        answer: 64,
+        tolerance: 0.5,
+        unit: "%",
+        hint: "0,8 × 0,8.",
+        explain:
+          "0,80 × 0,80 = 0,64, soit 64 %. L'énoncé pose l'indépendance entre années — c'est "
+          + "une hypothèse commode et discutable : les régimes pluviométriques présentent une "
+          + "persistance, et une série d'années sèches groupées est plus probable que ce calcul "
+          + "ne le suggère. Le dire dans la note vaut mieux que de laisser le lecteur le "
+          + "découvrir.",
+      },
+      {
+        type: "exercise",
+        id: "fcq3-ex3",
+        kind: "choice",
+        title: "Ce que change le seuil",
+        prompt:
+          "Vous abaissez le seuil de déficit de 480 mm à 440 mm, la série restant la même. "
+          + "Qu'arrive-t-il à p et à la perte attendue calculée à partir de p ?",
+        opts: [
+          "p augmente, la perte attendue augmente",
+          "p diminue, la perte attendue diminue — mais les saisons retenues sont plus sévères",
+          "p diminue, la perte attendue ne change pas",
+          "Ni p ni la perte attendue ne changent, le seuil n'est qu'une convention",
+        ],
+        answer: 1,
+        explain:
+          "Un seuil plus bas retient moins de saisons, donc p diminue et la perte attendue "
+          + "calculée diminue mécaniquement. Le piège est là : les saisons ainsi retenues sont "
+          + "plus sévères, donc les PD et LGD associées devraient monter. Déplacer le seuil "
+          + "sans réviser les paramètres qu'il conditionne est la façon la plus discrète de "
+          + "faire baisser un risque sur le papier.",
+      },
+      {
+        type: "resource",
+        title: "AGRHYMET — Centre régional de la CEDEAO",
+        url: "https://agrhymet.cilss.int/",
+        desc:
+          "Le producteur de référence des bulletins agrométéorologiques pour le Sahel et "
+          + "l'Afrique de l'Ouest. C'est la source à citer pour une série de cumuls régionale, "
+          + "plutôt qu'un jeu de données mondial reprojeté.",
+        provider: "CILSS / CEDEAO",
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    ordre: 4,
+    titre: "Simuler le portefeuille : de la perte moyenne au capital à immobiliser",
+    points: 120,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Le modèle tient en une phrase\n\n"
+          + "Chaque saison, chaque zone est **normale** (PD 7 %, LGD 60 %) ou **déficitaire** "
+          + "(PD 18 %, LGD 75 %), avec p = 0,20. On tire dix mille saisons, on calcule la perte "
+          + "du portefeuille dans chacune, et on regarde la distribution obtenue.\n\n"
+          + "Commençons par le cas où les trois zones sont **indépendantes** — une hypothèse "
+          + "fausse, on le verra en leçon 5, mais qui sert de point de comparaison.",
+      },
+      {
+        type: "code",
+        lang: "python",
+        code:
+          "ENCOURS = {\"A\": 240e6, \"B\": 144e6, \"C\": 96e6}\n"
+          + "EL_NORMALE, EL_DEFICIT = 0.042, 0.135\n"
+          + "P_DEFICIT = 0.20\n"
+          + "N = 10_000\n"
+          + "\n"
+          + "rng = np.random.default_rng(2026)\n"
+          + "\n"
+          + "# Une colonne par zone : True si la saison y est déficitaire.\n"
+          + "tirages = rng.random((N, 3)) < P_DEFICIT\n"
+          + "\n"
+          + "pertes = np.zeros(N)\n"
+          + "for i, (zone, encours) in enumerate(ENCOURS.items()):\n"
+          + "    taux = np.where(tirages[:, i], EL_DEFICIT, EL_NORMALE)\n"
+          + "    pertes += encours * taux\n"
+          + "\n"
+          + "print(f\"perte moyenne : {pertes.mean()/1e6:8.2f} M FCFA  ({pertes.mean()/480e6:.2%})\")\n"
+          + "print(f\"écart-type    : {pertes.std()/1e6:8.2f} M FCFA\")\n"
+          + "print(f\"médiane       : {np.median(pertes)/1e6:8.2f} M FCFA\")\n"
+          + "print(f\"VaR 99 %      : {np.quantile(pertes, 0.99)/1e6:8.2f} M FCFA  \"\n"
+          + "      f\"({np.quantile(pertes, 0.99)/480e6:.2%})\")",
+        output:
+          "perte moyenne :    29.05 M FCFA  (6.05%)\n"
+          + "écart-type    :    10.98 M FCFA\n"
+          + "médiane       :    29.09 M FCFA\n"
+          + "VaR 99 %      :    55.87 M FCFA  (11.64%)",
+      },
+      {
+        type: "callout",
+        title: "Le 4,2 % du premier cours était un chiffre de saison normale",
+        variant: "warning",
+        content:
+          "La perte moyenne ressort à **6,05 %**, pas à 4,2 %. Aucune contradiction : 4,2 % est "
+          + "la perte attendue **si la saison est normale**, et la simulation intègre le fait "
+          + "qu'une saison sur cinq ne l'est pas. C'est une distinction que beaucoup de notes "
+          + "d'analyse manquent — annoncer 4,2 % comme la perte attendue d'un portefeuille, "
+          + "c'est annoncer un chiffre conditionnel en le présentant comme inconditionnel, et "
+          + "sous-provisionner d'un tiers.",
+      },
+      {
+        type: "md",
+        content:
+          "## Vérifier la simulation contre le calcul exact\n\n"
+          + "Avec trois zones à deux états, il n'y a que huit configurations possibles : la "
+          + "distribution s'énumère à la main, et la simulation doit y converger. Le faire est "
+          + "la seule façon de distinguer un modèle juste d'un générateur de nombres "
+          + "plausibles.\n\n"
+          + "| Zones déficitaires | Probabilité | Perte |\n"
+          + "|---|---:|---:|\n"
+          + "| aucune | 51,2 % | 20,16 M |\n"
+          + "| C seule | 12,8 % | 29,09 M |\n"
+          + "| B seule | 12,8 % | 33,55 M |\n"
+          + "| A seule | 12,8 % | **42,48 M** |\n"
+          + "| B + C | 3,2 % | 42,48 M |\n"
+          + "| A + C | 3,2 % | 51,41 M |\n"
+          + "| A + B | 3,2 % | 55,87 M |\n"
+          + "| les trois | 0,8 % | 64,80 M |\n\n"
+          + "La moyenne exacte vaut 29,088 M et la VaR 99 % exacte 55,872 M : la simulation "
+          + "tombe dessus. Et la ligne « A seule » donne 42,48 M, soit **8,85 %** — le chiffre "
+          + "du premier cours, retrouvé comme un cas particulier.",
+      },
+      {
+        type: "exercise",
+        id: "fcq4-ex1",
+        kind: "number",
+        title: "Le capital au-delà de la perte moyenne",
+        prompt:
+          "Un établissement provisionne la perte moyenne (29,09 millions FCFA) et veut du "
+          + "capital pour couvrir jusqu'à la VaR 99 % (55,87 millions). Combien de millions "
+          + "FCFA de capital, au-delà des provisions, doit-il immobiliser ?",
+        answer: 26.78,
+        tolerance: 0.3,
+        unit: "millions FCFA",
+        hint: "La perte inattendue est l'écart entre le quantile et la moyenne.",
+        explain:
+          "55,87 − 29,09 = 26,78 millions FCFA. C'est la **perte inattendue** : les provisions "
+          + "couvrent ce qu'on s'attend à perdre, le capital couvre l'écart entre cela et un "
+          + "mauvais scénario. Cette distinction est celle que le comité attend ; la confondre "
+          + "conduit à provisionner deux fois la même chose, ou à ne rien couvrir du tout.",
+      },
+      {
+        type: "exercise",
+        id: "fcq4-ex2",
+        kind: "number",
+        title: "Fréquence d'une saison difficile",
+        prompt:
+          "Chaque zone est déficitaire avec une probabilité de 0,20, indépendamment des deux "
+          + "autres. Dans quel pourcentage des saisons **au moins une** des trois zones "
+          + "est-elle déficitaire ? Répondez en pourcentage, par exemple 25 pour 25 %.",
+        answer: 48.8,
+        tolerance: 0.5,
+        unit: "%",
+        hint:
+          "Passez par le complémentaire : la probabilité qu'aucune zone ne le soit.",
+        explain:
+          "Aucune zone déficitaire vaut 0,80³ = 0,512, donc au moins une vaut "
+          + "1 − 0,512 = 0,488, soit 48,8 %. Presque une saison sur deux comporte au moins une "
+          + "zone en difficulté — alors que chaque zone prise isolément n'en connaît qu'une sur "
+          + "cinq. Multiplier les zones multiplie les occasions d'être touché quelque part : "
+          + "c'est le revers exact de la diversification, et la raison pour laquelle un "
+          + "portefeuille dispersé subit des chocs plus **fréquents** mais plus **petits**.",
+      },
+      {
+        type: "exercise",
+        id: "fcq4-ex3",
+        kind: "choice",
+        title: "Lire une VaR",
+        prompt:
+          "« VaR 99 % = 55,87 millions FCFA ». Quelle formulation est exacte ?",
+        opts: [
+          "La perte ne dépassera jamais 55,87 millions",
+          "La perte moyenne des 1 % de pires saisons est de 55,87 millions",
+          "Dans 99 % des saisons, la perte reste inférieure à 55,87 millions",
+          "Il y a 99 % de chances que la perte soit de 55,87 millions",
+        ],
+        answer: 2,
+        explain:
+          "Une VaR est un quantile : 99 % des saisons restent en dessous. Elle ne dit rien de "
+          + "ce qui se passe dans le 1 % restant — ici, jusqu'à 64,8 millions. La proposition 2 "
+          + "décrit une autre mesure, l'**expected shortfall**, qui répond justement à la "
+          + "question « et si on dépasse ? » et que les régulateurs préfèrent pour cette raison.",
+      },
+      {
+        type: "quiz",
+        question:
+          "Vous multipliez par dix le nombre de tirages, de 10 000 à 100 000. Qu'attendez-vous ?",
+        opts: [
+          "Une perte moyenne nettement plus élevée",
+          "Une estimation plus stable des mêmes valeurs",
+          "Une VaR 99 % nettement plus basse",
+          "Un écart-type qui tend vers zéro",
+        ],
+        ans: 1,
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    ordre: 5,
+    titre: "Corrélation : pourquoi 1 200 prêts ne font pas 1 200 risques",
+    points: 120,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## L'hypothèse d'indépendance est confortable et fausse\n\n"
+          + "La leçon 4 tire trois saisons zonales indépendantes. Or les trois zones d'un même "
+          + "portefeuille partagent souvent un régime pluviométrique : quand la mousson est "
+          + "courte, elle l'est pour tout le monde. L'indépendance minore alors le risque, et "
+          + "elle le minore là où ça compte — dans la queue.\n\n"
+          + "Reprenons la simulation avec l'hypothèse inverse : **une seule saison régionale**, "
+          + "qui frappe les trois zones ensemble ou aucune.",
+      },
+      {
+        type: "code",
+        lang: "python",
+        code:
+          "rng = np.random.default_rng(2026)\n"
+          + "\n"
+          + "# Une seule saison pour toute la région : corrélation parfaite entre zones.\n"
+          + "saison = rng.random(N) < P_DEFICIT\n"
+          + "\n"
+          + "pertes_c = np.zeros(N)\n"
+          + "for zone, encours in ENCOURS.items():\n"
+          + "    taux = np.where(saison, EL_DEFICIT, EL_NORMALE)\n"
+          + "    pertes_c += encours * taux\n"
+          + "\n"
+          + "for nom, serie in ((\"indépendantes\", pertes), (\"corrélées\", pertes_c)):\n"
+          + "    print(f\"{nom:>14} | moyenne {serie.mean()/1e6:6.2f} M | \"\n"
+          + "          f\"écart-type {serie.std()/1e6:6.2f} M | \"\n"
+          + "          f\"VaR 99 % {np.quantile(serie, 0.99)/1e6:6.2f} M\")",
+        output:
+          " indépendantes | moyenne  29.05 M | écart-type  10.98 M | VaR 99 %  55.87 M\n"
+          + "     corrélées | moyenne  29.09 M | écart-type  17.86 M | VaR 99 %  64.80 M",
+      },
+      {
+        type: "callout",
+        title: "Même moyenne, capital supérieur de 8,93 millions",
+        variant: "warning",
+        content:
+          "La corrélation **ne change pas la perte attendue** — 29,09 millions dans les deux "
+          + "cas. Elle change tout le reste : l'écart-type passe de 11,0 à 17,9 millions, et la "
+          + "VaR 99 % de 55,87 à 64,80 millions. Un établissement qui suppose ses zones "
+          + "indépendantes sous-estime son besoin en capital de 8,93 millions FCFA sans que "
+          + "rien, dans sa perte attendue, ne le signale. C'est la raison pour laquelle une "
+          + "note qui annonce une perte attendue sans dire un mot de la corrélation entre zones "
+          + "ne devrait pas passer la diligence.",
+      },
+      {
+        type: "md",
+        content:
+          "## La vraie question n'est pas « corrélé ou non »\n\n"
+          + "Les deux cas simulés sont les bornes. Le portefeuille réel est entre les deux, et "
+          + "l'endroit exact dépend de la distance entre zones, du relief, de la diversité des "
+          + "cultures et des dates de semis. Ce qui se défend devant un comité, ce n'est pas "
+          + "une corrélation précise — personne ne la connaît — mais **l'encadrement** :\n\n"
+          + "> « Selon l'hypothèse de dépendance retenue entre les trois zones, la perte à "
+          + "99 % se situe entre 55,9 et 64,8 millions FCFA. Nous retenons la borne haute. »\n\n"
+          + "Une fourchette assumée vaut mieux qu'un point faussement précis. Et retenir la "
+          + "borne haute est un choix qui s'explique en une phrase, ce qu'un comité apprécie "
+          + "davantage qu'un chiffre unique dont personne ne sait d'où il sort.",
+      },
+      {
+        type: "exercise",
+        id: "fcq5-ex1",
+        kind: "number",
+        title: "Le coût de l'hypothèse d'indépendance",
+        prompt:
+          "De combien de millions FCFA la VaR 99 % augmente-t-elle lorsqu'on passe de zones "
+          + "indépendantes (55,87 M) à des zones parfaitement corrélées (64,80 M) ?",
+        answer: 8.93,
+        tolerance: 0.1,
+        unit: "millions FCFA",
+        hint: "Une soustraction.",
+        explain:
+          "64,80 − 55,87 = 8,93 millions FCFA. Cet écart ne provient d'aucun changement dans "
+          + "les emprunteurs, les encours ou les paramètres de risque : uniquement de "
+          + "l'hypothèse sur la façon dont les mauvaises saisons se produisent ensemble. C'est "
+          + "le genre de chiffre qu'un analyste doit savoir produire en dix minutes quand un "
+          + "comité lui demande « et si tout tombe en même temps ? ».",
+      },
+      {
+        type: "exercise",
+        id: "fcq5-ex2",
+        kind: "choice",
+        title: "Diversification réelle",
+        prompt:
+          "Un directeur propose de diviser la zone A en deux zones administratives de "
+          + "120 millions chacune, sans changer un seul emprunteur ni un seul montant. Quel "
+          + "effet cela a-t-il sur le risque du portefeuille ?",
+        opts: [
+          "Le risque baisse : le portefeuille est mieux diversifié",
+          "Aucun effet réel — seule une dépendance climatique moindre entre découpages diversifierait",
+          "Le risque baisse de moitié sur la zone A",
+          "Le risque augmente, car il y a plus de zones à surveiller",
+        ],
+        answer: 1,
+        explain:
+          "Redécouper une carte ne diversifie rien. Les deux nouvelles zones subissent la même "
+          + "pluie, donc leurs saisons sont quasi parfaitement corrélées et la distribution des "
+          + "pertes ne bouge pas. La diversification vient de la décorrélation réelle — "
+          + "distance, régimes pluviométriques distincts, cultures aux calendriers différents — "
+          + "jamais du découpage administratif. C'est une erreur fréquente parce qu'elle "
+          + "améliore les indicateurs sans améliorer le portefeuille.",
+      },
+      {
+        type: "exercise",
+        id: "fcq5-ex3",
+        kind: "number",
+        title: "Écart-type et corrélation",
+        prompt:
+          "L'écart-type des pertes passe de 10,98 millions FCFA (zones indépendantes) à "
+          + "17,86 millions (zones corrélées). De quel pourcentage augmente-t-il ? Répondez en "
+          + "pourcentage, par exemple 25 pour 25 %.",
+        answer: 62.7,
+        tolerance: 1.5,
+        unit: "%",
+        hint: "(17,86 − 10,98) / 10,98.",
+        explain:
+          "(17,86 − 10,98) / 10,98 = 62,7 %. La dispersion augmente de près des deux tiers "
+          + "alors que la moyenne ne bouge pas d'un franc. Retenir que la corrélation est un "
+          + "phénomène de dispersion, pas de niveau, évite de la chercher là où elle ne se voit "
+          + "pas — dans la perte attendue.",
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    ordre: 6,
+    titre: "Auditer une assurance indicielle : le risque de base, chiffré des deux côtés",
+    points: 120,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Un indice n'indemnise pas une perte, il indemnise un déclencheur\n\n"
+          + "Une assurance indicielle paie quand un **indice** — un cumul pluviométrique, un "
+          + "indice de végétation — franchit un seuil. Elle ne regarde jamais la parcelle. "
+          + "L'écart entre « l'indice a déclenché » et « l'exploitation a effectivement perdu » "
+          + "porte un nom : le **risque de base**.\n\n"
+          + "Il joue dans les deux sens, et les deux sens n'ont pas le même poids :\n\n"
+          + "- l'indice déclenche alors que la récolte était bonne → l'assureur paie pour rien, "
+          + "et cela se répercute dans la prime ;\n"
+          + "- l'indice ne déclenche pas alors que la récolte est perdue → **l'agriculteur a "
+          + "payé une prime, a tout perdu, et ne reçoit rien**.\n\n"
+          + "Le second cas est celui qui détruit la confiance dans le produit, village par "
+          + "village. C'est celui qu'un audit doit chiffrer en premier, et c'est presque "
+          + "toujours celui que les plaquettes commerciales passent sous silence.",
+      },
+      {
+        type: "code",
+        lang: "python",
+        code:
+          "# Backtest sur 30 saisons. Séries fictives, construites pour être recalculables.\n"
+          + "#   indice_declenche : le produit a payé cette année-là\n"
+          + "#   perte_reelle     : la campagne a effectivement été perdue sur la zone\n"
+          + "backtest = pd.DataFrame({\n"
+          + "    \"indice_declenche\": [0,0,0,1,0,0,0,1,0,0, 0,1,0,0,0,1,0,0,0,1, 0,0,1,0,0,0,0,0,0,0],\n"
+          + "    \"perte_reelle\":     [0,0,0,1,0,0,0,1,0,0, 0,0,0,0,0,1,0,0,0,1, 0,0,0,0,1,0,0,0,1,0],\n"
+          + "}).astype(bool)\n"
+          + "\n"
+          + "vp = ( backtest.indice_declenche &  backtest.perte_reelle).sum()   # payé à bon droit\n"
+          + "fp = ( backtest.indice_declenche & ~backtest.perte_reelle).sum()   # payé pour rien\n"
+          + "fn = (~backtest.indice_declenche &  backtest.perte_reelle).sum()   # perte non couverte\n"
+          + "vn = (~backtest.indice_declenche & ~backtest.perte_reelle).sum()\n"
+          + "\n"
+          + "print(f\"saisons              : {len(backtest)}\")\n"
+          + "print(f\"pertes réelles       : {vp + fn}\")\n"
+          + "print(f\"déclenchements       : {vp + fp}\")\n"
+          + "print(f\"\\n  couvertes          {vp}\")\n"
+          + "print(f\"  NON couvertes      {fn}   <-- l'agriculteur paie et n'est pas indemnisé\")\n"
+          + "print(f\"  payées à tort      {fp}\")\n"
+          + "print(f\"\\ntaux de couverture   : {vp/(vp+fn):.1%}\")\n"
+          + "print(f\"taux de fausse alerte: {fp/(fp+vn):.1%}\")",
+        output:
+          "saisons              : 30\n"
+          + "pertes réelles       : 6\n"
+          + "déclenchements       : 7\n"
+          + "\n"
+          + "  couvertes          4\n"
+          + "  NON couvertes      2   <-- l'agriculteur paie et n'est pas indemnisé\n"
+          + "  payées à tort      3\n"
+          + "\n"
+          + "taux de couverture   : 66.7%\n"
+          + "taux de fausse alerte: 12.5%",
+      },
+      {
+        type: "callout",
+        title: "Une fois sur trois, la perte n'est pas couverte",
+        variant: "warning",
+        content:
+          "Deux pertes réelles sur six échappent au produit : **33,3 %**. Un agriculteur qui "
+          + "souscrit trois saisons difficiles au cours de sa vie a une chance sérieuse de "
+          + "vivre au moins une fois l'expérience d'avoir payé, tout perdu, et de ne rien "
+          + "toucher. Aucune moyenne de long terme ne le consolera, et il le dira autour de "
+          + "lui. C'est ainsi qu'un produit techniquement correct meurt en trois campagnes.",
+      },
+      {
+        type: "exercise",
+        id: "fcq6-ex1",
+        kind: "number",
+        title: "La part des pertes non couvertes",
+        prompt:
+          "Sur 6 pertes réelles, 2 n'ont pas déclenché l'indice. Quelle part des pertes réelles "
+          + "reste sans indemnisation ? Répondez en pourcentage, par exemple 25 pour 25 %.",
+        answer: 33.3,
+        tolerance: 0.5,
+        unit: "%",
+        hint: "2 sur 6.",
+        explain:
+          "2 / 6 = 33,3 %. C'est le chiffre à mettre en premier dans un audit de produit "
+          + "indiciel, avant le taux de sinistralité et avant la prime : il dit à l'assuré ce "
+          + "qu'il achète réellement. Un produit qui couvre deux pertes sur trois peut être "
+          + "acceptable s'il est vendu comme tel ; il ne l'est pas s'il est vendu comme une "
+          + "assurance récolte.",
+      },
+      {
+        type: "exercise",
+        id: "fcq6-ex2",
+        kind: "number",
+        title: "Le coût des fausses alertes",
+        prompt:
+          "Sur 30 saisons, l'indice a déclenché 7 fois dont 3 sans perte réelle. Quelle part "
+          + "des indemnisations versées l'a été sans perte correspondante ? Répondez en "
+          + "pourcentage, par exemple 25 pour 25 %.",
+        answer: 42.9,
+        tolerance: 0.5,
+        unit: "%",
+        hint: "3 sur 7.",
+        explain:
+          "3 / 7 = 42,9 % des versements ne correspondent à aucune perte. Ce n'est pas de "
+          + "l'argent volé — c'est le prix de l'objectivité de l'indice, qui paie sans enquête "
+          + "et donc sans contestation ni fraude. Mais il se retrouve dans la prime : "
+          + "l'agriculteur finance aussi les saisons où il a été indemnisé sans avoir souffert. "
+          + "Le dire est plus honnête que de présenter ces versements comme un avantage.",
+      },
+      {
+        type: "exercise",
+        id: "fcq6-ex3",
+        kind: "choice",
+        title: "Améliorer un produit indiciel",
+        prompt:
+          "Vous abaissez le seuil de déclenchement pour que l'indice paie plus souvent. Quel "
+          + "est l'effet le plus probable sur les deux faces du risque de base ?",
+        opts: [
+          "Les deux diminuent",
+          "Moins de pertes non couvertes, mais davantage de versements sans perte — donc une prime plus élevée",
+          "Les deux augmentent",
+          "Aucun effet : le seuil ne change que la fréquence, pas le risque de base",
+        ],
+        answer: 1,
+        explain:
+          "Déclencher plus souvent rattrape une partie des pertes manquées, et paie aussi plus "
+          + "souvent à tort. Les deux erreurs s'échangent l'une contre l'autre, elles ne "
+          + "disparaissent pas ensemble : seul un indice mieux corrélé à la perte réelle — "
+          + "meilleure résolution spatiale, indice de végétation plutôt que pluie seule — "
+          + "améliore les deux à la fois. Comprendre cet arbitrage est ce qui distingue un "
+          + "audit d'une lecture de plaquette.",
+      },
+      {
+        type: "exercise",
+        id: "fcq6-ex4",
+        kind: "text",
+        title: "Nommer le phénomène",
+        prompt:
+          "Comment appelle-t-on l'écart entre le déclenchement d'un indice et la perte "
+          + "réellement subie par l'exploitation ? (deux mots)",
+        answer: "risque de base",
+        accept: ["risque de base", "basis risk", "risque base"],
+        explain:
+          "Le **risque de base** (basis risk). Savoir le nommer compte : c'est le terme qui "
+          + "figure dans les contrats et dans les rapports de diligence, et l'employer "
+          + "spontanément situe immédiatement le niveau de la conversation face à un assureur "
+          + "ou à un bailleur.",
+      },
+      {
+        type: "resource",
+        title: "IFAD / WFP — Weather Index-based Insurance in Agricultural Development",
+        url: "https://www.ifad.org/en/w/publications/weather-index-based-insurance-in-agricultural-development-a-technical-guide",
+        desc:
+          "Guide technique de référence sur l'assurance indicielle en développement agricole, "
+          + "risque de base compris. À lire avant de auditer un produit réel — il documente les "
+          + "échecs autant que les réussites.",
+        provider: "FIDA / PAM",
+      },
+    ],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════════════
+  {
+    ordre: 7,
+    titre: "Le notebook qui se défend en comité",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Un résultat qu'on ne peut pas reproduire n'est pas un résultat\n\n"
+          + "Tout ce cours produit des chiffres destinés à sortir de votre écran : ils iront "
+          + "dans une note, dans un dossier de financement, devant un comité de crédit. À ce "
+          + "moment-là, une seule question compte : **quelqu'un d'autre, avec votre fichier, "
+          + "retrouve-t-il vos chiffres ?**\n\n"
+          + "Trois exigences suffisent à répondre oui.\n\n"
+          + "**1. La graine est fixée et écrite.** `rng = np.random.default_rng(2026)` — sans "
+          + "elle, la VaR change à chaque exécution et personne ne peut vérifier quoi que ce "
+          + "soit.\n\n"
+          + "**2. Les hypothèses sont dans le notebook, pas dans votre tête.** PD, LGD, p, "
+          + "seuil de déficit, hypothèse de corrélation : un bloc en tête de fichier, chacune "
+          + "avec sa source ou la mention « hypothèse de travail ».\n\n"
+          + "**3. Les contrôles de retour sont visibles.** Le notebook doit montrer qu'il "
+          + "retrouve 4,20 % en saison normale et 8,85 % sur le scénario zone A. Un lecteur qui "
+          + "voit ces deux nombres sait que la mécanique est saine avant même de lire vos "
+          + "conclusions.",
+      },
+      {
+        type: "code",
+        lang: "python",
+        code:
+          "HYPOTHESES = {\n"
+          + "    \"pd_normale\":   (0.07, \"hypothèse de travail — historique interne SFD\"),\n"
+          + "    \"lgd_normale\":  (0.60, \"hypothèse de travail — réalisation des sûretés\"),\n"
+          + "    \"pd_deficit\":   (0.18, \"hypothèse de travail — dires d'expert\"),\n"
+          + "    \"lgd_deficit\":  (0.75, \"hypothèse de travail — dires d'expert\"),\n"
+          + "    \"p_deficit\":    (0.20, \"6 saisons sur 30 sous 480 mm — série zone A\"),\n"
+          + "    \"correlation\":  (\"bornes\", \"indépendance et corrélation parfaite\"),\n"
+          + "    \"taux_usure\":   (0.24, \"TAEG max SFD, décision n°19/29-12-2025/CM/UMOA, \"\n"
+          + "                            \"en vigueur au 1er juin 2026\"),\n"
+          + "}\n"
+          + "\n"
+          + "for cle, (valeur, source) in HYPOTHESES.items():\n"
+          + "    print(f\"{cle:<14} {str(valeur):<12} {source}\")",
+        output:
+          "pd_normale     0.07         hypothèse de travail — historique interne SFD\n"
+          + "lgd_normale    0.6          hypothèse de travail — réalisation des sûretés\n"
+          + "pd_deficit     0.18         hypothèse de travail — dires d'expert\n"
+          + "lgd_deficit    0.75         hypothèse de travail — dires d'expert\n"
+          + "p_deficit      0.2          6 saisons sur 30 sous 480 mm — série zone A\n"
+          + "correlation    bornes       indépendance et corrélation parfaite\n"
+          + "taux_usure     0.24         TAEG max SFD, décision n°19/29-12-2025/CM/UMOA, en vigueur au 1er juin 2026",
+      },
+      {
+        type: "callout",
+        title: "Distinguer ce qui est sourcé de ce qui est supposé",
+        variant: "info",
+        content:
+          "Une seule ligne du tableau est un fait vérifiable : le taux d'usure, daté et référencé. "
+          + "Toutes les autres sont des hypothèses. Un notebook qui les présente sur le même "
+          + "plan, sans le dire, transforme des dires d'expert en données — et c'est exactement "
+          + "ce qu'un comité de diligence cherche à débusquer. Marquer soi-même la différence "
+          + "coûte trois mots par ligne et vaut mieux que de se la faire pointer en séance.",
+      },
+      {
+        type: "md",
+        content:
+          "## Les six lignes qui sortent du notebook\n\n"
+          + "Voici ce que ce cours permet d'écrire, et qu'on ne pouvait pas écrire avec un "
+          + "tableur :\n\n"
+          + "> Portefeuille agricole de 480 millions FCFA, 1 200 prêts, trois zones.\n"
+          + "> En saison normale, la perte attendue est de 4,20 % (20,2 millions).\n"
+          + "> En intégrant une saison déficitaire tous les cinq ans, elle est de **6,05 %** "
+          + "(29,1 millions) — c'est le niveau à provisionner.\n"
+          + "> La perte à 99 % se situe entre **55,9 et 64,8 millions** selon l'hypothèse de "
+          + "dépendance entre zones ; nous retenons la borne haute.\n"
+          + "> Le capital à immobiliser au-delà des provisions est donc de **35,7 millions**.\n"
+          + "> Le produit indiciel envisagé laisse **une perte réelle sur trois** sans "
+          + "indemnisation ; il réduit le besoin de capital, il ne le supprime pas.\n\n"
+          + "Six lignes, chacune adossée à un calcul reproductible. C'est ce qu'un comité "
+          + "attend, et c'est ce qui distingue un dossier qui passe la diligence d'un dossier "
+          + "qui repart avec des questions.",
+      },
+      {
+        type: "exercise",
+        id: "fcq7-ex1",
+        kind: "number",
+        title: "Le capital sur la borne haute",
+        prompt:
+          "En retenant la borne haute (VaR 99 % de 64,80 millions FCFA) et des provisions "
+          + "égales à la perte attendue (29,09 millions), quel capital faut-il immobiliser "
+          + "au-delà des provisions, en millions FCFA ?",
+        answer: 35.71,
+        tolerance: 0.2,
+        unit: "millions FCFA",
+        hint: "64,80 − 29,09.",
+        explain:
+          "64,80 − 29,09 = 35,71 millions FCFA. C'est le chiffre de la note. Retenir la borne "
+          + "haute plutôt que la moyenne des deux hypothèses est un choix prudentiel qui "
+          + "s'explique en une phrase — et un choix explicite se défend toujours mieux qu'un "
+          + "chiffre unique dont l'origine reste floue.",
+      },
+      {
+        type: "exercise",
+        id: "fcq7-ex2",
+        kind: "choice",
+        title: "Ce qui rend une analyse auditable",
+        prompt:
+          "Parmi ces quatre pratiques, laquelle fait le plus pour qu'un tiers puisse vérifier "
+          + "vos chiffres ?",
+        opts: [
+          "Commenter abondamment chaque ligne de code",
+          "Fixer la graine aléatoire et afficher les contrôles qui retrouvent les résultats connus",
+          "Utiliser les bibliothèques les plus récentes",
+          "Produire des graphiques de qualité publication",
+        ],
+        answer: 1,
+        explain:
+          "La graine rend les tirages reproductibles ; les contrôles de retour prouvent que la "
+          + "mécanique n'a pas dérivé. Les trois autres pratiques sont utiles mais ne "
+          + "permettent à personne de refaire votre calcul et de tomber sur votre nombre. "
+          + "L'auditabilité tient à cela, et à rien d'autre.",
+      },
+      {
+        type: "exercise",
+        id: "fcq7-ex3",
+        kind: "choice",
+        title: "Le chiffre à provisionner",
+        prompt:
+          "Votre note doit annoncer la perte attendue du portefeuille. Entre 4,20 % (saison "
+          + "normale) et 6,05 % (toutes saisons confondues), lequel retenir, et pourquoi ?",
+        opts: [
+          "4,20 %, parce que c'est le chiffre du cours d'analyse et qu'il faut rester cohérent",
+          "6,05 %, parce qu'une perte attendue doit intégrer la fréquence des mauvaises saisons",
+          "La moyenne des deux, soit 5,13 %",
+          "4,20 %, en mentionnant 6,05 % en note de bas de page",
+        ],
+        answer: 1,
+        explain:
+          "6,05 %. Une perte attendue est une espérance sur toutes les saisons, bonnes et "
+          + "mauvaises ; 4,20 % est une valeur **conditionnelle** — la perte si la saison est "
+          + "normale. Annoncer 4,20 % comme perte attendue sous-provisionne de près d'un tiers, "
+          + "et l'erreur est invisible tant qu'une mauvaise saison n'est pas survenue. Les deux "
+          + "chiffres doivent figurer dans la note, mais chacun sous son vrai nom.",
+      },
+      {
+        type: "resource",
+        title: "Fonds Vert pour le Climat — Accès direct et entités accréditées",
+        url: "https://www.greenclimate.fund/about/partners/ae",
+        desc:
+          "La liste des entités accréditées et les conditions d'accès direct. À consulter avant "
+          + "de rédiger une note destinée à un financement climatique : elle montre ce qui est "
+          + "attendu d'un dossier, et ce qui bloque les candidatures.",
+        provider: "GCF",
+      },
+    ],
+  },
+];

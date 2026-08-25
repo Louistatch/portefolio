@@ -19,8 +19,10 @@ import { existsSync, readFileSync, readdirSync } from "fs";
 import { programById } from "../shared/programs.js";
 import { QUESTIONS_TOF } from "../shared/tof-test.js";
 import { QUESTIONS_FCA } from "../shared/fca-test.js";
+import { QUESTIONS_FCQ } from "../shared/fcq-test.js";
 import { TOF_ANSWER_KEY, TOF_CORRECT_TEXTS } from "../api/tof-answers.js";
 import { FCA_ANSWER_KEY, FCA_CORRECT_TEXTS } from "../api/fca-answers.js";
+import { FCQ_ANSWER_KEY, FCQ_CORRECT_TEXTS } from "../api/fcq-answers.js";
 
 const LETTRES = ["A", "B", "C", "D"];
 
@@ -51,6 +53,14 @@ const SUITES: Suite[] = [
     textes: FCA_CORRECT_TEXTS,
     themesAttendus: ["Vocabulaire du crédit", "Calcul", "Campagne agricole",
       "Microfinance", "Lecture de données"],
+  },
+  {
+    programId: "fcq",
+    questions: QUESTIONS_FCQ,
+    cle: FCQ_ANSWER_KEY,
+    textes: FCQ_CORRECT_TEXTS,
+    themesAttendus: ["Python et pandas", "Probabilités", "Statistique descriptive",
+      "Crédit et portefeuille", "Méthode et rigueur"],
   },
 ];
 

@@ -33,18 +33,19 @@ const PAGES = [
     url: `${HOTE}/elearning`,
     // Ce texte est ce que voit un groupe WhatsApp quand le lien y est collé — souvent le
     // premier contact avec la formation. Il annonçait le seul cursus MEAL, alors que
-    // LouisFarm délivre trois certificats distincts : les deux autres parcours étaient
-    // invisibles au moment précis où le lien circule. Les trois sont nommés, dans l'ordre
+    // LouisFarm délivre quatre certificats distincts : les trois autres parcours étaient
+    // invisibles au moment précis où le lien circule. Les quatre sont nommés, dans l'ordre
     // de shared/programs.ts.
-    titre: "Trois parcours certifiants, 100 % gratuits | LouisFarm Learning",
-    titrePartage: "Trois parcours certifiants, 100 % gratuits",
+    titre: "Quatre parcours certifiants, 100 % gratuits | LouisFarm Learning",
+    titrePartage: "Quatre parcours certifiants, 100 % gratuits",
     description:
       "Suivi-évaluation (MEAL), formation de formateurs en gestion financière paysanne, "
-      + "analyse du risque climatique agricole. Formation par projets en Afrique de l'Ouest, "
+      + "analyse du risque climatique agricole et son second niveau quantitatif en Python. "
+      + "Formation par projets en Afrique de l'Ouest, "
       + "certificat à la clé. Inscription ouverte en permanence, admission sur test.",
     image: `${HOTE}/academy/partage-elearning.png`,
-    alt: "LouisFarm Learning — trois parcours certifiants gratuits : cursus MEAL, "
-      + "formation de formateurs, finance climatique agricole",
+    alt: "LouisFarm Learning — quatre parcours certifiants gratuits : cursus MEAL, "
+      + "formation de formateurs, finance climatique agricole analyste et quantitative",
   },
 ];
 
