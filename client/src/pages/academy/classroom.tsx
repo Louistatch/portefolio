@@ -8,6 +8,11 @@ import {
   AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon, PenLine, Clock,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn } from "@/lib/student";
+// Ce module ne pèse que quelques kilo-octets et ne tire aucune dépendance : il ne
+// contient que la logique de chargement. Les 11 Mo de Pyodide arrivent d'un CDN,
+// par un script ajouté au document au premier clic — c'est là qu'est la paresse,
+// pas dans un découpage de bundle.
+import { POIDS_ANNONCE, executerPython } from "@/lib/pyodide";
 import DOMPurify from "dompurify";
 
 interface Cell {
@@ -211,6 +216,13 @@ export default function AcademyClassroom() {
   const [activeLesson, setActiveLesson] = useState(0);
   const [completedLessons, setCompletedLessons] = useState<Set<number>>(new Set());
   const [ranCells, setRanCells] = useState<Set<string>>(new Set());
+  // Sortie et phase de chaque cellule de code. `ranCells` dit qu'on a cliqué ; ceci dit ce
+  // qui s'est passé. Les deux sont distincts parce que la validation de la leçon dépend du
+  // premier, et l'affichage du second.
+  type EtatCode = { phase: "chargement" | "execution" | "fini"; sortie?: string; erreur?: boolean; repli?: boolean };
+  const [etatsCode, setEtatsCode] = useState<Record<string, EtatCode>>({});
+  // Python déjà téléchargé dans cet onglet : évite d'annoncer 11 Mo une seconde fois.
+  const [pythonPret, setPythonPret] = useState(false);
   const [progress, setProgress] = useState(0);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -276,7 +288,35 @@ export default function AcademyClassroom() {
     })();
   }, [courseId]);
 
-  function runCell(key: string) { setRanCells(prev => new Set(prev).add(key)); }
+  /**
+   * Exécute une cellule de code dans le navigateur.
+   *
+   * Trois issues, et la cellule est marquée exécutée dans les trois :
+   *   — le code tourne et affiche quelque chose ;
+   *   — le code lève une exception Python : c'est un résultat, pas une panne, on l'affiche ;
+   *   — Pyodide n'a pas pu démarrer : on retombe sur la sortie enregistrée de la leçon.
+   *
+   * Le troisième cas est la raison d'être de ce garde-fou. `allCodeRan` conditionne le
+   * bouton de validation de la leçon : si un échec de téléchargement laissait la cellule
+   * non exécutée, l'étudiant ne pourrait plus terminer son cours, sans rien y pouvoir.
+   *
+   * Rien de ce qui se passe ici ne rapporte de point. La note vient du serveur, sur les
+   * réponses saisies dans les exercices — voir client/src/lib/pyodide.ts.
+   */
+  async function executerCellule(key: string, code: string, packages?: string[]) {
+    setEtatsCode(p => ({ ...p, [key]: { phase: pythonPret ? "execution" : "chargement" } }));
+    try {
+      setEtatsCode(p => ({ ...p, [key]: { phase: "execution" } }));
+      const r = await executerPython(code, packages);
+      setPythonPret(true);
+      setEtatsCode(p => ({ ...p, [key]: { phase: "fini", sortie: r.texte, erreur: r.erreur } }));
+    } catch {
+      // Échec d'infrastructure : la leçon reste utilisable avec sa sortie de référence.
+      setEtatsCode(p => ({ ...p, [key]: { phase: "fini", repli: true } }));
+    } finally {
+      setRanCells(prev => new Set(prev).add(key));
+    }
+  }
 
   // Changer de leçon repart d'une copie vierge : réponses, correction et message d'erreur.
   function goToLesson(index: number) {
@@ -575,23 +615,80 @@ export default function AcademyClassroom() {
               );
             }
 
-            // ── Code statique (run pour révéler l'output) ──
+            // ── Cellule de code : exécutée pour de vrai, avec repli ──
+            //
+            // Le premier clic télécharge Pyodide (~11 Mo). Le poids est annoncé AVANT le
+            // clic : personne ne doit découvrir une facture de données après coup.
+            //
+            // Si le téléchargement échoue — connexion coupée, navigateur trop ancien,
+            // mémoire insuffisante pour pandas en WebAssembly — la sortie enregistrée
+            // s'affiche comme auparavant. Dans tous les cas la cellule est marquée exécutée,
+            // parce que `allCodeRan` conditionne la validation de la leçon : un échec
+            // d'infrastructure ne doit pas enfermer l'étudiant hors de son cours.
             const codeIdx = cells.slice(0, ci).filter(c => c.type === "code").length;
             const key = `${activeLesson}-code-${codeIdx}`;
             const ran = ranCells.has(key);
+            const etat = etatsCode[key];
+            const enCours = etat?.phase === "chargement" || etat?.phase === "execution";
+            const sortie = etat?.sortie ?? (ran ? cell.output : undefined);
             return (
               <div key={ci} className="bg-card rounded-2xl border border-border/50 overflow-hidden">
                 <div className="flex items-center justify-between px-4 py-2 border-b border-border/50 bg-muted/30">
                   <div className="flex items-center gap-2"><Terminal className="w-3.5 h-3.5 text-blue-500" /><span className="text-xs text-muted-foreground font-mono">{cell.lang || "python"}</span></div>
-                  <Button size="sm" variant={ran ? "outline" : "default"} className={`h-7 text-xs gap-1.5 ${ran ? "text-primary border-primary/40" : ""}`} onClick={() => runCell(key)}>
-                    {ran ? <><CheckCircle2 className="w-3 h-3" /> Exécuté</> : <><PlayCircle className="w-3 h-3" /> Exécuter</>}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    {!ran && !enCours && !pythonPret && (
+                      <span className="hidden sm:inline text-[11px] text-muted-foreground">
+                        télécharge Python, {POIDS_ANNONCE}, une seule fois
+                      </span>
+                    )}
+                    {enCours && (
+                      <span className="text-[11px] text-muted-foreground">
+                        {etat?.phase === "chargement" ? "téléchargement de Python…" : "exécution…"}
+                      </span>
+                    )}
+                    <Button size="sm" variant={ran ? "outline" : "default"} disabled={enCours}
+                      className={`h-7 text-xs gap-1.5 ${ran ? "text-primary border-primary/40" : ""}`}
+                      onClick={() => executerCellule(key, cell.code || "", (cell as any).packages)}>
+                      {enCours ? <><Loader2 className="w-3 h-3 animate-spin" /> …</>
+                        : ran ? <><CheckCircle2 className="w-3 h-3" /> Relancer</>
+                        : <><PlayCircle className="w-3 h-3" /> Exécuter</>}
+                    </Button>
+                  </div>
                 </div>
                 <pre className="px-5 py-4 text-xs font-mono overflow-x-auto bg-[#0d1117] text-slate-300 leading-relaxed"><code>{cell.code}</code></pre>
-                {ran && cell.output && (
+                {sortie !== undefined && sortie !== "" && (
                   <div className="border-t border-border/50">
-                    <div className="flex items-center gap-2 px-4 py-1.5 bg-muted/20"><Star className="w-3 h-3 text-primary" /><span className="text-xs text-muted-foreground font-mono">output</span></div>
-                    <pre className="px-5 py-3 text-xs font-mono text-primary/80 whitespace-pre-wrap">{cell.output}</pre>
+                    <div className="flex items-center gap-2 px-4 py-1.5 bg-muted/20">
+                      <Star className={`w-3 h-3 ${etat?.erreur ? "text-destructive" : "text-primary"}`} />
+                      <span className="text-xs text-muted-foreground font-mono">
+                        {etat?.erreur ? "erreur" : "output"}
+                      </span>
+                      {etat?.repli && (
+                        <span className="ml-auto text-[11px] text-muted-foreground">
+                          sortie de référence — l'exécution n'a pas pu démarrer ici
+                        </span>
+                      )}
+                    </div>
+                    <pre className={`px-5 py-3 text-xs font-mono whitespace-pre-wrap ${
+                      etat?.erreur ? "text-destructive" : "text-primary/80"}`}>{sortie}</pre>
+                    {/* Les cellules d'une leçon partagent un interpréteur, comme dans un
+                        notebook : la leçon 5 s'appuie sur les variables de la leçon 1. Un
+                        étudiant qui revient une semaine plus tard, dans un onglet neuf,
+                        obtiendrait donc un NameError à la place du résultat attendu. On lui
+                        montre alors aussi la sortie de référence — sans quoi il croirait le
+                        cours cassé. */}
+                    {etat?.erreur && cell.output && (
+                      <div className="border-t border-border/50">
+                        <div className="flex items-center gap-2 px-4 py-1.5 bg-muted/20">
+                          <Star className="w-3 h-3 text-primary" />
+                          <span className="text-xs text-muted-foreground font-mono">sortie de référence</span>
+                          <span className="ml-auto text-[11px] text-muted-foreground">
+                            exécutez les cellules précédentes dans l'ordre pour la reproduire
+                          </span>
+                        </div>
+                        <pre className="px-5 py-3 text-xs font-mono text-primary/80 whitespace-pre-wrap">{cell.output}</pre>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
