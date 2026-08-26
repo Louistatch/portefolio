@@ -193,5 +193,38 @@ console.log();
     c ? "plus de garde contre une seconde délivrance" : "fonction introuvable");
 }
 
+// ── Le planning ne montre-t-il que les parcours admis ? ──────────────────────
+//
+// Générer le planning par parcours ne suffit pas : encore faut-il le lire de même. Des
+// lignes TOF-FIN-01 héritées d'avant la séparation traînaient chez dix-sept étudiants admis
+// au seul cursus MEAL — affichées dans leur planning, proposées en fin de leçon, et
+// validables par URL puisque le verrou de planning voyait une ligne ouverte.
+//
+// Trois points doivent porter le filtre : les deux lectures, et surtout l'écriture. Si
+// seule la lecture filtre, le cours devient invisible mais reste validable — la pire des
+// deux situations, parce que plus rien ne la montre.
+console.log();
+{
+  const { readFileSync } = await import("node:fs");
+  const api = readFileSync("api/index.ts", "utf-8");
+
+  const routeApres = (chemin: string) => {
+    const debut = api.indexOf(`"${chemin}"`);
+    if (debut < 0) return null;
+    const suivante = api.indexOf("\napp.", debut);
+    return api.slice(debut, suivante < 0 ? api.length : suivante);
+  };
+
+  for (const [chemin, attendu, quoi] of [
+    ["/api/academy/lesson-schedule", "filtrerAuxParcoursAdmis", "filtre le planning"],
+    ["/api/academy/my-enrollments", "filtrerAuxParcoursAdmis", "filtre la liste des cours"],
+    ["/api/academy/complete-lesson", "parcoursAdmis", "refuse un parcours non admis"],
+  ] as const) {
+    const c = routeApres(chemin);
+    v(`${chemin} ${quoi}`, !!c && c.includes(attendu),
+      c ? `« ${attendu} » a disparu de cette route` : "route introuvable — le contrôle est à réécrire");
+  }
+}
+
 console.log(ko ? `\n${ko} ÉCHEC(S)` : "\nTOUT PASSE");
 process.exit(ko ? 1 : 0);

@@ -1132,6 +1132,31 @@ async function regenererPlannings(sid: number) {
   }
 }
 
+/**
+ * Ne garde d'une liste que ce qui relève d'un parcours auquel l'étudiant est admis.
+ *
+ * Écrire correctement le planning ne suffit pas : il faut aussi le LIRE correctement. Les
+ * plannings ont été générés, avant la séparation par parcours, pour tous les cours publiés
+ * sans distinction. Dix-sept étudiants admis au seul cursus MEAL portent encore des lignes
+ * TOF-FIN-01 — jamais commencées, mais affichées dans leur planning et proposées en fin de
+ * leçon comme « leçon ouverte cette semaine ». Ils n'ont jamais passé le test d'admission
+ * de ce parcours.
+ *
+ * Le filtre est posé à la lecture plutôt que par un nettoyage de la base, pour deux raisons.
+ * Il corrige les dix-sept d'un coup sans rien détruire ; et il tient encore le jour où une
+ * ligne réapparaît — import, admission retirée, cours renommé. Une donnée orpheline devient
+ * alors invisible au lieu d'être offerte.
+ */
+async function filtrerAuxParcoursAdmis<T>(sid: number, lignes: T[], codeDe: (l: T) => string | undefined) {
+  const admis = new Set((await parcoursAdmis(sid)).map(p => p.programId));
+  return lignes.filter(l => {
+    const code = codeDe(l);
+    if (!code) return true;                      // rien à rattacher : on ne retire pas
+    const prog = programOf(code)?.id;
+    return prog == null || admis.has(prog);      // hors parcours connu : on ne retire pas
+  });
+}
+
 async function generateLessonSchedule(sid: number, admittedAt: Date, programId: string) {
   // Un parcours à la fois, depuis SA date d'admission. Les parcours ont désormais chacun
   // leur porte d'entrée : planifier les leçons d'un parcours auquel l'étudiant n'est pas
@@ -2733,7 +2758,9 @@ app.get("/api/academy/my-enrollments", requireStudent, async (req, res) => {
     ...e,
     sms_courses: e.sms_courses ? { ...e.sms_courses, total_lessons: counts[e.course_id] ?? e.sms_courses.total_lessons } : e.sms_courses,
   }));
-  res.json(enriched);
+  // Même filtre que le planning : les inscriptions héritées à un parcours non admis
+  // faisaient apparaître le cours dans « mes cours », d'où l'on pouvait entrer.
+  res.json(await filtrerAuxParcoursAdmis(sid, enriched, (e: any) => e.sms_courses?.code));
 });
 
 // ── S'inscrire à un cours ──
@@ -2777,6 +2804,26 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   if (!stud?.admitted_at) return res.status(403).json({ message: "Vous devez réussir le test d'admission pour accéder aux cours." });
   if (stud.admission_expires && new Date(stud.admission_expires) < new Date())
     return res.status(403).json({ message: "Votre période d'admission (3 mois) a expiré. Repassez le test d'admission." });
+
+  // Le cours doit relever d'un parcours auquel l'étudiant est admis.
+  //
+  // Le contrôle au-dessus ne regarde que l'admission au cursus MEAL. Il suffisait donc
+  // d'être admis au MEAL pour valider les leçons de N'IMPORTE QUEL parcours, à condition
+  // d'avoir une ligne de planning ouverte — et dix-sept étudiants en portaient une pour
+  // TOF-FIN-01, héritée d'avant la séparation par parcours. Le verrou de planning plus bas
+  // ne le voyait pas : la ligne existait et n'était pas verrouillée, donc elle passait.
+  //
+  // Chaque parcours a sa propre porte et sa propre fenêtre de trois mois ; c'est ici
+  // qu'elles se vérifient.
+  const { data: coursVise } = await supabase.from("sms_courses").select("code").eq("id", course_id).maybeSingle();
+  const progDuCours = coursVise?.code ? programOf(coursVise.code)?.id : null;
+  if (progDuCours) {
+    const admission = (await parcoursAdmis(sid)).find(p => p.programId === progDuCours);
+    if (!admission)
+      return res.status(403).json({ message: "Vous devez réussir le test d'admission de ce parcours pour accéder à ses cours." });
+    if (admission.expires && new Date(admission.expires) < new Date())
+      return res.status(403).json({ message: "Votre période d'admission (3 mois) à ce parcours a expiré. Repassez le test d'admission." });
+  }
 
   // Vérifier l'inscription
   const { data: enr } = await supabase.from("enrollments")
@@ -3159,7 +3206,7 @@ app.get("/api/academy/lesson-schedule", requireStudent, async (req, res) => {
     (a.week_index - b.week_index)
     || ((a.sms_courses?.order_index ?? 0) - (b.sms_courses?.order_index ?? 0))
     || ((a.sms_lessons?.order_index ?? 0) - (b.sms_lessons?.order_index ?? 0)));
-  res.json(ordered);
+  res.json(await filtrerAuxParcoursAdmis(sid, ordered, (l: any) => l.sms_courses?.code));
 });
 
 // ── Travaux de groupe : mon groupe, mes trois GW et leur état ──
