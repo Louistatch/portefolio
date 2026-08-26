@@ -154,5 +154,44 @@ console.log();
                     termineesDuCours: 2, rangMaxTermine: 2, coursPrecedentTermine: null }));
 }
 
+// ── Le certificat final reste-t-il atteignable ? ─────────────────────────────
+//
+// Le certificat exige désormais les cours ET la correction des travaux de groupe. Pour qui
+// termine ses leçons avant la correction du GW3 — c'est-à-dire à peu près tout le monde, les
+// leçons finissant en semaine 9 et le GW3 s'ouvrant en semaine 12 — la dernière condition
+// tombe au moment de la correction, pas à la fin d'un cours. Si l'appel disparaît de
+// applyGroupWorkGrade, plus personne n'est jamais certifié, et rien ne le signale : pas
+// d'erreur, pas de log, juste un certificat qui n'arrive plus.
+//
+// Ce contrôle lit le source. Il ne prouve pas que l'appel fonctionne — il prouve qu'il est
+// encore là, ce qui est exactement le mode de panne redouté.
+console.log();
+{
+  const { readFileSync } = await import("node:fs");
+  const api = readFileSync("api/index.ts", "utf-8");
+
+  const corps = (nom: string) => {
+    const debut = api.indexOf(`async function ${nom}(`);
+    if (debut < 0) return null;
+    const suivante = api.indexOf("\nasync function ", debut + 1);
+    return api.slice(debut, suivante < 0 ? api.length : suivante);
+  };
+
+  for (const nom of ["applyGroupWorkGrade", "recalcCourseProgress"]) {
+    const c = corps(nom);
+    v(`${nom} peut délivrer le certificat final`,
+      !!c && c.includes("delivrerCertificatFinalSiComplet"),
+      c ? "l'appel a disparu" : "fonction introuvable — le contrôle est à réécrire");
+  }
+
+  const c = corps("delivrerCertificatFinalSiComplet");
+  v("la délivrance regarde bien les travaux de groupe",
+    !!c && c.includes("refreshGroupWorkStates"),
+    c ? "plus aucune lecture des travaux de groupe" : "fonction introuvable");
+  v("la délivrance reste idempotente",
+    !!c && c.includes("final_certificate_no"),
+    c ? "plus de garde contre une seconde délivrance" : "fonction introuvable");
+}
+
 console.log(ko ? `\n${ko} ÉCHEC(S)` : "\nTOUT PASSE");
 process.exit(ko ? 1 : 0);

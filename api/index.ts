@@ -1749,6 +1749,12 @@ async function applyGroupWorkGrade(submissionId: number) {
     .update({ status: "completed", score: sub.score, completed_at: sub.graded_at || new Date().toISOString() })
     .in("student_id", ids).eq("group_work_id", gw.id).then(() => {}, () => {});
 
+  // Cette correction est peut-être la dernière pièce du certificat final. Depuis qu'il exige
+  // aussi les travaux de groupe, terminer les cours ne suffit plus à le déclencher : pour qui
+  // a fini ses leçons avant la correction du GW3, c'est ICI que la condition tombe, et nulle
+  // part ailleurs. Sans cet appel, le certificat n'aurait plus jamais été délivré à personne.
+  for (const id of ids) await delivrerCertificatFinalSiComplet(id).catch(() => {});
+
   // Email de correction, un par membre.
   const { data: studs } = await supabase.from("students")
     .select("id, full_name, email, course_emails").in("id", ids);
@@ -1800,42 +1806,75 @@ async function recalcCourseProgress(sid: number, course_id: number) {
     }
   }
 
-  // Vérifier si les cours du cursus MEAL sont terminés → certificat FINAL
-  let finalCert = null;
-  if (wasCompleted) {
-    const { data: allCourses } = await supabase.from("sms_courses")
-      .select("id, code").eq("is_published", true).like("code", `${MEAL_PROGRAM_PREFIX}%`);
-    const { data: doneEnr } = await supabase.from("enrollments")
-      .select("course_id").eq("student_id", sid).eq("status", "completed");
-    const doneIds = new Set((doneEnr || []).map((e: any) => e.course_id));
-    const allDone = (allCourses || []).length > 0 && (allCourses || []).every((co: any) => doneIds.has(co.id));
-    if (allDone) {
-      const { data: existingFinal } = await supabase.from("students").select("final_certificate_no").eq("id", sid).single();
-      if (!existingFinal?.final_certificate_no) {
-        const certNo = `DMA-FINAL-${sid}-${Date.now().toString(36).toUpperCase()}`;
-        const nowIso = new Date().toISOString();
-        // Moyenne générale
-        const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
-        const ga = allGrades || [];
-        const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
-        await supabase.from("students").update({ final_certificate_no: certNo, final_certified_at: nowIso }).eq("id", sid);
-        await supabase.from("attestations").insert({
-          student_id: sid, course_id: course_id, cert_type: "final",
-          certificate_no: certNo, final_score: avg, status: "issued", issued_at: nowIso,
-        }).then(() => {}, () => {});
-        finalCert = { certificate_no: certNo, average: avg };
-        const { data: st2 } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
-        if (st2?.email) sendAcademyEmail({
-          studentId: sid, to: st2.email, type: "final_certificate",
-          subject: "🎓 Certificat Super-Expert MEAL délivré !",
-          html: finalCertEmailHtml(st2.full_name, certNo, avg),
-          dedupeKey: `final:${sid}`,
-        });
-      }
-    }
-  }
+  const finalCert = wasCompleted ? await delivrerCertificatFinalSiComplet(sid, course_id) : null;
 
   return { progress, done: doneCount, total: totalLessons || 0, completed: wasCompleted, finalCertificate: finalCert };
+}
+
+/**
+ * Délivre le certificat final Super-Expert MEAL si tout est réuni. Idempotent.
+ *
+ * Deux conditions, pas une :
+ *
+ *   1. les trois cours du cursus MEAL sont terminés ;
+ *   2. les travaux de groupe inscrits au calendrier de CET étudiant sont tous corrigés.
+ *
+ * La seconde manquait. Le certificat ne regardait que les inscriptions aux cours, si bien
+ * qu'une étudiante l'a obtenu avec ses trois travaux de groupe encore verrouillés, jamais
+ * rendus et jamais notés — c'est-à-dire sans la moitié collective de l'évaluation, celle
+ * qui étale précisément le parcours sur trois mois.
+ *
+ * « Inscrits au calendrier de cet étudiant » et non « les trois GW » : le dispositif ne
+ * s'ouvre qu'à ceux qui n'ont pas franchi leur semaine 2 (voir eligibleAuxTravauxDeGroupe),
+ * et les autres n'ont aucune ligne. Exiger trois travaux dans l'absolu leur interdirait le
+ * certificat à vie, pour une règle arrivée après eux. Qui n'a pas de ligne n'est pas
+ * bloqué ; qui en a trois les doit toutes.
+ *
+ * Un travail n'est « completed » qu'une fois le rendu du groupe corrigé par l'administration
+ * — c'est le choix retenu : la note vient d'une lecture humaine, pas d'un dépôt.
+ */
+async function delivrerCertificatFinalSiComplet(sid: number, courseIdPourAttestation?: number) {
+  const { data: existingFinal } = await supabase.from("students")
+    .select("final_certificate_no").eq("id", sid).maybeSingle();
+  if (existingFinal?.final_certificate_no) return null;
+
+  const { data: allCourses } = await supabase.from("sms_courses")
+    .select("id, code").eq("is_published", true).like("code", `${MEAL_PROGRAM_PREFIX}%`);
+  const { data: doneEnr } = await supabase.from("enrollments")
+    .select("course_id").eq("student_id", sid).eq("status", "completed");
+  const doneIds = new Set((doneEnr || []).map((e: any) => e.course_id));
+  const coursTermines = (allCourses || []).length > 0 && (allCourses || []).every((co: any) => doneIds.has(co.id));
+  if (!coursTermines) return null;
+
+  // refreshGroupWorkStates plutôt qu'une lecture directe : l'état d'un travail DÉRIVE du
+  // rendu du groupe, et la ligne de l'étudiant peut être en retard d'un cran si personne
+  // n'a rouvert son tableau de bord depuis la correction.
+  const { lignes } = await refreshGroupWorkStates(sid);
+  const gwTermines = (lignes || []).every((l: any) => l.status === "completed");
+  if (!gwTermines) return null;
+
+  const certNo = `DMA-FINAL-${sid}-${Date.now().toString(36).toUpperCase()}`;
+  const nowIso = new Date().toISOString();
+  // Moyenne générale
+  const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
+  const ga = allGrades || [];
+  const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
+  await supabase.from("students").update({ final_certificate_no: certNo, final_certified_at: nowIso }).eq("id", sid);
+  await supabase.from("attestations").insert({
+    student_id: sid, cert_type: "final",
+    // Rattachement de bon ordre quand l'appel ne vient pas de la fin d'un cours : le dernier
+    // cours du cursus. La colonne ne sert qu'au classement de l'attestation.
+    course_id: courseIdPourAttestation ?? (allCourses || []).at(-1)?.id ?? null,
+    certificate_no: certNo, final_score: avg, status: "issued", issued_at: nowIso,
+  }).then(() => {}, () => {});
+  const { data: st2 } = await supabase.from("students").select("full_name, email").eq("id", sid).maybeSingle();
+  if (st2?.email) sendAcademyEmail({
+    studentId: sid, to: st2.email, type: "final_certificate",
+    subject: "🎓 Certificat Super-Expert MEAL délivré !",
+    html: finalCertEmailHtml(st2.full_name, certNo, avg),
+    dedupeKey: `final:${sid}`,
+  });
+  return { certificate_no: certNo, average: avg };
 }
 
 /**
@@ -5138,7 +5177,8 @@ app.get("/api/academy/certificate/final", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data: stud } = await supabase.from("students")
     .select("full_name, first_name, middle_name, last_name, final_certificate_no, final_certified_at").eq("id", sid).single();
-  if (!stud?.final_certificate_no) return res.status(403).send("Vous devez terminer les 3 cours pour obtenir le certificat final.");
+  if (!stud?.final_certificate_no) return res.status(403).send(
+    "Le certificat final s'obtient après les 3 cours du cursus ET la correction de vos travaux de groupe.");
   const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
   const ga = allGrades || [];
   const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
