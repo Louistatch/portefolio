@@ -12,6 +12,7 @@ import fs from "fs";
 // production (ERR_MODULE_NOT_FOUND) alors que le build, lui, passe sans broncher.
 import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises.js";
 import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
+import { leconOuverte } from "../shared/rythme.js";
 import { TESTS_PARCOURS, type TestParcours } from "./program-tests.js";
 import {
   GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_MAX_MEMBERS,
@@ -1211,7 +1212,10 @@ async function generateLessonSchedule(sid: number, admittedAt: Date, programId: 
  *
  * Les points 2 et 3 sont ce qui fait que le parcours « suit » : sans eux, terminer une leçon
  * laissait la suivante verrouillée jusqu'à la semaine prévue — jusqu'à un mois d'attente
- * alors que le cours était prêt.
+ * alors que le cours était prêt. Ils sont bornés à une semaine d'avance : non bornés, ils
+ * ne faisaient pas que « suivre », ils supprimaient le calendrier — les 20 leçons du cursus
+ * MEAL ont été validées en cinq jours. Voir shared/rythme.ts, où la règle est désormais
+ * écrite et testable sans base.
  *
  * `missed` ne signifie plus « recalé » mais « en retard » : l'échéance hebdomadaire est un
  * repère, pas un couperet. La seule échéance qui exclut reste la fenêtre d'admission de
@@ -1260,11 +1264,18 @@ async function refreshLessonStates(sid: number) {
     const s = stat[lp.course_id];
     const prev = previousCourse[lp.course_id];
 
-    const parCalendrier = now >= new Date(lp.unlock_at).getTime();
-    const suiteDuCours = (s?.done ?? 0) > 0 && rank <= (s!.maxDone + 1);
-    const debutDuCoursSuivant = (s?.done ?? 0) === 0 && rank <= 1 && prev != null && courseFinished(prev);
-
-    const ouverte = parCalendrier || suiteDuCours || debutDuCoursSuivant;
+    // La règle vit dans shared/rythme.ts, pas ici : au milieu d'une fonction qui écrit en
+    // base, elle n'était vérifiable que par une vraie base, et c'est ainsi qu'elle a pu
+    // rester fausse — voir l'en-tête de ce fichier.
+    const ouverte = leconOuverte({
+      maintenant: now,
+      ouvertureAt: new Date(lp.unlock_at).getTime(),
+      statut: lp.status,
+      rang: rank,
+      termineesDuCours: s?.done ?? 0,
+      rangMaxTermine: s?.maxDone ?? 0,
+      coursPrecedentTermine: prev == null ? null : courseFinished(prev),
+    });
     const enRetard = now > new Date(lp.due_at).getTime();
     const ns = !ouverte ? "locked" : (enRetard ? "missed" : "available");
     if (ns !== lp.status) {

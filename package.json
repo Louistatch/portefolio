@@ -11,6 +11,7 @@
     "check": "tsc",
     "verify:exercises": "tsx script/verify-exercises.ts",
     "verify:routes": "node script/verify-routes.mjs",
+    "verify:rythme": "tsx script/verify-rythme.ts",
     "verify:tests": "tsx script/verify-program-tests.ts",
     "db:push": "drizzle-kit push",
     "verify:python": "node script/verify-python.mjs",
