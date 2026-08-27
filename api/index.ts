@@ -22,10 +22,14 @@ import {
 } from "../shared/groupwork.js";
 
 // ── Supabase client ──
+// Service_role obligatoire côté serveur : les tables publiques sont en RLS sans
+// policy, la clé anon n'y a plus accès. L'anon ne sert que de repli en dev.
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
-const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
-if (!supabaseUrl || !supabaseKey) throw new Error("VITE_SUPABASE_URL et VITE_SUPABASE_ANON_KEY doivent être définis dans les variables d'environnement.");
-const supabase = createClient(supabaseUrl, supabaseKey);
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
+if (!supabaseUrl || !supabaseKey) throw new Error("VITE_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY (ou VITE_SUPABASE_ANON_KEY en dev) doivent être définis dans les variables d'environnement.");
+const supabase = createClient(supabaseUrl, supabaseKey, {
+  auth: { persistSession: false, autoRefreshToken: false },
+});
 
 // ── Email (Resend) ──
 const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null;

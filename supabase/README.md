@@ -29,6 +29,16 @@ base. Lisez cette page avant d'en lancer un.
 | 18 | `academy_cohort_forum.sql` | Forum de promotion (formateur ↔ cohorte) et journal des remises à zéro pour retard |
 | 19 | `academy_group_work_v4.sql` | Un groupe **par travail** (équipes retirées au sort à chaque GW) + verrou de constitution |
 
+## Verrouillage RLS (`academy_rls_lockdown.sql`)
+
+À part : ce script n'est pas une migration, c'est un **durcissement de sécurité** qui
+s'exécute **une fois le serveur déployé avec la clé service_role**
+(`SUPABASE_SERVICE_ROLE_KEY` sur Vercel). Il active RLS sans policy sur toutes les tables
+publiques qui ne l'avaient pas : la clé anon ne peut plus lire `students` (hashs de mot de
+passe, jetons de vérification), `academy_emails`, `enrollments`, `grades`… L'application ne
+passe jamais par PostgREST depuis le navigateur, donc rien ne change pour elle. Voir le
+préambule du fichier pour l'ordre exact et les requêtes de contrôle.
+
 ## Les travaux de groupe (GW)
 
 `academy_group_work.sql` ne crée que des tables **vides**. Les trois énoncés sont semés par
