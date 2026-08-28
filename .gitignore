@@ -15,4 +15,9 @@ vite.config.ts.*
 # une règle par dossier finirait par en oublier un, et le dépôt gagnerait 2 Mo sans que
 # personne ne le voie.
 design/*/*.html
+# Même chose lorsque le canevas est assemblé à la RACINE plutôt que dans son dossier de
+# sources : le nom du fichier devient celui de la page publiée, il ne suit donc pas la
+# convention des dossiers. Le dépôt n'a aucun .html de source à sa racine — client/index.html
+# est le seul point d'entrée, et il est un cran plus bas.
+/*.html
 !design/*/*.dc.html

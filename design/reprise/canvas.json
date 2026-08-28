@@ -1,0 +1,32 @@
+{
+  "artboards": [
+    { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Reprise après connexion" },
+    { "file": "Mobile.dc.html", "x": 1560, "y": 0, "w": 390, "h": 900, "title": "Reprise — téléphone" },
+    { "file": "Connexion.dc.html", "x": 0, "y": 1060, "w": 1440, "h": 860, "title": "Connexion — le retour" },
+    { "file": "Tableau.dc.html", "x": 0, "y": 2040, "w": 1440, "h": 780, "title": "Tableau de bord — étudiant à jour" }
+  ],
+  "annotations": [
+    {
+      "id": "principe",
+      "x": 0,
+      "y": -250,
+      "w": 620,
+      "text": "Ce qui décide de tout.\n\nAvant le mot de passe, le site ne sait rien du visiteur : ni sa semaine, ni son retard, ni son équipe. Afficher un état personnel sur la page de connexion reviendrait à le livrer à quiconque connaît l'adresse.\n\nLa visibilité se joue donc en deux temps. La page de connexion porte la RÈGLE — celle qui coûte, et qu'on oublie quand on n'est pas venu depuis trois semaines. L'écran de reprise, lui, porte l'ÉTAT, dans la seconde qui suit."
+    },
+    {
+      "id": "quand",
+      "x": 1560,
+      "y": -250,
+      "w": 420,
+      "text": "L'écran de reprise ne s'affiche que si quelque chose demande une action : un retard, un rendu de groupe qui se ferme, une équipe à découvrir.\n\nUn écran qu'on traverse tous les jours sans rien à y faire cesse d'être lu au bout d'une semaine — et le jour où il compte, il ne compte plus."
+    },
+    {
+      "id": "a-jour",
+      "x": 0,
+      "y": 1960,
+      "w": 560,
+      "text": "L'autre moitié : l'étudiant à jour ne voit pas d'écran de reprise, il arrive ici.\n\nLe ruban vert occupe l'emplacement exact où l'alerte apparaîtrait. L'œil apprend qu'à cet endroit se trouve l'état du parcours — et le jour où il vire à l'ambre, le changement se voit sans qu'on ait à lire."
+    }
+  ],
+  "launch": { "view": "canvas" }
+}

@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700&family=Plus+Jakarta+Sans:wght@200..800&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    a { color: #085E41; text-decoration: none; }
+    a:hover { color: #16A260; }
+    .lora { font-family: 'Lora', Georgia, serif; }
+  </style>
+</helmet>
+
+<!-- L'autre moitié de la réponse : l'étudiant À JOUR ne voit pas d'écran de reprise, il
+     arrive ici. L'en-tête doit donc porter seul la même information — semaine, échéance,
+     prochaine action — sans le ton d'alerte, qui ne se justifie pas.
+     Le ruban vert n'est pas une félicitation décorative : il dit la seule chose utile à
+     qui est à jour, la date à laquelle il cessera de l'être. -->
+<div style="width: 1440px; height: 780px; background: #FCFCFD; color: #0F172A; display: flex;">
+
+  <!-- Barre latérale de l'espace étudiant, telle qu'elle existe. -->
+  <div style="width: 256px; flex-shrink: 0; background: #FFFFFF; border-right: 1px solid #E2E8F0; padding: 18px 14px; display: flex; flex-direction: column;">
+    <div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 20px;">
+      <span style="width: 34px; height: 34px; border-radius: 9px; background: #085E41; display: grid; place-items: center;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3L2 8l10 5 10-5-10-5z"></path><path d="M6 11v5c0 1.7 2.7 3 6 3s6-1.3 6-3v-5"></path>
+        </svg>
+      </span>
+      <span>
+        <span style="display: block; font-size: 13px; font-weight: 700; line-height: 1.2;">MEAL</span>
+        <span style="display: block; font-size: 9px; letter-spacing: 0.14em; color: #64748B;">ACADEMY</span>
+      </span>
+    </div>
+    <div style="display: flex; flex-direction: column; gap: 3px;">
+      <span style="display: block; padding: 10px 12px; border-radius: 8px; background: #ECFDF5; color: #085E41; font-size: 13.5px; font-weight: 600;">Accueil</span>
+      <span style="display: block; padding: 10px 12px; font-size: 13.5px; color: #64748B;">Cursus MEAL</span>
+      <span style="display: block; padding: 10px 12px; font-size: 13.5px; color: #64748B;">Formation de formateurs</span>
+      <span style="display: block; padding: 10px 12px; font-size: 13.5px; color: #64748B;">Finance climatique agricole</span>
+      <span style="display: block; padding: 10px 12px; font-size: 13.5px; color: #64748B;">Travaux de groupe</span>
+      <span style="display: block; padding: 10px 12px; font-size: 13.5px; color: #64748B;">Certifications</span>
+      <span style="display: block; padding: 10px 12px; font-size: 13.5px; color: #64748B;">Ressources</span>
+    </div>
+  </div>
+
+  <!-- Contenu -->
+  <div style="flex: 1; padding: 32px 40px; min-width: 0;">
+
+    <!-- En-tête renforcé : identité, position dans le calendrier, prochaine action.
+         Trois blocs sur une seule ligne, l'échéance au centre parce que c'est elle qui
+         cadence tout le reste — y compris la date des travaux de groupe. -->
+    <div style="border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 16px; padding: 24px 26px;">
+      <div style="display: flex; align-items: center; gap: 32px;">
+
+        <div style="display: flex; align-items: center; gap: 15px; min-width: 0;">
+          <span style="width: 56px; height: 56px; border-radius: 14px; background: #ECFDF5; color: #085E41; display: grid; place-items: center; font-size: 18px; font-weight: 700; flex-shrink: 0;">EA</span>
+          <span style="min-width: 0;">
+            <span class="lora" style="display: block; font-size: 23px; font-weight: 600; line-height: 1.2;">Eméraude</span>
+            <span style="display: block; font-size: 13px; color: #64748B; margin-top: 3px;">Admise · 2 credentials au relevé</span>
+          </span>
+        </div>
+
+        <span style="width: 1px; height: 56px; background: #E2E8F0; flex-shrink: 0;"></span>
+
+        <div style="min-width: 230px;">
+          <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 6px;">
+            <span style="font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; font-weight: 700;">Fin d'admission</span>
+            <span style="font-size: 11px; color: #64748B;">semaine 2 / 13</span>
+          </div>
+          <div class="lora" style="font-size: 19px; font-weight: 600; margin-bottom: 9px;">21 novembre 2026</div>
+          <div style="height: 6px; border-radius: 3px; background: #F1F5F9; overflow: hidden;">
+            <span style="display: block; width: 12%; height: 100%; background: #085E41;"></span>
+          </div>
+          <p style="font-size: 11px; color: #64748B; margin: 6px 0 0;">85 jours restants</p>
+        </div>
+
+        <div style="flex: 1;"></div>
+
+        <a href="#" style="display: inline-flex; flex-direction: column; gap: 2px; background: #085E41; color: #FFFFFF; border-radius: 10px; padding: 13px 20px; max-width: 260px;">
+          <span style="font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(255,255,255,.72); font-weight: 700;">À faire maintenant</span>
+          <span style="font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Rendre le formulaire intelligent</span>
+        </a>
+      </div>
+    </div>
+
+    <!-- Le ruban qui remplace l'alerte quand il n'y a rien à signaler. Même emplacement,
+         même largeur, même hauteur : l'œil apprend qu'à cet endroit se trouve l'état du
+         parcours, et le jour où il vire à l'ambre, le changement se voit. -->
+    <div style="margin-top: 16px; border: 1px solid #A7F3D0; background: #ECFDF5; border-radius: 16px; padding: 16px 22px; display: flex; align-items: center; gap: 14px;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#047857" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;">
+        <path d="M20 6 9 17l-5-5"></path>
+      </svg>
+      <div style="min-width: 0; flex: 1;">
+        <p style="font-size: 14px; font-weight: 600; color: #065F46; margin: 0;">
+          Vous êtes à jour sur le calendrier.
+        </p>
+        <p style="font-size: 13px; color: #047857; margin: 3px 0 0; line-height: 1.5;">
+          Prochaine échéance le 4 septembre&nbsp;: deux leçons de MEAL-01. Votre équipe du premier
+          travail de groupe est tirée au sort le 3 septembre.
+        </p>
+      </div>
+      <a href="#" style="font-size: 13px; font-weight: 600; color: #047857; white-space: nowrap;">Voir mon planning</a>
+    </div>
+
+    <!-- Le reste de la page, esquissé : il ne change pas, il est là pour situer l'en-tête. -->
+    <div style="margin-top: 26px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px;">
+      <div style="border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 12px; padding: 20px; height: 150px;">
+        <div style="font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; font-weight: 700;">Cursus MEAL</div>
+        <div class="lora" style="font-size: 24px; font-weight: 600; margin-top: 10px;">100 %</div>
+        <div style="height: 5px; border-radius: 3px; background: #F1F5F9; margin-top: 12px; overflow: hidden;"><span style="display: block; width: 100%; height: 100%; background: #085E41;"></span></div>
+        <p style="font-size: 12.5px; color: #64748B; margin: 10px 0 0;">20 leçons sur 20</p>
+      </div>
+      <div style="border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 12px; padding: 20px; height: 150px;">
+        <div style="font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; font-weight: 700;">Formation de formateurs</div>
+        <div class="lora" style="font-size: 24px; font-weight: 600; margin-top: 10px;">100 %</div>
+        <div style="height: 5px; border-radius: 3px; background: #F1F5F9; margin-top: 12px; overflow: hidden;"><span style="display: block; width: 100%; height: 100%; background: #7C3AED;"></span></div>
+        <p style="font-size: 12.5px; color: #64748B; margin: 10px 0 0;">12 leçons sur 12</p>
+      </div>
+      <div style="border: 1px solid #E2E8F0; background: #FFFFFF; border-radius: 12px; padding: 20px; height: 150px;">
+        <div style="font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #64748B; font-weight: 700;">Travaux de groupe</div>
+        <div class="lora" style="font-size: 24px; font-weight: 600; margin-top: 10px;">0 <span style="font-size: 15px; color: #64748B; font-weight: 400;">/ 3 rendus</span></div>
+        <p style="font-size: 12.5px; color: #64748B; margin: 14px 0 0; line-height: 1.55;">Le premier s'ouvre le 10 septembre.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
