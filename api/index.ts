@@ -1479,6 +1479,9 @@ async function formGroupsForGw(cohorte: string, gwId: number): Promise<{ groupId
   const { data: candidats } = await supabase.from("students")
     .select("id, admitted_at").not("admitted_at", "is", null);
 
+  const candidatParId = new Map<number, string>(
+    (candidats || []).map((c: any) => [c.id, c.admitted_at]));
+
   const libres = melanger((candidats || [])
     .filter((s: any) => !exclus.has(s.id))
     .filter((s: any) => cohortOf(new Date(s.admitted_at)) === cohorte)
@@ -1508,6 +1511,15 @@ async function formGroupsForGw(cohorte: string, gwId: number): Promise<{ groupId
       .select("student_id");
     const places = (inseres || []).map((r: any) => r.student_id);
     if (places.length) resultat.push({ groupId: cree.id, membres: places });
+
+    // Invariant : qui est dans une équipe a son calendrier. Le tirage puise dans `students`
+    // alors que le calendrier se créait à la première visite de la page ; les deux
+    // pouvaient donc diverger — être annoncé dans un groupe sans avoir de travail à
+    // l'écran. On le referme ici, à l'endroit exact où l'étudiant entre dans le dispositif.
+    for (const sid of places) {
+      const admisLe = candidatParId.get(sid);
+      if (admisLe) await generateGroupWorkSchedule(sid, new Date(admisLe), true);
+    }
   }
 
   await supabase.from("academy_group_formation_locks").update({
@@ -1603,7 +1615,7 @@ async function seedGroupForum(groupId: number, gw: any) {
  * recalculée, sinon un étudiant se retrouverait en retard sur une échéance qu'il n'a
  * jamais vue.
  */
-async function generateGroupWorkSchedule(sid: number, admittedAt: Date) {
+async function generateGroupWorkSchedule(sid: number, admittedAt: Date, dejaDansLeDispositif = false) {
   const gws = (await getGroupWorks()).filter(g => g.is_published !== false);
   if (!gws.length) return;
 
@@ -1615,7 +1627,13 @@ async function generateGroupWorkSchedule(sid: number, admittedAt: Date) {
   // La règle ne vaut que pour ENTRER : qui a déjà un calendrier le garde, sans quoi tout le
   // monde en serait sorti au passage de sa propre semaine 2 — deux semaines avant l'ouverture
   // du premier travail.
-  if (!eligibleAuxTravauxDeGroupe(admittedAt)) {
+  //
+  // `dejaDansLeDispositif` est la troisième façon d'y être : avoir été tiré au sort dans une
+  // équipe. Le tirage puise dans `students`, pas dans les calendriers ; sans ce passage, un
+  // étudiant qui n'a jamais ouvert la page « Travaux de groupe » avant sa semaine 2 se
+  // retrouvait dans un groupe, prévenu par email, devant un écran qui ne connaissait aucun
+  // travail. Six étudiants de la promotion d'août étaient dans ce cas.
+  if (!dejaDansLeDispositif && !eligibleAuxTravauxDeGroupe(admittedAt)) {
     const { count } = await supabase.from("group_work_progress")
       .select("id", { count: "exact", head: true }).eq("student_id", sid);
     if (!count) return;
@@ -3757,11 +3775,41 @@ async function constatDeRetard() {
   if (!admis?.length) return [];
 
   const { data: lp } = await supabase.from("lesson_progress")
-    .select("student_id, status, due_at");
+    .select("student_id, course_id, status, due_at");
+
+  // Ne compter que les leçons des parcours auxquels l'étudiant est admis.
+  //
+  // Les plannings d'avant la séparation par parcours ont été générés pour tous les cours
+  // publiés : dix-sept étudiants admis au seul cursus MEAL portent encore douze lignes
+  // TOF-FIN-01 chacun, échéances comprises. Leur écran ne les montre plus
+  // (filtrerAuxParcoursAdmis), mais ce constat-ci lisait la table brute — il les aurait
+  // donc déclarés en retard sur un parcours qu'ils n'ont jamais rejoint, puis rendus
+  // exclusibles pour cela. Trois leçons par semaine leur étaient comptées au lieu de deux.
+  //
+  // Le filtre est posé ici plutôt que par un nettoyage de la base, pour la même raison
+  // qu'à la lecture du planning : il corrige les dix-sept d'un coup sans rien détruire, et
+  // il tient encore le jour où une ligne réapparaît.
+  const { data: cours } = await supabase.from("sms_courses").select("id, code");
+  const parcoursDuCours = new Map<number, string | null>(
+    (cours || []).map((c: any) => [c.id, programOf(c.code)?.id ?? null]));
+
+  // Une seule lecture des admissions par parcours, plutôt qu'un parcoursAdmis() par
+  // étudiant : cette fonction tourne sur toute la promotion, à chaque passage de la tâche.
+  const { data: admissionsParcours } = await supabase.from("academy_program_admissions")
+    .select("student_id, program_id").not("admitted_at", "is", null);
+  const parcoursDe = new Map<number, Set<string>>();
+  for (const s of admis as any[]) parcoursDe.set(s.id, new Set(["meal"]));
+  for (const r of admissionsParcours || []) parcoursDe.get(r.student_id)?.add(r.program_id);
 
   const now = Date.now();
   return (admis as any[]).map(s => {
-    const siennes = (lp || []).filter((l: any) => l.student_id === s.id);
+    const siens = parcoursDe.get(s.id) ?? new Set<string>();
+    const siennes = (lp || []).filter((l: any) => {
+      if (l.student_id !== s.id) return false;
+      const prog = parcoursDuCours.get(l.course_id);
+      // Cours sans parcours identifiable : on ne retire rien, comme à la lecture du planning.
+      return prog == null || siens.has(prog);
+    });
     const enRetard = siennes.filter((l: any) => l.status !== "completed" && new Date(l.due_at).getTime() < now);
     const jours = enRetard.length
       ? Math.floor(Math.max(...enRetard.map((l: any) => now - new Date(l.due_at).getTime())) / JOUR_MS)
