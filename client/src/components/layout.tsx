@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Newsletter } from "@/components/newsletter";
 import { NewsletterPopup } from "@/components/newsletter-popup";
 import { TermsPopup } from "@/components/terms-popup";
-import { ScrollProgressBar, PageTransition, useAutoHideHeader } from "@/components/motion";
+import { ScrollProgressBar, PageTransition, useAutoHideHeader, SPRING_STIFF, SPRING_SOFT } from "@/components/motion";
 import { useQuery } from "@tanstack/react-query";
 import { getStudent, clearStudentSession, isStudentLoggedIn } from "@/lib/student";
 
@@ -71,7 +71,7 @@ export function Layout({ children }: { children: ReactNode }) {
       <motion.header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass-nav py-3" : "bg-transparent py-5"}`}
         animate={{ y: headerHidden ? "-115%" : "0%" }}
-        transition={{ type: "spring", stiffness: 260, damping: 30 }}
+        transition={SPRING_SOFT}
       >
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold tracking-tighter text-foreground hover:text-primary transition-colors flex items-center gap-2">
@@ -95,7 +95,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   <motion.span
                     layoutId="nav-pill"
                     className="absolute inset-0 rounded-full bg-primary/10"
-                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                    transition={SPRING_STIFF}
                   />
                 )}
                 <span className="relative">{item.label}</span>

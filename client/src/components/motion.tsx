@@ -21,6 +21,18 @@ import { ReactNode, useEffect, useRef, useState } from "react";
 
 const EASE: [number, number, number, number] = [0.16, 1, 0.3, 1];
 
+/**
+ * Ressorts du projet (presets Motion). Une seule source de vérité :
+ *  - SPRING_STIFF  : éléments nets qui doivent répondre vite (pilule de navigation) ;
+ *  - SPRING_SOFT   : surfaces flottantes (en-tête qui se masque) ;
+ *  - SPRING_SMOOTH : valeurs de défilement (barre de progression) ;
+ *  - SPRING_TILT   : inclinaison des cartes (TiltCard).
+ */
+export const SPRING_STIFF = { type: "spring" as const, stiffness: 400, damping: 30 };
+export const SPRING_SOFT = { type: "spring" as const, stiffness: 260, damping: 30 };
+export const SPRING_SMOOTH = { stiffness: 130, damping: 28 };
+export const SPRING_TILT = { stiffness: 200, damping: 20 };
+
 /** Apparition au défilement : fondu + translation douce. */
 export function Reveal({
   children,
@@ -205,8 +217,8 @@ export function TiltCard({
   const reduce = useReducedMotion();
   const rx = useMotionValue(0);
   const ry = useMotionValue(0);
-  const srx = useSpring(rx, { stiffness: 200, damping: 20 });
-  const sry = useSpring(ry, { stiffness: 200, damping: 20 });
+  const srx = useSpring(rx, SPRING_TILT);
+  const sry = useSpring(ry, SPRING_TILT);
 
   const onMove = (e: React.MouseEvent<HTMLDivElement>) => {
     if (reduce || !ref.current) return;
@@ -238,8 +250,7 @@ export function TiltCard({
 export function ScrollProgressBar() {
   const { scrollYProgress } = useScroll();
   const scaleX = useSpring(scrollYProgress, {
-    stiffness: 130,
-    damping: 28,
+    ...SPRING_SMOOTH,
     restDelta: 0.001,
   });
   return (
