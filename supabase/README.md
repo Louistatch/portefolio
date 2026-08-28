@@ -39,6 +39,18 @@ passe, jetons de vérification), `academy_emails`, `enrollments`, `grades`… L'
 passe jamais par PostgREST depuis le navigateur, donc rien ne change pour elle. Voir le
 préambule du fichier pour l'ordre exact et les requêtes de contrôle.
 
+## Contenus de vitrine (`testimonials_seed.sql`, `academy_illustrations_cours.sql`)
+
+Deux scripts de **contenu**, pas de schéma, tous deux idempotents (rejouables sans doublon) :
+
+- `testimonials_seed.sql` — pose trois témoignages pour la section « Ce qu'ils disent » de
+  l'accueil (la section disparaît tant que la table est vide). Les textes sont des
+  propositions à **remplacer par de vrais témoignages** depuis l'administration.
+- `academy_illustrations_cours.sql` — insère les schémas pédagogiques des cours (SVG de
+  `client/public/academy/{qgis,meal,tof}`) avant le premier quiz/exercice de chaque leçon.
+  MEAL-02 (QGIS) était 100 % texte malgré son sujet ; TOF-FIN-01 reçoit des visuels de
+  gestion financière paysanne pour un public peu lecteur.
+
 ## Les travaux de groupe (GW)
 
 `academy_group_work.sql` ne crée que des tables **vides**. Les trois énoncés sont semés par

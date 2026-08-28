@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" font-family="system-ui, sans-serif">
+  <rect width="800" height="460" fill="#ffffff"/>
+  <text x="30" y="48" font-size="20" font-weight="700" fill="#134e4a">Une même donnée, trois façons de la faire parler</text>
+  <text x="30" y="72" font-size="13" fill="#64748b">La symbologie traduit les nombres en lecture visuelle immédiate.</text>
+  <!-- taille proportionnelle -->
+  <g>
+    <rect x="40" y="100" width="226" height="200" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+    <circle cx="110" cy="210" r="26" fill="#0d9488"/>
+    <circle cx="180" cy="180" r="13" fill="#0d9488"/>
+    <circle cx="230" cy="240" r="7" fill="#0d9488"/>
+    <text x="54" y="120" font-size="12" font-weight="700" fill="#134e4a">Taille proportionnelle</text>
+    <text x="54" y="140" font-size="11" fill="#64748b">plus de cas = plus gros</text>
+    <g font-size="10" fill="#475569">
+      <circle cx="64" cy="262" r="5" fill="#0d9488"/><text x="76" y="266">200 cas</text>
+      <circle cx="64" cy="280" r="3" fill="#0d9488"/><text x="76" y="284">30 cas</text>
+    </g>
+  </g>
+  <!-- dégradé -->
+  <g>
+    <rect x="287" y="100" width="226" height="200" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+    <circle cx="340" cy="210" r="14" fill="#b91c1c"/>
+    <circle cx="400" cy="180" r="14" fill="#d97706"/>
+    <circle cx="460" cy="240" r="14" fill="#16a34a"/>
+    <text x="301" y="120" font-size="12" font-weight="700" fill="#134e4a">Dégradé de couleur</text>
+    <text x="301" y="140" font-size="11" fill="#64748b">élevé → rouge, faible → vert</text>
+    <rect x="301" y="258" width="198" height="14" rx="7" fill="#b91c1c"/>
+    <rect x="367" y="258" width="66" height="14" fill="#d97706"/>
+    <rect x="433" y="258" width="66" height="14" fill="#16a34a"/>
+    <text x="301" y="290" font-size="10" fill="#475569">prévalence malnutrition</text>
+  </g>
+  <!-- catégorie -->
+  <g>
+    <rect x="534" y="100" width="226" height="200" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+    <circle cx="580" cy="210" r="14" fill="#0ea5e9"/>
+    <circle cx="640" cy="180" r="14" fill="#0d9488"/>
+    <circle cx="700" cy="240" r="14" fill="#d97706"/>
+    <text x="548" y="120" font-size="12" font-weight="700" fill="#134e4a">Couleur par catégorie</text>
+    <text x="548" y="140" font-size="11" fill="#64748b">une couleur = un type</text>
+    <g font-size="10" fill="#475569">
+      <circle cx="558" cy="262" r="5" fill="#0ea5e9"/><text x="570" y="266">forage</text>
+      <circle cx="558" cy="280" r="5" fill="#0d9488"/><text x="570" y="284">puits</text>
+      <circle cx="558" cy="298" r="5" fill="#d97706"/><text x="570" y="302">rivière</text>
+    </g>
+  </g>
+  <g font-size="12" fill="#475569">
+    <rect x="40" y="320" width="720" height="110" rx="10" fill="#fefce8" stroke="#fde68a"/>
+    <text x="56" y="348" font-weight="700" fill="#b45309">Pièges classiques</text>
+    <text x="56" y="372" fill="#b45309">• Trop de couleurs : au-delà de 5-7 catégories, l'œil ne distingue plus rien — regrouper en « autre ».</text>
+    <text x="56" y="394" fill="#b45309">• Un dégradé pour des catégories (ou l'inverse) : le rouge « élevé » d'un dégradé n'a pas de sens pour un type de point d'eau.</text>
+    <text x="56" y="416" fill="#b45309">• Oublier la légende : une carte sans légende est un dessin, pas une carte.</text>
+  </g>
+</svg>

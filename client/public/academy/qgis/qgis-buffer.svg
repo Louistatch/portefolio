@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" font-family="system-ui, sans-serif">
+  <rect width="800" height="460" fill="#ffffff"/>
+  <text x="30" y="48" font-size="20" font-weight="700" fill="#134e4a">Le tampon (buffer) : la zone à moins de X mètres</text>
+  <text x="30" y="72" font-size="13" fill="#64748b">Exemple : quels villages sont à moins de 1 km d'une école ?</text>
+  <!-- carte -->
+  <rect x="40" y="100" width="440" height="300" rx="10" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2"/>
+  <circle cx="260" cy="250" r="150" fill="#bae6fd" opacity="0.55"/>
+  <circle cx="260" cy="250" r="100" fill="#a5f3fc" opacity="0.55"/>
+  <circle cx="260" cy="250" r="50" fill="#67e8f9" opacity="0.6"/>
+  <rect x="242" y="234" width="36" height="32" rx="4" fill="#134e4a"/>
+  <text x="248" y="256" font-size="15" fill="#ffffff">🏫</text>
+  <circle cx="150" cy="200" r="9" fill="#0d9488" stroke="#fff" stroke-width="2"/>
+  <circle cx="360" cy="300" r="9" fill="#0d9488" stroke="#fff" stroke-width="2"/>
+  <circle cx="410" cy="150" r="9" fill="#94a3b8" stroke="#fff" stroke-width="2"/>
+  <text x="120" y="196" font-size="11" fill="#134e4a">dans la zone</text>
+  <text x="330" y="318" font-size="11" fill="#134e4a">dans la zone</text>
+  <text x="382" y="146" font-size="11" fill="#64748b">hors zone</text>
+  <!-- anneaux annotés -->
+  <g font-size="11" fill="#0369a1">
+    <line x1="260" y1="250" x2="306" y2="250" stroke="#0369a1" stroke-width="1.5"/>
+    <text x="266" y="268">500 m</text>
+    <line x1="260" y1="250" x2="355" y2="250" stroke="#0369a1" stroke-width="1.5"/>
+    <text x="314" y="268">1 km</text>
+    <line x1="260" y1="250" x2="406" y2="250" stroke="#0369a1" stroke-width="1.5"/>
+    <text x="360" y="268">1,5 km</text>
+  </g>
+  <!-- procédure -->
+  <g font-size="13" fill="#334155">
+    <rect x="520" y="100" width="250" height="150" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="536" y="128" font-weight="700" fill="#134e4a">Comment faire</text>
+    <text x="536" y="154">1. Couche écoles (points)</text>
+    <text x="536" y="178">2. Vecteur → Géotraitements</text>
+    <text x="556" y="200">→ Tampon</text>
+    <text x="536" y="226">3. Distance : 1 000 m</text>
+    <text x="536" y="248" fill="#047857">4. Nouvelle couche créée ✓</text>
+    <rect x="520" y="270" width="250" height="130" rx="10" fill="#ecfdf5" stroke="#a7f3d0"/>
+    <text x="536" y="298" font-weight="700" fill="#047857">À retenir</text>
+    <text x="536" y="322" fill="#047857">Le tampon répond aux questions</text>
+    <text x="536" y="342" fill="#047857">« à moins de… » : école, forage,</text>
+    <text x="536" y="362" fill="#047857">marché, piste. L'unité suit le</text>
+    <text x="536" y="382" fill="#047857">SCR de la couche (mètres en UTM).</text>
+  </g>
+</svg>

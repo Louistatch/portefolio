@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" font-family="system-ui, sans-serif">
+  <rect width="800" height="460" fill="#ffffff"/>
+  <text x="30" y="48" font-size="20" font-weight="700" fill="#134e4a">Chaque point de la carte est une ligne du tableau</text>
+  <text x="30" y="72" font-size="13" fill="#64748b">La table attributaire relie la géométrie (le point) aux données (l'enquête).</text>
+  <!-- carte -->
+  <rect x="40" y="100" width="360" height="300" rx="10" fill="#f1f5f9" stroke="#e2e8f0" stroke-width="2"/>
+  <circle cx="160" cy="180" r="9" fill="#0d9488" stroke="#fff" stroke-width="2"/>
+  <circle cx="300" cy="230" r="9" fill="#0d9488" stroke="#fff" stroke-width="2"/>
+  <circle cx="220" cy="330" r="9" fill="#fbbf24" stroke="#fff" stroke-width="3"/>
+  <rect x="110" y="120" width="150" height="26" rx="13" fill="#0d9488"/>
+  <text x="128" y="137" font-size="11" fill="#ffffff">sélectionné</text>
+  <text x="172" y="176" font-size="11" fill="#134e4a">A</text>
+  <text x="312" y="226" font-size="11" fill="#134e4a">B</text>
+  <text x="232" y="326" font-size="11" fill="#b45309">C</text>
+  <!-- tableau -->
+  <g>
+    <rect x="440" y="100" width="330" height="300" rx="10" fill="#ffffff" stroke="#e2e8f0" stroke-width="2"/>
+    <rect x="440" y="100" width="330" height="40" rx="10" fill="#134e4a"/>
+    <rect x="440" y="126" width="330" height="14" fill="#134e4a"/>
+    <g font-size="12" fill="#ffffff" font-weight="600">
+      <text x="456" y="126">id</text><text x="512" y="126">village</text><text x="640" y="126">puits</text>
+    </g>
+    <rect x="440" y="142" width="330" height="44" fill="#ecfdf5"/>
+    <g font-size="12" fill="#334155">
+      <text x="456" y="169">1</text><text x="512" y="169">Kara</text><text x="640" y="169">oui</text>
+    </g>
+    <g font-size="12" fill="#334155">
+      <text x="456" y="213">2</text><text x="512" y="213">Pya</text><text x="640" y="213">non</text>
+    </g>
+    <rect x="440" y="230" width="330" height="44" fill="#ffffff"/>
+    <g font-size="12" fill="#334155">
+      <text x="456" y="257">3</text><text x="512" y="257">Niamtou</text><text x="640" y="257">oui</text>
+    </g>
+    <line x1="440" y1="142" x2="770" y2="142" stroke="#e2e8f0"/>
+    <line x1="440" y1="186" x2="770" y2="186" stroke="#e2e8f0"/>
+    <line x1="440" y1="230" x2="770" y2="230" stroke="#e2e8f0"/>
+  </g>
+  <!-- liaison -->
+  <path d="M160 188 C 250 120 360 130 470 160" fill="none" stroke="#0d9488" stroke-width="2" stroke-dasharray="6 5"/>
+  <g font-size="12" fill="#475569">
+    <rect x="60" y="416" width="300" height="34" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="74" y="437">Sélectionner sur la carte = surligner dans le tableau (et l'inverse).</text>
+    <rect x="430" y="416" width="340" height="34" rx="8" fill="#f8fafc" stroke="#e2e8f0"/>
+    <text x="444" y="437">Un clic sur le point A ouvre sa ligne : toutes les réponses de l'enquête.</text>
+  </g>
+</svg>

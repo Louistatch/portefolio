@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" font-family="system-ui, sans-serif">
+  <rect width="800" height="460" fill="#ffffff"/>
+  <text x="30" y="48" font-size="20" font-weight="700" fill="#5b21b6">Combien coûte vraiment un sac de maïs ?</text>
+  <text x="30" y="72" font-size="13" fill="#64748b">Le paysan connaît son prix de vente ; le coût de production, lui, se calcule poste par poste.</text>
+  <!-- barre empilée -->
+  <g>
+    <rect x="60" y="150" width="90" height="130" fill="#16a34a"/>
+    <rect x="60" y="280" width="90" height="70" fill="#0d9488"/>
+    <rect x="60" y="350" width="90" height="50" fill="#d97706"/>
+    <rect x="60" y="400" width="90" height="40" fill="#7c3aed"/>
+    <text x="66" y="172" font-size="11" fill="#ffffff" font-weight="700">Semences</text>
+    <text x="66" y="300" font-size="11" fill="#ffffff" font-weight="700">Engrais</text>
+    <text x="66" y="376" font-size="11" fill="#ffffff" font-weight="700">Main-d'œuvre</text>
+    <text x="66" y="424" font-size="11" fill="#ffffff" font-weight="700">Transport</text>
+  </g>
+  <!-- légende chiffrée -->
+  <g font-size="13" fill="#334155">
+    <rect x="190" y="150" width="280" height="34" rx="6" fill="#f0fdf4" stroke="#bbf7d0"/>
+    <text x="204" y="172">Semences sélectionnées</text><text x="430" y="172" font-weight="700">4 000 F</text>
+    <rect x="190" y="192" width="280" height="34" rx="6" fill="#f0fdf4" stroke="#bbf7d0"/>
+    <text x="204" y="214">Engrais (NPK + urée)</text><text x="430" y="214" font-weight="700">7 500 F</text>
+    <rect x="190" y="234" width="280" height="34" rx="6" fill="#f0fdf4" stroke="#bbf7d0"/>
+    <text x="204" y="256">Main-d'œuvre (sarclage, récolte)</text><text x="430" y="256" font-weight="700">3 500 F</text>
+    <rect x="190" y="276" width="280" height="34" rx="6" fill="#f0fdf4" stroke="#bbf7d0"/>
+    <text x="204" y="298">Transport au marché</text><text x="430" y="298" font-weight="700">1 500 F</text>
+    <rect x="190" y="318" width="280" height="38" rx="6" fill="#ede9fe" stroke="#c4b5fd"/>
+    <text x="204" y="342" font-weight="700" fill="#5b21b6">Coût total du sac</text><text x="430" y="342" font-weight="700" fill="#5b21b6">16 500 F</text>
+  </g>
+  <!-- comparaison -->
+  <g>
+    <rect x="540" y="150" width="220" height="150" rx="12" fill="#fefce8" stroke="#fde68a"/>
+    <text x="556" y="178" font-size="13" font-weight="700" fill="#b45309">Lecture du résultat</text>
+    <text x="556" y="202" font-size="12" fill="#b45309">Prix de vente : 22 000 F</text>
+    <text x="556" y="222" font-size="12" fill="#b45309">Coût : − 16 500 F</text>
+    <line x1="556" y1="234" x2="744" y2="234" stroke="#e2e8f0"/>
+    <text x="556" y="256" font-size="13" font-weight="700" fill="#047857">Marge : + 5 500 F</text>
+    <text x="556" y="280" font-size="11" fill="#64748b">… sans compter le temps</text>
+    <text x="556" y="296" font-size="11" fill="#64748b">de travail du ménage.</text>
+  </g>
+  <g font-size="12" fill="#475569">
+    <rect x="60" y="130" width="700" height="0" fill="none"/>
+    <text x="30" y="122" font-size="12" fill="#64748b">Exercice du groupe : refaire la colonne avec le maïs, le riz ou l'arachide du village — puis comparer les marges.</text>
+  </g>
+</svg>

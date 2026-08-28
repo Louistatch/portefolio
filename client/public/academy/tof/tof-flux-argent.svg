@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 460" font-family="system-ui, sans-serif">
+  <rect width="800" height="460" fill="#ffffff"/>
+  <text x="30" y="48" font-size="20" font-weight="700" fill="#5b21b6">D'où vient l'argent, où va-t-il ?</text>
+  <text x="30" y="72" font-size="13" fill="#64748b">Le premier exercice de toute session : dessiner le cycle de l'argent du ménage, au tableau ou au sol.</text>
+  <!-- centre -->
+  <rect x="310" y="150" width="180" height="70" rx="12" fill="#7c3aed"/>
+  <text x="340" y="180" font-size="16" font-weight="700" fill="#ffffff">La récolte</text>
+  <text x="340" y="202" font-size="12" fill="#ede9fe">vente au marché</text>
+  <!-- entrées -->
+  <g>
+    <rect x="40" y="120" width="200" height="56" rx="10" fill="#ecfdf5" stroke="#16a34a" stroke-width="2"/>
+    <text x="56" y="144" font-size="13" font-weight="700" fill="#047857">Entrées d'argent</text>
+    <text x="56" y="164" font-size="11" fill="#047857">récolte · petit élevage · transferts</text>
+  </g>
+  <path d="M240 148 C 280 148 280 185 310 185" fill="none" stroke="#16a34a" stroke-width="3" marker-end="url(#t1)"/>
+  <defs><marker id="t1" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#16a34a"/></marker>
+  <marker id="t2" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto"><path d="M0,0 L8,3 L0,6 Z" fill="#dc2626"/></marker></defs>
+  <!-- sorties -->
+  <g>
+    <rect x="560" y="120" width="200" height="56" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="2"/>
+    <text x="576" y="144" font-size="13" font-weight="700" fill="#b91c1c">Sorties d'argent</text>
+    <text x="576" y="164" font-size="11" fill="#b91c1c">intrants · école · santé · cérémonies</text>
+  </g>
+  <path d="M490 185 C 520 185 520 148 560 148" fill="none" stroke="#dc2626" stroke-width="3" marker-end="url(#t2)"/>
+  <!-- piège -->
+  <g font-size="12" fill="#475569">
+    <rect x="40" y="250" width="350" height="130" rx="10" fill="#fefce8" stroke="#fde68a"/>
+    <text x="56" y="278" font-weight="700" fill="#b45309">Le piège du « tout à la fois »</text>
+    <text x="56" y="300" fill="#b45309">La récolte se vend en novembre, mais les dépenses</text>
+    <text x="56" y="320" fill="#b45309">courent toute l'année. L'argent « fond » sans qu'on</text>
+    <text x="56" y="340" fill="#b45309">sache où : c'est le signe qu'il n'y a pas de budget.</text>
+    <text x="56" y="364" fill="#b45309">Dessiner le cycle, c'est déjà reprendre la main.</text>
+  </g>
+  <g font-size="12" fill="#475569">
+    <rect x="410" y="250" width="350" height="130" rx="10" fill="#ecfdf5" stroke="#a7f3d0"/>
+    <text x="426" y="278" font-weight="700" fill="#047857">Séquence d'animation (60 min)</text>
+    <text x="426" y="300" fill="#047857">1. Chacun raconte sa dernière vente de récolte.</text>
+    <text x="426" y="320" fill="#047857">2. Le groupe liste TOUTES les sorties de l'année.</text>
+    <text x="426" y="340" fill="#047857">3. On relie chaque sortie à une saison.</text>
+    <text x="426" y="364" fill="#047857">4. Question clé : où est passé l'argent en mars ?</text>
+  </g>
+  <text x="30" y="420" font-size="12" fill="#64748b">Astuce : utilisez des cailloux — un caillou = 1 000 FCFA. Les flux deviennent visibles pour tous, même sans lire.</text>
+</svg>

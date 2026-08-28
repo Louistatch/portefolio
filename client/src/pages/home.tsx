@@ -4,6 +4,7 @@ import { SEO } from "@/components/seo";
 import { useQuery } from "@tanstack/react-query";
 import { Testimonials } from "@/components/testimonials";
 import { MountStagger, MountItem, Reveal, Stagger, StaggerItem, AnimatedNumber, TiltCard } from "@/components/motion";
+import { groupByProgram } from "@shared/programs";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { estimateReadingTime } from "@/components/reading-progress";
@@ -80,6 +81,19 @@ export default function Home() {
     queryFn: async () => { const r = await fetch("/api/site-figures"); return r.json(); },
     staleTime: 10 * 60_000,
   });
+
+  // Catalogue des cursus : piloté par l'API, groupé par parcours. Un cours publié
+  // (FCQ-01 l'a été sans que personne ne le remarque) ne peut plus rester invisible.
+  const { data: catalogue } = useQuery<any[]>({
+    queryKey: ["courses"],
+    queryFn: async () => { const r = await fetch("/api/academy/courses"); return r.json(); },
+    staleTime: 10 * 60_000,
+  });
+  const parcours = groupByProgram(
+    (catalogue || [])
+      .filter((c: any) => c.is_published)
+      .map((c: any) => ({ id: c.id, code: c.code, order_index: c.order_index, title: c.title, total_lessons: c.total_lessons }))
+  ).filter(g => g.program.id !== "autres");
 
   const nom = profile?.full_name || "Louis TATCHIDA";
 
@@ -270,18 +284,25 @@ export default function Home() {
               </tr>
             </thead>
             <tbody>
-              {[
-                ["MEAL-01…03", "Cursus MEAL — collecte, cartographie, reporting automatisé", "Certificat Super-Expert MEAL", "20"],
-                ["FCA-01", "Analyse du risque climatique appliquée au crédit agricole", "Certificat d'Analyste du Risque Climatique Agricole", "6"],
-                ["TOF-FIN-01", "Formation de formateurs — gestion financière paysanne", "Attestation de fin de parcours", "12"],
-              ].map(([code, titre, credential, lecons]) => (
-                <tr key={code} className="border-t border-border">
-                  <td className="py-4 px-5 font-mono text-[13px] text-primary font-semibold whitespace-nowrap">{code}</td>
-                  <td className="py-4 px-5 font-semibold">{titre}</td>
-                  <td className="py-4 px-5 text-foreground/80">{credential}</td>
-                  <td className="py-4 px-5 text-right text-muted-foreground">{lecons}</td>
-                </tr>
-              ))}
+              {parcours.map(g => {
+                const codes = g.courses.map(c => c.code);
+                const prefixe = codes[0] ? codes[0].replace(/\d+$/, "") : "";
+                const code = codes.length > 1
+                  ? `${codes[0]}…${codes[codes.length - 1].replace(prefixe, "")}`
+                  : (codes[0] ?? "");
+                const titre = g.courses.length === 1
+                  ? g.courses[0].title
+                  : `${g.program.title} — ${g.program.subtitle}`;
+                const lecons = g.courses.reduce((n, c) => n + (c.total_lessons ?? 0), 0);
+                return (
+                  <tr key={g.program.id} className="border-t border-border">
+                    <td className="py-4 px-5 font-mono text-[13px] text-primary font-semibold whitespace-nowrap">{code}</td>
+                    <td className="py-4 px-5 font-semibold">{titre}</td>
+                    <td className="py-4 px-5 text-foreground/80">{g.program.credential}</td>
+                    <td className="py-4 px-5 text-right text-muted-foreground">{lecons}</td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
