@@ -132,6 +132,30 @@
   }
 }
 
+/* Boutons connexion / inscription : apparition soignée à l'arrivée */
+.auth-enter {
+  animation: auth-pop-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.auth-enter-delayed {
+  animation: auth-pop-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+}
+@keyframes auth-pop-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-enter,
+  .auth-enter-delayed {
+    animation: none;
+  }
+}
+
 /* ──────────────────────────────────────────────
    Correctif anti-artefacts GPU (bandes/résidus de
    rendu sur certains navigateurs mobiles Android)

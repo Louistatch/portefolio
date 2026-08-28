@@ -1,6 +1,6 @@
 import { Link, useLocation } from "wouter";
 import { ReactNode, useState, useEffect } from "react";
-import { Menu, X, BookOpen, User, Home, Lightbulb, Calendar, Mail, FileText, HelpCircle, GraduationCap, LogOut, LayoutDashboard, ChevronDown } from "lucide-react";
+import { Menu, X, BookOpen, User, Home, Lightbulb, Calendar, Mail, FileText, HelpCircle, GraduationCap, LogOut, LayoutDashboard, ChevronDown, LogIn, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Newsletter } from "@/components/newsletter";
 import { NewsletterPopup } from "@/components/newsletter-popup";
@@ -119,10 +119,16 @@ export function Layout({ children }: { children: ReactNode }) {
                 )}
               </div>
             ) : (
-              <Link href="/academy/login"
-                className="ml-2 px-4 py-2 rounded-full text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex items-center gap-1.5">
-                <GraduationCap className="w-4 h-4" /> Espace étudiant
-              </Link>
+              <>
+                <Link href="/academy/login"
+                  className="auth-enter ml-2 px-4 py-2 rounded-full text-sm font-medium border border-primary/40 text-primary hover:bg-primary/10 hover:border-primary/70 transition-colors flex items-center gap-1.5">
+                  <LogIn className="w-4 h-4" /> Se connecter
+                </Link>
+                <Link href="/academy/register"
+                  className="auth-enter-delayed ml-2 px-4 py-2 rounded-full text-sm font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity flex items-center gap-1.5 shadow-sm">
+                  <UserPlus className="w-4 h-4" /> S'inscrire
+                </Link>
+              </>
             )}
           </nav>
 
@@ -166,9 +172,14 @@ export function Layout({ children }: { children: ReactNode }) {
               </button>
             </>
           ) : (
-            <Link href="/academy/login" className="flex items-center gap-4 text-lg font-medium p-3.5 rounded-2xl bg-primary text-primary-foreground">
-              <GraduationCap className="w-6 h-6" /> Espace étudiant
-            </Link>
+            <>
+              <Link href="/academy/register" className="auth-enter flex items-center gap-4 text-lg font-medium p-3.5 rounded-2xl bg-primary text-primary-foreground">
+                <UserPlus className="w-6 h-6" /> S'inscrire
+              </Link>
+              <Link href="/academy/login" className="auth-enter-delayed flex items-center gap-4 text-lg font-medium p-3.5 rounded-2xl border border-primary/40 text-primary">
+                <LogIn className="w-6 h-6" /> Se connecter
+              </Link>
+            </>
           )}
         </div>
       )}
