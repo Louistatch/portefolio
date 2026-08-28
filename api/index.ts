@@ -13,6 +13,7 @@ import fs from "fs";
 import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises.js";
 import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
 import { leconOuverte } from "../shared/rythme.js";
+import { RETARD_EXCLUSION_JOURS, RETARD_PALIERS, alerteDeRetard } from "../shared/retard.js";
 import { TESTS_PARCOURS, type TestParcours } from "./program-tests.js";
 import {
   GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_MAX_MEMBERS,
@@ -2413,6 +2414,63 @@ app.post("/api/cron/verify-reminders", async (req, res) => {
   res.json({ candidats: students?.length ?? 0, envoyees, ignorees, parEtape });
 });
 
+/**
+ * Alertes de retard sur le rythme conseillé.
+ *
+ * Tâche quotidienne (voir vercel.json). Comme pour les relances de vérification, un envoi
+ * déclenché depuis le site n'atteindrait que les étudiants qui reviennent — or ceux qu'il
+ * faut prévenir sont précisément ceux qui ne reviennent plus.
+ *
+ * Trois alertes avant le seuil (7, 14 et 21 jours de retard), puis une quatrième quand les
+ * trente jours sont franchis. Le palier se déduit du retard constaté, pas d'un compteur :
+ * si la tâche saute un jour, l'étudiant reçoit quand même la bonne alerte.
+ *
+ * La clé d'idempotence porte la date d'admission : un étudiant remis à zéro puis réadmis
+ * repart avec une série d'alertes neuve, au lieu d'être considéré comme déjà prévenu.
+ */
+app.post("/api/cron/late-warnings", async (req, res) => {
+  const secret = process.env.CRON_SECRET;
+  const fromVercelCron = req.headers["x-vercel-cron"] !== undefined;
+  const authorized = fromVercelCron || (!!secret && req.headers.authorization === `Bearer ${secret}`);
+  if (!authorized) return res.status(401).json({ message: "Non autorisé" });
+
+  const constat = await constatDeRetard();
+  let envoyees = 0, ignorees = 0;
+  const parPalier: Record<string, number> = {};
+
+  for (const c of constat) {
+    if (!c.emailsCours || !c.email) { ignorees++; continue; }
+    // Palier applicable : le plus avancé que le retard justifie. Au-delà du seuil, une
+    // alerte unique — insister davantage relèverait du harcèlement.
+    const palier = c.joursDeRetard > RETARD_EXCLUSION_JOURS
+      ? RETARD_EXCLUSION_JOURS
+      : [...RETARD_PALIERS].reverse().find(d => c.joursDeRetard >= d);
+    if (!palier) { ignorees++; continue; }
+
+    const alerte = alerteDeRetard({
+      jours: c.joursDeRetard,
+      leconsEnRetard: c.leconsEnRetard,
+      finAdmission: c.finAdmission,
+    });
+    if (!alerte) { ignorees++; continue; }
+
+    const r = await sendAcademyEmail({
+      studentId: c.id, to: c.email, type: "retard",
+      subject: alerte.niveau === "rappel" ? "Une échéance est passée — reprenez quand vous voulez"
+        : alerte.niveau === "avertissement" ? "Votre parcours est menacé — il reste " + alerte.joursAvantRemiseAZero + " jours"
+        : alerte.niveau === "dernier" ? "Dernier rappel avant la remise à zéro de votre parcours"
+        : "Votre parcours dépasse le seuil de trente jours de retard",
+      html: retardEmailHtml(c.nom, alerte),
+      dedupeKey: `retard:${c.id}:${c.admisLe}:${palier}`,
+    });
+    if (r.sent) { envoyees++; parPalier[`J+${palier}`] = (parPalier[`J+${palier}`] || 0) + 1; }
+    else ignorees++;
+  }
+
+  console.log(`late-warnings: ${envoyees} alerte(s) envoyée(s), ${ignorees} ignorée(s) sur ${constat.length} admis.`, parPalier);
+  res.json({ admis: constat.length, envoyees, ignorees, parPalier });
+});
+
 // ── Renvoyer l'email de validation ──
 app.post("/api/academy/resend-verify", rateLimit(5, 15 * 60 * 1000), requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
@@ -3687,13 +3745,15 @@ async function notifierAnnonceCohorte(cohorte: string, corps: string): Promise<n
 // aurait puni un étudiant rapide en vacances autant qu'un étudiant décroché.
 // ══════════════════════════════════════════════════════════════════
 
-const RETARD_EXCLUSION_JOURS = 30;
+// RETARD_EXCLUSION_JOURS vit dans shared/retard.ts : le tableau de bord de l'étudiant
+// et les relances annoncent le même seuil que celui qui est appliqué ici.
 const JOUR_MS = 24 * 60 * 60 * 1000;
 
 /** Constat de retard de tous les admis. Lecture seule — ne modifie rien. */
 async function constatDeRetard() {
   const { data: admis } = await supabase.from("students")
-    .select("id, full_name, email, admitted_at").not("admitted_at", "is", null);
+    .select("id, full_name, email, admitted_at, admission_expires, course_emails")
+    .not("admitted_at", "is", null);
   if (!admis?.length) return [];
 
   const { data: lp } = await supabase.from("lesson_progress")
@@ -3714,6 +3774,11 @@ async function constatDeRetard() {
       cohorte: cohortOf(new Date(s.admitted_at)),
       leconsFaites: siennes.filter((l: any) => l.status === "completed").length,
       leconsTotal: siennes.length,
+      // Les deux chiffres que l'alerte cite : l'ancienneté de la plus vieille échéance
+      // non tenue, et combien de leçons sont dans ce cas.
+      leconsEnRetard: enRetard.length,
+      finAdmission: s.admission_expires ?? null,
+      emailsCours: s.course_emails !== false,
       joursDeRetard: jours,
       aExclure: jours > RETARD_EXCLUSION_JOURS,
     };
@@ -4709,6 +4774,58 @@ function cohortAnnouncementEmailHtml(name: string, cohorte: string, corps: strin
 // Le ton compte plus que d'habitude. L'étudiant n'est pas renvoyé : son parcours est
 // remis à zéro parce qu'il ne pouvait plus tenir dans sa fenêtre, et la porte reste
 // ouverte immédiatement. Un message sec ferait perdre quelqu'un qui peut encore réussir.
+// ── Email : alerte de retard sur le rythme conseillé ──
+//
+// Ce message est le seul qui arrive AVANT la remise à zéro. Son texte n'est pas écrit ici
+// mais dans shared/retard.ts, où le tableau de bord le lit aussi : l'écran et l'email
+// annoncent forcément la même échéance. Ici, seule la mise en forme.
+function retardEmailHtml(name: string, a: ReturnType<typeof alerteDeRetard>) {
+  if (!a) return "";
+  const esc = (t: string) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const firstName = (name || "").trim().split(" ")[0];
+  const teinte = a.ton === "grave" ? "#b91c1c" : a.ton === "attention" ? "#b45309" : "#0d9488";
+  const fond = a.ton === "grave" ? "#fef2f2" : a.ton === "attention" ? "#fffbeb" : "#f0fdfa";
+  const bord = a.ton === "grave" ? "#fecaca" : a.ton === "attention" ? "#fde68a" : "#99f6e4";
+
+  const compteur = a.joursAvantRemiseAZero > 0
+    ? `<div class="code" style="background:${fond};border-color:${bord}">
+         <p class="lbl">Il vous reste</p>
+         <p class="val" style="color:${teinte};letter-spacing:2px">${a.joursAvantRemiseAZero} jour${a.joursAvantRemiseAZero > 1 ? "s" : ""}</p>
+       </div>`
+    : "";
+
+  const liste = a.consequences.length
+    ? `<div class="info" style="background:${fond};border-color:${bord}">
+         <h3 style="color:${teinte}">Ce qu'une remise à zéro entraîne</h3>
+         <ul style="margin:10px 0 0;padding-left:18px;color:#374151;font-size:14px;line-height:1.7">
+           ${a.consequences.map(c => `<li>${esc(c)}</li>`).join("")}
+         </ul>
+       </div>
+       <div class="info">
+         <h3>Ce qu'elle ne touche pas</h3>
+         <ul style="margin:10px 0 0;padding-left:18px;color:#6b7280;font-size:14px;line-height:1.7">
+           ${a.conserve.map(c => `<li>${esc(c)}</li>`).join("")}
+         </ul>
+       </div>`
+    : "";
+
+  return academyEmailLayout(
+    `<div class="hd" style="background:linear-gradient(135deg,${teinte},${teinte}dd)">
+       <div class="logo"><span>LOUISFARM LEARNING</span></div>
+       <h1>${esc(a.titre)}</h1>
+       <p class="sub">${esc(a.resume)}</p>
+     </div>
+     <div class="bd">
+       <p>${firstName ? `Bonjour ${esc(firstName)},` : "Bonjour,"}</p>
+       ${a.paragraphes.map(t => `<p>${esc(t)}</p>`).join("")}
+       ${compteur}
+       ${liste}
+       <p style="text-align:center"><a href="${SITE_URL}${a.action.href}" class="btn" style="background:${teinte}">${esc(a.action.libelle)}</a></p>
+       <p class="muted">Vous pouvez répondre directement à cet email : il arrive dans une boîte lue par une personne.</p>
+     </div>`
+  );
+}
+
 function admissionResetEmailHtml(name: string, joursDeRetard: number, faites: number, total: number) {
   const firstName = (name || "").split(" ")[0] || "";
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Votre parcours repart de zéro</h1><p class="sub">Et vous pouvez recommencer dès aujourd'hui</p></div><div class="bd"><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p>Votre parcours accusait <strong>${joursDeRetard} jours de retard</strong> sur le rythme conseillé (${faites} leçon${faites > 1 ? "s" : ""} validée${faites > 1 ? "s" : ""} sur ${total}). À ce stade, la fenêtre d'admission de trois mois qui vous restait ne permettait plus de terminer le cursus.</p><p>Plutôt que de vous laisser accumuler des échéances intenables, nous remettons votre parcours à zéro. <strong>Ce n'est pas une exclusion :</strong> vous pouvez repasser le test d'admission immédiatement, sans délai d'attente, et repartir avec la promotion suivante depuis la semaine 1 — avec un groupe de travail neuf.</p><div class="info"><p style="margin:0"><strong>Ce que vous gardez :</strong> vos notes et vos attestations déjà obtenues. Vous avez fait ce travail, il vous reste acquis.</p></div><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Repasser le test d'admission</a></p><p class="muted">Si quelque chose vous a empêché d'avancer et que nous pouvons aider, répondez simplement à cet email.</p></div>`);

@@ -9,6 +9,7 @@ import {
   Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink, Send } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
 import { groupByProgram } from "@shared/programs";
+import { AlerteRetard, constatDepuisPlanning } from "@/components/academy/alerte-retard";
 
 interface Cred { id: string; type: string; title: string; subtitle: string; issued_at: string; expires_at: string | null; status: string; certificate_no: string | null; score: number | null; download_url: string | null; skills: string[]; color: string; }
 
@@ -151,6 +152,14 @@ export default function AcademyDashboard() {
           ) : null}
         </div>
       </div>
+
+      {/* ───── Alerte de retard ─────
+          Placée avant tout le reste : la remise à zéro d'un parcours tombait jusqu'ici
+          sans avoir été annoncée nulle part, et une règle qu'on découvre en la subissant
+          n'en est pas une. Le texte vient de shared/retard.ts, comme celui de l'email. */}
+      {testStatus?.passed && (
+        <AlerteRetard constat={constatDepuisPlanning(schedule, bord?.etudiant?.admissionExpire)} />
+      )}
 
       {/* ───── Alerte vérification email ───── */}
       {!emailVerified && (
