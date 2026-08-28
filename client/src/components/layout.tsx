@@ -1,10 +1,12 @@
 import { Link, useLocation } from "wouter";
 import { ReactNode, useState, useEffect } from "react";
 import { Menu, X, BookOpen, User, Home, Lightbulb, Calendar, Mail, FileText, HelpCircle, GraduationCap, LogOut, LayoutDashboard, ChevronDown, LogIn, UserPlus } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Newsletter } from "@/components/newsletter";
 import { NewsletterPopup } from "@/components/newsletter-popup";
 import { TermsPopup } from "@/components/terms-popup";
+import { ScrollProgressBar, PageTransition, useAutoHideHeader } from "@/components/motion";
 import { useQuery } from "@tanstack/react-query";
 import { getStudent, clearStudentSession, isStudentLoggedIn } from "@/lib/student";
 
@@ -55,9 +57,22 @@ export function Layout({ children }: { children: ReactNode }) {
     navigate("/");
   }
 
+  // L'en-tête se cache en descendant, revient en remontant (jamais quand un menu est ouvert).
+  const headerHidden = useAutoHideHeader(isMobileMenuOpen || studentMenuOpen);
+
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass-nav py-3" : "bg-transparent py-5"}`}>
+    <div className="min-h-screen flex flex-col bg-background relative">
+      {/* Orbes d'ambiance : dérive lente derrière tout le contenu. */}
+      <div aria-hidden className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
+        <div className="orb animate-float-slow -top-44 -left-36 w-[36rem] h-[36rem] bg-primary/[0.07] dark:bg-primary/[0.12]" />
+        <div className="orb animate-float-slower top-1/3 -right-44 w-[32rem] h-[32rem] bg-accent/[0.07] dark:bg-accent/[0.10]" />
+      </div>
+      <ScrollProgressBar />
+      <motion.header
+        className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${scrolled ? "glass-nav py-3" : "bg-transparent py-5"}`}
+        animate={{ y: headerHidden ? "-115%" : "0%" }}
+        transition={{ type: "spring", stiffness: 260, damping: 30 }}
+      >
         <div className="max-w-7xl mx-auto px-6 flex items-center justify-between">
           <Link href="/" className="text-xl font-bold tracking-tighter text-foreground hover:text-primary transition-colors flex items-center gap-2">
             {profile?.photo_url ? (
@@ -73,10 +88,17 @@ export function Layout({ children }: { children: ReactNode }) {
           <nav className="hidden lg:flex items-center gap-1">
             {NAV_ITEMS.map((item) => (
               <Link key={item.href} href={item.href}
-                className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 ${
-                  location === item.href ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                className={`relative px-4 py-2 rounded-full text-sm font-medium transition-colors duration-200 ${
+                  location === item.href ? "text-primary" : "text-muted-foreground hover:text-foreground hover:bg-muted"
                 }`}>
-                {item.label}
+                {location === item.href && (
+                  <motion.span
+                    layoutId="nav-pill"
+                    className="absolute inset-0 rounded-full bg-primary/10"
+                    transition={{ type: "spring", stiffness: 400, damping: 32 }}
+                  />
+                )}
+                <span className="relative">{item.label}</span>
               </Link>
             ))}
             {/* Menu étudiant (connecté) ou bouton Academy */}
@@ -136,7 +158,7 @@ export function Layout({ children }: { children: ReactNode }) {
             {isMobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </Button>
         </div>
-      </header>
+      </motion.header>
 
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-40 bg-background/95 backdrop-blur-md lg:hidden pt-24 px-6 flex flex-col gap-3 overflow-y-auto pb-12">
@@ -184,13 +206,17 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       )}
 
-      <main className="flex-1 pt-24 pb-12 w-full page-enter">
-        {children}
+      <main className="relative z-10 flex-1 pt-24 pb-12 w-full">
+        <AnimatePresence mode="wait" initial={false}>
+          <PageTransition key={location}>
+            {children}
+          </PageTransition>
+        </AnimatePresence>
       </main>
       <TermsPopup />
       <NewsletterPopup />
 
-      <footer className="border-t border-border/50 py-12 mt-auto bg-muted/30">
+      <footer className="relative z-10 border-t border-border/50 py-12 mt-auto bg-muted/30">
         <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-3 gap-8">
           <div>
             <h3 className="font-bold text-lg mb-4">Louis TATCHIDA</h3>

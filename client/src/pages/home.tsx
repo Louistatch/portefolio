@@ -3,6 +3,7 @@ import { ArrowRight, LineChart, Map, GraduationCap, Calendar, Clock, Eye } from 
 import { SEO } from "@/components/seo";
 import { useQuery } from "@tanstack/react-query";
 import { Testimonials } from "@/components/testimonials";
+import { MountStagger, MountItem, Reveal, Stagger, StaggerItem, AnimatedNumber, TiltCard } from "@/components/motion";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { estimateReadingTime } from "@/components/reading-progress";
@@ -38,9 +39,12 @@ interface Figures {
 
 /** Un chiffre de la bande de preuve. Le libellé tient sur deux lignes courtes, jamais une. */
 function Chiffre({ valeur, libelle, dernier }: { valeur: string; libelle: string; dernier?: boolean }) {
+  const num = Number(valeur);
   return (
     <div className={`py-5 pr-5 ${dernier ? "" : "border-r border-border"} ${dernier ? "pl-5" : ""}`}>
-      <div className="font-serif text-3xl font-semibold text-primary leading-none">{valeur}</div>
+      <div className="font-serif text-3xl font-semibold text-primary leading-none">
+        {Number.isFinite(num) ? <AnimatedNumber value={num} /> : valeur}
+      </div>
       <div className="text-xs text-muted-foreground mt-2 leading-snug">{libelle}</div>
     </div>
   );
@@ -51,7 +55,7 @@ function Domaine({ icone: Icone, titre, texte, livrable }: {
   icone: any; titre: string; texte: string; livrable: string;
 }) {
   return (
-    <div className="border-t-2 border-primary pt-5">
+    <div className="lift border-t-2 border-primary pt-5">
       <Icone className="w-[22px] h-[22px] text-primary" strokeWidth={1.6} />
       <h3 className="text-base font-bold mt-3.5 mb-2">{titre}</h3>
       <p className="text-sm leading-relaxed text-foreground/80 mb-3.5">{texte}</p>
@@ -85,9 +89,9 @@ export default function Home() {
 
       {/* ───── Hero ───── */}
       <section className="max-w-7xl mx-auto px-6 pt-12 pb-14 lg:pt-16">
-        <div className="grid lg:grid-cols-12 gap-8 lg:gap-10">
+        <MountStagger className="grid lg:grid-cols-12 gap-8 lg:gap-10" gap={0.14}>
 
-          <div className="lg:col-span-7 min-w-0">
+          <MountItem className="lg:col-span-7 min-w-0">
             <div className="flex items-center gap-2.5 mb-5">
               <span className="w-7 h-px bg-accent" />
               <span className="text-[11px] tracking-[0.14em] uppercase text-primary font-bold">
@@ -106,10 +110,10 @@ export default function Home() {
             </p>
 
             <div className="flex flex-wrap gap-3 mb-10">
-              <Link href="/booking" className="inline-flex items-center px-6 py-3.5 text-[15px] font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
+              <Link href="/booking" className="pressable inline-flex items-center px-6 py-3.5 text-[15px] font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors">
                 Discuter d'une mission
               </Link>
-              <Link href="/publications" className="inline-flex items-center px-6 py-3.5 text-[15px] font-semibold border border-border rounded-lg hover:bg-muted transition-colors">
+              <Link href="/publications" className="pressable inline-flex items-center px-6 py-3.5 text-[15px] font-semibold border border-border rounded-lg hover:bg-muted transition-colors">
                 Voir les publications
               </Link>
             </div>
@@ -121,68 +125,73 @@ export default function Home() {
               <Chiffre valeur={String(chiffres?.cours ?? 0)} libelle="cursus certifiants en ligne" />
               <Chiffre valeur={String(chiffres?.lecons ?? 0)} libelle="leçons évaluées et corrigées" dernier />
             </div>
-          </div>
+          </MountItem>
 
           {/* Fiche d'identité : ce qu'un chargé de programme recopie dans sa note. */}
-          <div className="lg:col-span-5 min-w-0">
-            <div className="border border-border rounded-lg bg-card overflow-hidden">
-              <div className="flex gap-4 p-5 border-b border-border">
-                {profile?.photo_url ? (
-                  <img src={profile.photo_url} alt={nom}
-                    className="w-[76px] h-[92px] rounded-md object-cover border border-border shrink-0" />
-                ) : (
-                  <div className="w-[76px] h-[92px] rounded-md bg-muted border border-border shrink-0" />
-                )}
-                <div className="min-w-0">
-                  <div className="font-serif text-lg font-semibold leading-tight">{nom}</div>
-                  <p className="text-[13px] text-muted-foreground leading-relaxed mt-1.5">
-                    {profile?.title || "Agronome, expert en finance agricole. Résilience climatique & digitalisation des systèmes agricoles."}
-                  </p>
+          <MountItem className="lg:col-span-5 min-w-0" y={34}>
+            <TiltCard max={3}>
+              <div className="border border-border rounded-lg bg-card overflow-hidden shadow-sm">
+                <div className="flex gap-4 p-5 border-b border-border">
+                  {profile?.photo_url ? (
+                    <img src={profile.photo_url} alt={nom}
+                      className="w-[76px] h-[92px] rounded-md object-cover border border-border shrink-0" />
+                  ) : (
+                    <div className="w-[76px] h-[92px] rounded-md bg-muted border border-border shrink-0" />
+                  )}
+                  <div className="min-w-0">
+                    <div className="font-serif text-lg font-semibold leading-tight">{nom}</div>
+                    <p className="text-[13px] text-muted-foreground leading-relaxed mt-1.5">
+                      {profile?.title || "Agronome, expert en finance agricole. Résilience climatique & digitalisation des systèmes agricoles."}
+                    </p>
+                  </div>
                 </div>
+                <table className="w-full text-[13px]">
+                  <tbody>
+                    {[
+                      ["Base", profile?.location || "Lomé, Togo"],
+                      ["Zone d'intervention", "Afrique de l'Ouest"],
+                      ["Langues de travail", "Français, anglais"],
+                      ["Outils", "KoboToolbox, QGIS, Python, Excel"],
+                    ].map(([cle, valeur], i, arr) => (
+                      <tr key={cle} className={i < arr.length - 1 ? "border-b border-muted" : ""}>
+                        <td className="py-3 px-5 text-muted-foreground w-[42%]">{cle}</td>
+                        <td className="py-3 px-5 font-medium">{valeur}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-              <table className="w-full text-[13px]">
-                <tbody>
-                  {[
-                    ["Base", profile?.location || "Lomé, Togo"],
-                    ["Zone d'intervention", "Afrique de l'Ouest"],
-                    ["Langues de travail", "Français, anglais"],
-                    ["Outils", "KoboToolbox, QGIS, Python, Excel"],
-                  ].map(([cle, valeur], i, arr) => (
-                    <tr key={cle} className={i < arr.length - 1 ? "border-b border-muted" : ""}>
-                      <td className="py-3 px-5 text-muted-foreground w-[42%]">{cle}</td>
-                      <td className="py-3 px-5 font-medium">{valeur}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+            </TiltCard>
+          </MountItem>
+        </MountStagger>
       </section>
 
       {/* ───── Domaines d'intervention ───── */}
       <section className="max-w-7xl mx-auto px-6 pb-16">
-        <div className="flex items-baseline gap-4 mb-7">
-          <h2 className="font-serif text-2xl lg:text-[28px] font-semibold tracking-tight">Domaines d'intervention</h2>
-          <span className="flex-1 h-px bg-border" />
-        </div>
-        <div className="grid md:grid-cols-3 gap-7">
-          <Domaine icone={LineChart} titre="Analyse du risque climatique"
+        <Reveal>
+          <div className="flex items-baseline gap-4 mb-7">
+            <h2 className="font-serif text-2xl lg:text-[28px] font-semibold tracking-tight">Domaines d'intervention</h2>
+            <span className="flex-1 h-px bg-border" />
+          </div>
+        </Reveal>
+        <Stagger className="grid md:grid-cols-3 gap-7">
+          <StaggerItem><Domaine icone={LineChart} titre="Analyse du risque climatique"
             texte="Perte attendue d'un portefeuille de crédit agricole sous aléa climatique : EAD, PD, LGD, concentration, seuil de rentabilité sous plafond d'usure."
-            livrable="Livrable : note d'analyse chiffrée et paramétrage du produit de garantie." />
-          <Domaine icone={Map} titre="Suivi-évaluation (MEAL)"
+            livrable="Livrable : note d'analyse chiffrée et paramétrage du produit de garantie." /></StaggerItem>
+          <StaggerItem><Domaine icone={Map} titre="Suivi-évaluation (MEAL)"
             texte="Conception de la collecte, cartographie des bénéficiaires et automatisation du reporting — de la question d'évaluation au rapport qui se met à jour tout seul."
-            livrable="Livrable : chaîne opérationnelle Kobo → QGIS → rapport, transférée à l'équipe." />
-          <Domaine icone={GraduationCap} titre="Formation des équipes"
+            livrable="Livrable : chaîne opérationnelle Kobo → QGIS → rapport, transférée à l'équipe." /></StaggerItem>
+          <StaggerItem><Domaine icone={GraduationCap} titre="Formation des équipes"
             texte="Cursus certifiants en ligne et formation de formateurs en milieu rural, évalués par exercices corrigés et travaux de groupe, pas par attestation de présence."
-            livrable="Livrable : agents autonomes, avec relevé de notes vérifiable." />
-        </div>
+            livrable="Livrable : agents autonomes, avec relevé de notes vérifiable." /></StaggerItem>
+        </Stagger>
       </section>
 
       {/* ───── Note de veille ─────
           La section qui fait la différence devant une banque : un fait daté, sourcé, et sa
           conséquence chiffrée. Les deux natures de chiffres ne sont jamais mélangées. */}
       <section className="max-w-7xl mx-auto px-6 pb-16">
+        <Reveal y={34}>
         <div className="bg-foreground text-background rounded-lg p-8 lg:p-11">
           <div className="grid lg:grid-cols-12 gap-8 lg:gap-10 items-start">
             <div className="lg:col-span-5 min-w-0">
@@ -235,17 +244,21 @@ export default function Home() {
             </div>
           </div>
         </div>
+        </Reveal>
       </section>
 
       {/* ───── Cursus certifiants ───── */}
       <section className="max-w-7xl mx-auto px-6 pb-16">
-        <div className="flex items-baseline gap-4 mb-6">
-          <h2 className="font-serif text-2xl lg:text-[28px] font-semibold tracking-tight">Cursus certifiants</h2>
-          <span className="flex-1 h-px bg-border" />
-          <Link href="/elearning" className="text-[13px] font-semibold text-primary hover:text-accent transition-colors shrink-0">
-            Voir la formation
-          </Link>
-        </div>
+        <Reveal>
+          <div className="flex items-baseline gap-4 mb-6">
+            <h2 className="font-serif text-2xl lg:text-[28px] font-semibold tracking-tight">Cursus certifiants</h2>
+            <span className="flex-1 h-px bg-border" />
+            <Link href="/elearning" className="text-[13px] font-semibold text-primary hover:text-accent transition-colors shrink-0">
+              Voir la formation
+            </Link>
+          </div>
+        </Reveal>
+        <Reveal delay={0.12}>
         <div className="border border-border rounded-lg bg-card overflow-x-auto">
           <table className="w-full text-sm min-w-[620px]">
             <thead className="bg-muted">
@@ -272,27 +285,31 @@ export default function Home() {
             </tbody>
           </table>
         </div>
+        </Reveal>
       </section>
 
       {/* ───── Journal ───── */}
       <section className="max-w-7xl mx-auto px-6 pb-16">
-        <div className="flex items-baseline gap-4 mb-6">
-          <h2 className="font-serif text-2xl lg:text-[28px] font-semibold tracking-tight">Journal</h2>
-          <span className="flex-1 h-px bg-border" />
-          <Link href="/blog" className="text-[13px] font-semibold text-primary hover:text-accent transition-colors shrink-0 inline-flex items-center gap-1">
-            Tous les articles <ArrowRight className="w-3.5 h-3.5" />
-          </Link>
-        </div>
+        <Reveal>
+          <div className="flex items-baseline gap-4 mb-6">
+            <h2 className="font-serif text-2xl lg:text-[28px] font-semibold tracking-tight">Journal</h2>
+            <span className="flex-1 h-px bg-border" />
+            <Link href="/blog" className="text-[13px] font-semibold text-primary hover:text-accent transition-colors shrink-0 inline-flex items-center gap-1">
+              Tous les articles <ArrowRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+        </Reveal>
 
         {isLoading ? (
           <div className="grid md:grid-cols-3 gap-6">
             {[0, 1, 2].map(i => <Skeleton key={i} className="h-44 rounded-lg" />)}
           </div>
         ) : (
-          <div className="grid md:grid-cols-3 gap-6">
+          <Stagger className="grid md:grid-cols-3 gap-6">
             {(posts || []).slice(0, 3).map((post: any) => (
-              <Link key={post.id} href={`/blog/${post.slug}`}
-                className="group border border-border rounded-lg bg-card p-5 hover:border-primary/40 transition-colors flex flex-col">
+              <StaggerItem key={post.id}>
+              <Link href={`/blog/${post.slug}`}
+                className="group lift border border-border rounded-lg bg-card p-5 hover:border-primary/40 transition-colors flex flex-col h-full">
                 <div className="flex items-center gap-3 text-[11px] text-muted-foreground mb-3">
                   <span className="inline-flex items-center gap-1.5">
                     <Calendar className="w-3 h-3" />
@@ -315,8 +332,9 @@ export default function Home() {
                   <p className="text-[13px] leading-relaxed text-muted-foreground line-clamp-3">{post.summary}</p>
                 )}
               </Link>
+              </StaggerItem>
             ))}
-          </div>
+          </Stagger>
         )}
       </section>
 
@@ -324,6 +342,7 @@ export default function Home() {
 
       {/* ───── Un seul appel à l'action, répété ───── */}
       <section className="max-w-7xl mx-auto px-6 pb-20">
+        <Reveal y={30}>
         <div className="bg-primary rounded-lg p-8 lg:p-11 flex flex-col lg:flex-row lg:items-center gap-8">
           <div className="flex-1">
             <h2 className="font-serif text-2xl lg:text-[28px] font-semibold text-primary-foreground mb-2.5 leading-tight text-pretty">
@@ -335,10 +354,11 @@ export default function Home() {
             </p>
           </div>
           <Link href="/booking"
-            className="inline-flex items-center justify-center px-7 py-4 text-[15px] font-bold text-primary bg-background rounded-lg hover:bg-background/90 transition-colors shrink-0 whitespace-nowrap">
+            className="pressable inline-flex items-center justify-center px-7 py-4 text-[15px] font-bold text-primary bg-background rounded-lg hover:bg-background/90 transition-colors shrink-0 whitespace-nowrap">
             Prendre rendez-vous
           </Link>
         </div>
+        </Reveal>
       </section>
 
     </>

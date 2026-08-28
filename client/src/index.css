@@ -132,6 +132,55 @@
   }
 }
 
+/* ──────────────────────────────────────────────
+   Mouvement global
+────────────────────────────────────────────── */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 96px;
+}
+
+/* Micro-pression : les éléments interactifs s'enfoncent légèrement. */
+.pressable {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+.pressable:active {
+  transform: scale(0.97);
+}
+
+/* Orbes d'ambiance (arrière-plan du site) : dérive lente, GPU uniquement. */
+.orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(90px);
+  pointer-events: none;
+  will-change: transform;
+}
+.animate-float-slow {
+  animation: orb-drift-a 18s ease-in-out infinite;
+}
+.animate-float-slower {
+  animation: orb-drift-b 26s ease-in-out infinite;
+}
+@keyframes orb-drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(42px, -30px, 0) scale(1.07); }
+}
+@keyframes orb-drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(-46px, 34px, 0) scale(0.94); }
+}
+
+/* Survol : élévation douce des cartes cliquables. */
+.lift {
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.35s ease, border-color 0.35s ease;
+}
+@media (hover: hover) {
+  .lift:hover {
+    transform: translateY(-4px);
+  }
+}
+
 /* Boutons connexion / inscription : apparition soignée à l'arrivée */
 .auth-enter {
   animation: auth-pop-in 0.65s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -151,8 +200,17 @@
 }
 @media (prefers-reduced-motion: reduce) {
   .auth-enter,
-  .auth-enter-delayed {
+  .auth-enter-delayed,
+  .animate-float-slow,
+  .animate-float-slower {
     animation: none;
+  }
+  html {
+    scroll-behavior: auto;
+  }
+  .pressable:active,
+  .lift:hover {
+    transform: none;
   }
 }
 
