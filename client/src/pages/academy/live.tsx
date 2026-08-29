@@ -11,6 +11,7 @@ import {
 import { studentFetch, isStudentLoggedIn, getStudent } from "@/lib/student";
 import { adminFetch, getToken } from "@/lib/admin";
 import { SalonEntree } from "@/components/academy/salon-entree";
+import { lireMessageProjection, texteDuMessage, expediteurDuMessage, APP_PROJECTION } from "@shared/projection";
 
 declare global { interface Window { JitsiMeetExternalAPI?: any } }
 
@@ -85,13 +86,28 @@ export default function AcademyLive() {
     if (meeting) setDiapo(Math.max(0, Math.min((meeting.current_slide ?? 0), Math.max(0, (meeting.slides?.length ?? 1) - 1))));
   }, [meeting?.id]);
 
-  // Les participants suivent la projection par consultation périodique. Quatre secondes est
-  // un compromis : assez pour ne pas décrocher d'une explication, assez peu pour ne pas
-  // multiplier les requêtes par le nombre de personnes présentes.
+  /**
+   * La projection suivait le présentateur par consultation périodique : chaque participant
+   * demandait à l'API, toutes les quatre secondes, quelle diapositive afficher. Pour une
+   * séance de 90 minutes à 21 étudiants, 28 350 invocations serverless — et jusqu'à quatre
+   * secondes entre le clic du formateur et l'écran de l'étudiant.
+   *
+   * Jitsi tient déjà une liaison directe entre tous les participants. Un message par
+   * changement suffit, sans passer par nous.
+   *
+   * Le filet reste tendu, mais il dort. Tant qu'aucun message n'est arrivé, on interroge
+   * l'API toutes les vingt secondes ; au PREMIER message reçu, on cesse définitivement. Un
+   * canal muet — pare-feu d'entreprise, version de Jitsi sans canal de données — ne fait donc
+   * pas perdre la séance, il la fait seulement suivre plus lentement. Et un canal qui marche
+   * ne coûte plus rien du tout.
+   */
+  const canalVivant = useRef(false);
+
   useEffect(() => {
     if (estPresentateur || !joined || diapos.length === 0) return;
     let vivant = true;
     const lire = async () => {
+      if (canalVivant.current) return;
       try {
         const r = await studentFetch(`/api/academy/meetings/${params?.id}/slide`);
         if (!r.ok || !vivant) return;
@@ -100,17 +116,33 @@ export default function AcademyLive() {
       } catch { /* la séance continue même si une lecture échoue */ }
     };
     lire();
-    const t = setInterval(lire, 4000);
+    const t = setInterval(lire, 20000);
     return () => { vivant = false; clearInterval(t); };
   }, [estPresentateur, joined, diapos.length, params?.id]);
 
-  // Le présentateur pousse la nouvelle position. L'affichage local change immédiatement :
-  // attendre la réponse du serveur ferait bégayer la navigation en séance.
+  /**
+   * Le présentateur pousse la nouvelle position — aux autres d'abord, au serveur ensuite.
+   *
+   * L'affichage local change immédiatement : attendre une réponse ferait bégayer la
+   * navigation en pleine explication.
+   *
+   * L'écriture en base reste, mais elle ne sert plus qu'à une chose — qu'un retardataire
+   * reprenne à la bonne diapositive. C'est le seul rôle que l'API garde dans la projection.
+   */
   const allerDiapo = useCallback((index: number) => {
     if (!diapos.length) return;
     const borne = Math.max(0, Math.min(index, diapos.length - 1));
     setDiapo(borne);
     if (!estPresentateur) return;
+
+    // Destinataire vide = diffusion à toute la salle.
+    try {
+      apiRef.current?.executeCommand?.(
+        "sendEndpointTextMessage", "",
+        JSON.stringify({ app: APP_PROJECTION, t: "diapo", i: borne }),
+      );
+    } catch { /* le filet de sondage prend le relais */ }
+
     adminFetch(`/api/admin/academy/meetings/${params?.id}/slide`, {
       method: "POST", body: JSON.stringify({ index: borne }),
     }).catch(() => { /* la projection locale reste juste */ });
@@ -212,6 +244,32 @@ export default function AcademyLive() {
       });
       api.addEventListener("incomingMessage", (e: any) => {
         setMessages(m => [...m, { from: e.nick || e.from || "Invité", text: e.message, ts: Date.now() }]);
+      });
+
+      /**
+       * La projection, reçue par le canal de données.
+       *
+       * La forme de l'événement varie selon les versions de Jitsi — le texte se trouve tantôt
+       * sous `eventData.text`, tantôt sous `data.eventData.text`, tantôt à la racine. On
+       * essaie les trois plutôt que de parier sur une : cette page tourne sur l'instance
+       * publique meet.jit.si, dont nous ne choisissons pas la version.
+       *
+       * Le message n'est suivi QUE s'il vient d'un modérateur. Sans ce filtre, n'importe quel
+       * participant pourrait faire défiler les diapositives de toute la salle. Le garde-fou
+       * n'est pas parfait — Jitsi accorde le rôle de modérateur au premier arrivé — mais il
+       * relève sensiblement la barre, et la conséquence d'un contournement reste bénigne :
+       * des écrans désynchronisés, que le formateur remet d'accord d'un clic. Rien n'est
+       * exposé, et l'index reçu est borné avant d'être appliqué.
+       */
+      api.addEventListener("endpointTextMessageReceived", (e: any) => {
+        if (estPresentateur) return;
+        const emetteurs = api.getParticipantsInfo?.() || [];
+        const auteur = emetteurs.find((p: any) => p.participantId === expediteurDuMessage(e));
+        const lu = lireMessageProjection(
+          texteDuMessage(e), auteur ? auteur.role : null, meeting.slides?.length ?? 0);
+        if (!("index" in lu)) return;
+        canalVivant.current = true;      // le filet de sondage peut cesser
+        setDiapo(lu.index);
       });
       api.addEventListener("readyToClose", () => { cleanup(); navigate("/academy/dashboard"); });
     };
