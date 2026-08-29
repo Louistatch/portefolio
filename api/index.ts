@@ -16,6 +16,7 @@ import {
 } from "../shared/exercises.js";
 import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
 import { leconOuverte } from "../shared/rythme.js";
+import { raisonDeNePasNotifier, FENETRE_NOTIF_FORUM_MS } from "../shared/notifications.js";
 import { RETARD_EXCLUSION_JOURS, RETARD_PALIERS, alerteDeRetard } from "../shared/retard.js";
 import { TESTS_PARCOURS, type TestParcours } from "./program-tests.js";
 import {
@@ -3654,6 +3655,21 @@ app.post("/api/academy/group-forum/:gwId", requireStudent, async (req, res) => {
   }).select("id, created_at").maybeSingle();
   if (error) return res.status(500).json({ message: error.message });
   res.status(201).json({ id: data?.id, le: data?.created_at });
+
+  // Après la réponse : l'auteur ne doit pas attendre l'envoi de trois emails pour voir son
+  // message s'afficher, et une messagerie en panne ne doit pas faire échouer une écriture
+  // déjà enregistrée.
+  const membres = await membersOfGroup(groupe.id);
+  notifierForum({
+    portee: `groupe:${groupe.id}`,
+    titre: `le forum de votre groupe (${groupe.name})`,
+    lien: "/academy/group-work",
+    auteurId: sid,
+    auteurNom: (stud?.full_name || "").trim() || "Un membre de votre groupe",
+    corps: corps.slice(0, 400),
+    postId: data?.id,
+    destinataires: membres.map((m: any) => m.studentId),
+  }).catch(() => {});
 });
 
 // ── Dépôt de fichiers de l'étudiant ──
@@ -3826,6 +3842,25 @@ app.post("/api/academy/cohort-forum", rateLimit(20, 10 * 60 * 1000), requireStud
   }).select("id, created_at").maybeSingle();
   if (error) return res.status(500).json({ message: error.message });
   res.status(201).json({ id: data?.id, le: data?.created_at });
+
+  // Les destinataires sont les admis de la même promotion, calculée comme partout ailleurs
+  // à partir de la date d'admission — il n'y a pas de colonne « cohorte » en base.
+  const { data: admis } = await supabase.from("students")
+    .select("id, admitted_at").not("admitted_at", "is", null);
+  const memePromo = (admis || [])
+    .filter((s: any) => cohortOf(new Date(s.admitted_at)) === cohorte)
+    .map((s: any) => s.id);
+
+  notifierForum({
+    portee: `promo:${cohorte}`,
+    titre: `le forum de votre promotion (${cohorte})`,
+    lien: "/academy/group-work",
+    auteurId: sid,
+    auteurNom: (stud?.full_name || "").trim() || "Un étudiant de votre promotion",
+    corps: corps.slice(0, 400),
+    postId: data?.id,
+    destinataires: memePromo,
+  }).catch(() => {});
 });
 
 // ── Côté formateur : la liste des cohortes, puis le fil de l'une d'elles ──
@@ -4959,6 +4994,95 @@ function courseUnlockedEmailHtml(
 ) {
   const firstName = (name || "").split(" ")[0] || "";
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Nouveau cours débloqué 🔓</h1><p class="sub">${course.code} · ${course.title}</p></div><div class="bd"><span class="badge">🔓 Accès ouvert</span><p>${firstName ? `Bravo ${firstName},` : "Bravo,"}</p><p>Vous avez avancé assez loin pour ouvrir le cours suivant de votre parcours :</p><div class="info"><h3>${course.title}</h3>${course.description ? `<p style="margin-top:6px">${course.description}</p>` : ""}<p style="margin-top:10px;font-size:12px;color:#0d9488;font-weight:700">${course.code}</p></div>${firstLesson ? `<p><strong>Première leçon :</strong> « ${firstLesson.title} »${dueAt ? `, à rendre avant le ${new Date(dueAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}.</p>` : ""}<p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Commencer ce cours</a></p><p class="muted">Rappel : les dates du planning sont un rythme conseillé, pas un couperet. Vous pouvez prendre de l'avance, et une leçon en retard reste rattrapable jusqu'à la fin de votre période d'admission.</p></div>`);
+}
+
+// ── Email : quelqu'un a écrit dans un forum ──
+function forumMessageEmailHtml(
+  name: string,
+  lieu: { titre: string; lien: string },
+  auteur: string,
+  corps: string,
+) {
+  const firstName = (name || "").split(" ")[0] || "";
+  // Le corps vient d'un champ libre : on échappe avant de l'insérer, sinon un chevron dans
+  // un message casserait la mise en page — ou pire.
+  const echappe = corps
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
+    .replace(/\n/g, "<br>");
+  const auteurSur = auteur.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Nouveau message 💬</h1><p class="sub">${lieu.titre}</p></div><div class="bd"><p>${firstName ? `Bonjour ${firstName},` : "Bonjour,"}</p><p><strong>${auteurSur}</strong> vient d'écrire dans ${lieu.titre} :</p><div class="info"><p style="margin:0">${echappe}</p></div><p style="text-align:center"><a href="${SITE_URL}${lieu.lien}" class="btn">Lire et répondre</a></p><p class="muted">Pour ne pas encombrer votre boîte, ce rappel n'est envoyé qu'une fois toutes les trois heures, même si plusieurs messages se suivent : ouvrez le forum pour voir toute la discussion. Vous pouvez couper ces emails depuis votre profil.</p></div>`);
+}
+
+/**
+ * Prévient les autres participants d'un forum qu'un message vient d'y être écrit.
+ *
+ * Une notification par PERSONNE et par forum toutes les trois heures — pas une par message.
+ * C'est la décision qui compte ici : le forum de promotion réunit vingt-et-un étudiants, et
+ * notifier chaque message aurait fait deux cents emails pour une discussion d'une dizaine de
+ * réponses. Le coût n'est pas le vrai problème ; le vrai problème est qu'on n'écrit ce
+ * volume qu'une fois. Ensuite les gens filtrent, se désabonnent ou signalent comme
+ * indésirable — et ce qui se perd alors, ce sont les emails qui comptent : l'admission, la
+ * correction d'un travail, le certificat. Une notification trop bavarde ne fait pas
+ * qu'agacer, elle détruit le canal.
+ *
+ * Fenêtre glissante lue dans academy_emails plutôt que fenêtre fixe : un message à 14 h 59
+ * suivi d'un autre à 15 h 01 ne doit pas produire deux emails simplement parce que l'heure
+ * a changé.
+ *
+ * La clé de déduplication passée à sendAcademyEmail porte l'identifiant du message : sa
+ * propre idempotence protège contre le double envoi d'un même message sans bloquer les
+ * notifications suivantes.
+ *
+ * Silencieux par construction : ni l'auteur, ni les comptes non vérifiés, ni ceux qui ont
+ * coupé les emails de cours. Aucune exception n'est levée vers l'appelant — un forum doit
+ * accepter un message même quand la messagerie est en panne.
+ */
+async function notifierForum(opts: {
+  /** Identifie le forum, pour la fenêtre de silence : « groupe:12 » ou « promo:2026-08 ». */
+  portee: string;
+  titre: string;
+  lien: string;
+  auteurId: number;
+  auteurNom: string;
+  corps: string;
+  postId: number | undefined;
+  /** Ids des participants. L'auteur en est retiré. Vide = toute la promotion admise. */
+  destinataires: number[];
+}): Promise<{ notifies: number }> {
+  if (!resend) return { notifies: 0 };
+  const cibles = opts.destinataires.filter(id => id !== opts.auteurId);
+  if (!cibles.length) return { notifies: 0 };
+
+  const { data: studs } = await supabase.from("students")
+    .select("id, full_name, email, course_emails, email_verified, status")
+    .in("id", cibles);
+
+  const maintenant = Date.now();
+  const seuil = new Date(maintenant - FENETRE_NOTIF_FORUM_MS).toISOString();
+  let notifies = 0;
+
+  for (const st of studs || []) {
+    // Le dernier envoi POUR CE FORUM, dans la fenêtre. On ne lit la base que si la personne
+    // passe déjà les autres critères : inutile d'interroger academy_emails pour quelqu'un
+    // qui s'est désabonné.
+    if (raisonDeNePasNotifier(st as any, opts.auteurId, null, maintenant)) continue;
+
+    const { data: recent } = await supabase.from("academy_emails")
+      .select("sent_at").eq("type", "forum_message").eq("email", st.email)
+      .like("dedupe_key", `forum:${opts.portee}:%`)
+      .gte("sent_at", seuil).order("sent_at", { ascending: false }).limit(1).maybeSingle();
+    const dernier = recent?.sent_at ? new Date(recent.sent_at).getTime() : null;
+    if (raisonDeNePasNotifier(st as any, opts.auteurId, dernier, maintenant)) continue;
+
+    const r = await sendAcademyEmail({
+      studentId: st.id, to: st.email, type: "forum_message",
+      subject: `💬 ${opts.auteurNom} a écrit dans ${opts.titre}`,
+      html: forumMessageEmailHtml(st.full_name, { titre: opts.titre, lien: opts.lien }, opts.auteurNom, opts.corps),
+      dedupeKey: `forum:${opts.portee}:${st.id}:${opts.postId ?? "x"}`,
+    });
+    if (r.sent) notifies++;
+  }
+  return { notifies };
 }
 
 // ── Email : annonce du formateur à toute une promotion ──
