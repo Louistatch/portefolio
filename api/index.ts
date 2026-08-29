@@ -634,7 +634,7 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
   const debut = new Date(now - jours * J);
   const debutPrecedent = new Date(now - 2 * jours * J);
 
-  const [studentsQ, enrollmentsQ, coursesQ, subscribersQ, attestationsQ, messagesQ, commentsQ] = await Promise.all([
+  const [studentsQ, enrollmentsQ, coursesQ, subscribersQ, attestationsQ, messagesQ, commentsQ, tachesQ] = await Promise.all([
     supabase.from("students").select("id, full_name, email, created_at, status, admitted_at, admission_expires, entry_score, email_verified, final_certificate_no, final_certified_at"),
     supabase.from("enrollments").select("student_id, course_id, progress, status"),
     supabase.from("sms_courses").select("id, code, title, is_published"),
@@ -642,6 +642,8 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
     supabase.from("attestations").select("student_id, cert_type, status, issued_at").order("issued_at", { ascending: false }).limit(20),
     supabase.from("contact_messages").select("name, subject, created_at").order("created_at", { ascending: false }).limit(10),
     supabase.from("comments").select("author_name, created_at").order("created_at", { ascending: false }).limit(10),
+    supabase.from("cron_runs").select("tache, demarre_at, termine_at, ok, resume, erreur")
+      .order("demarre_at", { ascending: false }).limit(60),
   ]);
 
   const students = studentsQ.data || [];
@@ -733,7 +735,38 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
   const admisSurPeriode = students.filter(s => dansFenetre(s.admitted_at)).length;
   const coursTermines = enrollments.filter(e => e.status === "completed").length;
 
+  // ── État des tâches planifiées ──
+  //
+  // Ce que ce bloc surveille n'est pas l'erreur, c'est le SILENCE. Les deux tâches sont
+  // restées muettes des semaines parce qu'elles répondaient 404 : aucune exception, aucune
+  // ligne, rien à quoi s'accrocher. On regarde donc l'ancienneté de la dernière exécution,
+  // et une tâche quotidienne qui n'a rien écrit depuis 36 heures est déclarée muette —
+  // une journée et demie, soit un cycle manqué plus une marge pour un décalage horaire.
+  const executions = tachesQ.data || [];
+  const taches = ["verify-reminders", "late-warnings"].map(nom => {
+    const siennes = executions.filter((r: any) => r.tache === nom);
+    const derniere = siennes[0] || null;
+    const dernierSucces = siennes.find((r: any) => r.ok === true) || null;
+    const heures = derniere
+      ? Math.floor((now - new Date(derniere.demarre_at).getTime()) / 3600000)
+      : null;
+    return {
+      nom,
+      derniereExecution: derniere?.demarre_at ?? null,
+      dernierSucces: dernierSucces?.demarre_at ?? null,
+      heuresDepuis: heures,
+      ok: derniere?.ok ?? null,
+      erreur: derniere?.erreur ?? null,
+      resume: derniere?.resume ?? null,
+      // Jamais exécutée compte comme muette : c'est exactement l'état qu'on a vécu.
+      muette: heures === null || heures > TACHE_SILENCE_HEURES,
+      // `ok = null` sur la dernière ligne : la tâche a démarré et n'a jamais rendu la main.
+      interrompue: !!derniere && derniere.ok === null && !!derniere.demarre_at,
+    };
+  });
+
   res.json({
+    taches,
     periode: { jours, debut: debut.toISOString(), fin: new Date(now).toISOString() },
     kpis: {
       etudiants: kpi(() => true, "created_at"),
@@ -2397,8 +2430,66 @@ function cronAutorise(req: Request): boolean {
   return !!secret && req.headers.authorization === `Bearer ${secret}`;
 }
 
-const relancesDeVerification = async (req: Request, res: Response) => {
+/** Adresse qui reçoit les alertes d'exploitation. Jamais celle d'un étudiant. */
+const EMAIL_ALERTE = process.env.ADMIN_ALERT_EMAIL || "contact@louisfarm.com";
+
+/** Délai au-delà duquel une tâche quotidienne est considérée comme muette. */
+export const TACHE_SILENCE_HEURES = 36;
+
+/**
+ * Exécute une tâche planifiée en laissant une trace, quoi qu'il arrive.
+ *
+ * Trois choses que le try/catch seul ne donne pas :
+ *
+ *   1. Une LIGNE EST ÉCRITE AVANT le travail. Si la fonction est tuée en cours de route
+ *      — temps imparti dépassé, mémoire — la ligne reste à `ok = null`, et cet état
+ *      inachevé est précisément ce qu'aucune exception n'aurait signalé.
+ *   2. L'alerte ne dépend pas du journal. Si la base est en panne, l'écriture échoue mais
+ *      l'email part quand même : c'est le cas où il est le plus utile.
+ *   3. L'envoi de l'alerte est lui-même protégé. Une erreur d'expédition ne doit pas
+ *      remplacer l'erreur d'origine dans les journaux de la plateforme.
+ */
+async function executerTache(
+  nom: string,
+  req: Request,
+  res: Response,
+  corps: () => Promise<Record<string, unknown>>,
+) {
   if (!cronAutorise(req)) return res.status(401).json({ message: "Non autorisé" });
+
+  const { data: ligne } = await supabase.from("cron_runs")
+    .insert({ tache: nom }).select("id").maybeSingle()
+    .then(r => r, () => ({ data: null } as any));
+
+  const clore = async (champs: Record<string, unknown>) => {
+    if (!ligne?.id) return;
+    await supabase.from("cron_runs")
+      .update({ termine_at: new Date().toISOString(), ...champs })
+      .eq("id", ligne.id).then(() => {}, () => {});
+  };
+
+  try {
+    const resume = await corps();
+    await clore({ ok: true, resume });
+    res.json(resume);
+  } catch (e: any) {
+    const message = String(e?.message || e).slice(0, 2000);
+    console.error(`cron ${nom} : échec —`, message);
+    await clore({ ok: false, erreur: message });
+    // Une alerte par tâche et par jour : un échec qui se répète mérite un rappel
+    // quotidien, pas un email par tentative.
+    await sendAcademyEmail({
+      studentId: null, to: EMAIL_ALERTE, type: "cron_echec",
+      subject: `⚠️ Tâche planifiée en échec : ${nom}`,
+      html: tacheEchoueeEmailHtml(nom, message),
+      dedupeKey: `cron_echec:${nom}:${new Date().toISOString().slice(0, 10)}`,
+    }).catch(() => {});
+    res.status(500).json({ message: "Tâche en échec", tache: nom });
+  }
+}
+
+const relancesDeVerification = (req: Request, res: Response) =>
+  executerTache("verify-reminders", req, res, async () => {
 
   const now = Date.now();
   const horizon = new Date(now - VERIFY_REMINDER_GIVE_UP_DAYS * 86400000).toISOString();
@@ -2406,7 +2497,9 @@ const relancesDeVerification = async (req: Request, res: Response) => {
     .select("id, full_name, email, created_at, course_emails")
     .eq("email_verified", false)
     .gte("created_at", horizon);
-  if (error) return res.status(500).json({ message: error.message });
+  // Une lecture en échec est une panne, pas un résultat : on la fait remonter à
+  // l'enveloppe, qui la journalise et vous alerte.
+  if (error) throw new Error(`lecture des comptes non vérifiés : ${error.message}`);
 
   let envoyees = 0, ignorees = 0;
   const parEtape: Record<string, number> = {};
@@ -2440,8 +2533,8 @@ const relancesDeVerification = async (req: Request, res: Response) => {
   }
 
   console.log(`verify-reminders: ${envoyees} relance(s) envoyée(s), ${ignorees} ignorée(s) sur ${students?.length ?? 0} compte(s) non vérifié(s).`, parEtape);
-  res.json({ candidats: students?.length ?? 0, envoyees, ignorees, parEtape });
-};
+  return { candidats: students?.length ?? 0, envoyees, ignorees, parEtape };
+});
 
 // ══════════════════════════════════════════════════════════════
 // GET *et* POST, et c'est GET qui compte.
@@ -2477,8 +2570,8 @@ app.post("/api/cron/verify-reminders", relancesDeVerification);
  * La clé d'idempotence porte la date d'admission : un étudiant remis à zéro puis réadmis
  * repart avec une série d'alertes neuve, au lieu d'être considéré comme déjà prévenu.
  */
-const alertesDeRetard = async (req: Request, res: Response) => {
-  if (!cronAutorise(req)) return res.status(401).json({ message: "Non autorisé" });
+const alertesDeRetard = (req: Request, res: Response) =>
+  executerTache("late-warnings", req, res, async () => {
 
   const constat = await constatDeRetard();
   let envoyees = 0, ignorees = 0;
@@ -2514,8 +2607,8 @@ const alertesDeRetard = async (req: Request, res: Response) => {
   }
 
   console.log(`late-warnings: ${envoyees} alerte(s) envoyée(s), ${ignorees} ignorée(s) sur ${constat.length} admis.`, parPalier);
-  res.json({ admis: constat.length, envoyees, ignorees, parPalier });
-};
+  return { admis: constat.length, envoyees, ignorees, parPalier };
+});
 
 app.get("/api/cron/late-warnings", alertesDeRetard);
 app.post("/api/cron/late-warnings", alertesDeRetard);
@@ -4853,6 +4946,41 @@ function cohortAnnouncementEmailHtml(name: string, cohorte: string, corps: strin
 // Le ton compte plus que d'habitude. L'étudiant n'est pas renvoyé : son parcours est
 // remis à zéro parce qu'il ne pouvait plus tenir dans sa fenêtre, et la porte reste
 // ouverte immédiatement. Un message sec ferait perdre quelqu'un qui peut encore réussir.
+// ── Email : une tâche planifiée a échoué ──
+//
+// Destiné à l'exploitation, pas à un étudiant : ton sec, l'erreur brute, et les trois
+// endroits où regarder. Un email d'alerte qui oblige à se souvenir de la marche à suivre
+// arrive toujours au mauvais moment.
+function tacheEchoueeEmailHtml(tache: string, erreur: string) {
+  const esc = (t: string) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const quand = new Date().toLocaleString("fr-FR", { dateStyle: "full", timeStyle: "short" });
+  return academyEmailLayout(
+    `<div class="hd" style="background:linear-gradient(135deg,#b91c1c,#7f1d1d)">
+       <div class="logo"><span>LOUISFARM LEARNING</span></div>
+       <h1>Tâche planifiée en échec</h1>
+       <p class="sub">${esc(tache)}</p>
+     </div>
+     <div class="bd">
+       <p>La tâche <strong>${esc(tache)}</strong> a échoué le ${esc(quand)}.</p>
+       <div class="info" style="background:#fef2f2;border-color:#fecaca">
+         <h3 style="color:#b91c1c">Erreur remontée</h3>
+         <p style="font-family:monospace;font-size:13px;color:#7f1d1d;word-break:break-word">${esc(erreur)}</p>
+       </div>
+       <div class="info">
+         <h3>Où regarder</h3>
+         <ul style="margin:10px 0 0;padding-left:18px;color:#6b7280;font-size:14px;line-height:1.7">
+           <li>Le journal des exécutions : table <code>cron_runs</code>, filtrée sur cette tâche.</li>
+           <li>Les journaux de la fonction, onglet Logs du projet Vercel.</li>
+           <li>L'état de la base Supabase, si l'erreur mentionne une table ou une requête.</li>
+         </ul>
+       </div>
+       <p class="muted">Un seul message par tâche et par jour. Tant que l'échec se répète,
+       ce rappel revient chaque jour — son absence signifie que la tâche est repassée au vert,
+       ou qu'elle ne s'exécute plus du tout.</p>
+     </div>`
+  );
+}
+
 // ── Email : alerte de retard sur le rythme conseillé ──
 //
 // Ce message est le seul qui arrive AVANT la remise à zéro. Son texte n'est pas écrit ici

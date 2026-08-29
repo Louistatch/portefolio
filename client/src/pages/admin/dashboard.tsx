@@ -8,7 +8,7 @@ import {
 import {
   Users, UserCheck, Clock, Award, TrendingUp, TrendingDown, Minus,
   UserPlus, Send, Video, FileText, GraduationCap, Mail, MessageSquare,
-  ShieldCheck, ChevronRight, Loader2, AlertCircle,
+  ShieldCheck, ChevronRight, Loader2, AlertCircle, AlarmClock,
 } from "lucide-react";
 
 /** Formatage court d'une date ISO, en français. */
@@ -127,8 +127,54 @@ export default function Dashboard() {
     { cle: "expire", n: data.repartition.expires },
   ].filter(s => s.n > 0);
 
+  // Les tâches muettes ou en échec passent AVANT les indicateurs : une relance qui ne part
+  // pas ne se voit dans aucune courbe, et c'est précisément ce qui l'a rendue invisible
+  // pendant des semaines.
+  const tachesEnDefaut = (data.taches || []).filter((t: any) => t.muette || t.ok === false || t.interrompue);
+
   return (
     <div className="space-y-6">
+      {tachesEnDefaut.length > 0 && (
+        <div className="rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 p-5">
+          <div className="flex gap-3.5">
+            <AlarmClock className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold text-red-900 dark:text-red-200">
+                {tachesEnDefaut.length === 1 ? "Une tâche planifiée ne tourne pas" : `${tachesEnDefaut.length} tâches planifiées ne tournent pas`}
+              </h2>
+              <p className="text-[13px] text-red-800/90 dark:text-red-200/80 mt-1 leading-relaxed">
+                Les relances automatiques n'atteignent que les étudiants qui ne reviennent plus.
+                Tant qu'une tâche est muette, ils ne reçoivent rien — et rien d'autre ne le signale.
+              </p>
+              <ul className="mt-3 space-y-2">
+                {tachesEnDefaut.map((t: any) => (
+                  <li key={t.nom} className="text-[13px] text-red-900 dark:text-red-200">
+                    <span className="font-mono font-semibold">{t.nom}</span>
+                    {" — "}
+                    {t.derniereExecution == null
+                      ? "jamais exécutée"
+                      : t.interrompue
+                        ? `démarrée il y a ${t.heuresDepuis} h, jamais terminée`
+                        : t.ok === false
+                          ? `en échec depuis ${t.heuresDepuis} h`
+                          : `silencieuse depuis ${t.heuresDepuis} h`}
+                    {t.erreur && (
+                      <span className="block font-mono text-[12px] text-red-700/80 dark:text-red-300/70 mt-0.5 break-words">
+                        {t.erreur}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              <p className="text-[12px] text-red-800/70 dark:text-red-200/60 mt-3">
+                À vérifier dans l'ordre : l'onglet Cron Jobs du projet Vercel, puis les journaux
+                de la fonction, puis la table <span className="font-mono">cron_runs</span>.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── En-tête ── */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>

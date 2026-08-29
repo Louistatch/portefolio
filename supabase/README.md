@@ -28,6 +28,7 @@ base. Lisez cette page avant d'en lancer un.
 | 17 | `academy_group_work_v2.sql` | Forum de groupe, dépôt de fichiers du rendu, évaluation par les pairs, grille du formateur |
 | 18 | `academy_cohort_forum.sql` | Forum de promotion (formateur ↔ cohorte) et journal des remises à zéro pour retard |
 | 19 | `academy_group_work_v4.sql` | Un groupe **par travail** (équipes retirées au sort à chaque GW) + verrou de constitution |
+| 20 | `academy_cron_runs.sql` | Journal des tâches planifiées — c'est l'ABSENCE de ligne récente qui alerte |
 
 ## Verrouillage RLS (`academy_rls_lockdown.sql`)
 
