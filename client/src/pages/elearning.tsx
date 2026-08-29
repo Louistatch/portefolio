@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { Spotlight } from "@/components/motion";
 import { useLocation } from "wouter";
 import { SEO } from "@/components/seo";
 import {
@@ -607,7 +608,7 @@ export default function ELearning() {
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("tof") },
               },
             ].map(p => (
-              <div key={p.code} className="border border-border rounded-lg bg-card overflow-hidden flex flex-col">
+              <Spotlight key={p.code} className="lift border border-border rounded-lg bg-card overflow-hidden flex flex-col">
                 <div className="h-1" style={{ background: p.teinte }} />
                 <div className="p-6 flex flex-col flex-1">
                   <div className="font-mono text-xs text-muted-foreground tracking-wide">{p.code}</div>
@@ -639,7 +640,7 @@ export default function ELearning() {
                     )}
                   </div>
                 </div>
-              </div>
+              </Spotlight>
             ))}
           </div>
         </section>

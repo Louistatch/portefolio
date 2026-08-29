@@ -177,6 +177,26 @@ export function AnimatedNumber({
   const inView = useInView(ref, { once: true, margin: "-40px" });
   const reduce = useReducedMotion();
   const [display, setDisplay] = useState(0);
+  const aDemarre = useRef(false);
+
+  // Filet de sécurité : si l'animation n'a pas démarré, le nombre s'affiche
+  // quand même.
+  //
+  // Sans lui, le premier compteur de la bande de preuve restait bloqué à zéro
+  // — « 0 années de terrain post-diplôme » sur la page d'accueil, c'est-à-dire
+  // exactement le contraire de ce que la bande est là pour établir. Les trois
+  // autres compteurs, même code et même rangée, s'animaient normalement ; la
+  // cause du cas isolé n'a pas été établie, alors on garantit le résultat au
+  // lieu de parier sur le mécanisme. Une seconde et demie est le temps que
+  // l'animation elle-même prendrait : passé ce délai, il n'y a plus rien à
+  // attendre.
+  useEffect(() => {
+    if (aDemarre.current) return;
+    const t = setTimeout(() => {
+      if (!aDemarre.current) setDisplay(value);
+    }, 1500);
+    return () => clearTimeout(t);
+  }, [value]);
 
   useEffect(() => {
     if (!inView) return;
@@ -184,6 +204,7 @@ export function AnimatedNumber({
       setDisplay(value);
       return;
     }
+    aDemarre.current = true;
     let raf = 0;
     const t0 = performance.now();
     const tick = (t: number) => {
@@ -244,6 +265,59 @@ export function TiltCard({
       {children}
     </motion.div>
   );
+}
+
+/**
+ * Halo qui suit le curseur sur une carte portant la classe `spotlight`.
+ *
+ * Complète TiltCard plutôt qu'elle ne la remplace : l'inclinaison dit que la
+ * carte est un objet, le halo dit où se trouve le regard. Rien ici ne passe par
+ * Motion — une variable CSS écrite une fois par image suffit, et le pseudo-
+ * élément qui la lit ne repeint ni la carte ni son texte.
+ */
+export function useSpotlight<T extends HTMLElement = HTMLDivElement>() {
+  const ref = useRef<T | null>(null);
+  const reduce = useReducedMotion();
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || reduce) return;
+    // Pas de curseur à suivre sur un écran tactile : on n'attache rien.
+    if (!window.matchMedia?.("(hover: hover) and (pointer: fine)").matches) return;
+
+    let attente = 0;
+    let x = 50, y = 50;
+    const appliquer = () => {
+      attente = 0;
+      el.style.setProperty("--mx", `${x}%`);
+      el.style.setProperty("--my", `${y}%`);
+    };
+    const surMouvement = (e: MouseEvent) => {
+      const r = el.getBoundingClientRect();
+      x = ((e.clientX - r.left) / r.width) * 100;
+      y = ((e.clientY - r.top) / r.height) * 100;
+      // Une application par image, quel que soit le débit d'événements souris :
+      // un pavé tactile en émet bien plus de soixante par seconde.
+      if (!attente) attente = requestAnimationFrame(appliquer);
+    };
+
+    el.addEventListener("mousemove", surMouvement, { passive: true });
+    return () => {
+      el.removeEventListener("mousemove", surMouvement);
+      if (attente) cancelAnimationFrame(attente);
+    };
+  }, [reduce]);
+
+  return ref;
+}
+
+/**
+ * Carte au halo. Le hook ne peut pas être appelé dans un `.map()` — un
+ * composant le peut, et c'est la seule raison d'être de ce wrapper.
+ */
+export function Spotlight({ children, className }: { children: ReactNode; className?: string }) {
+  const ref = useSpotlight<HTMLDivElement>();
+  return <div ref={ref} className={`spotlight ${className ?? ""}`}>{children}</div>;
 }
 
 /** Barre de progression du défilement, en haut de page. */

@@ -64,8 +64,8 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="min-h-screen flex flex-col bg-background relative">
       {/* Orbes d'ambiance : dérive lente derrière tout le contenu. */}
       <div aria-hidden className="fixed inset-0 z-0 overflow-hidden pointer-events-none">
-        <div className="orb animate-float-slow -top-44 -left-36 w-[36rem] h-[36rem] bg-primary/[0.07] dark:bg-primary/[0.12]" />
-        <div className="orb animate-float-slower top-1/3 -right-44 w-[32rem] h-[32rem] bg-accent/[0.07] dark:bg-accent/[0.10]" />
+        <div className="orb animate-float-slow -top-44 -left-36 w-[36rem] h-[36rem] text-primary/[0.09] dark:text-primary/[0.16]" />
+        <div className="orb animate-float-slower top-1/3 -right-44 w-[32rem] h-[32rem] text-accent/[0.09] dark:text-accent/[0.13]" />
       </div>
       <ScrollProgressBar />
       <motion.header

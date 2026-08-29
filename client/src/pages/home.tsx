@@ -3,12 +3,11 @@ import { ArrowRight, LineChart, Map, GraduationCap, Calendar, Clock, Eye } from 
 import { SEO } from "@/components/seo";
 import { useQuery } from "@tanstack/react-query";
 import { Testimonials } from "@/components/testimonials";
-import { MountStagger, MountItem, Reveal, Stagger, StaggerItem, AnimatedNumber, TiltCard } from "@/components/motion";
+import { MountStagger, MountItem, Reveal, Stagger, StaggerItem, AnimatedNumber, TiltCard, useSpotlight } from "@/components/motion";
 import { groupByProgram } from "@shared/programs";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { estimateReadingTime } from "@/components/reading-progress";
-import { Skeleton } from "@/components/ui/skeleton";
 
 /**
  * Page d'accueil — direction institutionnelle.
@@ -55,9 +54,10 @@ function Chiffre({ valeur, libelle, dernier }: { valeur: string; libelle: string
 function Domaine({ icone: Icone, titre, texte, livrable }: {
   icone: any; titre: string; texte: string; livrable: string;
 }) {
+  const carte = useSpotlight<HTMLDivElement>();
   return (
-    <div className="lift border-t-2 border-primary pt-5">
-      <Icone className="w-[22px] h-[22px] text-primary" strokeWidth={1.6} />
+    <div ref={carte} className="lift spotlight group border-t-2 border-primary pt-5 rounded-b-lg">
+      <Icone className="w-[22px] h-[22px] text-primary transition-transform duration-[220ms] ease-[cubic-bezier(0.16,1,0.3,1)] group-hover:-translate-y-0.5 group-hover:scale-110" strokeWidth={1.6} />
       <h3 className="text-base font-bold mt-3.5 mb-2">{titre}</h3>
       <p className="text-sm leading-relaxed text-foreground/80 mb-3.5">{texte}</p>
       <p className="text-xs text-muted-foreground border-l-2 border-border pl-3">{livrable}</p>
@@ -323,7 +323,7 @@ export default function Home() {
 
         {isLoading ? (
           <div className="grid md:grid-cols-3 gap-6">
-            {[0, 1, 2].map(i => <Skeleton key={i} className="h-44 rounded-lg" />)}
+            {[0, 1, 2].map(i => <div key={i} className="shimmer h-44 rounded-lg" />)}
           </div>
         ) : (
           <Stagger className="grid md:grid-cols-3 gap-6">
