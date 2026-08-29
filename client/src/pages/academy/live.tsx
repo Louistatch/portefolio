@@ -26,6 +26,14 @@ export default function AcademyLive() {
   const [error, setError] = useState("");
   const [joined, setJoined] = useState(false);
   const [ready, setReady] = useState(false);
+  /**
+   * Au bout de combien de temps on cesse de masquer Jitsi.
+   *
+   * Ce n'est pas un simple délai d'affichage : c'est ce qui rend visible le seul écran
+   * capable de débloquer la séance. Huit secondes — assez pour qu'une connexion normale
+   * aboutisse sans clignotement, assez peu pour ne pas laisser une salle muette.
+   */
+  const [attenteLongue, setAttenteLongue] = useState(false);
 
   // états média locaux
   const [micOn, setMicOn] = useState(true);
@@ -164,6 +172,14 @@ export default function AcademyLive() {
   // Ouvrir le support d'office quand la séance en a un : c'est ce que les participants
   // viennent voir, pas la mosaïque de visages.
   useEffect(() => { if (diapos.length > 0) setVueSupport(true); }, [diapos.length]);
+
+  // Le compte à rebours du voile de connexion. Remis à zéro dès que la salle s'ouvre : une
+  // reconnexion en cours de séance ne doit pas rouvrir le message d'attente.
+  useEffect(() => {
+    if (!joined || ready) { setAttenteLongue(false); return; }
+    const t = setTimeout(() => setAttenteLongue(true), 8000);
+    return () => clearTimeout(t);
+  }, [joined, ready]);
 
   // minuteur
   useEffect(() => {
@@ -363,10 +379,51 @@ export default function AcademyLive() {
       <div className="flex-1 flex min-h-0">
         {/* Scène vidéo (Jitsi engine, UI masquée) */}
         <div className="flex-1 relative min-w-0">
-          {!ready && (
+          {/* Le voile de connexion ne couvre plus indéfiniment.
+              Il était opaque, à `inset-0`, et ne se levait qu'à `videoConferenceJoined` —
+              lequel ne survient JAMAIS tant que meet.jit.si attend un modérateur. Or depuis
+              le 24 août 2023 l'instance publique exige que le créateur de la salle se
+              connecte (Google, GitHub ou Facebook). Jitsi affichait donc « Waiting for a
+              moderator — Log in » juste derrière ce rectangle plein : personne ne pouvait
+              lire le message ni atteindre le bouton, et la salle « tournait » sans fin.
+              Passé huit secondes on s'efface et on explique. */}
+          {!ready && !attenteLongue && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 z-10 bg-[#0b1220]">
               <Loader2 className="w-8 h-8 animate-spin text-teal-400" />
               <p className="text-sm text-white/60">Connexion à la salle…</p>
+            </div>
+          )}
+
+          {!ready && attenteLongue && (
+            // `pointer-events-none` sur le conteneur : les clics traversent vers l'écran de
+            // Jitsi, où se trouve le bouton de connexion.
+            <div className="absolute inset-x-0 top-0 z-20 p-3 sm:p-4 pointer-events-none">
+              <div className="mx-auto max-w-2xl rounded-2xl bg-[#0f172a]/95 backdrop-blur border border-amber-500/25 p-4 sm:p-5 pointer-events-auto">
+                <div className="flex gap-3.5">
+                  <AlertCircle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                  <div className="min-w-0 text-[13.5px] leading-relaxed">
+                    {estPresentateur ? (
+                      <>
+                        <p className="font-bold text-amber-200 mb-1.5">La salle attend que vous vous connectiez</p>
+                        <p className="text-slate-300">
+                          Jitsi demande qu'un modérateur s'identifie avant d'ouvrir une salle.
+                          Utilisez le bouton de connexion affiché ci-dessous — Google, GitHub ou
+                          Facebook — une seule fois par séance. Les étudiants entreront ensuite
+                          sans rien avoir à faire.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="font-bold text-amber-200 mb-1.5">La séance n'a pas encore été ouverte</p>
+                        <p className="text-slate-300">
+                          Elle attend que le formateur se connecte. Restez sur cette page&nbsp;:
+                          elle démarrera d'elle-même, vous n'avez rien à faire.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           )}
           <div ref={jitsiRef} className="absolute inset-0" />
