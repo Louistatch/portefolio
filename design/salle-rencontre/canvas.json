@@ -1,0 +1,15 @@
+{
+  "artboards": [
+    { "file": "Audit.dc.html",        "x": 0,    "y": 0,    "w": 1440, "h": 1180, "title": "1 · Audit de l'existant" },
+    { "file": "References.dc.html",   "x": 1560, "y": 0,    "w": 1440, "h": 940,  "title": "2 · Ce qui marche ailleurs" },
+    { "file": "Salon.dc.html",        "x": 0,    "y": 1320, "w": 1440, "h": 900,  "title": "3 · Le salon d'entrée" },
+    { "file": "Main.dc.html",         "x": 1560, "y": 1320, "w": 1440, "h": 900,  "title": "4 · La salle en séance" },
+    { "file": "Apres.dc.html",        "x": 0,    "y": 2360, "w": 1440, "h": 920,  "title": "5 · Après la séance" },
+    { "file": "Architecture.dc.html", "x": 1560, "y": 2360, "w": 1440, "h": 860,  "title": "6 · Architecture" }
+  ],
+  "annotations": [
+    { "id": "depart", "x": 0, "y": -150, "w": 620, "text": "Salle de rencontre en ligne — refonte complète.\nLire dans l'ordre : l'audit chiffré, puis ce que font les produits les mieux notés, puis les trois écrans, puis l'architecture." },
+    { "id": "livrable", "x": 1560, "y": 1180, "w": 380, "text": "Planches 3 et 4 : les écrans à construire. Le reste justifie ce qu'ils contiennent." }
+  ],
+  "launch": { "view": "canvas" }
+}

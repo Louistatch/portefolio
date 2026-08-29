@@ -1,0 +1,144 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    a { color: #0d9488; } a:hover { color: #0f766e; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; min-height: 1180px; background: #f8fafc; padding: 56px 64px 64px; box-sizing: border-box; color: #0f172a">
+
+  <div style="display: flex; align-items: flex-end; justify-content: space-between; gap: 32px; margin-bottom: 8px">
+    <div>
+      <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: #64748b">Planche 1 · état des lieux</div>
+      <h1 style="font-family: 'Lora', Georgia, serif; font-weight: 600; font-size: 46px; letter-spacing: -0.02em; line-height: 1.08; margin: 12px 0 0">Ce que la salle actuelle fait mal</h1>
+    </div>
+    <div style="text-align: right; font-size: 13px; color: #64748b; line-height: 1.6; max-width: 340px">
+      <code style="font-size: 12px; background: #e2e8f0; padding: 2px 7px; border-radius: 5px">client/src/pages/academy/live.tsx</code><br>
+      478 lignes · Jitsi encapsulé, interface entièrement réécrite
+    </div>
+  </div>
+  <div style="height: 1px; background: #e2e8f0; margin: 28px 0 36px"></div>
+
+  <!-- Les trois défauts majeurs -->
+  <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-bottom: 20px">
+
+    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; box-shadow: 0 1px 2px -1px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.05)">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 18px">
+        <span style="width: 30px; height: 30px; border-radius: 9px; background: #fef2f2; display: grid; place-items: center">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.3 3.2 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.2a2 2 0 0 0-3.4 0Z"/></svg>
+        </span>
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #dc2626">Structure</span>
+      </div>
+      <h3 style="font-family: 'Lora', Georgia, serif; font-size: 21px; font-weight: 600; margin: 0 0 10px; line-height: 1.25">Le support est synchronisé par sondage</h3>
+      <p style="font-size: 13.5px; line-height: 1.65; color: #475569; margin: 0 0 18px">Chaque participant interroge l'API toutes les 4 secondes pour savoir quelle diapositive afficher. Le canal de données Jitsi est pourtant déjà ouvert entre tous.</p>
+      <div style="background: #fef2f2; border-radius: 12px; padding: 16px">
+        <div class="num" style="font-family: 'Lora', Georgia, serif; font-size: 38px; font-weight: 600; color: #dc2626; line-height: 1">28 350</div>
+        <div style="font-size: 12px; color: #7f1d1d; margin-top: 4px; line-height: 1.5">invocations serverless pour <span class="num">une</span> séance de 90 min à 21 étudiants</div>
+      </div>
+      <p style="font-size: 12.5px; color: #64748b; margin: 14px 0 0; line-height: 1.6">Et jusqu'à 4 s de retard entre le clic du formateur et l'écran de l'étudiant.</p>
+    </div>
+
+    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; box-shadow: 0 1px 2px -1px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.05)">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 18px">
+        <span style="width: 30px; height: 30px; border-radius: 9px; background: #fef2f2; display: grid; place-items: center">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2" stroke-linecap="round"><path d="m2 2 20 20"/><path d="M9 9v3a3 3 0 0 0 5.1 2.1"/><path d="M15 9.3V5a3 3 0 0 0-5.7-1.3"/><path d="M19 10v2a7 7 0 0 1-.1 1.2"/><path d="M5 10v2a7 7 0 0 0 12 5"/><path d="M12 19v3"/></svg>
+        </span>
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #dc2626">Bug</span>
+      </div>
+      <h3 style="font-family: 'Lora', Georgia, serif; font-size: 21px; font-weight: 600; margin: 0 0 10px; line-height: 1.25">La liste des participants ment sur les micros</h3>
+      <p style="font-size: 13.5px; line-height: 1.65; color: #475569; margin: 0 0 16px">Les indicateurs micro et caméra ne sont mis à jour que pour <em>soi</em>. Pour tous les autres, la valeur reste celle par défaut&nbsp;: micro ouvert.</p>
+      <div style="background: #0f172a; border-radius: 12px; padding: 14px 16px; font-family: ui-monospace, monospace; font-size: 11.5px; line-height: 1.75; color: #94a3b8">
+        <div><span style="color: #f472b6">audio</span>: old?.audio <span style="color: #fbbf24">?? true</span></div>
+        <div><span style="color: #f472b6">video</span>: old?.video <span style="color: #fbbf24">?? true</span></div>
+        <div style="color: #64748b; margin-top: 8px">// audioMuteStatusChanged ne porte</div>
+        <div style="color: #64748b">// que sur le participant local</div>
+      </div>
+      <p style="font-size: 12.5px; color: #64748b; margin: 14px 0 0; line-height: 1.6">Le formateur croit voir qui est coupé. Il voit une valeur par défaut.</p>
+    </div>
+
+    <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 26px; box-shadow: 0 1px 2px -1px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.05)">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 18px">
+        <span style="width: 30px; height: 30px; border-radius: 9px; background: #fffbeb; display: grid; place-items: center">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#b45309" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 2"/></svg>
+        </span>
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #b45309">Manque</span>
+      </div>
+      <h3 style="font-family: 'Lora', Georgia, serif; font-size: 21px; font-weight: 600; margin: 0 0 10px; line-height: 1.25">On entre sans avoir rien vérifié</h3>
+      <p style="font-size: 13.5px; line-height: 1.65; color: #475569; margin: 0 0 16px">Le salon d'attente de Jitsi est désactivé — <code style="font-size: 11.5px; background: #f1f5f9; padding: 1px 5px; border-radius: 4px">prejoinPageEnabled: false</code> — et rien ne le remplace. Aucun aperçu caméra, aucun niveau de micro, aucun test de connexion.</p>
+      <p style="font-size: 13.5px; line-height: 1.65; color: #475569; margin: 0">C'est la première minute d'une séance qui se perd&nbsp;: «&nbsp;tu m'entends&nbsp;?&nbsp;», «&nbsp;je ne te vois pas&nbsp;».</p>
+      <div style="margin-top: 18px; padding-top: 16px; border-top: 1px solid #f1f5f9; font-size: 12.5px; color: #64748b; line-height: 1.6">
+        Zoom, Meet et Teams en ont tous un. C'est le premier reproche des utilisateurs quand il manque.
+      </div>
+    </div>
+  </div>
+
+  <!-- Les défauts secondaires -->
+  <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px 30px; box-shadow: 0 1px 2px -1px rgba(15,23,42,0.06), 0 1px 3px rgba(15,23,42,0.05)">
+    <h3 style="font-family: 'Lora', Georgia, serif; font-size: 20px; font-weight: 600; margin: 0 0 22px">Le reste, par ordre de conséquence</h3>
+    <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 26px 44px">
+
+      <div style="display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start">
+        <span style="width: 8px; height: 8px; border-radius: 99px; background: #dc2626; margin-top: 7px"></span>
+        <div>
+          <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 4px">Le chat disparaît à chaque rechargement</div>
+          <div style="font-size: 13px; color: #64748b; line-height: 1.6">Les messages ne vivent que dans l'état React. Qui arrive en retard ne voit rien de ce qui s'est dit ; qui recharge perd tout. Aucune question posée en séance ne survit à la séance.</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start">
+        <span style="width: 8px; height: 8px; border-radius: 99px; background: #dc2626; margin-top: 7px"></span>
+        <div>
+          <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 4px">Aucune présence n'est enregistrée</div>
+          <div style="font-size: 13px; color: #64748b; line-height: 1.6">Rien en base ne dit qui a assisté à quoi. Pour un cursus certifiant dont les travaux de groupe sont notés, c'est une information qui manque au dossier de chaque étudiant.</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start">
+        <span style="width: 8px; height: 8px; border-radius: 99px; background: #b45309; margin-top: 7px"></span>
+        <div>
+          <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 4px">Aucune reprise après coupure réseau</div>
+          <div style="font-size: 13px; color: #64748b; line-height: 1.6">Sur une 4G qui décroche — la norme pour la promotion — rien n'indique la reconnexion en cours. L'écran reste noir et l'étudiant croit que la séance est finie.</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start">
+        <span style="width: 8px; height: 8px; border-radius: 99px; background: #b45309; margin-top: 7px"></span>
+        <div>
+          <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 4px">La salle est hors charte</div>
+          <div style="font-size: 13px; color: #64748b; line-height: 1.6">Couleurs écrites en dur — <code style="font-size: 11.5px; background: #f1f5f9; padding: 1px 5px; border-radius: 4px">teal-500</code> vaut #14b8a6, le teal de la marque vaut #0d9488. Le reste du site passe par les jetons de thème ; cette page ne les utilise pas et ne suit pas le mode sombre.</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start">
+        <span style="width: 8px; height: 8px; border-radius: 99px; background: #94a3b8; margin-top: 7px"></span>
+        <div>
+          <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 4px">Le minuteur ne compte pas la séance</div>
+          <div style="font-size: 13px; color: #64748b; line-height: 1.6">Il démarre au clic sur «&nbsp;Rejoindre&nbsp;», pas à l'heure de début. Deux personnes entrées à dix minutes d'écart lisent deux durées différentes pour la même séance.</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 22px 1fr; gap: 14px; align-items: start">
+        <span style="width: 8px; height: 8px; border-radius: 99px; background: #94a3b8; margin-top: 7px"></span>
+        <div>
+          <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 4px">L'instance publique meet.jit.si porte tout</div>
+          <div style="font-size: 13px; color: #64748b; line-height: 1.6">Sans engagement de service, avec des limites de débit et des écrans d'authentification qui peuvent apparaître sans prévenir. Acceptable pour essayer, fragile pour un cursus qu'on fait payer de son temps.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+</x-dc>
+</body>
+</html>

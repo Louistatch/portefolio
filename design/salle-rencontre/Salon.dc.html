@@ -1,0 +1,152 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    a { color: #2dd4bf; } a:hover { color: #5eead4; }
+    .num { font-variant-numeric: tabular-nums; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; min-height: 900px; background: #0b1220; padding: 40px 48px; box-sizing: border-box; color: #e2e8f0; display: flex; flex-direction: column">
+
+  <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 30px">
+    <div style="display: flex; align-items: center; gap: 12px">
+      <span style="width: 32px; height: 32px; border-radius: 10px; background: #0d9488; display: grid; place-items: center; font-weight: 800; font-size: 14px; color: #fff">L</span>
+      <div>
+        <div style="font-size: 13px; font-weight: 700; line-height: 1.2">LouisFarm Learning</div>
+        <div style="font-size: 10.5px; letter-spacing: 0.11em; text-transform: uppercase; color: rgba(226,232,240,0.45)">Salon d'entrée</div>
+      </div>
+    </div>
+    <button style="display: flex; align-items: center; gap: 7px; background: none; border: none; color: rgba(226,232,240,0.5); font-size: 13px; font-family: inherit; cursor: pointer; padding: 8px">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg> Retour au tableau de bord
+    </button>
+  </div>
+
+  <div style="display: grid; grid-template-columns: 1fr 400px; gap: 28px; flex-grow: 1">
+
+    <!-- Aperçu caméra -->
+    <div style="display: flex; flex-direction: column; gap: 16px">
+      <div style="position: relative; background: #020617; border-radius: 18px; aspect-ratio: 16/10; overflow: hidden; border: 1px solid rgba(255,255,255,0.07)">
+        <div style="position: absolute; inset: 0; background: radial-gradient(circle at 50% 42%, #1e293b, #020617 72%)"></div>
+        <div style="position: absolute; inset: 0; display: grid; place-items: center">
+          <div style="text-align: center">
+            <div style="width: 108px; height: 108px; border-radius: 99px; background: rgba(13,148,136,0.18); display: grid; place-items: center; margin: 0 auto 16px; font-family: 'Lora', Georgia, serif; font-size: 38px; font-weight: 600; color: #5eead4">EH</div>
+            <div style="font-size: 14px; color: rgba(226,232,240,0.55)">Aperçu de votre caméra</div>
+          </div>
+        </div>
+
+        <div style="position: absolute; top: 16px; left: 16px; display: flex; gap: 8px">
+          <span style="display: inline-flex; align-items: center; gap: 6px; background: rgba(2,6,23,0.72); backdrop-filter: blur(8px); padding: 7px 12px; border-radius: 99px; font-size: 11.5px; font-weight: 500">
+            <span style="width: 7px; height: 7px; border-radius: 99px; background: #22c55e"></span> Caméra prête
+          </span>
+        </div>
+
+        <div style="position: absolute; bottom: 16px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px">
+          <button style="width: 46px; height: 46px; border-radius: 14px; background: rgba(255,255,255,0.1); border: none; display: grid; place-items: center; cursor: pointer">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg>
+          </button>
+          <button style="width: 46px; height: 46px; border-radius: 14px; background: rgba(255,255,255,0.1); border: none; display: grid; place-items: center; cursor: pointer">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+          </button>
+          <button style="width: 46px; height: 46px; border-radius: 14px; background: rgba(255,255,255,0.06); border: none; display: grid; place-items: center; cursor: pointer">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.75)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6h.09A1.65 1.65 0 0 0 10.6 3.09V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Le niveau de micro, visible en continu -->
+      <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 20px 22px">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px">
+          <div style="font-size: 13.5px; font-weight: 700">Dites quelque chose — la barre doit bouger</div>
+          <button style="background: rgba(13,148,136,0.16); border: none; color: #5eead4; font-family: inherit; font-size: 12px; font-weight: 700; padding: 7px 13px; border-radius: 9px; cursor: pointer">Tester le haut-parleur</button>
+        </div>
+        <div style="display: flex; gap: 3px; align-items: flex-end; height: 34px">
+          <div style="flex-grow: 1; height: 40%; background: #0d9488; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 72%; background: #0d9488; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 100%; background: #14b8a6; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 64%; background: #0d9488; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 88%; background: #14b8a6; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 46%; background: #0d9488; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 28%; background: rgba(13,148,136,0.4); border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 18%; background: rgba(13,148,136,0.25); border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 12%; background: rgba(13,148,136,0.15); border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 10%; background: rgba(13,148,136,0.12); border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 10%; background: rgba(13,148,136,0.1); border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 10%; background: rgba(13,148,136,0.1); border-radius: 2px"></div>
+        </div>
+        <div style="font-size: 11.5px; color: rgba(226,232,240,0.42); margin-top: 12px; line-height: 1.6">
+          Le niveau reste visible tant que vous êtes dans le salon — c'est précisément ce que Zoom et Meet ne font pas.
+        </div>
+      </div>
+    </div>
+
+    <!-- Colonne de droite -->
+    <div style="display: flex; flex-direction: column; gap: 16px">
+
+      <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 22px">
+        <div style="font-size: 10.5px; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: rgba(226,232,240,0.42); margin-bottom: 10px">Séance</div>
+        <h2 style="font-family: 'Lora', Georgia, serif; font-size: 23px; font-weight: 600; margin: 0 0 8px; line-height: 1.25; color: #fff">Cadre logique&nbsp;: de la théorie du changement aux indicateurs</h2>
+        <div class="num" style="font-size: 13px; color: rgba(226,232,240,0.6); line-height: 1.6">jeudi 4 septembre · 18 h 30 · 90 min</div>
+        <div style="display: flex; gap: 8px; margin-top: 14px; flex-wrap: wrap">
+          <span style="font-size: 11px; font-weight: 700; padding: 5px 11px; border-radius: 99px; background: rgba(13,148,136,0.18); color: #5eead4">Cursus MEAL</span>
+          <span class="num" style="font-size: 11px; font-weight: 700; padding: 5px 11px; border-radius: 99px; background: rgba(255,255,255,0.06); color: rgba(226,232,240,0.7)">18 diapositives</span>
+        </div>
+      </div>
+
+      <!-- Réseau : le point qui décide, ici -->
+      <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 22px">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px">
+          <div style="font-size: 13.5px; font-weight: 700">Votre connexion</div>
+          <span style="display: inline-flex; align-items: center; gap: 6px; font-size: 11.5px; font-weight: 700; color: #fbbf24">
+            <span style="width: 7px; height: 7px; border-radius: 99px; background: #fbbf24"></span> Moyenne
+          </span>
+        </div>
+        <div style="display: flex; gap: 4px; align-items: flex-end; height: 26px; margin-bottom: 16px">
+          <div style="flex-grow: 1; height: 40%; background: #fbbf24; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 55%; background: #fbbf24; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 45%; background: #fbbf24; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 70%; background: #fbbf24; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 35%; background: #fbbf24; border-radius: 2px"></div>
+          <div style="flex-grow: 1; height: 50%; background: rgba(251,191,36,0.35); border-radius: 2px"></div>
+        </div>
+        <div style="background: rgba(251,191,36,0.09); border-radius: 11px; padding: 14px 15px; font-size: 12.5px; line-height: 1.65; color: rgba(253,230,138,0.92)">
+          Sur cette connexion, la vidéo risque de saccader. Le mode voix seule garde le son net et le support lisible.
+        </div>
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding-top: 16px; border-top: 1px solid rgba(255,255,255,0.06)">
+          <div>
+            <div style="font-size: 13.5px; font-weight: 700; margin-bottom: 3px">Entrer en voix seule</div>
+            <div class="num" style="font-size: 11.5px; color: rgba(226,232,240,0.45)">≈ 40 Mo pour 90 min, au lieu de 700 Mo</div>
+          </div>
+          <div style="width: 46px; height: 27px; border-radius: 99px; background: #0d9488; position: relative; flex-shrink: 0; cursor: pointer">
+            <span style="position: absolute; top: 3px; right: 3px; width: 21px; height: 21px; border-radius: 99px; background: #fff"></span>
+          </div>
+        </div>
+      </div>
+
+      <div style="background: #0f172a; border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; padding: 18px 22px; display: flex; align-items: center; gap: 13px">
+        <span style="width: 38px; height: 38px; border-radius: 99px; background: rgba(13,148,136,0.18); display: grid; place-items: center; font-size: 12.5px; font-weight: 800; color: #5eead4; flex-shrink: 0">EH</span>
+        <div style="flex-grow: 1; min-width: 0">
+          <div style="font-size: 11px; color: rgba(226,232,240,0.45)">Vous entrez en tant que</div>
+          <div style="font-size: 14px; font-weight: 700">Eméraude Hezou TEÏ</div>
+        </div>
+      </div>
+
+      <button style="width: 100%; height: 56px; border-radius: 16px; background: #0d9488; border: none; color: #fff; font-family: inherit; font-size: 15.5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; box-shadow: 0 4px 14px -4px rgba(13,148,136,0.5)">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/></svg>
+        Rejoindre la séance
+      </button>
+      <div style="font-size: 11.5px; color: rgba(226,232,240,0.35); text-align: center; line-height: 1.6">Votre présence sera enregistrée à l'entrée.</div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>

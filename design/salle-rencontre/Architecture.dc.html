@@ -1,0 +1,179 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600&family=Plus+Jakarta+Sans:wght@400;500;700;800&display=swap">
+  <style>
+    body { margin: 0; font-family: 'Plus Jakarta Sans', system-ui, sans-serif; }
+    a { color: #0d9488; } a:hover { color: #0f766e; }
+    .num { font-variant-numeric: tabular-nums; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; min-height: 860px; background: #f8fafc; padding: 56px 64px 64px; box-sizing: border-box; color: #0f172a">
+
+  <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.11em; text-transform: uppercase; color: #64748b">Planche 6 · architecture</div>
+  <h1 style="font-family: 'Lora', Georgia, serif; font-weight: 600; font-size: 46px; letter-spacing: -0.02em; line-height: 1.08; margin: 12px 0 14px">Le canal est déjà ouvert — il suffit de s'en servir</h1>
+  <p style="font-size: 15px; color: #475569; line-height: 1.7; max-width: 900px; margin: 0">Jitsi maintient une liaison directe entre tous les participants. Le support de séance passe pourtant par l'API, en demandant toutes les quatre secondes «&nbsp;on en est où&nbsp;?&nbsp;». C'est la correction la plus rentable de la refonte.</p>
+
+  <div style="height: 1px; background: #e2e8f0; margin: 34px 0 32px"></div>
+
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px">
+
+    <!-- Aujourd'hui -->
+    <div style="background: #fff; border: 1px solid #fecaca; border-radius: 16px; padding: 28px">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px">
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #dc2626">Aujourd'hui · sondage HTTP</span>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px">
+        <div style="text-align: center">
+          <div style="width: 62px; height: 62px; border-radius: 16px; background: #0f172a; display: grid; place-items: center; margin-bottom: 8px">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/></svg>
+          </div>
+          <div style="font-size: 11px; font-weight: 700">Formateur</div>
+        </div>
+
+        <div style="flex-grow: 1; padding: 0 16px; text-align: center">
+          <svg width="100%" height="30" viewBox="0 0 200 30" preserveAspectRatio="none">
+            <line x1="0" y1="15" x2="196" y2="15" stroke="#cbd5e1" stroke-width="2" stroke-dasharray="5 4"/>
+            <polygon points="196,15 188,10 188,20" fill="#cbd5e1"/>
+          </svg>
+          <div style="font-size: 10.5px; color: #94a3b8; margin-top: 2px">1 écriture</div>
+        </div>
+
+        <div style="text-align: center">
+          <div style="width: 62px; height: 62px; border-radius: 16px; background: #dc2626; display: grid; place-items: center; margin-bottom: 8px">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+          </div>
+          <div style="font-size: 11px; font-weight: 700">API Vercel</div>
+        </div>
+
+        <div style="flex-grow: 1; padding: 0 16px; text-align: center">
+          <svg width="100%" height="30" viewBox="0 0 200 30" preserveAspectRatio="none">
+            <line x1="196" y1="8" x2="4" y2="8" stroke="#dc2626" stroke-width="1.5"/>
+            <line x1="196" y1="15" x2="4" y2="15" stroke="#dc2626" stroke-width="1.5"/>
+            <line x1="196" y1="22" x2="4" y2="22" stroke="#dc2626" stroke-width="1.5"/>
+            <polygon points="4,8 12,4 12,12" fill="#dc2626"/>
+            <polygon points="4,15 12,11 12,19" fill="#dc2626"/>
+            <polygon points="4,22 12,18 12,26" fill="#dc2626"/>
+          </svg>
+          <div class="num" style="font-size: 10.5px; color: #dc2626; margin-top: 2px; font-weight: 700">21 × toutes les 4 s</div>
+        </div>
+
+        <div style="text-align: center">
+          <div style="width: 62px; height: 62px; border-radius: 16px; background: #f1f5f9; display: grid; place-items: center; margin-bottom: 8px">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.8" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+          </div>
+          <div style="font-size: 11px; font-weight: 700">21 étudiants</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+        <div style="background: #fef2f2; border-radius: 12px; padding: 15px 16px">
+          <div class="num" style="font-family: 'Lora', Georgia, serif; font-size: 30px; font-weight: 600; color: #dc2626; line-height: 1">28 350</div>
+          <div style="font-size: 11.5px; color: #7f1d1d; margin-top: 4px; line-height: 1.5">invocations par séance de 90 min</div>
+        </div>
+        <div style="background: #fef2f2; border-radius: 12px; padding: 15px 16px">
+          <div class="num" style="font-family: 'Lora', Georgia, serif; font-size: 30px; font-weight: 600; color: #dc2626; line-height: 1">4 s</div>
+          <div style="font-size: 11.5px; color: #7f1d1d; margin-top: 4px; line-height: 1.5">de retard au pire sur chaque changement</div>
+        </div>
+      </div>
+      <p style="font-size: 12.5px; color: #64748b; line-height: 1.65; margin: 16px 0 0">Et le coût monte avec le carré de la réussite&nbsp;: deux fois plus d'étudiants, deux fois plus de séances, quatre fois plus d'appels.</p>
+    </div>
+
+    <!-- Demain -->
+    <div style="background: #fff; border: 1px solid #99f6e4; border-radius: 16px; padding: 28px">
+      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 20px">
+        <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: #0f766e">Proposé · canal de données Jitsi</span>
+      </div>
+
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px">
+        <div style="text-align: center">
+          <div style="width: 62px; height: 62px; border-radius: 16px; background: #0f172a; display: grid; place-items: center; margin-bottom: 8px">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="1.8" stroke-linecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/></svg>
+          </div>
+          <div style="font-size: 11px; font-weight: 700">Formateur</div>
+        </div>
+
+        <div style="flex-grow: 1; padding: 0 20px; text-align: center">
+          <svg width="100%" height="30" viewBox="0 0 240 30" preserveAspectRatio="none">
+            <line x1="4" y1="15" x2="236" y2="15" stroke="#0d9488" stroke-width="2.5"/>
+            <polygon points="236,15 227,9 227,21" fill="#0d9488"/>
+            <circle cx="80" cy="15" r="4" fill="#0d9488"/>
+            <circle cx="160" cy="15" r="4" fill="#0d9488"/>
+          </svg>
+          <div style="font-size: 10.5px; color: #0f766e; margin-top: 2px; font-weight: 700">1 message par diapositive</div>
+        </div>
+
+        <div style="text-align: center">
+          <div style="width: 62px; height: 62px; border-radius: 16px; background: #ccfbf1; display: grid; place-items: center; margin-bottom: 8px">
+            <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="1.8" stroke-linecap="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/></svg>
+          </div>
+          <div style="font-size: 11px; font-weight: 700">21 étudiants</div>
+        </div>
+      </div>
+
+      <div style="background: #0f172a; border-radius: 12px; padding: 15px 17px; margin-bottom: 16px" class="mono">
+        <div style="font-size: 11.5px; line-height: 1.8; color: #94a3b8">
+          <div><span style="color: #64748b">// le formateur</span></div>
+          <div>api.<span style="color: #5eead4">executeCommand</span>(</div>
+          <div style="padding-left: 14px"><span style="color: #fbbf24">'sendEndpointTextMessage'</span>,</div>
+          <div style="padding-left: 14px"><span style="color: #fbbf24">''</span>, JSON.stringify({ diapo: <span style="color: #f472b6">7</span> }))</div>
+          <div style="margin-top: 10px"><span style="color: #64748b">// chaque étudiant</span></div>
+          <div>api.<span style="color: #5eead4">addEventListener</span>(</div>
+          <div style="padding-left: 14px"><span style="color: #fbbf24">'endpointTextMessageReceived'</span>, …)</div>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px">
+        <div style="background: #f0fdfa; border-radius: 12px; padding: 15px 16px">
+          <div class="num" style="font-family: 'Lora', Georgia, serif; font-size: 30px; font-weight: 600; color: #0f766e; line-height: 1">0</div>
+          <div style="font-size: 11.5px; color: #115e59; margin-top: 4px; line-height: 1.5">invocation serverless pour suivre</div>
+        </div>
+        <div style="background: #f0fdfa; border-radius: 12px; padding: 15px 16px">
+          <div class="num" style="font-family: 'Lora', Georgia, serif; font-size: 30px; font-weight: 600; color: #0f766e; line-height: 1">&lt; 200 ms</div>
+          <div style="font-size: 11.5px; color: #115e59; margin-top: 4px; line-height: 1.5">entre le clic et l'écran</div>
+        </div>
+      </div>
+      <p style="font-size: 12.5px; color: #64748b; line-height: 1.65; margin: 16px 0 0">L'écriture en base reste — une par changement, côté formateur seulement — pour qu'un retardataire reprenne à la bonne diapositive. C'est le seul rôle que l'API garde.</p>
+    </div>
+  </div>
+
+  <!-- L'ordre de bataille -->
+  <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 28px 30px">
+    <h3 style="font-family: 'Lora', Georgia, serif; font-size: 20px; font-weight: 600; margin: 0 0 6px">Dans quel ordre</h3>
+    <p style="font-size: 13px; color: #64748b; margin: 0 0 22px; line-height: 1.6">Classé par rapport entre ce que cela change pour la promotion et ce que cela coûte à écrire.</p>
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px">
+      <div style="border-top: 3px solid #0d9488; padding-top: 16px">
+        <div class="num" style="font-size: 11px; font-weight: 700; color: #0d9488; margin-bottom: 7px">1 · une demi-journée</div>
+        <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 6px">Le salon d'entrée</div>
+        <div style="font-size: 12.5px; color: #64748b; line-height: 1.6">Aperçu, niveau de micro, état du réseau, mode voix seule. Ce que chaque étudiant ressent dès la prochaine séance.</div>
+      </div>
+      <div style="border-top: 3px solid #0d9488; padding-top: 16px">
+        <div class="num" style="font-size: 11px; font-weight: 700; color: #0d9488; margin-bottom: 7px">2 · deux heures</div>
+        <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 6px">Le canal de données</div>
+        <div style="font-size: 12.5px; color: #64748b; line-height: 1.6">Supprime 28 350 appels par séance et rend la projection instantanée. Le sondage reste en repli si le canal se tait.</div>
+      </div>
+      <div style="border-top: 3px solid #94a3b8; padding-top: 16px">
+        <div class="num" style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 7px">3 · une demi-journée</div>
+        <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 6px">Présence et questions</div>
+        <div style="font-size: 12.5px; color: #64748b; line-height: 1.6">Deux tables, deux écritures. C'est ce qui fait exister la séance dans le dossier de l'étudiant.</div>
+      </div>
+      <div style="border-top: 3px solid #94a3b8; padding-top: 16px">
+        <div class="num" style="font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 7px">4 · une heure</div>
+        <div style="font-size: 14.5px; font-weight: 700; margin-bottom: 6px">Le bug des micros</div>
+        <div style="font-size: 12.5px; color: #64748b; line-height: 1.6">Court, mais à ne pas oublier : tant qu'il est là, la liste des participants affiche une valeur par défaut et non la réalité.</div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+</body>
+</html>
