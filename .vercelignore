@@ -21,3 +21,8 @@ attached_assets
 # Le CV n'est pas dans client/public : le site ne le sert pas, il n'a rien à faire dans
 # l'envoi. Exclusion nommée plutôt que globale, pour ne plus emporter les PDF du cours.
 TATCHIDA_*.pdf
+
+# La source de la vidéo d'ouverture des séances (video/) n'est pas servie par le site : elle
+# se rend hors ligne en MP4. Rien dans client/ n'y renvoie — vérifié par le garde-fou
+# d'existence des ressources de pages-partage.mjs, qui n'y trouve aucun lien.
+video
