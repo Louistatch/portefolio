@@ -11,8 +11,11 @@ export function TermsPopup() {
   const [showFull, setShowFull] = useState(false);
 
   useEffect(() => {
-    // Don't show if already accepted
-    if (localStorage.getItem("terms_accepted")) return;
+    // Le stockage local n'est pas toujours joignable — navigation privée stricte, données de
+    // site bloquées : l'accès LÈVE au lieu de renvoyer null. Même durcissement que partout
+    // ailleurs. En cas d'échec on montre la fenêtre : redemander l'accord vaut mieux que le
+    // supposer donné.
+    try { if (localStorage.getItem("terms_accepted")) return; } catch { /* stockage indisponible */ }
 
     // Show immediately on first visit
     setShow(true);
@@ -20,7 +23,7 @@ export function TermsPopup() {
 
   const handleAccept = () => {
     if (accepted) {
-      localStorage.setItem("terms_accepted", "1");
+      try { localStorage.setItem("terms_accepted", "1"); } catch { /* stockage indisponible */ }
       setShow(false);
     }
   };

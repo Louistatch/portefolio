@@ -4,6 +4,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { X, Mail, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useLocation } from "wouter";
+import { isStudentLoggedIn } from "@/lib/student";
 
 export function NewsletterPopup() {
   const [show, setShow] = useState(false);
@@ -12,10 +14,29 @@ export function NewsletterPopup() {
   const [done, setDone] = useState(false);
   const [dismissed, setDismissed] = useState(false);
   const subscribe = useSubscribe();
+  const [location] = useLocation();
 
   useEffect(() => {
-    // Don't show if already subscribed or dismissed recently
-    if (localStorage.getItem("newsletter_subscribed") || sessionStorage.getItem("newsletter_dismissed")) return;
+    // Cette fenêtre s'adresse à un VISITEUR. Elle n'a rien à faire chez un membre.
+    //
+    // Elle était armée sur toute page enveloppée par Layout, sans exception de route — donc
+    // aussi sur la salle de rencontre et la salle de cours. Quarante-cinq secondes après le
+    // début d'une séance, un voile plein écran recouvrait la vidéo de chaque étudiant pour
+    // lui proposer de s'abonner à la newsletter d'une école où il est déjà inscrit. Le
+    // déclencheur au défilement faisait la même chose au milieu d'une leçon.
+    //
+    // Deux garde-fous plutôt qu'un : le chemin, pour les écrans où l'interruption est
+    // inacceptable ; et la session étudiante, parce qu'un membre connecté n'est jamais la
+    // cible de cette fenêtre, sur quelque page qu'il se trouve.
+    if (/^\/(academy|pagesecure)/.test(location)) return;
+    if (isStudentLoggedIn()) return;
+
+    // Le stockage local n'est pas toujours joignable — navigation privée stricte, données de
+    // site bloquées. L'accès ne renvoie pas null, il LÈVE. Même durcissement que partout
+    // ailleurs dans le projet.
+    try {
+      if (localStorage.getItem("newsletter_subscribed") || sessionStorage.getItem("newsletter_dismissed")) return;
+    } catch { /* stockage indisponible : on montre la fenêtre, au pire une fois de trop */ }
 
     // Show after 45 seconds OR 60% scroll
     const timer = setTimeout(() => setShow(true), 45000);
@@ -27,12 +48,12 @@ export function NewsletterPopup() {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => { clearTimeout(timer); window.removeEventListener("scroll", handleScroll); };
-  }, []);
+  }, [location]);
 
   const dismiss = () => {
     setDismissed(true);
     setShow(false);
-    sessionStorage.setItem("newsletter_dismissed", "1");
+    try { sessionStorage.setItem("newsletter_dismissed", "1"); } catch { /* stockage indisponible */ }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -43,14 +64,19 @@ export function NewsletterPopup() {
       {
         onSuccess: () => {
           setDone(true);
-          localStorage.setItem("newsletter_subscribed", "1");
+          try { localStorage.setItem("newsletter_subscribed", "1"); } catch { /* stockage indisponible */ }
           setTimeout(dismiss, 3000);
         },
       }
     );
   };
 
-  if (dismissed || localStorage.getItem("newsletter_subscribed")) return null;
+  // Lecture protégée : celle-ci est dans le CORPS du rendu, pas dans un effet. Une exception
+  // ici ne rate pas une fenêtre, elle fait tomber tout le Layout — donc chaque page du site.
+  const dejaAbonne = (() => {
+    try { return !!localStorage.getItem("newsletter_subscribed"); } catch { return false; }
+  })();
+  if (dismissed || dejaAbonne) return null;
 
   return (
     <AnimatePresence>

@@ -5,11 +5,12 @@ import { SEO } from "@/components/seo";
 import { Button } from "@/components/ui/button";
 import {
   Loader2, Video, VideoOff, Mic, MicOff, MonitorUp, MessageSquare, Hand,
-  PhoneOff, Users, ArrowLeft, AlertCircle, Radio, Maximize2, MoreHorizontal,
-  Settings, LayoutGrid, Send, X, Presentation, ChevronLeft, ChevronRight,
+  PhoneOff, Users, ArrowLeft, AlertCircle,
+  LayoutGrid, Send, Presentation, ChevronLeft, ChevronRight,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn, getStudent } from "@/lib/student";
 import { adminFetch, getToken } from "@/lib/admin";
+import { SalonEntree } from "@/components/academy/salon-entree";
 
 declare global { interface Window { JitsiMeetExternalAPI?: any } }
 
@@ -150,9 +151,14 @@ export default function AcademyLive() {
     } catch {}
   }, []);
 
-  function joinMeeting() {
+  function joinMeeting(options?: { voixSeule?: boolean }) {
     if (!meeting) return;
+    const voixSeule = !!options?.voixSeule;
     setJoined(true);
+    // Le choix du salon décide de l'état d'ENTRÉE, pas d'un réglage local : sans cela la
+    // caméra s'ouvre une fraction de seconde avant d'être coupée — assez pour consommer, et
+    // assez pour que la diode s'allume chez quelqu'un qui venait justement de dire non.
+    if (voixSeule) setCamOn(false);
     const start = () => {
       if (!jitsiRef.current || !window.JitsiMeetExternalAPI) return;
       const api = new window.JitsiMeetExternalAPI("meet.jit.si", {
@@ -162,7 +168,7 @@ export default function AcademyLive() {
         userInfo: { displayName },
         configOverwrite: {
           startWithAudioMuted: meeting.kind === "webinar",
-          startWithVideoMuted: meeting.kind === "webinar",
+          startWithVideoMuted: meeting.kind === "webinar" || voixSeule,
           prejoinPageEnabled: false,
           disableDeepLinking: true,
           toolbarButtons: [],          // on masque toute la toolbar Jitsi
@@ -189,6 +195,7 @@ export default function AcademyLive() {
       api.addEventListener("videoConferenceJoined", (e: any) => {
         myIdRef.current = e.id; setReady(true); refreshParticipants();
         if (meeting.kind === "webinar") { setMicOn(false); setCamOn(false); }
+        else if (voixSeule) setCamOn(false);
       });
       api.addEventListener("participantJoined", refreshParticipants);
       api.addEventListener("participantLeft", refreshParticipants);
@@ -230,48 +237,40 @@ export default function AcademyLive() {
 
   const fmtTime = (s: number) => { const m = Math.floor(s / 60), ss = s % 60; return `${String(m).padStart(2, "0")}:${String(ss).padStart(2, "0")}`; };
 
-  if (loading) return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (loading) return (
+    <div className="min-h-screen bg-[#0b1220] grid place-items-center">
+      <Loader2 className="w-8 h-8 animate-spin text-primary" />
+    </div>
+  );
 
   if (error) return (
-    <div className="max-w-md mx-auto px-6 py-20 text-center">
-      <div className="w-14 h-14 rounded-2xl bg-destructive/10 flex items-center justify-center mx-auto mb-4"><AlertCircle className="w-7 h-7 text-destructive" /></div>
-      <p className="font-semibold mb-2">{error}</p>
-      <Link href="/academy/dashboard"><Button variant="outline" size="sm" className="mt-2 gap-2"><ArrowLeft className="w-4 h-4" /> Retour</Button></Link>
+    <div className="min-h-screen bg-[#0b1220] grid place-items-center px-6 text-center text-slate-200">
+      <div className="max-w-md">
+        <div className="w-14 h-14 rounded-2xl bg-red-500/15 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle className="w-7 h-7 text-red-400" />
+        </div>
+        <p className="font-semibold mb-4">{error}</p>
+        <Link href="/academy/dashboard">
+          <Button variant="outline" size="sm" className="gap-2 bg-white/5 border-white/15 text-slate-200 hover:bg-white/10 hover:text-white">
+            <ArrowLeft className="w-4 h-4" /> Retour au tableau de bord
+          </Button>
+        </Link>
+      </div>
     </div>
   );
 
   const isWebinar = meeting?.kind === "webinar";
 
-  // ───────── Écran d'accueil (lobby) ─────────
+  // ───────── Salon d'entrée ─────────
+  // Le composant vit à part : il ouvre caméra et micro, mesure, puis les RELÂCHE avant de
+  // rendre la main. Cette libération est la raison d'être de la séparation — la laisser ici,
+  // au milieu du cycle de vie de Jitsi, c'était la condition pour l'oublier un jour.
   if (!joined) {
-    const start = meeting?.starts_at ? new Date(meeting.starts_at) : null;
     return (
-      <div className="max-w-2xl mx-auto px-5 py-10">
+      <>
         <SEO title={`${meeting?.title || "Rencontre"} — LouisFarm Learning`} description="Rejoignez la rencontre en ligne." />
-        <Link href="/academy/dashboard"><button className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 mb-6"><ArrowLeft className="w-4 h-4" /> Retour</button></Link>
-        <div className="bg-card rounded-3xl border border-border/50 overflow-hidden">
-          <div className="relative bg-gradient-to-br from-primary via-primary to-teal-700 p-8 text-white">
-            <div className="absolute -right-6 -top-6 w-32 h-32 rounded-full bg-white/10" />
-            <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full mb-3 bg-white/20">
-              {isWebinar ? <Radio className="w-3.5 h-3.5" /> : <Users className="w-3.5 h-3.5" />}
-              {isWebinar ? "Webinaire" : "Rencontre interactive"}
-            </span>
-            <h1 className="text-2xl font-bold relative">{meeting?.title}</h1>
-            {meeting?.description && <p className="text-white/80 text-sm mt-2 relative">{meeting.description}</p>}
-          </div>
-          <div className="p-6 space-y-5">
-            {start && <p className="text-sm text-muted-foreground">{start.toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" })} · {start.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })} · {meeting?.duration_min} min</p>}
-            <div className="bg-muted/40 rounded-2xl p-4 text-sm text-muted-foreground">
-              {isWebinar ? "Vous rejoindrez avec micro et caméra coupés. Levez la main pour demander la parole." : "Tout le monde peut parler et partager sa caméra. Autorisez le micro et la caméra quand le navigateur le demande."}
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-primary text-primary-foreground flex items-center justify-center text-sm font-bold">{displayName.split(" ").map(n => n[0]).slice(0, 2).join("")}</div>
-              <div><p className="text-xs text-muted-foreground">Vous rejoignez en tant que</p><p className="text-sm font-medium">{displayName}</p></div>
-            </div>
-            <Button onClick={joinMeeting} size="lg" className="w-full gap-2"><Video className="w-5 h-5" /> Rejoindre la rencontre</Button>
-          </div>
-        </div>
-      </div>
+        <SalonEntree meeting={meeting} displayName={displayName} onRejoindre={joinMeeting} />
+      </>
     );
   }
 

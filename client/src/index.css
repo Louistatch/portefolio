@@ -1,4 +1,6 @@
-@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&display=swap');
+/* Les polices sont demandées depuis le <head> de client/index.html, pas ici : un @import
+   force le navigateur à télécharger et analyser cette feuille AVANT de savoir qu'il lui
+   faut des polices — une cascade là où le <head> lance tout en parallèle. */
 
 @tailwind base;
 @tailwind components;

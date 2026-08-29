@@ -138,7 +138,11 @@ function App() {
             <Route path="/academy/profile">{() => <RequireStudentAuth><AcademyLayout><AcademyProfile /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/verify-certificate/:certNo">{() => <Layout><VerifyCertificate /></Layout>}</Route>
             <Route path="/academy/verify-certificate">{() => <Layout><VerifyCertificate /></Layout>}</Route>
-            <Route path="/academy/live/:id">{() => <Layout><RequireStudentAuth><AcademyLive /></RequireStudentAuth></Layout>}</Route>
+            {/* La salle de rencontre sort de Layout : c'est une surface plein écran, pas une
+                page du site. En-tête public, pied de page et fenêtres modales par-dessus une
+                séance en cours n'avaient rien à y faire — et le voile de la newsletter
+                recouvrait littéralement la vidéo au bout de quarante-cinq secondes. */}
+            <Route path="/academy/live/:id">{() => <RequireStudentAuth><AcademyLive /></RequireStudentAuth>}</Route>
 
             {/* Public routes */}
             <Route path="/">{() => <Layout><Home /></Layout>}</Route>
