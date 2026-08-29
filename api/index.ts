@@ -2380,14 +2380,25 @@ app.post("/api/academy/verify-code", rateLimit(15, 10 * 60 * 1000), requireStude
 const VERIFY_REMINDER_DAYS = [1, 3, 7];
 const VERIFY_REMINDER_GIVE_UP_DAYS = 30;
 
-app.post("/api/cron/verify-reminders", async (req, res) => {
-  // Fail-closed : sans secret configuré, l'endpoint refuse toute requête qui ne vient pas
-  // de l'ordonnanceur Vercel. Ouvert, il permettrait à n'importe qui de déclencher un envoi
-  // de masse — et de griller la réputation du domaine d'expédition.
+/**
+ * Garde-fou commun aux tâches planifiées.
+ *
+ * Fail-closed : sans secret configuré, seul l'ordonnanceur de la plateforme passe. Ouvert,
+ * l'endpoint permettrait à n'importe qui de déclencher un envoi de masse — et de griller la
+ * réputation du domaine d'expédition.
+ *
+ * Les deux voies sont acceptées parce qu'elles ne couvrent pas le même cas : `x-vercel-cron`
+ * est posé par la plateforme sur ses propres appels ; le jeton porteur sert au déclenchement
+ * manuel depuis un terminal, le jour où il faut rattraper une exécution manquée.
+ */
+function cronAutorise(req: Request): boolean {
   const secret = process.env.CRON_SECRET;
-  const fromVercelCron = req.headers["x-vercel-cron"] !== undefined;
-  const authorized = fromVercelCron || (!!secret && req.headers.authorization === `Bearer ${secret}`);
-  if (!authorized) return res.status(401).json({ message: "Non autorisé" });
+  if (req.headers["x-vercel-cron"] !== undefined) return true;
+  return !!secret && req.headers.authorization === `Bearer ${secret}`;
+}
+
+const relancesDeVerification = async (req: Request, res: Response) => {
+  if (!cronAutorise(req)) return res.status(401).json({ message: "Non autorisé" });
 
   const now = Date.now();
   const horizon = new Date(now - VERIFY_REMINDER_GIVE_UP_DAYS * 86400000).toISOString();
@@ -2430,7 +2441,27 @@ app.post("/api/cron/verify-reminders", async (req, res) => {
 
   console.log(`verify-reminders: ${envoyees} relance(s) envoyée(s), ${ignorees} ignorée(s) sur ${students?.length ?? 0} compte(s) non vérifié(s).`, parEtape);
   res.json({ candidats: students?.length ?? 0, envoyees, ignorees, parEtape });
-});
+};
+
+// ══════════════════════════════════════════════════════════════
+// GET *et* POST, et c'est GET qui compte.
+//
+// L'ordonnanceur de Vercel appelle une tâche planifiée en GET. Les deux routes n'étaient
+// déclarées qu'en POST : chaque nuit, la plateforme joignait l'URL, Express répondait
+// « Cannot GET », et la tâche ne s'exécutait pas. Rien ne le signalait — un 404 est une
+// réponse HTTP valide pour l'appelant, il ne réessaie pas ; et la route n'étant jamais
+// atteinte, elle n'écrivait aucune trace. L'absence d'envoi était indiscernable de
+// « rien à envoyer ».
+//
+// La panne n'a touché que ce qui est déclenché par l'horloge, c'est-à-dire exactement ce qui
+// vise les étudiants qui ne reviennent plus : sept comptes non vérifiés n'ont jamais reçu
+// leurs relances. Tout ce qui part sur une action d'étudiant fonctionnait, ce qui rendait le
+// volume global rassurant.
+//
+// POST reste accepté : il sert au rattrapage manuel avec le jeton porteur.
+// ══════════════════════════════════════════════════════════════
+app.get("/api/cron/verify-reminders", relancesDeVerification);
+app.post("/api/cron/verify-reminders", relancesDeVerification);
 
 /**
  * Alertes de retard sur le rythme conseillé.
@@ -2446,11 +2477,8 @@ app.post("/api/cron/verify-reminders", async (req, res) => {
  * La clé d'idempotence porte la date d'admission : un étudiant remis à zéro puis réadmis
  * repart avec une série d'alertes neuve, au lieu d'être considéré comme déjà prévenu.
  */
-app.post("/api/cron/late-warnings", async (req, res) => {
-  const secret = process.env.CRON_SECRET;
-  const fromVercelCron = req.headers["x-vercel-cron"] !== undefined;
-  const authorized = fromVercelCron || (!!secret && req.headers.authorization === `Bearer ${secret}`);
-  if (!authorized) return res.status(401).json({ message: "Non autorisé" });
+const alertesDeRetard = async (req: Request, res: Response) => {
+  if (!cronAutorise(req)) return res.status(401).json({ message: "Non autorisé" });
 
   const constat = await constatDeRetard();
   let envoyees = 0, ignorees = 0;
@@ -2487,7 +2515,10 @@ app.post("/api/cron/late-warnings", async (req, res) => {
 
   console.log(`late-warnings: ${envoyees} alerte(s) envoyée(s), ${ignorees} ignorée(s) sur ${constat.length} admis.`, parPalier);
   res.json({ admis: constat.length, envoyees, ignorees, parPalier });
-});
+};
+
+app.get("/api/cron/late-warnings", alertesDeRetard);
+app.post("/api/cron/late-warnings", alertesDeRetard);
 
 // ── Renvoyer l'email de validation ──
 app.post("/api/academy/resend-verify", rateLimit(5, 15 * 60 * 1000), requireStudent, async (req, res) => {
