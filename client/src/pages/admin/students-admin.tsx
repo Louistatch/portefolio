@@ -4,7 +4,7 @@ import { adminFetch } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
-  Users, GraduationCap, Award, BookOpen, Loader2, X, Trophy, CheckCircle2,
+  Users, GraduationCap, Award, BookOpen, Loader2, X, Trophy, CheckCircle2, AlertCircle,
   Clock, TrendingUp, Search, ShieldCheck, ShieldAlert, Mail, MoreVertical,
   UserCheck, RotateCcw, Trash2, Ban, Download, Sparkles, Filter, ChevronRight,
 } from "lucide-react";
@@ -33,13 +33,20 @@ export default function AdminStudents() {
     queryKey: ["academy-stats"],
     queryFn: async () => (await adminFetch("/api/admin/academy/stats")).json(),
   });
-  const { data: students, isLoading } = useQuery<Student[]>({
+  const { data: students, isLoading, isError, refetch } = useQuery<Student[]>({
     queryKey: ["academy-students"],
     queryFn: async () => (await adminFetch("/api/admin/academy/students")).json(),
   });
-  const { data: detail } = useQuery({
+  // `isError` et `isFetching` étaient ignorés. Sur une requête qui échoue — jeton périmé,
+  // 500, coupure de réseau — react-query réessaie puis abandonne, et `detail` reste indéfini
+  // POUR TOUJOURS. Le panneau tournait alors sans fin, sans message et sans sortie.
+  const { data: detail, isError: detailKo, isFetching: detailEnCours, refetch: relireDetail } = useQuery({
     queryKey: ["academy-student", selectedId],
-    queryFn: async () => (await adminFetch(`/api/admin/academy/students/${selectedId}`)).json(),
+    queryFn: async () => {
+      const r = await adminFetch(`/api/admin/academy/students/${selectedId}`);
+      if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.message || `Erreur ${r.status}`);
+      return r.json();
+    },
     enabled: selectedId !== null,
   });
 
@@ -71,6 +78,17 @@ export default function AdminStudents() {
   }, [students, search, filter]);
 
   if (isLoading) return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+
+  if (isError) return (
+    <div className="max-w-sm mx-auto text-center py-24">
+      <AlertCircle className="w-10 h-10 text-destructive/60 mx-auto mb-3" />
+      <p className="font-semibold mb-1">Impossible de charger les étudiants</p>
+      <p className="text-sm text-muted-foreground mb-4">
+        Si cela se répète, votre session a peut-être expiré : reconnectez-vous.
+      </p>
+      <Button variant="outline" size="sm" onClick={() => refetch()}>Réessayer</Button>
+    </div>
+  );
 
   const total = students?.length || 0;
   const admittedCount = students?.filter(s => s.admitted_at).length || 0;
@@ -215,7 +233,19 @@ export default function AdminStudents() {
         <>
           <div className="fixed inset-0 bg-black/40 z-50 backdrop-blur-sm" style={{ animation: "fadeIn .2s ease" }} onClick={() => setSelectedId(null)} />
           <div className="fixed right-0 top-0 bottom-0 w-full max-w-md bg-background z-50 overflow-y-auto shadow-2xl" style={{ animation: "slideIn .3s cubic-bezier(.16,1,.3,1)" }}>
-            {!detail ? <div className="flex justify-center py-32"><Loader2 className="w-7 h-7 animate-spin text-primary" /></div> : (
+            {detailKo || (!detail && !detailEnCours) ? (
+              <div className="p-6 py-24 text-center">
+                <AlertCircle className="w-9 h-9 text-destructive/60 mx-auto mb-3" />
+                <p className="font-semibold mb-1">Fiche indisponible</p>
+                <p className="text-sm text-muted-foreground mb-5">
+                  La fiche de cet étudiant n'a pas pu être chargée.
+                </p>
+                <div className="flex gap-2 justify-center">
+                  <Button variant="outline" size="sm" onClick={() => relireDetail()}>Réessayer</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedId(null)}>Fermer</Button>
+                </div>
+              </div>
+            ) : !detail ? <div className="flex justify-center py-32"><Loader2 className="w-7 h-7 animate-spin text-primary" /></div> : (
               <div className="p-6 space-y-5">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-3">
