@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useRoute, useLocation, Link } from "wouter";
 import { SEO } from "@/components/seo";
 import { Button } from "@/components/ui/button";
@@ -44,6 +45,17 @@ export default function AcademyLive() {
   const [estPresentateur] = useState(() => !!getToken());
   const [vueSupport, setVueSupport] = useState(false);
   const [diapo, setDiapo] = useState(0);
+  const reduire = useReducedMotion();
+  // Le SENS du déplacement, pas seulement la position. Pour un étudiant, l'index change tout
+  // seul — c'est le présentateur qui avance — et la diapositive qui entre par la droite dit
+  // « on avance » là où un simple fondu ne dit rien. Une référence et non un état : elle est
+  // lue pendant le rendu de la transition, la changer ne doit pas provoquer de rendu.
+  const sens = useRef(1);
+  const diapoPrec = useRef(0);
+  useEffect(() => {
+    sens.current = diapo >= diapoPrec.current ? 1 : -1;
+    diapoPrec.current = diapo;
+  }, [diapo]);
   const [vignettes, setVignettes] = useState(true);
 
   const jitsiRef = useRef<HTMLDivElement>(null);
@@ -278,7 +290,7 @@ export default function AcademyLive() {
             <p className="text-sm font-semibold truncate flex items-center gap-2">{meeting?.title}
               {isWebinar && <span className="text-[9px] bg-purple-500/30 text-purple-200 px-1.5 py-0.5 rounded">WEBINAIRE</span>}
             </p>
-            <p className="text-[11px] text-white/50">{fmtTime(elapsed)} · {participants.length} participant{participants.length > 1 ? "s" : ""}{diapos.length > 0 && <> · diapo {diapo + 1}/{diapos.length}</>}</p>
+            <p className="text-[11px] text-white/50 chiffres-tabulaires">{fmtTime(elapsed)} · {participants.length} participant{participants.length > 1 ? "s" : ""}{diapos.length > 0 && <> · diapo {diapo + 1}/{diapos.length}</>}</p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
@@ -306,10 +318,22 @@ export default function AcademyLive() {
               conteneur Jitsi couperait l'appel de tout le monde. */}
           {vueSupport && diapos.length > 0 && (
             <div className="absolute inset-0 z-30 bg-black flex flex-col">
-              <div className="flex-1 relative min-h-0 grid place-items-center p-3">
-                <img key={diapos[diapo]?.url} src={diapos[diapo]?.url}
-                  alt={diapos[diapo]?.titre || `Diapositive ${diapo + 1}`}
-                  className="max-w-full max-h-full object-contain rounded-lg" />
+              <div className="flex-1 relative min-h-0 grid place-items-center p-3 overflow-hidden">
+                {/* `mode="popLayout"` : la diapositive sortante quitte le flux immédiatement,
+                    sinon les deux se disputent la case de la grille et l'image saute d'un
+                    demi-écran pendant le croisement. En mouvement réduit, fondu seul — pas de
+                    glissement, mais l'image doit finir visible. */}
+                <AnimatePresence mode="popLayout" initial={false} custom={sens.current}>
+                  <motion.img key={diapos[diapo]?.url}
+                    src={diapos[diapo]?.url}
+                    alt={diapos[diapo]?.titre || `Diapositive ${diapo + 1}`}
+                    className="max-w-full max-h-full object-contain rounded-lg row-start-1 col-start-1"
+                    custom={sens.current}
+                    initial={reduire ? { opacity: 0 } : { opacity: 0, x: sens.current * 56, scale: 0.985 }}
+                    animate={{ opacity: 1, x: 0, scale: 1 }}
+                    exit={reduire ? { opacity: 0 } : { opacity: 0, x: sens.current * -56, scale: 0.985 }}
+                    transition={{ duration: reduire ? 0.12 : 0.34, ease: [0.16, 1, 0.3, 1] }} />
+                </AnimatePresence>
 
                 {estPresentateur && (
                   <>
@@ -327,7 +351,7 @@ export default function AcademyLive() {
                 )}
 
                 <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-2">
-                  <span className="px-3 py-1 rounded-full bg-black/65 backdrop-blur text-xs font-medium">
+                  <span className="px-3 py-1 rounded-full bg-black/65 backdrop-blur text-xs font-medium chiffres-tabulaires">
                     {diapo + 1} / {diapos.length}
                   </span>
                   {!estPresentateur && (

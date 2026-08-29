@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { adminFetch, ADMIN_BASE } from "@/lib/admin";
 import { Link } from "wouter";
+import { MountStagger, MountItem, AnimatedNumber } from "@/components/motion";
 import {
   AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
 } from "recharts";
@@ -42,20 +43,66 @@ function Tendance({ valeur }: { valeur: number | null }) {
   );
 }
 
+/**
+ * L'attente, dessinée.
+ *
+ * Cet écran interroge une route qui agrège une dizaine de tables ; le disque qui tournait
+ * au milieu du vide ne disait rien d'autre que « attendez ». La silhouette annonce ce qui
+ * arrive et où — quatre indicateurs, deux panneaux — et le contenu vient remplir une forme
+ * déjà en place au lieu de faire sauter la page.
+ */
+function SqueletteBord() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Chargement du tableau de bord">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div className="space-y-2">
+          <div className="h-8 w-56 rounded-lg shimmer" />
+          <div className="h-3 w-72 rounded shimmer" />
+        </div>
+        <div className="h-9 w-52 rounded-xl shimmer" />
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="bg-card rounded-2xl border border-border/50 p-5 space-y-3">
+            <div className="w-10 h-10 rounded-xl shimmer" />
+            <div className="h-8 w-20 rounded-lg shimmer" />
+            <div className="h-3 w-24 rounded shimmer" />
+          </div>
+        ))}
+      </div>
+      <div className="grid lg:grid-cols-5 gap-4">
+        <div className="lg:col-span-3 bg-card rounded-2xl border border-border/50 p-5 space-y-4">
+          <div className="h-4 w-40 rounded shimmer" />
+          <div className="h-52 rounded-xl shimmer" />
+        </div>
+        <div className="lg:col-span-2 bg-card rounded-2xl border border-border/50 p-5 space-y-4">
+          <div className="h-4 w-44 rounded shimmer" />
+          <div className="h-44 rounded-full shimmer mx-auto w-44" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function CarteKpi({ titre, valeur, tendance, icone: Icone, teinte, href, note }: {
   titre: string; valeur: number; tendance: number | null; icone: any;
   teinte: string; href: string; note?: string;
 }) {
   return (
     <Link href={href}
-      className="bg-card rounded-2xl border border-border/50 p-5 hover:shadow-md hover:border-border transition-all group">
+      className="bg-card rounded-2xl border border-border/50 p-5 lift pressable spotlight group">
       <div className="flex items-start justify-between mb-3">
         <span className={`w-10 h-10 rounded-xl grid place-items-center ${teinte}`}>
           <Icone className="w-5 h-5" />
         </span>
         <Tendance valeur={tendance} />
       </div>
-      <p className="text-3xl font-bold leading-none mb-1.5">{valeur}</p>
+      {/* Le compteur monte jusqu'à sa valeur : sur une rangée de quatre, c'est ce qui fait
+          lire les ordres de grandeur les uns par rapport aux autres. La chasse fixe évite
+          que le nombre change de largeur à chaque image en montant. */}
+      <p className="text-[32px] font-bold leading-none mb-1.5 chiffres-tabulaires tracking-tight">
+        <AnimatedNumber value={valeur} duration={1.1} />
+      </p>
       <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">{titre}</p>
       {note && <p className="text-[11px] text-muted-foreground/80 mt-1">{note}</p>}
     </Link>
@@ -106,11 +153,7 @@ export default function Dashboard() {
     },
   });
 
-  if (isLoading) return (
-    <div className="grid place-items-center py-32">
-      <Loader2 className="w-7 h-7 animate-spin text-primary" />
-    </div>
-  );
+  if (isLoading) return <SqueletteBord />;
 
   if (error) return (
     <div className="max-w-md mx-auto text-center py-24">
@@ -178,7 +221,7 @@ export default function Dashboard() {
       {/* ── En-tête ── */}
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Tableau de bord</h1>
+          <h1 className="titre-affichage text-[30px] sm:text-4xl font-semibold">Tableau de bord</h1>
           <p className="text-sm text-muted-foreground mt-0.5">
             Vue d'ensemble de l'académie · {jourMois(data.periode.debut)} → aujourd'hui
           </p>
@@ -196,7 +239,7 @@ export default function Dashboard() {
       </div>
 
       {/* ── Indicateurs clés ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <MountStagger className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <CarteKpi titre="Étudiants" valeur={k.etudiants.valeur} tendance={k.etudiants.tendance}
           icone={Users} teinte="bg-primary/10 text-primary" href={`${ADMIN_BASE}/students`}
           note={`${k.etudiants.surPeriode} sur la période`} />
@@ -209,7 +252,7 @@ export default function Dashboard() {
         <CarteKpi titre="Certifiés" valeur={k.certifies.valeur} tendance={k.certifies.tendance}
           icone={Award} teinte="bg-violet-500/10 text-violet-600" href={`${ADMIN_BASE}/students`}
           note="Super-Expert MEAL" />
-      </div>
+      </MountStagger>
 
       {/* ── Courbe + anneau ── */}
       <div className="grid lg:grid-cols-5 gap-4">
@@ -247,7 +290,7 @@ export default function Dashboard() {
                 { l: "Cours terminés", v: data.performances.coursTermines },
               ].map(s => (
                 <div key={s.l} className="rounded-xl bg-muted/50 px-3 py-2.5">
-                  <p className="text-lg font-bold leading-tight">{s.v}</p>
+                  <p className="text-lg font-bold leading-tight chiffres-tabulaires">{s.v}</p>
                   <p className="text-[11px] text-muted-foreground leading-tight mt-0.5">{s.l}</p>
                 </div>
               ))}
@@ -275,7 +318,7 @@ export default function Dashboard() {
                   </ResponsiveContainer>
                   <div className="absolute inset-0 grid place-items-center pointer-events-none">
                     <div className="text-center">
-                      <p className="text-2xl font-bold leading-none">{data.repartition.total}</p>
+                      <p className="text-2xl font-bold leading-none chiffres-tabulaires">{data.repartition.total}</p>
                       <p className="text-[11px] text-muted-foreground">au total</p>
                     </div>
                   </div>
@@ -331,13 +374,18 @@ export default function Dashboard() {
                     {LIBELLES_STATUT[e.statut]}
                   </span>
                   <div className="hidden md:block w-20 shrink-0">
-                    {e.progression === null
+                    {/* `!= null` et non `=== null` : un champ absent vaut `undefined`, que la
+                        comparaison stricte laissait passer — la barre partait alors à
+                        `width: undefined%`, donc pleine, suivie d'un « % » sans nombre. Vu en
+                        simulant cet écran avec un champ manquant, pas en production ; mais un
+                        tiret est la bonne réponse dans les deux cas. */}
+                    {e.progression == null
                       ? <span className="text-[11px] text-muted-foreground">—</span>
                       : <>
                           <div className="h-1.5 rounded-full bg-muted overflow-hidden">
                             <div className="h-full bg-primary rounded-full" style={{ width: `${e.progression}%` }} />
                           </div>
-                          <span className="text-[10px] text-muted-foreground">{e.progression} %</span>
+                          <span className="text-[10px] text-muted-foreground chiffres-tabulaires">{e.progression} %</span>
                         </>}
                   </div>
                   <span className="hidden lg:inline text-[11px] text-muted-foreground shrink-0 w-16 text-right">
