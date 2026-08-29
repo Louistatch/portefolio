@@ -192,6 +192,38 @@ html {
   50% { transform: translate3d(-46px, 34px, 0) scale(0.94); }
 }
 
+/* ── Typographie ──
+   L'échelle d'ombres, le squelette et la garde « mouvement réduit » vivent plus bas ; il
+   manquait le traitement des nombres et des titres, qui fait autant pour la finition. */
+
+/* Chiffres à chasse fixe.
+   Un pourcentage qui change de largeur en changeant de valeur fait sautiller la ligne
+   entière — visible sur toute colonne de nombres qu'on lit verticalement, et sur tout
+   compteur qui s'anime, où chaque image redessine un nombre d'une autre largeur. Plus
+   Jakarta Sans porte le jeu tabulaire ; il suffit de le demander.
+   À réserver aux nombres : sur du texte courant, la chasse fixe se voit. */
+.chiffres-tabulaires {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* Titre d'affichage : le serif, resserré. Lora s'espace largement par défaut — juste pour
+   du texte courant, dilué dès qu'on passe à vingt pixels. */
+.titre-affichage {
+  font-family: var(--font-serif);
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+/* Sur-titre : petites capitales espacées. Le repère qui structure une page sans y ajouter
+   une deuxième taille de titre. */
+.sur-titre {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
 /* Profondeur : deux ombres par niveau — une courte qui pose le bord, une longue
    et diffuse qui creuse. Une seule ombre donne un autocollant, pas un objet. */
 :root {

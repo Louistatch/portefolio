@@ -224,6 +224,46 @@ export function AnimatedNumber({
   );
 }
 
+/**
+ * Barre de progression qui se remplit depuis zéro à l'entrée dans le champ de vision.
+ *
+ * Elle ne décore pas : elle rend l'ampleur du chiffre lisible dans le temps. Un 8 % et un
+ * 80 % immobiles se ressemblent au coin de l'œil ; remplis, jamais — l'un s'arrête tout de
+ * suite, l'autre traverse. C'est la seule animation de cet écran qui ajoute de
+ * l'information plutôt que de la ponctuation.
+ *
+ * En mouvement réduit, la barre est posée à sa valeur finale sans trajet : l'état d'arrivée
+ * doit rester juste, sans quoi le réglage laisserait une barre vide.
+ */
+export function BarreRemplissage({
+  pct,
+  className,
+  couleur,
+  barre = "bg-primary",
+}: {
+  pct: number;
+  className?: string;
+  /** Couleur libre (accent de parcours). Prend le pas sur `barre`. */
+  couleur?: string;
+  /** Classe Tailwind de remplissage, quand la couleur vient du thème. */
+  barre?: string;
+}) {
+  const reduce = useReducedMotion();
+  const valeur = Math.max(0, Math.min(100, pct));
+  return (
+    <div className={`rounded-full bg-muted overflow-hidden ${className ?? "h-2"}`}>
+      <motion.div
+        className={`h-full rounded-full ${couleur ? "" : barre}`}
+        style={couleur ? { background: couleur } : undefined}
+        initial={reduce ? false : { width: 0 }}
+        whileInView={{ width: `${valeur}%` }}
+        viewport={{ once: true, margin: "-40px" }}
+        transition={{ duration: 0.7, ease: EASE }}
+      />
+    </div>
+  );
+}
+
 /** Carte à inclinaison subtile au survol (désactivée sur tactile et reduced-motion). */
 export function TiltCard({
   children,

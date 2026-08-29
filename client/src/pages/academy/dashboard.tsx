@@ -9,6 +9,64 @@ import {
   Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink, Send } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
 import { groupByProgram } from "@shared/programs";
+import { motion } from "framer-motion";
+import { MountStagger, MountItem, BarreRemplissage } from "@/components/motion";
+
+/**
+ * L'attente, dessinée plutôt que tournoyante.
+ *
+ * Le tableau de bord tire neuf appels en parallèle ; sur un téléphone en 4G, cela se compte
+ * en secondes. Un disque qui tourne au milieu d'un écran vide ne dit rien d'autre que
+ * « attendez », et une attente vide paraît plus longue qu'elle ne l'est. La silhouette de la
+ * page annonce ce qui arrive et où : quand les données tombent, elles remplissent une forme
+ * déjà connue au lieu d'en imposer une nouvelle.
+ *
+ * `shimmer` vient de index.css — bande claire en `transform`, donc composée : les douze
+ * blocs de cet écran ne coûtent pas douze repeints par image.
+ */
+function SquelettePage() {
+  return (
+    <div className="max-w-6xl mx-auto space-y-6" aria-busy="true" aria-label="Chargement de votre espace">
+      <div className="bg-card rounded-2xl border border-border/60 p-5 sm:p-6">
+        <div className="flex items-start justify-between flex-wrap gap-5">
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 rounded-xl shimmer" />
+            <div className="space-y-2">
+              <div className="h-6 w-40 rounded-md shimmer" />
+              <div className="h-3 w-56 rounded shimmer" />
+            </div>
+          </div>
+          <div className="min-w-[220px] space-y-2">
+            <div className="h-3 w-32 rounded shimmer" />
+            <div className="h-5 w-44 rounded-md shimmer" />
+            <div className="h-1.5 w-full rounded-full shimmer" />
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {[0, 1, 2, 3].map(i => (
+          <div key={i} className="bg-card rounded-2xl border border-border/50 p-4 space-y-3">
+            <div className="w-9 h-9 rounded-xl shimmer" />
+            <div className="h-7 w-16 rounded-md shimmer" />
+            <div className="h-3 w-24 rounded shimmer" />
+          </div>
+        ))}
+      </div>
+      <div className="grid sm:grid-cols-2 gap-4">
+        {[0, 1].map(i => (
+          <div key={i} className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+            <div className="h-1.5 shimmer" />
+            <div className="p-5 space-y-3">
+              <div className="h-4 w-2/3 rounded-md shimmer" />
+              <div className="h-3 w-full rounded shimmer" />
+              <div className="h-2 w-full rounded-full shimmer mt-4" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 import { AlerteRetard, constatDepuisPlanning } from "@/components/academy/alerte-retard";
 
 interface Cred { id: string; type: string; title: string; subtitle: string; issued_at: string; expires_at: string | null; status: string; certificate_no: string | null; score: number | null; download_url: string | null; skills: string[]; color: string; }
@@ -53,7 +111,7 @@ export default function AcademyDashboard() {
     })();
   }, []);
 
-  if (loading) return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+  if (loading) return <SquelettePage />;
 
   const completedCourses = enrollments.filter(e => e.status === "completed").length;
   // La prochaine leçon à faire : le planning est trié par semaine, donc une leçon en retard
@@ -99,7 +157,7 @@ export default function AcademyDashboard() {
               {initials}
             </div>
             <div className="min-w-0">
-              <h1 className="font-serif text-xl sm:text-2xl font-semibold leading-tight">{firstName}</h1>
+              <h1 className="titre-affichage text-2xl sm:text-[28px] font-semibold">{firstName}</h1>
               <p className="text-[13px] text-muted-foreground mt-1">
                 {testStatus?.passed
                   ? <>Admis · {creds.length} credential{creds.length > 1 ? "s" : ""} au relevé</>
@@ -119,19 +177,15 @@ export default function AcademyDashboard() {
             return (
               <div className="min-w-[220px]">
                 <div className="flex items-baseline justify-between mb-1.5">
-                  <span className="text-[11px] tracking-[0.1em] uppercase text-muted-foreground font-bold">
-                    Fin d'admission
-                  </span>
-                  <span className="text-[11px] text-muted-foreground">semaine {semaine} / 13</span>
+                  <span className="sur-titre text-muted-foreground">Fin d'admission</span>
+                  <span className="text-[11px] text-muted-foreground chiffres-tabulaires">semaine {semaine} / 13</span>
                 </div>
-                <div className="font-serif text-lg font-semibold mb-2">
+                <div className="titre-affichage text-lg font-semibold mb-2 chiffres-tabulaires">
                   {new Date(bord.etudiant.admissionExpire).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}
                 </div>
-                <div className="h-1.5 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full bg-primary rounded-full transition-all"
-                    style={{ width: `${Math.round((ecoule / total) * 100)}%` }} />
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-1.5">
+                <BarreRemplissage pct={Math.round((ecoule / total) * 100)}
+                  className="h-1.5" barre="bg-primary" />
+                <p className="text-[11px] text-muted-foreground mt-1.5 chiffres-tabulaires">
                   {restant} jour{restant > 1 ? "s" : ""} restant{restant > 1 ? "s" : ""}
                 </p>
               </div>
@@ -140,8 +194,8 @@ export default function AcademyDashboard() {
 
           {nextLesson ? (
             <button onClick={() => navigate(`/academy/classroom/${nextLesson.course_id}?lesson=${nextLesson.lesson_id}`)}
-              className="bg-primary text-primary-foreground rounded-lg px-5 py-3 text-left hover:bg-primary/90 transition-colors">
-              <p className="text-[11px] uppercase tracking-wide text-primary-foreground/70 font-semibold">À faire maintenant</p>
+              className="bg-primary text-primary-foreground rounded-xl px-5 py-3 text-left hover:bg-primary/90 transition-colors pressable lift">
+              <p className="sur-titre text-primary-foreground/70">À faire maintenant</p>
               <p className="font-bold text-sm max-w-[220px] truncate">{nextLesson.sms_lessons?.title || "Leçon disponible"}</p>
               <span className="text-xs flex items-center gap-1 mt-0.5">Continuer <ChevronRight className="w-3 h-3" /></span>
             </button>
@@ -173,20 +227,22 @@ export default function AcademyDashboard() {
       )}
 
       {/* ───── Stats cards ───── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4" style={{ isolation: "isolate" }}>
+      <MountStagger className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {[
           { label: "Moyenne générale", value: `${overall}%`, icon: TrendingUp, tint: "text-primary bg-primary/10" },
           { label: "Cours terminés", value: `${completedCourses}/${mesCours.length}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
           { label: "Credentials", value: creds.length, icon: Award, tint: "text-purple-600 bg-purple-500/10" },
           { label: "Évaluations", value: transcript?.totalGrades ?? 0, icon: CheckCircle2, tint: "text-emerald-600 bg-emerald-500/10" },
         ].map((s) => (
-          <div key={s.label} className="bg-card rounded-2xl border border-border/50 p-4">
+          <MountItem key={s.label} className="bg-card rounded-2xl border border-border/50 p-4">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${s.tint}`}><s.icon className="w-[18px] h-[18px]" /></div>
-            <p className="text-2xl font-bold">{s.value}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{s.label}</p>
-          </div>
+            {/* Chasse fixe : sans elle, « 100 % » est plus large que « 88 % » et la rangée
+                de chiffres sautille d'une carte à l'autre. */}
+            <p className="text-[28px] leading-none font-bold chiffres-tabulaires tracking-tight">{s.value}</p>
+            <p className="text-xs text-muted-foreground mt-1.5">{s.label}</p>
+          </MountItem>
         ))}
-      </div>
+      </MountStagger>
 
       {/* ───── Bannière test (non admis) ───── */}
       {testStatus && !testStatus.passed && emailVerified && (
@@ -284,19 +340,18 @@ export default function AcademyDashboard() {
             ? Math.round(st.reduce((a: number, e: any) => a + (e?.progress || 0), 0) / st.length) : 0;
           return (
             <button key={program.id} onClick={() => navigate(`/academy/parcours/${program.id}`)}
-              className="text-left rounded-2xl border border-border/50 bg-card overflow-hidden hover:shadow-md transition-shadow">
+              className="text-left rounded-2xl border border-border/50 bg-card overflow-hidden lift pressable spotlight">
               <div className="h-1.5" style={{ background: program.accent }} />
               <div className="p-5">
-                <h3 className="font-bold leading-tight">{program.title}</h3>
+                <h3 className="titre-affichage text-[17px] font-semibold">{program.title}</h3>
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{program.subtitle}</p>
                 <div className="flex items-center justify-between text-xs mt-4 mb-1.5">
-                  <span className="text-muted-foreground">{faits} / {courses.length} cours terminés</span>
-                  <span className="font-semibold" style={{ color: program.accent }}>{pct} %</span>
+                  <span className="text-muted-foreground chiffres-tabulaires">{faits} / {courses.length} cours terminés</span>
+                  <span className="font-semibold chiffres-tabulaires" style={{ color: program.accent }}>{pct} %</span>
                 </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%`, background: program.accent }} />
-                </div>
+                {/* Se remplit depuis zéro : un 8 % et un 80 % immobiles se ressemblent au
+                    coin de l'œil, remplis jamais. */}
+                <BarreRemplissage pct={pct} className="h-2" couleur={program.accent} />
                 <span className="inline-flex items-center gap-1 text-xs font-medium mt-4"
                   style={{ color: program.accent }}>
                   Ouvrir ce parcours <ChevronRight className="w-3.5 h-3.5" />
@@ -318,12 +373,12 @@ export default function AcademyDashboard() {
             <div className="flex gap-3 flex-wrap mb-4">
               <div className="bg-primary/10 rounded-xl px-4 py-2.5">
                 <p className="text-[11px] text-muted-foreground">Moyenne générale</p>
-                <p className="text-xl font-bold text-primary">{transcript.overall}%</p>
+                <p className="text-xl font-bold text-primary chiffres-tabulaires">{transcript.overall}%</p>
               </div>
               {transcript.courseAverages?.map((ca: any) => (
                 <div key={ca.code} className="bg-muted rounded-xl px-3 py-2.5">
                   <p className="text-[11px] text-muted-foreground">{ca.code}</p>
-                  <p className="text-base font-bold">{ca.average}%</p>
+                  <p className="text-base font-bold chiffres-tabulaires">{ca.average}%</p>
                 </div>
               ))}
             </div>
@@ -333,7 +388,7 @@ export default function AcademyDashboard() {
                 return (
                   <div key={g.id} className="flex items-center justify-between text-sm py-1.5">
                     <span className="truncate flex-1 text-muted-foreground">{g.title}</span>
-                    <span className={`font-semibold ml-3 ${pct >= 70 ? "text-primary" : pct >= 50 ? "text-amber-600" : "text-destructive"}`}>{pct}%</span>
+                    <span className={`font-semibold ml-3 chiffres-tabulaires ${pct >= 70 ? "text-primary" : pct >= 50 ? "text-amber-600" : "text-destructive"}`}>{pct}%</span>
                   </div>
                 );
               })}
@@ -351,7 +406,7 @@ function CredentialCard({ cred }: { cred: Cred }) {
   const issued = cred.issued_at ? new Date(cred.issued_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "";
   const isFinal = cred.type === "final";
   return (
-    <div className={`group relative bg-card rounded-2xl border overflow-hidden transition-all hover:shadow-lg ${expired ? "border-border/50 opacity-75" : "border-border/50 hover:border-primary/30"}`}>
+    <div className={`group relative bg-card rounded-2xl border overflow-hidden lift spotlight ${expired ? "border-border/50 opacity-75" : "border-border/50 hover:border-primary/30"}`}>
       {/* Badge médaillon */}
       <div className="relative p-5 pb-4" style={{ background: `linear-gradient(135deg, ${cred.color}18, transparent)`, transform: "translateZ(0)" }}>
         <div className="flex items-start justify-between">
@@ -366,7 +421,7 @@ function CredentialCard({ cred }: { cred: Cred }) {
             </span>
           )}
         </div>
-        <h3 className="font-bold text-sm mt-3 leading-snug">{cred.title}</h3>
+        <h3 className="titre-affichage text-[15px] font-semibold mt-3">{cred.title}</h3>
         <p className="text-xs text-muted-foreground mt-0.5">{cred.subtitle}</p>
       </div>
 
@@ -379,21 +434,32 @@ function CredentialCard({ cred }: { cred: Cred }) {
         </div>
       )}
 
-      {/* Footer */}
-      <div className="px-5 py-3 border-t border-border/40 flex items-center justify-between gap-2">
-        <div className="min-w-0">
-          {cred.score != null && <p className="text-xs font-semibold" style={{ color: cred.color }}>Score {cred.score}%</p>}
-          <p className="text-[10px] text-muted-foreground truncate">{issued}</p>
+      {/* Pied de carte : empilé, pas côte à côte.
+          Ces cartes tombent dans une grille à trois colonnes logée dans les deux tiers de
+          la page — environ 255 pixels. Score et date d'un côté, deux boutons de l'autre,
+          et « Score 88 % » passait à la ligne pendant que la date se coupait à « 23 ao… ».
+          Une ligne de méta, puis les actions en pleine largeur : plus rien ne se dispute
+          la place, à toutes les largeurs. */}
+      <div className="px-5 py-3 border-t border-border/40 space-y-2.5">
+        <div className="flex items-baseline gap-2 text-[11px] min-w-0">
+          {cred.score != null && (
+            <span className="font-semibold chiffres-tabulaires shrink-0" style={{ color: cred.color }}>
+              {cred.score}%
+            </span>
+          )}
+          <span className="text-muted-foreground truncate">{issued}</span>
         </div>
         <div className="flex gap-1.5">
-          {cred.certificate_no && (
-            <a href={`/academy/verify-certificate/${cred.certificate_no}`} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="ghost" className="gap-1.5 h-8 text-xs px-2" title="Page de vérification publique"><ShieldCheck className="w-3.5 h-3.5" /></Button>
+          {cred.download_url && (
+            <a href={`${cred.download_url}`} target="_blank" rel="noopener noreferrer" className="flex-1">
+              <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs w-full"><Download className="w-3.5 h-3.5" /> PDF</Button>
             </a>
           )}
-          {cred.download_url && (
-            <a href={`${cred.download_url}`} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs"><Download className="w-3.5 h-3.5" /> PDF</Button>
+          {cred.certificate_no && (
+            <a href={`/academy/verify-certificate/${cred.certificate_no}`} target="_blank" rel="noopener noreferrer">
+              <Button size="sm" variant="ghost" className="h-8 px-2.5" title="Page de vérification publique">
+                <ShieldCheck className="w-3.5 h-3.5" />
+              </Button>
             </a>
           )}
         </div>
