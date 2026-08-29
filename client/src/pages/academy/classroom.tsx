@@ -188,7 +188,7 @@ function ExerciseCell({ exId, cell, value, result, locked, onChange }: {
           <p className="text-xs text-muted-foreground italic">Leçon déjà validée — cet exercice a été corrigé.</p>
         )}
 
-        {cell.hint && !result && (
+        {cell.hint && (!result || !result.correct) && (
           showHint
             ? <p className="text-xs text-muted-foreground bg-muted/50 rounded-xl p-3 flex gap-2"><Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5 text-amber-500" />{cell.hint}</p>
             : <button onClick={() => setShowHint(true)} className="text-xs text-primary hover:underline flex items-center gap-1"><Lightbulb className="w-3 h-3" /> Un indice</button>
@@ -341,7 +341,12 @@ export default function AcademyClassroom() {
       // Exercices ratés : la correction s'affiche exercice par exercice, rien n'est enregistré.
       if (res.status === 422 && data?.exercisesFailed) {
         setExResults(Object.fromEntries((data.exerciseResults || []).map((r: any) => [r.id, { correct: r.correct, explain: r.explain }])));
-        setCompleteError(data.message || "Certaines réponses sont à revoir.");
+        // On annonce le coût de la reprise AVANT qu'elle ne coûte : découvrir un
+        // plafond après coup se lit comme une sanction cachée.
+        const suite = data.plafondProchaineNote != null && data.plafondProchaineNote < 100
+          ? ` Prochaine tentative : la note sera plafonnée à ${data.plafondProchaineNote} %.`
+          : "";
+        setCompleteError((data.message || "Certaines réponses sont à revoir.") + suite);
         return;
       }
       // Le serveur peut refuser (leçon verrouillée, fenêtre dépassée, admission expirée, email non

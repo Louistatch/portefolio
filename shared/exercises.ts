@@ -24,6 +24,54 @@ export type ExerciseCell = {
 
 export type ExerciseResult = { id: string; correct: boolean; explain: string | null };
 
+/**
+ * Tentatives tolérées avant que la note ne soit plafonnée.
+ *
+ * Deux, et pas une. Une connexion qui lâche au moment de l'envoi, un doigt qui
+ * valide trop tôt sur un écran de 390 px, une consigne relue de travers : la
+ * première reprise ne dit rien du savoir, elle dit le contexte. La troisième,
+ * si — surtout après avoir vu quels items étaient faux.
+ */
+export const TENTATIVES_SANS_PENALITE = 2;
+
+/**
+ * Plafond de la note selon le rang de la tentative qui réussit.
+ *
+ * Le plancher est le seuil de validation lui-même : la persévérance valide
+ * toujours la leçon, elle cesse seulement de valoir autant que la maîtrise. Une
+ * leçon qu'on ne pourrait plus valider après cinq essais serait un cul-de-sac,
+ * et c'est le cursus entier qui se refermerait derrière.
+ */
+export function plafondDeNote(tentative: number): number {
+  if (tentative <= TENTATIVES_SANS_PENALITE) return 100;
+  const paliers = [90, 80];
+  return paliers[tentative - TENTATIVES_SANS_PENALITE - 1] ?? EXERCISE_PASS_PCT;
+}
+
+/**
+ * Ce qu'on renvoie à l'étudiant qui n'a PAS atteint le seuil.
+ *
+ * ── La faille que cette fonction ferme ──
+ *
+ * L'échec renvoyait `explain` pour tous les exercices, ratés compris. Or la
+ * correction énonce la bonne réponse en toutes lettres — « c'est la colonne
+ * label ». Un échec volontaire était donc le moyen le plus rapide d'obtenir le
+ * corrigé complet, et rien n'étant enregistré, la note finale ne gardait aucune
+ * trace du détour.
+ *
+ * ── Pourquoi ne pas simplement tout masquer ──
+ *
+ * Parce que la correction est ce que le dispositif a de meilleur : les 146
+ * exercices en ont une, ce qui est rare. On ne la supprime pas, on la DÉPLACE au
+ * moment où elle est méritée — la réussite. Avant cela l'étudiant sait quels
+ * items sont faux, ce qui suffit à reprendre, et l'indice reste affiché puisqu'il
+ * était écrit pour être lu avant de répondre.
+ */
+export function resultatsSansCorrection(results: ExerciseResult[]): ExerciseResult[] {
+  return results.map(r => ({ id: r.id, correct: r.correct, explain: null }));
+}
+
+
 export type LessonGrade = {
   results: ExerciseResult[];
   correctCount: number;

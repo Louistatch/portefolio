@@ -10,7 +10,10 @@ import fs from "fs";
 // Extension .js obligatoire : le paquet est en "type": "module", et Node ESM ne devine pas
 // l'extension d'un import relatif. Sans elle, le chargement de la fonction échoue en
 // production (ERR_MODULE_NOT_FOUND) alors que le build, lui, passe sans broncher.
-import { gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT } from "../shared/exercises.js";
+import {
+  gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT,
+  plafondDeNote, resultatsSansCorrection,
+} from "../shared/exercises.js";
 import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
 import { leconOuverte } from "../shared/rythme.js";
 import { RETARD_EXCLUSION_JOURS, RETARD_PALIERS, alerteDeRetard } from "../shared/retard.js";
@@ -3060,15 +3063,41 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const graded = gradeLessonExercises(lessonContent, answers);
 
   const maxScore = lesson.points ?? 10;
+
+  // Toute soumission d'une leçon à exercices compte, réussie ou non. C'est le
+  // compteur qui manquait : sans lui un échec ne coûtait rien, et la note finale
+  // ne distinguait pas la maîtrise de l'obstination.
+  let tentative = 1;
+  if (graded) {
+    const { data: avant } = await supabase.from("lesson_progress")
+      .select("tentatives").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
+    tentative = (Number(avant?.tentatives) || 0) + 1;
+    await supabase.from("lesson_progress")
+      .update({ tentatives: tentative })
+      .eq("student_id", sid).eq("lesson_id", lesson_id).then(() => {}, () => {});
+  }
+
   if (graded && !graded.passed) {
-    // Échec : rien n'est enregistré, l'étudiant revoit sa copie et recommence.
+    // Échec : on dit QUELS exercices sont faux, jamais POURQUOI.
+    //
+    // La correction rédigée énonce la bonne réponse ; la renvoyer ici faisait de
+    // l'échec volontaire le chemin le plus court vers le corrigé complet. Elle est
+    // déplacée à la réussite, où elle est méritée. L'indice, lui, reste affiché :
+    // il a été écrit pour être lu avant de répondre.
     return res.status(422).json({
       message: `${graded.correctCount}/${graded.total} exercices justes — il en faut ${EXERCISE_PASS_PCT}% pour valider la leçon.`,
-      exerciseResults: graded.results, scorePct: graded.scorePct,
+      exerciseResults: resultatsSansCorrection(graded.results), scorePct: graded.scorePct,
       correctCount: graded.correctCount, total: graded.total, exercisesFailed: true,
+      tentative, plafondProchaineNote: plafondDeNote(tentative + 1),
     });
   }
-  const finalScore = graded ? Math.round(maxScore * graded.scorePct / 100) : maxScore;
+
+  // Réussite : la note est plafonnée par le rang de la tentative. Le plancher est
+  // le seuil de validation — la persévérance valide toujours, elle cesse seulement
+  // de valoir autant que la maîtrise du premier coup.
+  const plafond = graded ? plafondDeNote(tentative) : 100;
+  const pctRetenu = graded ? Math.min(graded.scorePct, plafond) : 100;
+  const finalScore = Math.round(maxScore * pctRetenu / 100);
 
   // Insertion idempotente (une seule note par élève/leçon, protégée par la contrainte UNIQUE(student_id, lesson_id))
   await supabase.from("grades").upsert({
@@ -3098,6 +3127,8 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
     lessonScore: finalScore, lessonMax: maxScore,
     exerciseResults: graded?.results ?? null,
     scorePct: graded?.scorePct ?? null,
+    tentative: graded ? tentative : null,
+    plafondApplique: graded && plafond < 100 ? plafond : null,
     correctCount: graded?.correctCount ?? null,
     total: graded?.total ?? null,
   });
