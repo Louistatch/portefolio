@@ -9,7 +9,7 @@ import {
 import {
   Users, UserCheck, Clock, Award, TrendingUp, TrendingDown, Minus,
   UserPlus, Send, Video, FileText, GraduationCap, Mail, MessageSquare,
-  ShieldCheck, ChevronRight, Loader2, AlertCircle, AlarmClock,
+  ShieldCheck, ChevronRight, Loader2, AlertCircle, AlarmClock, FileCheck2,
 } from "lucide-react";
 
 /** Formatage court d'une date ISO, en français. */
@@ -213,6 +213,38 @@ export default function Dashboard() {
                 À vérifier dans l'ordre : l'onglet Cron Jobs du projet Vercel, puis les journaux
                 de la fonction, puis la table <span className="font-mono">cron_runs</span>.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {(data.attestationsEnAttente || []).length > 0 && (
+        <div className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-5">
+          <div className="flex gap-3.5">
+            <FileCheck2 className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <h2 className="font-semibold text-amber-900 dark:text-amber-200">
+                {data.attestationsEnAttente.length === 1
+                  ? "Une attestation attend votre validation"
+                  : `${data.attestationsEnAttente.length} attestations attendent votre validation`}
+              </h2>
+              <p className="text-[13px] text-amber-800/90 dark:text-amber-200/80 mt-1 leading-relaxed">
+                Ces étudiants ont terminé leur cours à 100 % et confirmé leur adresse. Tant que la
+                demande n'est pas validée, ils ne reçoivent rien.
+              </p>
+              <ul className="mt-3 space-y-1.5">
+                {data.attestationsEnAttente.map((a: any) => (
+                  <li key={a.id} className="text-[13px] text-amber-900 dark:text-amber-200">
+                    <span className="font-semibold">{a.etudiant}</span>
+                    {" · "}<span className="font-mono">{a.cours}</span>
+                    {a.note != null && <> — moyenne {a.note} %</>}
+                  </li>
+                ))}
+              </ul>
+              <Link href={`${ADMIN_BASE}/students`}
+                className="inline-flex items-center gap-1 text-[13px] font-semibold text-amber-900 dark:text-amber-200 hover:underline mt-3">
+                Ouvrir les dossiers <ChevronRight className="w-3.5 h-3.5" />
+              </Link>
             </div>
           </div>
         </div>

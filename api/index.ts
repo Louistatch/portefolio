@@ -638,7 +638,7 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
   const debut = new Date(now - jours * J);
   const debutPrecedent = new Date(now - 2 * jours * J);
 
-  const [studentsQ, enrollmentsQ, coursesQ, subscribersQ, attestationsQ, messagesQ, commentsQ, tachesQ] = await Promise.all([
+  const [studentsQ, enrollmentsQ, coursesQ, subscribersQ, attestationsQ, messagesQ, commentsQ, tachesQ, enAttenteQ] = await Promise.all([
     supabase.from("students").select("id, full_name, email, created_at, status, admitted_at, admission_expires, entry_score, email_verified, final_certificate_no, final_certified_at"),
     supabase.from("enrollments").select("student_id, course_id, progress, status"),
     supabase.from("sms_courses").select("id, code, title, is_published"),
@@ -648,6 +648,9 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
     supabase.from("comments").select("author_name, created_at").order("created_at", { ascending: false }).limit(10),
     supabase.from("cron_runs").select("tache, demarre_at, termine_at, ok, resume, erreur")
       .order("demarre_at", { ascending: false }).limit(60),
+    supabase.from("attestations")
+      .select("id, student_id, course_id, certificate_no, final_score")
+      .eq("status", "pending").eq("cert_type", "course"),
   ]);
 
   const students = studentsQ.data || [];
@@ -739,6 +742,23 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
   const admisSurPeriode = students.filter(s => dansFenetre(s.admitted_at)).length;
   const coursTermines = enrollments.filter(e => e.status === "completed").length;
 
+  // ── Demandes d'attestation en attente ──
+  //
+  // Une file qui dépend d'une décision humaine doit être visible là où l'humain
+  // regarde. Trois demandes ont dormi cinq jours derrière un compteur logé dans un
+  // écran de statistiques : l'étudiante avait terminé trois cours et n'a rien reçu.
+  const attentes = (enAttenteQ.data || []).map((a: any) => {
+    const etu = students.find((s: any) => s.id === a.student_id);
+    const co = courses.find((c: any) => c.id === a.course_id);
+    return {
+      id: a.id,
+      etudiant: etu?.full_name || etu?.email || `#${a.student_id}`,
+      cours: co?.code || `#${a.course_id}`,
+      note: a.final_score == null ? null : Number(a.final_score),
+      numero: a.certificate_no,
+    };
+  });
+
   // ── État des tâches planifiées ──
   //
   // Ce que ce bloc surveille n'est pas l'erreur, c'est le SILENCE. Les deux tâches sont
@@ -771,6 +791,7 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
 
   res.json({
     taches,
+    attestationsEnAttente: attentes,
     periode: { jours, debut: debut.toISOString(), fin: new Date(now).toISOString() },
     kpis: {
       etudiants: kpi(() => true, "created_at"),
@@ -4182,6 +4203,24 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   // Accusé de réception de la demande d'attestation
   const { data: stud } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
   const { data: course } = await supabase.from("sms_courses").select("code, title").eq("id", course_id).single();
+
+  // ── Et l'avis à l'exploitation ──
+  //
+  // Une demande d'attestation attend une décision humaine : elle reste en `pending`
+  // jusqu'à ce que quelqu'un l'approuve. Or personne n'était prévenu. Trois demandes
+  // ont dormi cinq jours — l'étudiante avait terminé trois cours et n'a rien reçu,
+  // pendant qu'un compteur discret l'annonçait sur un écran que personne n'avait de
+  // raison d'ouvrir.
+  //
+  // Une file d'attente qui dépend d'un humain doit aller le chercher, pas l'attendre.
+  if (course) {
+    sendAcademyEmail({
+      studentId: null, to: EMAIL_ALERTE, type: "attestation_a_valider",
+      subject: `📋 Attestation à valider — ${stud?.full_name || "étudiant"} · ${course.code}`,
+      html: attestationAValiderEmailHtml(stud?.full_name || "—", course, certNo, finalScore),
+      dedupeKey: `attest_admin:${data?.id ?? certNo}`,
+    }).catch(() => {});
+  }
   if (stud?.email && course) {
     sendAcademyEmail({
       studentId: sid, to: stud.email, type: "attestation_requested",
@@ -5129,6 +5168,41 @@ function cohortAnnouncementEmailHtml(name: string, cohorte: string, corps: strin
 // Le ton compte plus que d'habitude. L'étudiant n'est pas renvoyé : son parcours est
 // remis à zéro parce qu'il ne pouvait plus tenir dans sa fenêtre, et la porte reste
 // ouverte immédiatement. Un message sec ferait perdre quelqu'un qui peut encore réussir.
+// ── Email : une attestation attend une décision ──
+//
+// Destiné à l'exploitation. Il porte les trois chiffres sur lesquels la décision se
+// prend — progression, moyenne, numéro — pour qu'elle puisse être prise sans ouvrir
+// le dossier, et le lien pour le faire quand elle ne peut pas l'être.
+function attestationAValiderEmailHtml(
+  nom: string,
+  cours: { code: string; title: string },
+  certNo: string,
+  score: number,
+) {
+  const esc = (t: string) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return academyEmailLayout(
+    `<div class="hd">
+       <div class="logo"><span>LOUISFARM LEARNING</span></div>
+       <h1>Une attestation attend votre validation</h1>
+       <p class="sub">${esc(cours.code)}</p>
+     </div>
+     <div class="bd">
+       <p><strong>${esc(nom)}</strong> a terminé <strong>${esc(cours.title)}</strong> et demande son attestation.</p>
+       <div class="info">
+         <h3>Ce sur quoi décider</h3>
+         <ul style="margin:10px 0 0;padding-left:18px;color:#6b7280;font-size:14px;line-height:1.7">
+           <li>Cours achevé à 100&nbsp;%, adresse email confirmée — les deux conditions exigées avant la demande.</li>
+           <li>Moyenne du cours&nbsp;: <strong>${esc(String(score))}&nbsp;%</strong></li>
+           <li>Numéro réservé&nbsp;: <span style="font-family:monospace">${esc(certNo)}</span></li>
+         </ul>
+       </div>
+       <p style="text-align:center"><a href="${SITE_URL}/pagesecure/students" class="btn">Ouvrir le dossier de l'étudiant</a></p>
+       <p class="muted">Tant que la demande n'est pas validée, l'étudiant ne reçoit rien : il a terminé
+       son cours et attend. Un refus se motive et lui est notifié ; il peut alors redemander.</p>
+     </div>`
+  );
+}
+
 // ── Email : une tâche planifiée a échoué ──
 //
 // Destiné à l'exploitation, pas à un étudiant : ton sec, l'erreur brute, et les trois
