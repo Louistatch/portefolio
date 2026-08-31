@@ -2459,7 +2459,35 @@ async function executerTache(
   res: Response,
   corps: () => Promise<Record<string, unknown>>,
 ) {
-  if (!cronAutorise(req)) return res.status(401).json({ message: "Non autorisé" });
+  if (!cronAutorise(req)) {
+    // Un refus ne laissait AUCUNE trace : le garde-fou répond avant l'écriture du
+    // journal, si bien que « appelée puis refusée » et « jamais appelée » se
+    // ressemblaient trait pour trait dans le tableau de bord. C'est le défaut qui
+    // rendait le diagnostic impossible, et c'est ce que cette ligne ferme.
+    //
+    // Dans les journaux de la fonction, pas en base : l'endpoint est joignable
+    // publiquement, et une table qu'un robot peut faire grossir n'est pas un journal,
+    // c'est une charge. L'agent d'appel est le renseignement décisif — l'ordonnanceur
+    // de la plateforme s'annonce, un robot d'indexation aussi.
+    //
+    // On journalise des PRÉSENCES, jamais des valeurs : ni le jeton reçu, ni le secret
+    // attendu ne doivent finir dans un journal d'exploitation.
+    console.warn(
+      `cron ${nom} : appel REFUSÉ`,
+      {
+        methode: req.method,
+        enteteVercel: req.headers["x-vercel-cron"] !== undefined,
+        jetonPorteurRecu: typeof req.headers.authorization === "string",
+        secretConfigure: !!process.env.CRON_SECRET,
+        agent: String(req.headers["user-agent"] || "—").slice(0, 80),
+      },
+    );
+    return res.status(401).json({ message: "Non autorisé" });
+  }
+
+  // Le pendant du refus : une ligne à l'entrée, avant toute écriture en base. Si le
+  // journal lui-même est injoignable, il reste au moins la preuve que l'appel est arrivé.
+  console.log(`cron ${nom} : appel accepté (${req.method})`);
 
   const { data: ligne } = await supabase.from("cron_runs")
     .insert({ tache: nom }).select("id").maybeSingle()
