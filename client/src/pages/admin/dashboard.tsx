@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { adminFetch, ADMIN_BASE } from "@/lib/admin";
+import { PointsAttention, type PointAttention } from "@/components/admin/points-attention";
 import { Link } from "wouter";
 import { MountStagger, MountItem, AnimatedNumber } from "@/components/motion";
 import {
@@ -9,7 +10,7 @@ import {
 import {
   Users, UserCheck, Clock, Award, TrendingUp, TrendingDown, Minus,
   UserPlus, Send, Video, FileText, GraduationCap, Mail, MessageSquare,
-  ShieldCheck, ChevronRight, Loader2, AlertCircle, AlarmClock, FileCheck2,
+  ShieldCheck, ChevronRight, Loader2, AlertCircle,
 } from "lucide-react";
 
 /** Formatage court d'une date ISO, en français. */
@@ -32,11 +33,23 @@ function depuis(iso: string) {
 /** Tendance en pourcentage. `null` signifie « aucune base de comparaison », ce qui n'est pas
  *  la même chose que « 0 % » — on l'affiche donc différemment plutôt que de le masquer. */
 function Tendance({ valeur }: { valeur: number | null }) {
-  if (valeur === null) return <span className="text-[11px] text-muted-foreground">pas de comparaison</span>;
+  // « Pas de comparaison » dit la bonne chose — l'absence de période précédente n'est pas
+  // une stagnation à 0 % — mais dix-sept caractères ne tiennent pas dans le coin d'une
+  // carte de 175 px : le libellé passait sur deux lignes et heurtait l'icône. Le sens est
+  // conservé partout ; seule sa FORME s'adapte, un tiret sur téléphone et les mots dès
+  // qu'il y a la place, l'infobulle et l'étiquette accessible portant la phrase entière.
+  if (valeur === null) return (
+    <span className="text-[11px] text-muted-foreground whitespace-nowrap shrink-0"
+      title="Aucune période précédente à comparer"
+      aria-label="Aucune période précédente à comparer">
+      <span aria-hidden="true" className="sm:hidden">—</span>
+      <span aria-hidden="true" className="hidden sm:inline">pas de comparaison</span>
+    </span>
+  );
   const Icone = valeur > 0 ? TrendingUp : valeur < 0 ? TrendingDown : Minus;
   const couleur = valeur > 0 ? "text-emerald-600" : valeur < 0 ? "text-destructive" : "text-muted-foreground";
   return (
-    <span className={`text-[11px] font-medium inline-flex items-center gap-0.5 ${couleur}`}>
+    <span className={`text-[11px] font-medium inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 ${couleur}`}>
       <Icone className="w-3 h-3" />
       {valeur > 0 ? "+" : ""}{valeur} %
     </span>
@@ -170,85 +183,87 @@ export default function Dashboard() {
     { cle: "expire", n: data.repartition.expires },
   ].filter(s => s.n > 0);
 
-  // Les tâches muettes ou en échec passent AVANT les indicateurs : une relance qui ne part
-  // pas ne se voit dans aucune courbe, et c'est précisément ce qui l'a rendue invisible
-  // pendant des semaines.
+  // ── Ce qui demande une décision ──
+  //
+  // Une seule liste, dans la grammaire de l'alerte étudiante : une ligne par sujet, le
+  // détail replié. Les deux bandeaux pleine largeur qui tenaient ici repoussaient le
+  // tableau de bord sous 1 500 pixels sur un téléphone de 390 px — l'alerte couvrait la
+  // page qu'elle devait servir.
   const tachesEnDefaut = (data.taches || []).filter((t: any) => t.muette || t.ok === false || t.interrompue);
+  const enAttente = data.attestationsEnAttente || [];
+  const points: PointAttention[] = [];
+
+  if (tachesEnDefaut.length) {
+    points.push({
+      cle: "taches",
+      ton: "grave",
+      resume: tachesEnDefaut.length === 1
+        ? "Une tâche planifiée ne tourne pas"
+        : `${tachesEnDefaut.length} tâches planifiées ne tournent pas`,
+      detail: (
+        <>
+          <p>
+            Les relances automatiques n'atteignent que les étudiants qui ne reviennent plus.
+            Tant qu'une tâche est muette, ils ne reçoivent rien.
+          </p>
+          <ul className="space-y-1">
+            {tachesEnDefaut.map((t: any) => (
+              <li key={t.nom}>
+                <span className="font-mono font-semibold text-foreground">{t.nom}</span>
+                {" — "}
+                {t.derniereExecution == null
+                  ? "jamais exécutée"
+                  : t.interrompue
+                    ? `démarrée il y a ${t.heuresDepuis} h, jamais terminée`
+                    : t.ok === false
+                      ? `en échec depuis ${t.heuresDepuis} h`
+                      : `silencieuse depuis ${t.heuresDepuis} h`}
+                {t.erreur && (
+                  <span className="block font-mono text-[12px] break-words mt-0.5">{t.erreur}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p>
+            À vérifier dans l'ordre : l'onglet Cron Jobs du projet Vercel, les journaux de la
+            fonction, puis la table <span className="font-mono">cron_runs</span>.
+          </p>
+        </>
+      ),
+    });
+  }
+
+  if (enAttente.length) {
+    points.push({
+      cle: "attestations",
+      ton: "attention",
+      resume: enAttente.length === 1
+        ? "Une attestation attend votre validation"
+        : `${enAttente.length} attestations attendent votre validation`,
+      detail: (
+        <>
+          <p>
+            Cours terminés à 100 % et adresse confirmée. Tant que la demande n'est pas
+            validée, l'étudiant ne reçoit rien.
+          </p>
+          <ul className="space-y-1">
+            {enAttente.map((a: any) => (
+              <li key={a.id}>
+                <span className="font-semibold text-foreground">{a.etudiant}</span>
+                {" · "}<span className="font-mono">{a.cours}</span>
+                {a.note != null && <> — moyenne {a.note} %</>}
+              </li>
+            ))}
+          </ul>
+        </>
+      ),
+      action: { libelle: "Ouvrir les dossiers", href: `${ADMIN_BASE}/students` },
+    });
+  }
 
   return (
     <div className="space-y-6">
-      {tachesEnDefaut.length > 0 && (
-        <div className="rounded-2xl border border-red-200 dark:border-red-900/40 bg-red-50 dark:bg-red-950/20 p-5">
-          <div className="flex gap-3.5">
-            <AlarmClock className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-            <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-red-900 dark:text-red-200">
-                {tachesEnDefaut.length === 1 ? "Une tâche planifiée ne tourne pas" : `${tachesEnDefaut.length} tâches planifiées ne tournent pas`}
-              </h2>
-              <p className="text-[13px] text-red-800/90 dark:text-red-200/80 mt-1 leading-relaxed">
-                Les relances automatiques n'atteignent que les étudiants qui ne reviennent plus.
-                Tant qu'une tâche est muette, ils ne reçoivent rien — et rien d'autre ne le signale.
-              </p>
-              <ul className="mt-3 space-y-2">
-                {tachesEnDefaut.map((t: any) => (
-                  <li key={t.nom} className="text-[13px] text-red-900 dark:text-red-200">
-                    <span className="font-mono font-semibold">{t.nom}</span>
-                    {" — "}
-                    {t.derniereExecution == null
-                      ? "jamais exécutée"
-                      : t.interrompue
-                        ? `démarrée il y a ${t.heuresDepuis} h, jamais terminée`
-                        : t.ok === false
-                          ? `en échec depuis ${t.heuresDepuis} h`
-                          : `silencieuse depuis ${t.heuresDepuis} h`}
-                    {t.erreur && (
-                      <span className="block font-mono text-[12px] text-red-700/80 dark:text-red-300/70 mt-0.5 break-words">
-                        {t.erreur}
-                      </span>
-                    )}
-                  </li>
-                ))}
-              </ul>
-              <p className="text-[12px] text-red-800/70 dark:text-red-200/60 mt-3">
-                À vérifier dans l'ordre : l'onglet Cron Jobs du projet Vercel, puis les journaux
-                de la fonction, puis la table <span className="font-mono">cron_runs</span>.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {(data.attestationsEnAttente || []).length > 0 && (
-        <div className="rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50 dark:bg-amber-950/20 p-5">
-          <div className="flex gap-3.5">
-            <FileCheck2 className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-            <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-amber-900 dark:text-amber-200">
-                {data.attestationsEnAttente.length === 1
-                  ? "Une attestation attend votre validation"
-                  : `${data.attestationsEnAttente.length} attestations attendent votre validation`}
-              </h2>
-              <p className="text-[13px] text-amber-800/90 dark:text-amber-200/80 mt-1 leading-relaxed">
-                Ces étudiants ont terminé leur cours à 100 % et confirmé leur adresse. Tant que la
-                demande n'est pas validée, ils ne reçoivent rien.
-              </p>
-              <ul className="mt-3 space-y-1.5">
-                {data.attestationsEnAttente.map((a: any) => (
-                  <li key={a.id} className="text-[13px] text-amber-900 dark:text-amber-200">
-                    <span className="font-semibold">{a.etudiant}</span>
-                    {" · "}<span className="font-mono">{a.cours}</span>
-                    {a.note != null && <> — moyenne {a.note} %</>}
-                  </li>
-                ))}
-              </ul>
-              <Link href={`${ADMIN_BASE}/students`}
-                className="inline-flex items-center gap-1 text-[13px] font-semibold text-amber-900 dark:text-amber-200 hover:underline mt-3">
-                Ouvrir les dossiers <ChevronRight className="w-3.5 h-3.5" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      )}
+      <PointsAttention points={points} />
 
       {/* ── En-tête ── */}
       <div className="flex flex-wrap items-end justify-between gap-3">
