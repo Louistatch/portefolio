@@ -30,6 +30,7 @@ base. Lisez cette page avant d'en lancer un.
 | 19 | `academy_group_work_v4.sql` | Un groupe **par travail** (équipes retirées au sort à chaque GW) + verrou de constitution |
 | 20 | `academy_cron_runs.sql` | Journal des tâches planifiées — c'est l'ABSENCE de ligne récente qui alerte |
 | 21 | `academy_tentatives.sql` | Compteur de tentatives sur une leçon — sans lui, un échec ne coûte rien |
+| 22 | `tof_exercices_notes.sql` | TOF-FIN-01 : les douze quiz deviennent des exercices notés |
 
 ## Verrouillage RLS (`academy_rls_lockdown.sql`)
 

@@ -18,7 +18,8 @@
     "verify:tests": "tsx script/verify-program-tests.ts",
     "db:push": "drizzle-kit push",
     "verify:python": "node script/verify-python.mjs",
-    "verify:poids": "node script/verify-poids.mjs"
+    "verify:poids": "node script/verify-poids.mjs",
+    "verify:lecons": "node script/verify-lecons.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
