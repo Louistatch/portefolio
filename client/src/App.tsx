@@ -53,6 +53,7 @@ const AdminStudents = lazy(() => import("@/pages/admin/students-admin"));
 const AdminMeetings = lazy(() => import("@/pages/admin/meetings-admin"));
 const AdminStudentMessages = lazy(() => import("@/pages/admin/student-messages-admin"));
 const AdminGroupWork = lazy(() => import("@/pages/admin/group-work-admin"));
+const AdminSupport = lazy(() => import("@/pages/admin/support-admin"));
 const Stats = lazy(() => import("@/pages/stats"));
 
 // Centre d'aide — public : quelqu'un qui hésite à s'inscrire doit pouvoir lire comment se
@@ -126,6 +127,7 @@ function App() {
             <Route path={`${ADMIN_BASE}/meetings`}>{() => <RequireAuth><AdminMeetings /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/student-messages`}>{() => <RequireAuth><AdminStudentMessages /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/group-work`}>{() => <RequireAuth><AdminGroupWork /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/support`}>{() => <RequireAuth><AdminSupport /></RequireAuth>}</Route>
 
             {/* LouisFarm Learning — espace étudiant (pas de Layout admin) */}
             <Route path="/academy/register">{() => <Layout><AcademyRegister /></Layout>}</Route>

@@ -633,19 +633,25 @@ app.get("/api/admin/stats", requireAuth, async (_req, res) => {
  * regardée.
  */
 app.get("/api/admin/badges", requireAuth, async (_req, res) => {
-  const [messages, commentaires, rdv, etudiants] = await Promise.all([
+  const [messages, commentaires, rdv, etudiants, support] = await Promise.all([
     supabase.from("contact_messages").select("id", { count: "exact", head: true }).eq("is_read", false),
     supabase.from("comments").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("appointments").select("id", { count: "exact", head: true }).eq("status", "pending"),
     supabase.from("students").select("id", { count: "exact", head: true }).eq("email_verified", false),
+    supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("statut", "ouvert"),
   ]);
   const b = {
     messagesNonLus: messages.count || 0,
     commentairesEnAttente: commentaires.count || 0,
     rendezVousEnAttente: rdv.count || 0,
     emailsNonVerifies: etudiants.count || 0,
+    ticketsOuverts: support.count || 0,
   };
-  res.json({ ...b, total: b.messagesNonLus + b.commentairesEnAttente + b.rendezVousEnAttente + b.emailsNonVerifies });
+  res.json({
+    ...b,
+    total: b.messagesNonLus + b.commentairesEnAttente + b.rendezVousEnAttente
+         + b.emailsNonVerifies + b.ticketsOuverts,
+  });
 });
 
 /**
@@ -5279,6 +5285,31 @@ function ticketAdminEmailHtml(
   );
 }
 
+/**
+ * Email : la réponse de l'équipe à une demande de support.
+ *
+ * La question d'origine est rappelée sous la réponse. Une réponse reçue trois jours plus
+ * tard, hors de son fil, est souvent incompréhensible sans elle — et l'étudiant ne se
+ * souvient pas toujours de ce qu'il avait écrit.
+ */
+function reponseSupportEmailHtml(nom: string, sujet: string, corps: string, lien: string) {
+  const esc = (t: string) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  return academyEmailLayout(
+    `<div class="hd">
+       <div class="logo"><span>LOUISFARM LEARNING</span></div>
+       <h1>Réponse à votre demande</h1>
+       <p class="sub">${esc(sujet)}</p>
+     </div>
+     <div class="bd">
+       <p>Bonjour ${esc(nom)},</p>
+       <p style="white-space:pre-wrap">${esc(corps)}</p>
+       <p style="text-align:center"><a href="${esc(lien)}" class="btn">Ouvrir mon espace</a></p>
+       <p class="muted">Vous pouvez répondre depuis la fenêtre d'aide de votre espace : le fil
+       de la demande y est conservé.</p>
+     </div>`
+  );
+}
+
 // ── Email : une tâche planifiée a échoué ──
 //
 // Destiné à l'exploitation, pas à un étudiant : ton sec, l'erreur brute, et les trois
@@ -6525,6 +6556,197 @@ app.post("/api/support/tickets/:id/messages", rateLimit(20, 10 * 60 * 1000), req
   await supabase.from("support_tickets")
     .update({ statut: "ouvert", updated_at: new Date().toISOString() }).eq("id", t.id);
   res.status(201).json({ message: "Envoyé." });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+//                    SUPPORT — CÔTÉ ADMINISTRATION
+// ══════════════════════════════════════════════════════════════════════════════
+
+/** La boîte des demandes. Le dossier de l'étudiant est déjà là : on ne le cherche pas. */
+app.get("/api/admin/support/tickets", requireAuth, async (req, res) => {
+  const statut = String(req.query.statut || "");
+  let q = supabase.from("support_tickets")
+    .select("id, student_id, nom, email, sujet, statut, priorite, page, constat, created_at, updated_at, first_reply_at")
+    .order("created_at", { ascending: false }).limit(200);
+  if (statut && ["ouvert", "en_attente", "resolu"].includes(statut)) q = q.eq("statut", statut);
+  const { data, error } = await q;
+  if (error) return res.status(400).json({ message: error.message });
+  res.json(data || []);
+});
+
+app.get("/api/admin/support/tickets/:id", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { data: t } = await supabase.from("support_tickets").select("*").eq("id", id).maybeSingle();
+  if (!t) return res.status(404).json({ message: "Demande introuvable." });
+  const { data: messages } = await supabase.from("support_messages")
+    .select("id, auteur, corps, email_envoye, created_at").eq("ticket_id", id).order("created_at");
+  res.json({ ...t, messages: messages || [] });
+});
+
+/**
+ * Répondre. Le message est enregistré AVANT l'envoi du courriel et la réponse HTTP part
+ * ensuite : une panne de Resend ne doit pas faire perdre une réponse déjà écrite, ni
+ * laisser croire qu'elle n'a pas été enregistrée.
+ */
+app.post("/api/admin/support/tickets/:id/messages", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const corps = String(req.body?.message || "").trim().slice(0, 5000);
+  const resoudre = req.body?.resoudre === true;
+  if (!corps) return res.status(400).json({ message: "Le message est vide." });
+
+  const { data: t } = await supabase.from("support_tickets")
+    .select("id, student_id, nom, email, sujet, first_reply_at").eq("id", id).maybeSingle();
+  if (!t) return res.status(404).json({ message: "Demande introuvable." });
+
+  const { data: msg, error } = await supabase.from("support_messages")
+    .insert({ ticket_id: id, auteur: "admin", corps }).select("id").single();
+  if (error) return res.status(400).json({ message: error.message });
+
+  const maintenant = new Date().toISOString();
+  await supabase.from("support_tickets").update({
+    statut: resoudre ? "resolu" : "en_attente",
+    updated_at: maintenant,
+    first_reply_at: t.first_reply_at ?? maintenant,
+    closed_at: resoudre ? maintenant : null,
+  }).eq("id", id);
+
+  res.status(201).json({ message: resoudre ? "Répondu et clos." : "Réponse envoyée." });
+
+  if (t.email) {
+    const r = await sendAcademyEmail({
+      studentId: t.student_id ?? null, type: "support_reponse", to: t.email,
+      subject: `Réponse — ${t.sujet}`,
+      html: reponseSupportEmailHtml(t.nom || "", t.sujet, corps, `${SITE_URL}/academy/dashboard`),
+    }).catch(() => ({ sent: false }));
+    if (r.sent && msg) {
+      await supabase.from("support_messages").update({ email_envoye: true }).eq("id", msg.id)
+        .then(() => {}, () => {});
+    }
+  }
+});
+
+app.put("/api/admin/support/tickets/:id", requireAuth, async (req, res) => {
+  const maj: any = { updated_at: new Date().toISOString() };
+  const statut = String(req.body?.statut || "");
+  const priorite = String(req.body?.priorite || "");
+  if (["ouvert", "en_attente", "resolu"].includes(statut)) {
+    maj.statut = statut;
+    maj.closed_at = statut === "resolu" ? new Date().toISOString() : null;
+  }
+  if (["basse", "normale", "haute"].includes(priorite)) maj.priorite = priorite;
+
+  const { error } = await supabase.from("support_tickets").update(maj).eq("id", Number(req.params.id));
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ message: "Mis à jour." });
+});
+
+// ── Les articles ────────────────────────────────────────────────────────────
+
+app.get("/api/admin/support/articles", requireAuth, async (_req, res) => {
+  const { data, error } = await supabase.from("support_articles")
+    .select("id, slug, titre, resume, contenu, famille, audience, publie, ordre, utile, inutile, updated_at")
+    .order("famille").order("ordre");
+  if (error) return res.status(400).json({ message: error.message });
+  res.json(data || []);
+});
+
+app.post("/api/admin/support/articles", requireAuth, async (req, res) => {
+  const b = req.body || {};
+  const slug = String(b.slug || "").trim().toLowerCase()
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 80);
+  if (!slug || !String(b.titre || "").trim()) {
+    return res.status(400).json({ message: "Un identifiant et un titre sont nécessaires." });
+  }
+  const ligne = {
+    slug, titre: String(b.titre).trim().slice(0, 200),
+    resume: String(b.resume || "").trim().slice(0, 400),
+    contenu: String(b.contenu || "").slice(0, 20000),
+    famille: String(b.famille || "compte"),
+    audience: ["public", "etudiant", "admis"].includes(b.audience) ? b.audience : "public",
+    publie: b.publie !== false,
+    ordre: Number(b.ordre) || 0,
+    updated_at: new Date().toISOString(),
+  };
+  const { data, error } = await supabase.from("support_articles")
+    .upsert(ligne, { onConflict: "slug" }).select("slug").single();
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ slug: data.slug, message: "Enregistré." });
+});
+
+app.delete("/api/admin/support/articles/:slug", requireAuth, async (req, res) => {
+  const { error } = await supabase.from("support_articles").delete().eq("slug", String(req.params.slug));
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ message: "Supprimé." });
+});
+
+/**
+ * Les mesures, et surtout la liste des questions restées sans réponse.
+ *
+ * C'est cette liste qui fait vivre la base de connaissances : sans elle, le centre d'aide
+ * répondrait indéfiniment aux questions qu'on a imaginées plutôt qu'à celles qu'on nous
+ * pose. Les recherches infructueuses sont donc regroupées et classées par fréquence — c'est
+ * une liste de travail, pas un journal.
+ */
+app.get("/api/admin/support/mesures", requireAuth, async (req, res) => {
+  const jours = Math.min(365, Math.max(7, Number(req.query.jours) || 30));
+  const depuis = new Date(Date.now() - jours * 24 * 3600 * 1000).toISOString();
+
+  const [evts, tickets, articles] = await Promise.all([
+    supabase.from("support_events").select("genre, niveau, termes, question, resultats, article, created_at")
+      .gte("created_at", depuis).limit(5000),
+    supabase.from("support_tickets").select("statut, created_at, first_reply_at").gte("created_at", depuis),
+    supabase.from("support_articles").select("slug, titre, utile, inutile"),
+  ]);
+  const e = evts.data || [];
+  const t = tickets.data || [];
+
+  const questions = e.filter((x: any) => x.genre === "question");
+  const parNiveau = [1, 2, 3, 4].map((n) => ({
+    niveau: n, nombre: questions.filter((x: any) => x.niveau === n).length,
+  }));
+  const repondues = questions.filter((x: any) => x.niveau != null && x.niveau <= 3).length;
+
+  // Les recherches sans résultat, regroupées sur le texte normalisé.
+  const sansReponse = new Map<string, { terme: string; nombre: number; dernier: string }>();
+  for (const x of e as any[]) {
+    const vide = (x.genre === "recherche" && x.resultats === 0)
+              || (x.genre === "question" && x.niveau === 4);
+    if (!vide) continue;
+    const brut = String(x.termes || x.question || "").trim();
+    if (!brut) continue;
+    const cle = brut.toLowerCase();
+    const dejaLa = sansReponse.get(cle);
+    if (dejaLa) { dejaLa.nombre++; if (x.created_at > dejaLa.dernier) dejaLa.dernier = x.created_at; }
+    else sansReponse.set(cle, { terme: brut, nombre: 1, dernier: x.created_at });
+  }
+
+  const delais = t.filter((x: any) => x.first_reply_at)
+    .map((x: any) => new Date(x.first_reply_at).getTime() - new Date(x.created_at).getTime());
+
+  res.json({
+    jours,
+    questions: questions.length,
+    // Part résolue sans intervention humaine. `null` plutôt que 0 % quand rien n'a encore
+    // été demandé : un taux calculé sur zéro question ne veut rien dire et se lirait comme
+    // un échec.
+    partAutonome: questions.length ? Math.round((repondues / questions.length) * 100) : null,
+    parNiveau,
+    tickets: {
+      total: t.length,
+      ouverts: t.filter((x: any) => x.statut === "ouvert").length,
+      resolus: t.filter((x: any) => x.statut === "resolu").length,
+      delaiMedianHeures: delais.length
+        ? Math.round(delais.sort((a, b) => a - b)[Math.floor(delais.length / 2)] / 3600000)
+        : null,
+    },
+    sansReponse: [...sansReponse.values()].sort((a, b) => b.nombre - a.nombre).slice(0, 25),
+    articles: (articles.data || [])
+      .map((a: any) => ({ ...a, total: (a.utile || 0) + (a.inutile || 0) }))
+      .filter((a: any) => a.total > 0)
+      .sort((a: any, b: any) => (b.inutile - b.utile) - (a.inutile - a.utile))
+      .slice(0, 15),
+  });
 });
 
 export default app;
