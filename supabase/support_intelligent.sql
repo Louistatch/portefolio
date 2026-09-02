@@ -197,3 +197,77 @@ ALTER TABLE public.support_events   ENABLE ROW LEVEL SECURITY;
 -- question soit tapée avec ou sans accents, au singulier ou au pluriel, avec
 -- « verrouillée » ou « verrouiller ». Les quatre cas ont été vérifiés sur la
 -- base avant que ce fichier soit écrit.
+
+
+-- ══ La recherche, côté base ═════════════════════════════════════════════════
+--
+-- Une fonction et non une composition de filtres PostgREST : une question
+-- d'étudiant contenant une virgule ou une parenthèse casserait la chaîne de
+-- filtre côté client. Ici, la saisie brute ne traverse que
+-- websearch_to_tsquery, qui ne lève jamais et n'interprète rien.
+--
+-- Deux passes, et la seconde est ce qui rend la recherche utilisable :
+--
+--   ET  — tous les mots. Précis, mais MUET dès qu'on écrit une phrase entière.
+--         « pourquoi je ne peux pas ouvrir ma leçon » ne renvoyait rien du
+--         tout, parce que « peux » ne figure dans aucun article. Or c'est
+--         exactement ainsi qu'une question est posée.
+--   OU  — n'importe quel mot, obtenu en remplaçant les & de la requête DÉJÀ
+--         assainie. N'entre en jeu que si la passe stricte est vide, sinon la
+--         bonne réponse se noierait sous les articles partageant un mot.
+--
+-- SECURITY INVOKER : appelée avec la clé anon, la RLS de support_articles ne
+-- renvoie rien. C'est voulu — l'API seule y accède, avec sa clé de service.
+
+CREATE OR REPLACE FUNCTION public.support_chercher(
+    q          TEXT,
+    audiences  TEXT[] DEFAULT ARRAY['public'],
+    n          INT    DEFAULT 5
+)
+RETURNS TABLE (slug TEXT, titre TEXT, resume TEXT, famille TEXT, rang REAL, extrait TEXT)
+LANGUAGE sql
+STABLE
+AS $$
+    WITH req AS (
+        SELECT
+            websearch_to_tsquery('french',                 COALESCE(q, ''))
+         || websearch_to_tsquery('public.fr_sans_accents', COALESCE(q, ''))          AS et,
+            NULLIF(replace(websearch_to_tsquery('french',                 COALESCE(q, ''))::text, ' & ', ' | '), '')::tsquery
+         || NULLIF(replace(websearch_to_tsquery('public.fr_sans_accents', COALESCE(q, ''))::text, ' & ', ' | '), '')::tsquery
+                                                                                      AS ou
+    ),
+    trouves AS (
+        SELECT a.slug, a.titre, a.resume, a.famille, a.contenu, a.ordre,
+               ts_rank(a.tsv, req.et) AS rang, req.et AS tq, 1 AS strate
+        FROM public.support_articles a, req
+        WHERE a.publie AND a.audience = ANY (audiences) AND req.et IS NOT NULL AND a.tsv @@ req.et
+
+        UNION ALL
+
+        SELECT a.slug, a.titre, a.resume, a.famille, a.contenu, a.ordre,
+               ts_rank(a.tsv, req.ou) AS rang, req.ou AS tq, 2 AS strate
+        FROM public.support_articles a, req
+        WHERE a.publie AND a.audience = ANY (audiences) AND req.ou IS NOT NULL AND a.tsv @@ req.ou
+          AND NOT EXISTS (
+              SELECT 1 FROM public.support_articles b, req r2
+              WHERE b.publie AND b.audience = ANY (audiences)
+                AND r2.et IS NOT NULL AND b.tsv @@ r2.et
+          )
+    )
+    SELECT t.slug, t.titre, t.resume, t.famille, t.rang,
+           ts_headline('public.fr_sans_accents', t.contenu, t.tq,
+                       'StartSel=<mark>,StopSel=</mark>,MaxWords=30,MinWords=12,ShortWord=2,MaxFragments=1')
+    FROM trouves t
+    ORDER BY t.strate, t.rang DESC, t.ordre
+    LIMIT GREATEST(1, LEAST(COALESCE(n, 5), 20));
+$$;
+
+-- Vérifié sur la base, avec trois articles réels :
+--
+--   « lecon verrouillee »                          → pourquoi-ma-lecon-est-verrouillee
+--   « pourquoi je ne peux pas ouvrir ma leçon »    → pourquoi-ma-lecon-est-verrouillee en tête
+--   « je n'arrive pas a valider mon adresse email »→ valider-mon-adresse en tête
+--   « quand est ce que je recois mon certificat »  → ou-est-mon-certificat
+--   « marmotte chocolat helicoptere »              → 0 résultat
+--   requête vide                                    → 0 résultat
+--   « certificat » demandé par un VISITEUR          → 0 résultat (article réservé aux admis)

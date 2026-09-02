@@ -1,8 +1,4 @@
 api/index.ts(L,C): error TS18047: 'data' is possibly 'null'.
 api/index.ts(L,C): error TS18047: 'data' is possibly 'null'.
 api/index.ts(L,C): error TS2345: Argument of type '{ id: number; code?: string | undefined; title: string; description?: string | undefined; }' is not assignable to parameter of type '{ code: string; title: string; description?: string | undefined; }'.
-api/index.ts(L,C): error TS2769: No overload matches this call.
-api/index.ts(L,C): error TS2769: No overload matches this call.
-api/index.ts(L,C): error TS2769: No overload matches this call.
-api/index.ts(L,C): error TS2769: No overload matches this call.
 shared/routes.ts(L,C): error TS2835: Relative import paths need explicit file extensions in ECMAScript imports when '--moduleResolution' is 'node16' or 'nodenext'. Did you mean './schema.js'?

@@ -18,6 +18,10 @@ import { programOf, programById, PROGRAMS, type Program } from "../shared/progra
 import { leconOuverte } from "../shared/rythme.js";
 import { raisonDeNePasNotifier, FENETRE_NOTIF_FORUM_MS } from "../shared/notifications.js";
 import { RETARD_EXCLUSION_JOURS, RETARD_PALIERS, alerteDeRetard } from "../shared/retard.js";
+import {
+  diagnostiquer, repondre, intentionDe, laDate,
+  type ContexteSupport, type Constat,
+} from "../shared/support.js";
 import { TESTS_PARCOURS, type TestParcours } from "./program-tests.js";
 import {
   GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_MAX_MEMBERS,
@@ -60,10 +64,18 @@ const ADMISSION_ANSWER_KEY: number[] = [1, 2, 1, 3, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1
 const ADMISSION_PASS_SCORE = 21;
 
 // ── Auth helpers ──
-const JWT_SECRET = process.env.JWT_SECRET;
-if (!JWT_SECRET) {
-  throw new Error("[SECURITE] JWT_SECRET non défini — définissez-le dans les variables d'environnement Vercel.");
-}
+// Le type est annoncé `string`, pas `string | undefined`, et c'est le rôle de la fonction :
+// le `throw` garantit déjà qu'on n'arrive jamais ici sans secret, mais TypeScript ne suivait
+// pas cette garantie jusque dans le corps des fonctions. D'où quatre `jwt.verify` signalés
+// depuis toujours comme « aucune surcharge ne correspond », qui masquaient les vraies erreurs
+// dans le bruit. Le comportement à l'exécution est identique : on refuse de démarrer.
+const JWT_SECRET: string = (() => {
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error("[SECURITE] JWT_SECRET non défini — définissez-le dans les variables d'environnement Vercel.");
+  }
+  return secret;
+})();
 
 // ── Rate limiting en mémoire (sans dépendance, adapté au serverless) ──
 const rateBuckets = new Map<string, { count: number; reset: number }>();
@@ -5217,6 +5229,56 @@ function attestationAValiderEmailHtml(
   );
 }
 
+/**
+ * Le chemin du back-office, côté serveur.
+ *
+ * Doublon assumé de ADMIN_BASE dans client/src/lib/admin.ts : l'API ne peut pas importer un
+ * module du client — ils ne sont pas compilés ensemble. La seule autre voie serait de le
+ * poser dans shared/, ce qui l'exposerait dans le bundle du navigateur, exactement ce que le
+ * renommage cherchait à éviter. Le doublon est donc le moindre mal ; il n'est utilisé que
+ * dans des courriels envoyés à Louis.
+ */
+const ADMIN_SUPPORT_PATH = "/pagesecure/support";
+
+/**
+ * Email : une demande de support vient d'arriver.
+ *
+ * Le diagnostic est mis AVANT le message. Louis n'a pas besoin de reconstituer où en est
+ * l'étudiant : la plateforme le savait au moment où la question a été posée, et c'est
+ * souvent la réponse.
+ */
+function ticketAdminEmailHtml(
+  nom: string,
+  sujet: string,
+  corps: string,
+  constat: { titre: string; explication: string } | null,
+  lien: string,
+) {
+  const esc = (t: string) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const diagnostic = constat
+    ? `<div class="info">
+         <h3>Ce que la plateforme voyait à cet instant</h3>
+         <p style="margin:8px 0 0"><strong>${esc(constat.titre)}</strong></p>
+         <p style="margin:6px 0 0;color:#6b7280;font-size:14px;line-height:1.7">${esc(constat.explication)}</p>
+       </div>`
+    : "";
+  return academyEmailLayout(
+    `<div class="hd">
+       <div class="logo"><span>LOUISFARM LEARNING</span></div>
+       <h1>${esc(sujet)}</h1>
+       <p class="sub">Demande de ${esc(nom)}</p>
+     </div>
+     <div class="bd">
+       <p style="white-space:pre-wrap">${esc(corps)}</p>
+       ${diagnostic}
+       <p style="text-align:center"><a href="${esc(lien)}" class="btn">Répondre dans le back-office</a></p>
+       <p class="muted">Votre réponse arrive à l'étudiant par courriel et reste dans son espace.
+       Si la question revient souvent, elle mérite un article du centre d'aide — le back-office
+       permet de transformer une réponse en article.</p>
+     </div>`
+  );
+}
+
 // ── Email : une tâche planifiée a échoué ──
 //
 // Destiné à l'exploitation, pas à un étudiant : ton sec, l'erreur brute, et les trois
@@ -6069,6 +6131,400 @@ app.delete("/api/admin/academy/meetings/:id", requireAuth, async (req, res) => {
   const { error } = await supabase.from("academy_meetings").delete().eq("id", Number(req.params.id));
   if (error) return res.status(400).json({ message: error.message });
   res.json({ message: "Supprimée" });
+});
+
+// ══════════════════════════════════════════════════════════════════════════════
+//                            SUPPORT INTELLIGENT
+// ══════════════════════════════════════════════════════════════════════════════
+//
+// Quatre niveaux, essayés dans l'ordre, et le premier qui sait répond :
+//
+//   1. le diagnostic   — la plateforme connaît l'état du dossier, donc la réponse exacte
+//   2. la recherche    — les articles du centre d'aide, en français, dans PostgreSQL
+//   3. l'action        — quand la réponse est un geste et non un texte
+//   4. le ticket       — personne ne sait : la question part chez Louis avec son contexte
+//
+// Il n'y a pas de cinquième niveau. Sa place est réservée dans le protocole (le champ
+// `niveau` de support_events accepte 5) mais aucun code ne l'appelle : rédiger une réponse
+// demanderait un fournisseur de modèle de langage, donc un abonnement, et les questions
+// observées ici sont déterministes — voir l'en-tête de shared/support.ts.
+
+/**
+ * Décode le jeton étudiant s'il y en a un, sans exiger qu'il y en ait un.
+ *
+ * Le centre d'aide est public : quelqu'un qui hésite à s'inscrire doit pouvoir lire comment
+ * se passe l'admission. Mais s'il est connecté, il a droit à davantage d'articles et à un
+ * diagnostic. Un garde tout-ou-rien obligerait à dédoubler chaque route.
+ */
+function etudiantOptionnel(req: Request, _res: Response, next: NextFunction) {
+  const header = req.headers.authorization;
+  if (header?.startsWith("Bearer ")) {
+    try {
+      const decoded = jwt.verify(header.slice(7), JWT_SECRET) as any;
+      if (decoded?.sid && decoded.role === "student") (req as any).studentOpt = Number(decoded.sid);
+    } catch { /* jeton absent ou périmé : on continue en visiteur */ }
+  }
+  next();
+}
+
+/** Les articles qu'une personne a le droit de voir, du plus large au plus restreint. */
+async function audiencesDe(sid: number | null): Promise<string[]> {
+  if (!sid) return ["public"];
+  const admis = await parcoursAdmis(sid);
+  return admis.length ? ["public", "etudiant", "admis"] : ["public", "etudiant"];
+}
+
+/**
+ * L'état du dossier, sous la forme que diagnostiquer() attend.
+ *
+ * Lecture SEULE, et c'est délibéré : refreshLessonStates() et refreshGroupWorkStates()
+ * savent déjà calculer tout ceci, mais elles écrivent en base, constituent des groupes et
+ * envoient des courriels. Ouvrir la fenêtre d'aide ne doit rien déclencher de tout cela —
+ * un étudiant qui demande « pourquoi ma leçon est verrouillée ? » ne s'attend pas à ce que
+ * la question forme un groupe.
+ */
+async function contexteSupport(sid: number, programId: string): Promise<ContexteSupport | null> {
+  const parcours = programById(programId);
+  if (!parcours) return null;
+
+  const { data: st } = await supabase.from("students")
+    .select("email_verified, admitted_at, admission_expires, test_attempts, next_test_allowed, final_certificate_no")
+    .eq("id", sid).maybeSingle();
+  if (!st) return null;
+
+  // Le cursus MEAL est porté par les colonnes de `students`, les autres parcours par
+  // academy_program_admissions — la même bifurcation que partout ailleurs.
+  const surStudents = parcours.admission.surStudents;
+  const pa = surStudents ? null : await admissionParcours(sid, programId);
+  const admisAt   = surStudents ? st.admitted_at        : pa?.admitted_at ?? null;
+  const expireAt  = surStudents ? st.admission_expires  : pa?.admission_expires ?? null;
+  const prochain  = surStudents ? st.next_test_allowed  : pa?.next_test_allowed ?? null;
+  const tentatives = Number((surStudents ? st.test_attempts : pa?.test_attempts) ?? 0);
+
+  // Les leçons de CE parcours seulement.
+  const { data: lps } = await supabase.from("lesson_progress")
+    .select("unlock_at, status, sms_lessons(order_index, title), sms_courses(code, order_index)")
+    .eq("student_id", sid);
+  const duParcours = (lps || []).filter((l: any) => programOf(l.sms_courses?.code)?.id === programId);
+  duParcours.sort((a: any, b: any) =>
+    (a.sms_courses?.order_index ?? 0) - (b.sms_courses?.order_index ?? 0) ||
+    (a.sms_lessons?.order_index ?? 0) - (b.sms_lessons?.order_index ?? 0));
+
+  const indexProchaine = duParcours.findIndex((l: any) => l.status !== "completed");
+  const brute: any = indexProchaine >= 0 ? duParcours[indexProchaine] : null;
+  const prochaineLecon = brute ? {
+    titre: brute.sms_lessons?.title ?? "la prochaine leçon",
+    ouvertureAt: new Date(brute.unlock_at).getTime(),
+    ouverte: brute.status !== "locked",
+    // La leçon d'avant dans l'ordre du parcours : s'il n'y en a pas, la question ne se pose
+    // pas et l'on considère le préalable rempli.
+    precedenteTerminee: indexProchaine === 0
+      ? true
+      : duParcours[indexProchaine - 1].status === "completed",
+  } : null;
+
+  // Les travaux de groupe. `academy_group_works` ne porte pas de code de cours : les travaux
+  // sont communs au dispositif, on ne les découpe donc pas par parcours.
+  const { data: gwp } = await supabase.from("group_work_progress")
+    .select("status").eq("student_id", sid);
+  const travauxRestants = (gwp || []).filter((g: any) => g.status !== "completed").length;
+
+  const { data: membre } = await supabase.from("academy_group_members")
+    .select("id").eq("student_id", sid).limit(1);
+
+  return {
+    maintenant: Date.now(),
+    parcours: parcours.title,
+    leconsParSemaine: parcours.lessonsPerWeek,
+    emailVerifie: !!st.email_verified,
+    admisAt: admisAt ? new Date(admisAt).getTime() : null,
+    admissionExpireAt: expireAt ? new Date(expireAt).getTime() : null,
+    prochainTestAt: prochain ? new Date(prochain).getTime() : null,
+    tentatives,
+    prochaineLecon,
+    aUnGroupe: !!membre?.length,
+    travauxRestants,
+    leconsToutesTerminees: duParcours.length > 0 && indexProchaine < 0,
+    certificatDelivre: !!st.final_certificate_no,
+  };
+}
+
+/**
+ * Le parcours dont il faut parler.
+ *
+ * Celui que la page demande s'il est valide ; sinon le premier auquel l'étudiant est admis ;
+ * sinon le cursus MEAL, qui est la porte d'entrée par défaut. Un étudiant inscrit à rien du
+ * tout doit quand même obtenir un diagnostic — c'est précisément lui qui est bloqué.
+ */
+async function parcoursDuSupport(sid: number, demande?: string): Promise<string> {
+  if (demande && programById(demande)) return demande;
+  const admis = await parcoursAdmis(sid);
+  return admis[0]?.programId ?? "meal";
+}
+
+/** Une trace, jamais bloquante : le support ne doit pas tomber parce qu'une mesure a raté. */
+async function tracerSupport(e: {
+  student_id?: number | null; genre: string; niveau?: number | null;
+  question?: string; termes?: string; resultats?: number;
+  article?: string; constat?: string; page?: string;
+}) {
+  await supabase.from("support_events").insert(e).then(() => {}, () => {});
+}
+
+async function chercherArticles(q: string, audiences: string[], n = 5) {
+  const { data, error } = await supabase.rpc("support_chercher", { q, audiences, n });
+  if (error) return [];
+  return (data || []) as { slug: string; titre: string; resume: string; famille: string; rang: number; extrait: string }[];
+}
+
+// ── Niveau 1 : le diagnostic, sans question ─────────────────────────────────
+// Ce que le widget montre à l'ouverture, avant que l'étudiant ait tapé quoi que ce soit.
+
+app.get("/api/support/contexte", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid as number;
+  const programId = await parcoursDuSupport(sid, String(req.query.parcours || ""));
+  const ctx = await contexteSupport(sid, programId);
+  if (!ctx) return res.status(404).json({ message: "Dossier introuvable." });
+
+  const constats = diagnostiquer(ctx);
+  res.json({
+    parcours: { id: programId, titre: ctx.parcours },
+    constats,
+    // Ce qui bloque vraiment, mis en avant : c'est la seule ligne que beaucoup liront.
+    principal: constats.find((c) => c.bloquant) ?? constats[0],
+  });
+});
+
+// ── Niveaux 1 puis 2 : une question écrite ──────────────────────────────────
+
+app.post("/api/support/question", rateLimit(30, 10 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid as number;
+  const question = String(req.body?.question || "").trim().slice(0, 1000);
+  const page = String(req.body?.page || "").slice(0, 200);
+  if (!question) return res.status(400).json({ message: "La question est vide." });
+
+  const programId = await parcoursDuSupport(sid, String(req.body?.parcours || ""));
+  const ctx = await contexteSupport(sid, programId);
+  const constats = ctx ? diagnostiquer(ctx) : [];
+  const lu = repondre(question, constats);
+
+  if (lu.niveau === 1) {
+    await tracerSupport({
+      student_id: sid, genre: "question", niveau: 1,
+      question, constat: lu.constat.code, page,
+    });
+    return res.json({ niveau: 1, constat: lu.constat, articles: [] });
+  }
+
+  const audiences = await audiencesDe(sid);
+  const articles = await chercherArticles(lu.termes || question, audiences);
+  await tracerSupport({
+    student_id: sid, genre: "question", niveau: articles.length ? 2 : 4,
+    question, termes: lu.termes, resultats: articles.length, page,
+  });
+
+  // Aucun article : on ne renvoie pas une page vide, on propose d'écrire. C'est le niveau 4,
+  // et c'est aussi la ligne qui alimentera la liste des articles à écrire.
+  res.json({
+    niveau: articles.length ? 2 : 4,
+    sujet: intentionDe(question),
+    articles,
+    constat: null,
+  });
+});
+
+// ── Niveau 2 : le centre d'aide ─────────────────────────────────────────────
+
+app.get("/api/support/articles", etudiantOptionnel, async (req, res) => {
+  const sid = ((req as any).studentOpt as number) ?? null;
+  const audiences = await audiencesDe(sid);
+  const q = String(req.query.q || "").trim().slice(0, 200);
+
+  if (q) {
+    const articles = await chercherArticles(q, audiences, 12);
+    await tracerSupport({ student_id: sid, genre: "recherche", niveau: 2, termes: q, resultats: articles.length });
+    return res.json({ recherche: q, articles });
+  }
+
+  const { data } = await supabase.from("support_articles")
+    .select("slug, titre, resume, famille, ordre")
+    .eq("publie", true).in("audience", audiences)
+    .order("famille").order("ordre");
+  res.json({ recherche: "", articles: data || [] });
+});
+
+app.get("/api/support/articles/:slug", etudiantOptionnel, async (req, res) => {
+  const sid = ((req as any).studentOpt as number) ?? null;
+  const audiences = await audiencesDe(sid);
+  const { data } = await supabase.from("support_articles")
+    .select("slug, titre, resume, contenu, famille, audience, utile, inutile")
+    .eq("slug", String(req.params.slug)).eq("publie", true).maybeSingle();
+
+  // Un article réservé aux étudiants demandé par un visiteur : 404 et non 403. Répondre
+  // « existe mais pas pour vous » révélerait la carte des articles internes sans rien
+  // apporter à personne.
+  if (!data || !audiences.includes(data.audience)) {
+    return res.status(404).json({ message: "Article introuvable." });
+  }
+  await tracerSupport({ student_id: sid, genre: "article_vu", article: data.slug });
+  res.json(data);
+});
+
+/**
+ * « Cela a-t-il répondu ? »
+ *
+ * Deux boutons, et c'est la mesure la plus utile du dispositif : elle dit quels articles
+ * réécrire. Sans jeton non plus — un visiteur qui lit l'article sur l'admission a un avis
+ * aussi valable qu'un étudiant.
+ */
+app.post("/api/support/articles/:slug/retour", rateLimit(40, 10 * 60 * 1000), etudiantOptionnel, async (req, res) => {
+  const sid = ((req as any).studentOpt as number) ?? null;
+  const utile = req.body?.utile === true;
+  const slug = String(req.params.slug);
+
+  const { data: a } = await supabase.from("support_articles")
+    .select("id, utile, inutile").eq("slug", slug).maybeSingle();
+  if (!a) return res.status(404).json({ message: "Article introuvable." });
+
+  await supabase.from("support_articles")
+    .update(utile ? { utile: (a.utile ?? 0) + 1 } : { inutile: (a.inutile ?? 0) + 1 })
+    .eq("id", a.id);
+  await tracerSupport({ student_id: sid, genre: utile ? "article_utile" : "article_inutile", article: slug });
+  res.json({ message: "Merci." });
+});
+
+// ── Niveau 3 : les actions ──────────────────────────────────────────────────
+//
+// Quand la réponse est un geste. Une seule action pour l'instant, et volontairement : c'est
+// celle des sept étudiants qui n'ont jamais validé leur adresse — le blocage le plus fréquent
+// de la plateforme, et le seul qu'un bouton résout entièrement.
+
+app.post("/api/support/action", rateLimit(6, 15 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid as number;
+  const id = String(req.body?.id || "");
+
+  if (id !== "renvoyer_verification") {
+    return res.status(400).json({ message: "Action inconnue." });
+  }
+
+  const { data: st } = await supabase.from("students")
+    .select("id, full_name, email, email_verified, verify_token, verify_code").eq("id", sid).maybeSingle();
+  if (!st) return res.status(404).json({ message: "Compte introuvable." });
+  if (st.email_verified) {
+    // Pas une erreur : l'étudiant a validé entre-temps, souvent depuis un autre appareil.
+    return res.json({ message: "Votre adresse est déjà validée.", dejaFait: true });
+  }
+
+  const token = st.verify_token || crypto.randomBytes(32).toString("hex");
+  const code = st.verify_code || String(Math.floor(100000 + Math.random() * 900000));
+  if (!st.verify_token || !st.verify_code) {
+    await supabase.from("students").update({
+      verify_token: token, verify_code: code,
+      verify_expires: new Date(Date.now() + 7 * 24 * 3600 * 1000).toISOString(),
+    }).eq("id", sid);
+  }
+
+  await sendAcademyEmail({
+    studentId: sid, type: "verify", to: st.email,
+    subject: "Validez votre adresse — LouisFarm Learning",
+    html: verifyEmailHtml(st.full_name || "", `${SITE_URL}/academy/verify?token=${token}`, code),
+  });
+  await tracerSupport({ student_id: sid, genre: "action", niveau: 3, constat: "adresse_non_verifiee" });
+  res.json({ message: `Un nouveau lien vient de partir vers ${st.email}.` });
+});
+
+// ── Niveau 4 : le ticket ────────────────────────────────────────────────────
+
+app.post("/api/support/tickets", rateLimit(5, 30 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid as number;
+  const sujet = String(req.body?.sujet || "").trim().slice(0, 200);
+  const corps = String(req.body?.message || "").trim().slice(0, 5000);
+  const page = String(req.body?.page || "").slice(0, 200);
+  if (!sujet || !corps) return res.status(400).json({ message: "Un sujet et un message sont nécessaires." });
+
+  const { data: st } = await supabase.from("students")
+    .select("full_name, email").eq("id", sid).maybeSingle();
+  if (!st) return res.status(404).json({ message: "Compte introuvable." });
+
+  // Le contexte est joint à la CRÉATION, pas à la lecture : c'est l'état au moment où la
+  // question s'est posée qui l'explique. Relu trois jours plus tard, le dossier aura bougé
+  // et la demande deviendra incompréhensible.
+  const programId = await parcoursDuSupport(sid);
+  const ctx = await contexteSupport(sid, programId);
+  const constats = ctx ? diagnostiquer(ctx) : [];
+  const principal = constats.find((c) => c.bloquant) ?? constats[0] ?? null;
+
+  const { data: ticket, error } = await supabase.from("support_tickets").insert({
+    student_id: sid, nom: st.full_name || "", email: st.email,
+    sujet, page, constat: principal?.code ?? null,
+    contexte: {
+      parcours: programId,
+      constats: constats.map((c) => ({ code: c.code, titre: c.titre, bloquant: c.bloquant })),
+      admis: ctx?.admisAt != null,
+      adresseValidee: ctx?.emailVerifie ?? null,
+      travauxRestants: ctx?.travauxRestants ?? null,
+    },
+  }).select("id").single();
+  if (error || !ticket) return res.status(400).json({ message: error?.message || "Création impossible." });
+
+  await supabase.from("support_messages").insert({ ticket_id: ticket.id, auteur: "etudiant", corps });
+  await tracerSupport({ student_id: sid, genre: "ticket", niveau: 4, question: sujet, constat: principal?.code, page });
+
+  // La réponse part AVANT le courriel : l'étudiant n'a pas à attendre Resend pour voir que
+  // sa demande est enregistrée. Même choix que les notifications du forum.
+  res.status(201).json({ id: ticket.id, message: "Votre demande est enregistrée." });
+
+  const alerte = process.env.ADMIN_ALERT_EMAIL;
+  if (alerte) {
+    await sendAcademyEmail({
+      studentId: sid, type: "support_ticket", to: alerte,
+      subject: `Support — ${sujet}`,
+      html: ticketAdminEmailHtml(st.full_name || st.email, sujet, corps, principal, `${SITE_URL}${ADMIN_SUPPORT_PATH}`),
+      dedupeKey: `support_ticket:${ticket.id}`,
+    }).catch(() => {});
+  }
+});
+
+app.get("/api/support/tickets", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid as number;
+  const { data } = await supabase.from("support_tickets")
+    .select("id, sujet, statut, created_at, updated_at")
+    .eq("student_id", sid).order("created_at", { ascending: false }).limit(30);
+  res.json(data || []);
+});
+
+app.get("/api/support/tickets/:id", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid as number;
+  // Le filtre sur student_id est dans la requête, pas dans une vérification qui suit : c'est
+  // la seule barrière entre deux étudiants, et une barrière qu'on peut oublier d'écrire ne
+  // vaut rien.
+  const { data: t } = await supabase.from("support_tickets")
+    .select("id, sujet, statut, created_at")
+    .eq("id", Number(req.params.id)).eq("student_id", sid).maybeSingle();
+  if (!t) return res.status(404).json({ message: "Demande introuvable." });
+
+  const { data: messages } = await supabase.from("support_messages")
+    .select("id, auteur, corps, created_at").eq("ticket_id", t.id).order("created_at");
+  res.json({ ...t, messages: messages || [] });
+});
+
+app.post("/api/support/tickets/:id/messages", rateLimit(20, 10 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid as number;
+  const corps = String(req.body?.message || "").trim().slice(0, 5000);
+  if (!corps) return res.status(400).json({ message: "Le message est vide." });
+
+  const { data: t } = await supabase.from("support_tickets")
+    .select("id, sujet").eq("id", Number(req.params.id)).eq("student_id", sid).maybeSingle();
+  if (!t) return res.status(404).json({ message: "Demande introuvable." });
+
+  const { error } = await supabase.from("support_messages")
+    .insert({ ticket_id: t.id, auteur: "etudiant", corps });
+  if (error) return res.status(400).json({ message: error.message });
+
+  // Une réponse de l'étudiant rouvre la demande : elle était peut-être « en attente ».
+  await supabase.from("support_tickets")
+    .update({ statut: "ouvert", updated_at: new Date().toISOString() }).eq("id", t.id);
+  res.status(201).json({ message: "Envoyé." });
 });
 
 export default app;
