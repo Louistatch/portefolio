@@ -27,9 +27,23 @@ import {
 } from "../shared/groupwork.js";
 
 // ── Supabase client ──
-// Service_role obligatoire côté serveur : les tables publiques sont en RLS sans
-// policy, la clé anon n'y a plus accès. L'anon ne sert que de repli en dev.
+// Service_role obligatoire côté serveur : plus AUCUNE table du schéma public ne
+// porte de policy — voir supabase/rls_suppression_policies_publiques.sql. La clé
+// anon ne peut donc plus rien lire nulle part.
+//
+// Le repli sur la clé anon reste utile en local, mais il ne doit jamais servir en
+// production : il ne provoquerait pas d'erreur au démarrage, seulement des routes
+// qui répondent 200 avec des listes vides et des connexions étudiant qui échouent
+// sans raison lisible. On préfère refuser de démarrer.
 const supabaseUrl = process.env.VITE_SUPABASE_URL;
+const enProduction = !!process.env.VERCEL || process.env.NODE_ENV === "production";
+if (enProduction && !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error(
+    "SUPABASE_SERVICE_ROLE_KEY est absente. Sans elle l'API tomberait sur la clé anon, " +
+    "qui n'a accès à aucune table depuis la fermeture des policies : toutes les données " +
+    "apparaîtraient vides. Définissez-la dans les variables d'environnement Vercel.",
+  );
+}
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY;
 if (!supabaseUrl || !supabaseKey) throw new Error("VITE_SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY (ou VITE_SUPABASE_ANON_KEY en dev) doivent être définis dans les variables d'environnement.");
 const supabase = createClient(supabaseUrl, supabaseKey, {
