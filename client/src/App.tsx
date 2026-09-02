@@ -54,10 +54,16 @@ const AdminMeetings = lazy(() => import("@/pages/admin/meetings-admin"));
 const AdminStudentMessages = lazy(() => import("@/pages/admin/student-messages-admin"));
 const AdminGroupWork = lazy(() => import("@/pages/admin/group-work-admin"));
 const Stats = lazy(() => import("@/pages/stats"));
+
+// Centre d'aide — public : quelqu'un qui hésite à s'inscrire doit pouvoir lire comment se
+// passe l'admission sans créer de compte. Le serveur élargit la liste des articles quand un
+// jeton étudiant accompagne la requête.
+const CentreAide = lazy(() => import("@/pages/aide"));
 import { getToken, ADMIN_BASE } from "@/lib/admin";
 import { isStudentLoggedIn } from "@/lib/student";
 import { useEffect } from "react";
 import { CookieConsent } from "@/components/cookie-consent";
+import { AideFlottante } from "@/components/support/aide-flottante";
 
 function RequireGuard({ isAuthed, loginPath, children }: { isAuthed: () => unknown; loginPath: string; children: React.ReactNode }) {
   const [, navigate] = useLocation();
@@ -156,10 +162,21 @@ function App() {
             <Route path="/contact">{() => <Layout><Contact /></Layout>}</Route>
             <Route path="/stats">{() => <Layout><Stats /></Layout>}</Route>
             <Route path="/elearning">{() => <Layout><ELearning /></Layout>}</Route>
+            {/* L'article AVANT l'index : wouter sert la première route qui correspond, et
+                `/aide` seul ne capte pas `/aide/mon-article`, mais l'ordre inverse rendrait
+                la lecture du fichier trompeuse. Les deux mènent au même composant, qui
+                distingue les deux cas avec useRoute. */}
+            <Route path="/aide/:slug">{() => <Layout><CentreAide /></Layout>}</Route>
+            <Route path="/aide">{() => <Layout><CentreAide /></Layout>}</Route>
 
             <Route>{() => <Layout><NotFound /></Layout>}</Route>
           </Switch>
           </Suspense>
+          {/* Monté une seule fois pour toute l'application : la salle de cours n'utilise pas
+              la coque de l'espace étudiant, et le poser dans la coque l'aurait fait
+              disparaître de la page où l'on passe le plus de temps. Le composant décide
+              lui-même où il s'affiche, et ne parle au serveur qu'après un clic. */}
+          <AideFlottante />
         </TooltipProvider>
       </QueryClientProvider>
     </HelmetProvider>

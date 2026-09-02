@@ -237,14 +237,18 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
           </button>
         </div>
 
-        <a href="mailto:contact@louisfarm.com"
+        {/* Menait à un `mailto:` — c'est-à-dire, pour un étudiant sur téléphone, à un client
+            de messagerie souvent non configuré, et pour nous à un message sans contexte qu'il
+            fallait instruire en repartant de zéro. Le centre d'aide répond d'abord ; le
+            formulaire, lui, joint l'état du dossier tout seul. */}
+        <Link href="/aide"
           className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] text-muted-foreground hover:text-foreground hover:bg-muted">
           <LifeBuoy className="w-4 h-4 shrink-0" />
           <span className="min-w-0">
             <span className="block leading-tight">Besoin d'aide ?</span>
-            <span className="block text-[11px] text-muted-foreground/80 leading-tight truncate">Écrivez-nous</span>
+            <span className="block text-[11px] text-muted-foreground/80 leading-tight truncate">Centre d'aide</span>
           </span>
-        </a>
+        </Link>
       </div>
     </>
   );
