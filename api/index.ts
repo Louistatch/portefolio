@@ -23,6 +23,7 @@ import {
   type ContexteSupport, type Constat,
 } from "../shared/support.js";
 import { TESTS_PARCOURS, type TestParcours } from "./program-tests.js";
+import { qrSvg, urlVerification } from "./qr.js";
 import {
   GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_MAX_MEMBERS,
   GROUP_WORK_ELIGIBILITY_WEEKS, GROUP_FORMATION_LEAD_WEEKS,
@@ -5562,6 +5563,14 @@ function certificateSvg(opts: {
       ${txt(`<text y="56" font-size="15" fill="#94a3b8">Certificat N° <tspan font-family="monospace" font-weight="700" fill="${accent}">${esc(opts.certNo)}</tspan></text>`)}
       ${txt(`<text y="82" font-size="15" font-weight="600" fill="${accent}">Vérifiable sur louisfarm.com/academy/verify-certificate</text>`)}
     </g>
+
+    <!-- QR de vérification.
+         Dessiné hors de txt() : ce n'est pas du texte, donc il doit apparaître AUSSI dans le
+         décor rasterisé du PDF (certificateSvg(opts, false)), sans quoi le PDF n'en aurait
+         pas. Il occupe la bande libre entre le bloc de mentions, centré autour de x=842, et
+         le sceau, qui commence à x=1408. -->
+    ${qrSvg(urlVerification(SITE_URL, opts.certNo), { x: 1200, y: 940, taille: 150, couleur: "#0f172a" })}
+    ${txt(`<text x="1275" y="1108" font-size="13" fill="#94a3b8" text-anchor="middle">Scanner pour vérifier</text>`)}
     <g transform="translate(1480,1010)">
       <circle r="72" fill="none" stroke="${accent}" stroke-width="3"/>
       <circle r="58" fill="none" stroke="${accent}" stroke-width="1.5" stroke-dasharray="3 3"/>
@@ -5814,6 +5823,11 @@ function certificateHtml(opts: {
   .meta .no { font-family:monospace; color:#0d9488; font-weight:700; }
   .meta .site { color:#0d9488; font-weight:600; }
   .badge-seal { width:30mm; height:30mm; position:relative; }
+  /* Le QR reprend la place et la taille qu'il occupe dans le SVG et le PDF : un même
+     document doit se présenter pareil quel que soit le format téléchargé. */
+  .qr { text-align:center; }
+  .qr svg { width:22mm; height:22mm; display:block; }
+  .qr span { display:block; margin-top:1.5mm; font-size:8px; color:#94a3b8; }
   ${opts.score != null ? '.score { position:absolute; top:13mm; right:16mm; text-align:center; z-index:3; }\n  .score-ring { width:20mm; height:20mm; border-radius:50%; border:2.5px solid #0d9488; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f0fdfa; }\n  .score-ring b { font-size:17px; color:#0d9488; font-weight:800; line-height:1; }\n  .score-ring span { font-size:7px; color:#64748b; letter-spacing:1px; }' : ''}
   @media print { body{background:#fff;} .no-print{display:none;} }
   .no-print { position:fixed; top:12px; right:12px; z-index:99; }
@@ -5866,6 +5880,10 @@ function certificateHtml(opts: {
         ${expires ? `<p class="valid">Valable jusqu'au ${expires}</p>` : `<p class="valid">Certification permanente</p>`}
         <p>Certificat N° <span class="no">${opts.certNo}</span></p>
         <p class="site">Vérifiable sur louisfarm.com/academy/verify-certificate</p>
+      </div>
+      <div class="qr">
+        <svg viewBox="0 0 150 150" xmlns="http://www.w3.org/2000/svg">${qrSvg(urlVerification(SITE_URL, opts.certNo), { x: 0, y: 0, taille: 150 })}</svg>
+        <span>Scanner pour vérifier</span>
       </div>
       <svg class="badge-seal" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
         <circle cx="50" cy="50" r="46" fill="none" stroke="#0d9488" stroke-width="2"/>

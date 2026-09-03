@@ -113,6 +113,42 @@ export const PROGRAMS: Program[] = [
     // savoir faire — lire du pandas, une probabilité, un quantile. Vingt questions, 70 %.
     admission: { nbQuestions: 20, seuil: 14, surStudents: false },
   },
+  {
+    id: "scoops",
+    prefix: "SCOOP-",
+    title: "Droit coopératif OHADA",
+    subtitle: "Monter, immatriculer et gouverner une société coopérative conforme",
+    // Cinquième titre. Public encore distinct : responsables de groupements de producteurs,
+    // agents d'ONG et de projets qui accompagnent des coopératives, conseillers d'unions et
+    // de faîtières, agents de l'administration chargée des coopératives.
+    credential: "Certificat de Praticien du Droit Coopératif OHADA",
+    outcome: "Choisir la forme, rédiger des statuts conformes, immatriculer, affecter les excédents, se fédérer.",
+    // ── Sur cette cinquième teinte ──
+    //
+    // Le commentaire du parcours « fcq » ci-dessus affirmait qu'aucune quatrième teinte
+    // catégorielle ne survivait au contrôle de séparation une fois teal, violet et ambre
+    // pris. C'était vrai des candidates alors examinées ; ça ne l'est pas de celle-ci, et il
+    // fallait le mesurer avant de l'écrire. Simulation de Viénot–Brettel, ΔE CIE76 contre
+    // les quatre accents en place, en vision normale, deutéranope et protanope :
+    //
+    //   #1e3a8a  ΔE minimum 32,1 (vs violet en deutéranopie)   contraste 10,36:1 sur blanc
+    //   #3730a3  ΔE minimum 22,5      #1e40af  ΔE minimum 18,6
+    //   #1d4ed8  ΔE minimum 10,6      #b91c1c  ΔE minimum  5,0   ← écartées
+    //
+    // Une fuchsia sombre mesurait mieux encore, et a été écartée quand même : elle aurait
+    // signalé par sa parenté visuelle avec le violet que ce parcours est un niveau de la
+    // formation de formateurs, ce qu'il n'est pas. Le bleu profond ouvre une famille neuve.
+    accent: "#1e3a8a",
+    // Huit leçons, une par semaine : le parcours tient en 8 semaines dans la fenêtre
+    // d'admission de 13. Le droit ne se révise pas en accéléré — chaque semaine porte un
+    // acte de la vie de la coopérative, dans l'ordre où on le rencontre sur le terrain.
+    lessonsPerWeek: 1,
+    // Aucune question ne suppose de connaître l'Acte uniforme : ce serait un test que seuls
+    // les anciens élèves réussiraient. Le test vérifie ce qu'il faut déjà savoir faire —
+    // lire un article de règlement et en tirer une conséquence, distinguer les formes
+    // juridiques usuelles, compter en pourcentages. Vingt questions, seuil à 70 %.
+    admission: { nbQuestions: 20, seuil: 14, surStudents: false },
+  },
 ];
 
 /** Parcours auquel appartient un cours, d'après son code. */

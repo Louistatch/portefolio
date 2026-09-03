@@ -20,6 +20,7 @@ import {
 import { QUESTIONS_TOF } from "@shared/tof-test";
 import { QUESTIONS_FCA } from "@shared/fca-test";
 import { QUESTIONS_FCQ } from "@shared/fcq-test";
+import { QUESTIONS_SCOOPS } from "@shared/scoops-test";
 import { programById } from "@shared/programs";
 
 /**
@@ -40,6 +41,7 @@ const BANQUES_PARCOURS: Record<string, { domain: string; q: string; opts: string
   tof: QUESTIONS_TOF.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
   fca: QUESTIONS_FCA.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
   fcq: QUESTIONS_FCQ.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
+  scoops: QUESTIONS_SCOOPS.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
 };
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -563,18 +565,20 @@ export default function ELearning() {
           </div>
         </section>
 
-        {/* ── Trois parcours ──
-            Les trois portes s'ouvrent : chaque parcours a sa banque de questions et sa
-            route d'admission. FCA-01 est resté un temps sans bouton, sa banque n'étant pas
-            écrite — proposer une porte qui ne s'ouvre pas est pire que ne rien proposer. */}
+        {/* ── Les parcours ──
+            Chaque parcours a sa banque de questions et sa route d'admission, et toutes les
+            portes s'ouvrent. FCA-01 est resté un temps sans bouton, sa banque n'étant pas
+            écrite — proposer une porte qui ne s'ouvre pas est pire que ne rien proposer.
+            La grille passe à trois colonnes avec le cinquième parcours : 3 + 2 se lit mieux
+            que 4 + 1, et laisse aux cartes la largeur qu'exige leur tableau. */}
         <section className="max-w-6xl mx-auto px-5 sm:px-6 pb-14">
           <div className="flex items-baseline gap-4 mb-6">
             <h2 className="font-serif text-2xl sm:text-[28px] font-semibold tracking-tight">
-              Quatre parcours, quatre portes d'entrée
+              Cinq parcours, cinq portes d'entrée
             </h2>
             <span className="flex-1 h-px bg-border" />
           </div>
-          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
                 code: "MEAL-01 · 02 · 03", teinte: "#0D9488", titre: "Cursus MEAL",
@@ -606,6 +610,14 @@ export default function ELearning() {
                 titreDelivre: "Attestation de fin de parcours",
                 fond: "bg-violet-50 dark:bg-violet-950/30", encre: "text-violet-800 dark:text-violet-300",
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("tof") },
+              },
+              {
+                code: "SCOOP-01", teinte: "#1E3A8A", titre: "Droit coopératif OHADA",
+                texte: "Passer d'un groupement de fait à une société coopérative immatriculée : choisir la forme, rédiger des statuts conformes, immatriculer, affecter les excédents, se fédérer.",
+                lignes: [["Leçons", "8"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"], ["Public", "Responsables de groupements"]],
+                titreDelivre: "Certificat de Praticien du Droit Coopératif OHADA",
+                fond: "bg-blue-50 dark:bg-blue-950/30", encre: "text-blue-900 dark:text-blue-300",
+                action: { libelle: "Passer le test", onClick: () => demarrerTest("scoops") },
               },
             ].map(p => (
               <Spotlight key={p.code} className="lift border border-border rounded-lg bg-card overflow-hidden flex flex-col">

@@ -1,0 +1,2319 @@
+/**
+ * Contenu du cours SCOOP-01 — Droit coopératif OHADA : monter et gouverner une SCOOPS.
+ *
+ * ── Pourquoi ce cours existe ──
+ *
+ * Sur le terrain ouest-africain, l'écrasante majorité des « coopératives » n'en sont pas au
+ * sens du droit. Ce sont des groupements de fait, des associations déclarées, des GIE, ou
+ * des structures dont les statuts recopient un modèle trouvé ailleurs sans que personne ne
+ * sache quelle forme a été choisie ni quelles obligations elle entraîne. La conséquence est
+ * concrète et se paie au guichet : pas de personnalité juridique, donc pas de compte au nom
+ * du groupement, pas de contrat d'approvisionnement opposable, pas de dossier recevable
+ * auprès d'un bailleur ou d'une institution de financement.
+ *
+ * L'Acte uniforme relatif au droit des sociétés coopératives, adopté le 15 décembre 2010 à
+ * Lomé et applicable depuis le 15 mai 2011, a substitué un régime unique aux lois nationales
+ * antérieures. Quinze ans plus tard, l'ignorer reste la règle plutôt que l'exception.
+ *
+ * ── Sur les sources ──
+ *
+ * Chaque règle énoncée ici renvoie à son article, et chaque article a été relu dans le texte
+ * publié au Journal Officiel de l'OHADA n° 23 du 15 février 2011. Là où la doctrine s'écarte
+ * du texte — et cela arrive, y compris dans les supports de formation les plus diffusés —
+ * c'est le texte qui fait foi et l'écart est signalé plutôt que masqué (voir la leçon 2 sur
+ * l'article 6 et le nombre de principes coopératifs).
+ *
+ * Ce que l'Acte uniforme NE règle pas est dit aussi clairement que ce qu'il règle : la
+ * fiscalité, l'agrément des coopératives d'épargne et de crédit, l'organisation
+ * interprofessionnelle d'une filière relèvent du droit national ou régional. Un cours de
+ * droit qui laisse croire qu'un seul texte suffit forme des praticiens qui se feront
+ * refouler au premier guichet.
+ *
+ * ── Sur les cas pratiques ──
+ *
+ * Les coopératives citées en exemple sont fictives ; leurs situations sont construites à
+ * partir de configurations réellement rencontrées (maraîchage périurbain, cacao, riz de bas-
+ * fond, karité, épargne-crédit villageoise). Aucun chiffre n'est présenté comme une donnée
+ * officielle : ce sont des données d'exercice, annoncées comme telles.
+ */
+
+export type Cellule =
+  | { type: "md"; content: string }
+  | { type: "callout"; title: string; content: string; variant: "info" | "warning" | "success" | "tip" }
+  | {
+      type: "exercise"; id: string; kind: "number" | "choice" | "text";
+      title: string; prompt: string; answer: any;
+      opts?: string[]; accept?: string[]; tolerance?: number; unit?: string;
+      hint?: string; explain: string;
+    }
+  | { type: "resource"; title: string; url: string; desc: string; provider: string };
+
+export interface LeconScoop {
+  ordre: number;
+  titre: string;
+  points: number;
+  cellules: Cellule[];
+}
+
+export const SCOOP_01 = {
+  code: "SCOOP-01",
+  titre: "Droit coopératif OHADA : monter et gouverner une société coopérative",
+  description:
+    "Huit semaines pour passer d'un groupement de fait à une société coopérative "
+    + "immatriculée, gouvernée et fédérable. Choix de la forme entre SCOOPS et COOP-CA, "
+    + "rédaction des statuts et du règlement intérieur, assemblée générale constitutive, "
+    + "immatriculation au Registre des Sociétés Coopératives, affectation des excédents, "
+    + "unions et fédérations. Chaque règle est rattachée à son article de l'Acte uniforme du "
+    + "15 décembre 2010.",
+  niveau: "intermediaire",
+  outils: ["Acte uniforme OHADA", "Statuts et règlement intérieur", "Registre des sociétés coopératives"],
+};
+
+export const LECONS_SCOOP_01: LeconScoop[] = [
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    ordre: 1,
+    titre: "Comprendre l'OHADA : ce que l'Acte uniforme a changé, et pour qui",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Le problème par lequel il faut commencer\n\n"
+          + "Un groupement de quarante maraîchers cotise depuis six ans, achète ses semences "
+          + "ensemble, vend sa production ensemble, tient un cahier de comptes. Il s'appelle "
+          + "« coopérative » sur sa pancarte. Il demande un crédit de campagne.\n\n"
+          + "Le chargé de clientèle demande trois pièces : le numéro d'immatriculation, les "
+          + "statuts, le procès-verbal de l'assemblée qui a désigné les dirigeants. Le "
+          + "groupement n'a aucune des trois. Le dossier s'arrête là — non pas parce que "
+          + "l'activité est mauvaise, mais parce que **du point de vue du droit, il n'y a "
+          + "personne en face**. Pas de personnalité juridique, donc pas de titulaire de "
+          + "compte, pas de signataire d'un contrat, pas de débiteur qu'on puisse poursuivre "
+          + "— et donc, pas de créancier qui prête.\n\n"
+          + "Ce cours porte sur ce passage-là : du groupement de fait à la société coopérative "
+          + "immatriculée. Ce n'est pas une formalité administrative. C'est ce qui transforme "
+          + "un collectif en sujet de droit.",
+      },
+      {
+        type: "md",
+        content:
+          "## Le texte, et les trois dates qui comptent\n\n"
+          + "L'**Acte uniforme relatif au droit des sociétés coopératives** (on écrira ici "
+          + "« l'Acte uniforme », et les articles cités sans autre précision sont les siens) "
+          + "a été :\n\n"
+          + "- **adopté le 15 décembre 2010 à Lomé** ;\n"
+          + "- **publié au Journal Officiel de l'OHADA n° 23 du 15 février 2011** ;\n"
+          + "- **applicable quatre-vingt-dix jours après cette publication**, soit le "
+          + "**15 mai 2011** (art. 397).\n\n"
+          + "Une quatrième date en découle. L'article 396 abroge toute disposition nationale "
+          + "contraire, **sous réserve d'une application transitoire de deux ans** au profit "
+          + "des coopératives qui n'avaient pas encore mis leurs statuts en harmonie. Ce délai "
+          + "a expiré le **15 mai 2013**.\n\n"
+          + "Autrement dit : depuis 2013, une structure qui se dit coopérative dans un État "
+          + "partie et dont les statuts ne sont pas conformes à l'Acte uniforme n'a plus de "
+          + "régime de repli. Elle n'est pas « une coopérative sous l'ancienne loi ». L'ancienne "
+          + "loi n'existe plus.",
+      },
+      {
+        type: "callout",
+        title: "Ce n'est pas un texte de plus, c'est le texte à la place des autres",
+        variant: "warning",
+        content:
+          "En Europe, le statut de société coopérative européenne s'ajoute aux lois nationales : "
+          + "on peut choisir l'un ou l'autre. L'Acte uniforme, lui, se substitue aux lois "
+          + "nationales sur les coopératives, qui ont vocation à disparaître. Il n'y a pas deux "
+          + "régimes entre lesquels arbitrer. C'est la différence la plus mal comprise sur le "
+          + "terrain, et celle qui produit le plus de statuts invalides : on rédige d'après un "
+          + "modèle national antérieur à 2011, et on obtient un document que le registre refuse.",
+      },
+      {
+        type: "md",
+        content:
+          "## Qui est concerné (art. 1er et 2)\n\n"
+          + "**L'article 1er** soumet à l'Acte uniforme toute société coopérative, toute union "
+          + "et toute fédération dont le **siège social** est situé sur le territoire d'un État "
+          + "partie — et les confédérations qui optent pour la forme coopérative. Le critère est "
+          + "le siège, pas la nationalité des membres ni le lieu de l'activité.\n\n"
+          + "Il ajoute une précision décisive : les coopératives **qui exercent une activité "
+          + "commerciale** relèvent quand même de l'Acte uniforme, et non de l'Acte uniforme sur "
+          + "les sociétés commerciales. Vendre du cacao ne fait pas d'une coopérative une "
+          + "société commerciale.\n\n"
+          + "**L'article 2** pose deux règles qu'il faut retenir ensemble :\n\n"
+          + "1. Ses dispositions sont **d'ordre public** — on n'y déroge pas par les statuts, "
+          + "sauf là où le texte autorise expressément les coopérateurs à le compléter ou à y "
+          + "substituer leurs stipulations. Cette autorisation revient très souvent (« les "
+          + "statuts prévoient… », « dans les conditions fixées par les statuts »), et repérer "
+          + "où elle est donnée est l'essentiel du métier de rédacteur de statuts.\n"
+          + "2. Les coopératives ayant pour objet une **activité bancaire ou financière** "
+          + "restent soumises, pour l'exercice de cette activité, au droit interne ou "
+          + "communautaire. Une coopérative d'épargne et de crédit relève donc de **deux** "
+          + "corpus : l'Acte uniforme pour sa forme coopérative, la réglementation des systèmes "
+          + "financiers décentralisés pour son agrément et sa surveillance.",
+      },
+      {
+        type: "md",
+        content:
+          "## La définition (art. 4), lue mot à mot\n\n"
+          + "> « La société coopérative est un **groupement autonome de personnes** "
+          + "**volontairement réunies** pour satisfaire leurs **aspirations et besoins "
+          + "économiques, sociaux et culturels communs**, au moyen d'une **entreprise** dont la "
+          + "**propriété et la gestion sont collectives** et où le **pouvoir est exercé "
+          + "démocratiquement** et selon les principes coopératifs. »\n\n"
+          + "Six éléments, chacun avec une conséquence pratique :\n\n"
+          + "| Élément du texte | Ce qu'il implique |\n"
+          + "|---|---|\n"
+          + "| groupement **de personnes** | jamais unipersonnelle ; le capital ne commande pas |\n"
+          + "| **volontairement** réunies | pas d'adhésion imposée par une autorité ou un projet |\n"
+          + "| besoins **économiques, sociaux et culturels** | l'objet dépasse le chiffre d'affaires |\n"
+          + "| au moyen d'une **entreprise** | ce n'est ni une ONG ni une association caritative |\n"
+          + "| propriété et gestion **collectives** | les réserves n'appartiennent à personne en particulier |\n"
+          + "| pouvoir **démocratique** | une personne, une voix (art. 102) |\n\n"
+          + "L'alinéa 2 du même article ajoute que la coopérative peut traiter avec des "
+          + "**usagers non coopérateurs**, dans les limites fixées par les statuts. C'est une "
+          + "ouverture utile — et un danger que les statuts doivent borner, on y revient en "
+          + "leçon 5.",
+      },
+      {
+        type: "md",
+        content:
+          "## Le lien commun et la double qualité\n\n"
+          + "**L'article 8** définit la coopérative comme composée de coopérateurs « unis par le "
+          + "**lien commun** sur la base duquel la société a été créée », qui **participent "
+          + "effectivement** à ses activités et reçoivent des parts sociales en représentation de "
+          + "leurs apports.\n\n"
+          + "Le lien commun, c'est le critère objectif qui fait qu'on est fondé à se regrouper : "
+          + "un métier, une filière, un territoire, une forme juridique. Il devra figurer dans "
+          + "les statuts (art. 18, 5°) et il servira ensuite à trancher des questions très "
+          + "concrètes — qui peut adhérer, à qui une part peut être cédée.\n\n"
+          + "De cet article découle la notion centrale de tout le droit coopératif, la **double "
+          + "qualité**. Le coopérateur est simultanément :\n\n"
+          + "- **associé** — il détient des parts, il vote, il est éligible aux organes, il "
+          + "participe aux pertes ;\n"
+          + "- **usager** — il apporte sa récolte, son épargne ou son travail à la coopérative, "
+          + "et en obtient un service.\n\n"
+          + "C'est cette superposition qui explique presque toutes les règles particulières du "
+          + "droit coopératif. Les excédents sont redistribués **au prorata des opérations** "
+          + "faites avec la coopérative (art. 112) et non au prorata du capital, parce que "
+          + "l'excédent vient de l'activité de l'usager, pas de l'apport de l'associé.\n\n"
+          + "**L'article 5** ne pose aucune limite de secteur : les coopératives « exercent leur "
+          + "action dans toutes les branches de l'activité humaine ». Et **l'article 3** oblige "
+          + "en retour à choisir l'une des formes prévues par l'Acte uniforme — on ne peut pas "
+          + "inventer une forme coopérative sur mesure.",
+      },
+      {
+        type: "md",
+        content:
+          "## Quatre voisins qu'il ne faut pas confondre\n\n"
+          + "| | Coopérative (OHADA) | Association | Société commerciale | GIE |\n"
+          + "|---|---|---|---|---|\n"
+          + "| But | servir ses membres | but non lucratif | partager des bénéfices | prolonger l'activité de ses membres |\n"
+          + "| Vote | 1 personne = 1 voix | 1 personne = 1 voix | proportionnel au capital | selon le contrat |\n"
+          + "| Capital | variable, obligatoire | pas de capital | fixe | peut être sans capital |\n"
+          + "| Excédents | réserves, puis ristournes au prorata des opérations | non distribuables | dividendes au prorata des parts | selon le contrat |\n"
+          + "| Boni de liquidation | dévolu à d'autres coopératives (art. 196) | dévolu | partagé entre associés | partagé |\n"
+          + "| Texte | Acte uniforme du 15/12/2010 | loi nationale | AUSCGIE | AUSCGIE |\n\n"
+          + "La ligne décisive est la dernière du milieu. Une structure qui prévoit de partager "
+          + "son actif net entre ses membres à la dissolution **n'est pas une coopérative**, "
+          + "quel que soit son nom : l'article 196 y fait obstacle. C'est le test le plus rapide "
+          + "pour qualifier des statuts qu'on vous soumet.",
+      },
+      {
+        type: "exercise",
+        id: "s1e1",
+        kind: "choice",
+        title: "La date d'application",
+        prompt:
+          "L'Acte uniforme a été adopté le 15 décembre 2010 et publié au Journal Officiel de "
+          + "l'OHADA n° 23 du 15 février 2011. À partir de quelle date est-il applicable ?",
+        opts: [
+          "Le 15 décembre 2010, jour de son adoption",
+          "Le 15 février 2011, jour de sa publication",
+          "Le 15 mai 2011, quatre-vingt-dix jours après sa publication",
+          "Le 15 mai 2013, à l'expiration du délai de mise en harmonie",
+        ],
+        answer: 2,
+        hint: "L'article 397 fixe un délai qui court à compter de la publication, pas de l'adoption.",
+        explain:
+          "Article 397 : l'Acte uniforme est applicable quatre-vingt-dix jours à compter de sa "
+          + "publication au Journal Officiel de l'OHADA, soit le 15 mai 2011. Le 15 mai 2013 est "
+          + "une autre date, celle de l'expiration du délai de deux ans de l'article 396 — le "
+          + "temps laissé aux coopératives existantes pour mettre leurs statuts en harmonie.",
+      },
+      {
+        type: "exercise",
+        id: "s1e2",
+        kind: "choice",
+        title: "Une coopérative d'épargne et de crédit",
+        prompt:
+          "Une COOPEC villageoise a son siège au Togo. Quel régime lui est applicable ?",
+        opts: [
+          "L'Acte uniforme seul : il est d'ordre public et écarte les autres textes",
+          "Le droit interne ou communautaire seul, parce que son activité est financière",
+          "L'Acte uniforme pour sa forme coopérative, et le droit interne ou communautaire pour l'exercice de son activité financière",
+          "Aucun des deux : les COOPEC sont hors du champ de l'Acte uniforme",
+        ],
+        answer: 2,
+        hint: "Lisez les deux alinéas de l'article 2 ensemble, pas l'un sans l'autre.",
+        explain:
+          "Article 2 : ses dispositions sont d'ordre public (alinéa 1er), mais les sociétés "
+          + "coopératives ayant pour objet des activités bancaires ou financières « demeurent "
+          + "soumises aux dispositions du droit interne ou communautaire relatives à l'exercice "
+          + "de ces activités » (alinéa 2). Les deux corpus s'appliquent : l'Acte uniforme pour "
+          + "la forme, la réglementation des systèmes financiers décentralisés pour l'agrément "
+          + "et la surveillance. C'est aussi ce que confirme l'article 78, qui subordonne "
+          + "l'exercice de l'activité aux règles propres à cette activité.",
+      },
+      {
+        type: "exercise",
+        id: "s1e3",
+        kind: "choice",
+        title: "Qualifier des statuts",
+        prompt:
+          "On vous soumet les statuts d'un groupement de productrices de karité. Une clause "
+          + "prévoit qu'en cas de dissolution, l'actif net subsistant sera partagé entre les "
+          + "membres au prorata de leurs parts. Que concluez-vous ?",
+        opts: [
+          "C'est régulier : les parts ont été souscrites, elles donnent droit à l'actif",
+          "C'est irrégulier : le boni de liquidation doit être dévolu à d'autres coopératives ou organismes du mouvement coopératif",
+          "C'est régulier si l'assemblée générale l'a voté à l'unanimité",
+          "C'est régulier pour une coopérative simplifiée, irrégulier pour une coopérative avec conseil d'administration",
+        ],
+        answer: 1,
+        hint: "Cette clause est le test le plus rapide pour savoir si un texte est vraiment coopératif.",
+        explain:
+          "Article 196 : le boni de liquidation est dévolu à d'autres sociétés coopératives ou "
+          + "à des organismes œuvrant pour la promotion du mouvement coopératif. Aucune majorité "
+          + "ne peut en décider autrement, et la règle ne dépend pas de la forme choisie : "
+          + "l'Acte uniforme est d'ordre public sur ce point (art. 2). La raison de fond est "
+          + "l'article 4 — les réserves sont la propriété collective des coopérateurs, ce qui "
+          + "protège la coopérative contre la démutualisation, c'est-à-dire la tentation de "
+          + "sortir du statut coopératif pour encaisser la valeur accumulée.",
+      },
+      {
+        type: "exercise",
+        id: "s1e4",
+        kind: "text",
+        title: "Le critère de rattachement",
+        prompt:
+          "Une coopérative dont tous les membres sont ghanéens exerce l'essentiel de son "
+          + "activité au Ghana, mais son siège social est établi à Lomé. Quel élément décide de "
+          + "l'application de l'Acte uniforme ? Répondez en deux mots.",
+        answer: "siège social",
+        accept: ["le siege social", "siege social", "son siege", "le siege"],
+        hint: "Relisez la première phrase de l'article 1er : elle ne parle ni des membres ni de l'activité.",
+        explain:
+          "Article 1er : est soumise à l'Acte uniforme toute société coopérative « dont le siège "
+          + "social est situé sur le territoire de l'un des États Parties ». Ni la nationalité "
+          + "des coopérateurs ni le lieu de l'activité n'entrent en compte — l'article 3 le "
+          + "confirme en visant « toutes personnes, quelle que soit leur nationalité ». Le siège "
+          + "étant à Lomé, l'Acte uniforme s'applique.",
+      },
+      {
+        type: "exercise",
+        id: "s1e5",
+        kind: "choice",
+        title: "La double qualité",
+        prompt:
+          "Dans une coopérative de riz, un membre a souscrit 40 parts et livré 2 tonnes cette "
+          + "campagne ; un autre a souscrit 4 parts et livré 20 tonnes. Sur quelle base les "
+          + "ristournes sont-elles réparties entre eux ?",
+        opts: [
+          "Au prorata des parts souscrites : 40 contre 4",
+          "Au prorata des tonnages livrés : 2 contre 20",
+          "À parts égales, en application du principe une personne une voix",
+          "Librement, l'assemblée générale décidant chaque année de la clé",
+        ],
+        answer: 1,
+        hint: "La ristourne rémunère l'usager, pas l'associé.",
+        explain:
+          "Article 112 : les ristournes sont versées « proportionnellement aux opérations faites "
+          + "par eux avec la société coopérative ou au travail effectué en faveur de cette "
+          + "dernière ». C'est la traduction financière de la double qualité : l'excédent est né "
+          + "de l'activité, il retourne à ceux qui l'ont produite. Le principe une personne une "
+          + "voix (art. 102) gouverne le vote, pas la répartition. Et le capital, lui, ne peut "
+          + "recevoir qu'un intérêt plafonné (art. 209), jamais une part des excédents au prorata "
+          + "des parts.",
+      },
+      {
+        type: "resource",
+        title: "Acte uniforme relatif au droit des sociétés coopératives",
+        url: "https://www.ohada.com/textes-ohada/actes-uniformes.html",
+        desc:
+          "Le texte intégral, 397 articles. À garder ouvert pendant tout le parcours : chaque "
+          + "leçon renvoie à ses articles, et l'habitude d'aller vérifier soi-même vaut mieux "
+          + "que n'importe quel résumé.",
+        provider: "OHADA",
+      },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    ordre: 2,
+    titre: "Les principes coopératifs, tels que l'Acte uniforme les écrit",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Pourquoi les principes sont du droit, et pas de la philosophie\n\n"
+          + "Dans beaucoup de statuts, les principes coopératifs figurent en préambule, en "
+          + "belles phrases, et personne n'y revient jamais. C'est une erreur de lecture.\n\n"
+          + "L'article 6 dispose que la société coopérative « **est constituée et gérée** selon "
+          + "les principes coopératifs universellement reconnus ». Ce n'est pas une déclaration "
+          + "d'intention : c'est une norme de constitution et de gestion. Et elle est "
+          + "sanctionnée — l'article 178 f) permet à la juridiction compétente de **dissoudre** "
+          + "une coopérative qui « n'est pas organisée ou ne fait pas de transactions selon les "
+          + "principes coopératifs ».\n\n"
+          + "Un principe dont la violation peut entraîner la dissolution n'est pas de la "
+          + "philosophie. C'est la sanction la plus lourde du texte.",
+      },
+      {
+        type: "md",
+        content:
+          "## Ce que l'article 6 énumère exactement\n\n"
+          + "Recopié du texte publié au Journal Officiel :\n\n"
+          + "1. l'adhésion volontaire et ouverte à tous ;\n"
+          + "2. le pouvoir démocratique exercé par les coopérateurs ;\n"
+          + "3. la participation économique des coopérateurs ;\n"
+          + "4. l'autonomie et l'indépendance ;\n"
+          + "5. l'éducation, la formation et l'information ;\n"
+          + "6. l'engagement volontaire envers la communauté.\n\n"
+          + "Puis, en alinéa séparé : « **Toute discrimination fondée sur le sexe ou sur "
+          + "l'appartenance ethnique, religieuse ou politique est interdite.** »\n\n"
+          + "Comptez : **six** principes énumérés, plus une interdiction de discriminer.",
+      },
+      {
+        type: "callout",
+        title: "Six, et non sept — un écart que la plupart des supports de formation ne signalent pas",
+        variant: "warning",
+        content:
+          "L'Alliance coopérative internationale en énonce sept depuis la déclaration de "
+          + "Manchester de 1995, dont « la coopération entre les coopératives ». Plusieurs "
+          + "supports de formation très diffusés — y compris des présentations universitaires "
+          + "du nouveau droit OHADA — annoncent que l'article 6 « cite sept principes » et "
+          + "incluent celui-là dans leur citation. Le texte publié n'en énumère que six et ne "
+          + "mentionne pas la coopération entre coopératives.\n\n"
+          + "Cela ne veut pas dire que l'Acte uniforme s'en désintéresse : il lui consacre au "
+          + "contraire tout un titre, les articles 133 et suivants sur les unions, fédérations, "
+          + "confédérations et réseaux (leçon 8). Le principe est organisé, il n'est simplement "
+          + "pas énuméré à l'article 6.\n\n"
+          + "Retenez surtout la méthode : quand un support et le texte divergent, c'est le texte "
+          + "qui fait foi. Devant un juge ou un agent du registre, on cite l'article, pas le "
+          + "support.",
+      },
+      {
+        type: "md",
+        content:
+          "## Ce que chaque principe impose, article à l'appui\n\n"
+          + "### 1. Adhésion volontaire et ouverte à tous\n\n"
+          + "Ouverte, mais pas inconditionnelle : le candidat doit partager le **lien commun** "
+          + "(art. 8). La demande d'adhésion est écrite, datée et signée, adressée à l'organe "
+          + "d'administration, qui peut fixer l'adhésion à la date de la demande ou à une date "
+          + "ultérieure **ne dépassant pas trois mois** ; l'assemblée générale entérine "
+          + "(art. 10). La qualité de coopérateur est constatée par un acte comportant "
+          + "l'identité, l'adresse, **la signature ou l'empreinte digitale** de l'intéressé.\n\n"
+          + "Cette dernière mention n'est pas anodine : le texte a été écrit pour des sociétaires "
+          + "qui ne savent pas tous écrire. Un règlement intérieur qui exigerait une signature "
+          + "manuscrite ajouterait une condition que la loi n'a pas voulue.\n\n"
+          + "### 2. Pouvoir démocratique exercé par les coopérateurs\n\n"
+          + "**Article 102** : « Chaque coopérateur dispose d'une voix quelle que soit "
+          + "l'importance de sa participation au capital. » Sans exception, sans vote plural — "
+          + "sauf, et c'est la seule ouverture, dans les unions, fédérations et confédérations, "
+          + "où le règlement intérieur peut prévoir un droit de vote plural (art. 68).\n\n"
+          + "**Article 100** : la participation à l'assemblée est personnelle ; les coopérateurs "
+          + "empêchés peuvent voter par procuration **sauf clause contraire des statuts**, et "
+          + "dans ce cas les statuts déterminent les modalités, « dont notamment le nombre de "
+          + "coopérateurs et/ou de voix qu'un mandataire peut représenter ». Deux décisions "
+          + "reviennent donc au rédacteur : autoriser ou non la procuration, et la plafonner. Ne "
+          + "rien écrire, c'est ouvrir la porte au dirigeant qui arrive à l'assemblée avec "
+          + "trente procurations en poche.\n\n"
+          + "### 3. Participation économique des coopérateurs\n\n"
+          + "C'est la double qualité vue en leçon 1, mais du côté des obligations. "
+          + "**L'article 47** impose au coopérateur de **participer aux pertes** et de **faire "
+          + "des transactions** avec la coopérative conformément à son objet. **L'article 13 b)** "
+          + "en tire la conséquence : ne pas traiter volontairement avec sa coopérative pendant "
+          + "**deux années consécutives** est un motif d'exclusion.\n\n"
+          + "Un membre qui ne livre jamais rien n'est pas un membre passif : c'est un membre "
+          + "exclusible.\n\n"
+          + "### 4. Autonomie et indépendance\n\n"
+          + "Principalement l'indépendance à l'égard de l'État et des projets de développement. "
+          + "L'Acte uniforme ne donne aux pouvoirs publics aucun pouvoir de direction — mais "
+          + "**l'article 178** permet à « l'autorité administrative chargée des coopératives ou "
+          + "à toute personne intéressée » de saisir le juge d'une demande de dissolution. Le "
+          + "contrôle existe, il passe par le juge et non par la tutelle.\n\n"
+          + "L'autre expression de ce principe est l'article 18, 18°, qui impose aux statuts de "
+          + "fixer « **l'étendue des transactions avec les usagers non coopérateurs, tout en "
+          + "ayant en vue la sauvegarde de l'autonomie de la société coopérative** ». Une "
+          + "coopérative dont 90 % du chiffre d'affaires vient de non-membres n'est plus au "
+          + "service de ses membres : elle est devenue une entreprise ordinaire avec un "
+          + "actionnariat curieux.\n\n"
+          + "### 5. Éducation, formation et information\n\n"
+          + "Ce principe est le seul à être **financé par la loi**. L'article 114 impose la "
+          + "constitution d'une réserve « destinée à la formation, à l'éducation et à la "
+          + "sensibilisation aux principes coopératifs », alimentée dans les mêmes conditions "
+          + "que la réserve générale. On y revient en détail en leçon 7 : c'est de l'argent que "
+          + "la coopérative doit mettre de côté, pas une bonne intention.\n\n"
+          + "### 6. Engagement volontaire envers la communauté\n\n"
+          + "Le seul principe que l'Acte uniforme énonce sans le définir. Il se traduit "
+          + "indirectement : ancrage territorial, obligation de loyauté et de fidélité "
+          + "(art. 13 c), dévolution du boni à d'autres coopératives (art. 196).",
+      },
+      {
+        type: "callout",
+        title: "La lacune que les statuts doivent combler",
+        variant: "tip",
+        content:
+          "L'Acte uniforme ne fixe aucun plafond de détention de parts par un seul coopérateur. "
+          + "Le principe une personne une voix protège le vote, mais pas le rapport de force "
+          + "économique : un membre détenant l'essentiel du capital peut menacer de se retirer "
+          + "et d'exiger le remboursement de ses parts, ce qui viderait la trésorerie.\n\n"
+          + "L'article 18, 10° permet aux statuts de fixer « toute limite relative au "
+          + "pourcentage maximal de parts sociales que peut détenir un seul membre ». C'est une "
+          + "mention facultative dans sa mise en œuvre mais listée parmi les mentions "
+          + "obligatoires : autrement dit, les statuts doivent en traiter. Ne pas la remplir, "
+          + "c'est laisser ouverte la principale porte de sortie du contrôle démocratique.",
+      },
+      {
+        type: "exercise",
+        id: "s2e1",
+        kind: "number",
+        title: "Compter ce que le texte énumère",
+        prompt:
+          "Combien de principes coopératifs l'article 6 de l'Acte uniforme énumère-t-il "
+          + "explicitement ? (Répondez par un nombre. L'interdiction de discriminer, qui figure "
+          + "à l'alinéa suivant, n'est pas un principe énuméré.)",
+        answer: 6,
+        tolerance: 0,
+        hint: "Comptez les tirets du texte publié, sans ajouter ce que vous savez de la déclaration de l'ACI.",
+        explain:
+          "Six : adhésion volontaire et ouverte à tous ; pouvoir démocratique exercé par les "
+          + "coopérateurs ; participation économique des coopérateurs ; autonomie et "
+          + "indépendance ; éducation, formation et information ; engagement volontaire envers "
+          + "la communauté. L'Alliance coopérative internationale en compte sept depuis 1995 — "
+          + "le septième, « la coopération entre les coopératives », n'est pas repris dans "
+          + "l'énumération de l'article 6, alors même que les articles 133 et suivants "
+          + "l'organisent longuement. Un support qui annonce sept principes cite l'ACI, pas "
+          + "l'Acte uniforme.",
+      },
+      {
+        type: "exercise",
+        id: "s2e2",
+        kind: "choice",
+        title: "Un membre qui ne livre plus",
+        prompt:
+          "Un coopérateur d'une coopérative cacaoyère n'a effectué aucune transaction avec elle "
+          + "depuis deux campagnes complètes, alors qu'il continue de produire et de vendre à un "
+          + "acheteur privé. Que permet l'Acte uniforme ?",
+        opts: [
+          "Rien : l'adhésion est volontaire, la participation ne peut pas être imposée",
+          "Une majoration de sa cotisation, décidée par le comité de gestion",
+          "Son exclusion, la non-réalisation volontaire de transactions pendant deux années consécutives étant un motif prévu par le texte",
+          "La suspension automatique de son droit de vote, sans autre formalité",
+        ],
+        answer: 2,
+        hint: "L'obligation de traiter avec sa coopérative est à l'article 47 ; sa sanction est à l'article 13.",
+        explain:
+          "Article 13 b) : la coopérative peut exclure, après avis écrit, le coopérateur qui « ne "
+          + "fait pas volontairement de transactions avec la société coopérative pendant deux "
+          + "années consécutives ». C'est la sanction de l'obligation posée à l'article 47. "
+          + "L'exclusion n'est pas automatique pour autant : elle est prononcée par l'assemblée "
+          + "générale par résolution spéciale dûment motivée, ou par le comité de gestion ou le "
+          + "conseil d'administration sous réserve de confirmation par l'assemblée (art. 14), "
+          + "et le coopérateur dispose d'un recours (art. 15).",
+      },
+      {
+        type: "exercise",
+        id: "s2e3",
+        kind: "choice",
+        title: "Le poids d'un gros porteur de parts",
+        prompt:
+          "Dans une coopérative de 60 membres, l'un détient 62 % du capital social. Lors de "
+          + "l'assemblée générale ordinaire, de combien de voix dispose-t-il ?",
+        opts: [
+          "62 % des voix, à proportion de sa participation",
+          "Une voix, comme chacun des autres coopérateurs",
+          "Une voix, sauf clause contraire des statuts",
+          "Un nombre de voix fixé par le règlement intérieur",
+        ],
+        answer: 1,
+        hint: "L'article 102 ne réserve aucune exception statutaire pour les coopératives de base.",
+        explain:
+          "Article 102 : « Chaque coopérateur dispose d'une voix quelle que soit l'importance de "
+          + "sa participation au capital de la société coopérative. » La règle est d'ordre "
+          + "public (art. 2) et les statuts ne peuvent pas y déroger. Le vote plural n'est "
+          + "envisageable que dans les unions, fédérations et confédérations, par le règlement "
+          + "intérieur (art. 68). Reste que sa position économique lui donne un moyen de "
+          + "pression que le vote n'encadre pas : c'est précisément ce que l'article 18, 10° "
+          + "invite les statuts à borner en plafonnant la détention de parts.",
+      },
+      {
+        type: "exercise",
+        id: "s2e4",
+        kind: "choice",
+        title: "Une adhésion refusée",
+        prompt:
+          "Le comité de gestion d'une coopérative maraîchère refuse l'adhésion d'une "
+          + "candidate au motif qu'elle n'est pas de la même confession que la majorité des "
+          + "membres. Sur quel fondement ce refus est-il attaquable ?",
+        opts: [
+          "Sur l'article 6, qui interdit toute discrimination fondée sur le sexe ou sur l'appartenance ethnique, religieuse ou politique",
+          "Sur l'article 4, qui définit la coopérative comme un groupement autonome",
+          "Sur aucun : l'agrément des candidatures est discrétionnaire",
+          "Sur l'article 102, qui garantit l'égalité des voix",
+        ],
+        answer: 0,
+        hint: "L'interdiction est écrite noir sur blanc, à l'alinéa qui suit l'énumération des principes.",
+        explain:
+          "Article 6, dernier alinéa : « Toute discrimination fondée sur le sexe ou sur "
+          + "l'appartenance ethnique, religieuse ou politique est interdite. » Le principe "
+          + "d'adhésion ouverte n'oblige pas à admettre n'importe qui — le candidat doit "
+          + "partager le lien commun (art. 8) et suivre la procédure de l'article 10 — mais il "
+          + "interdit ces motifs-là. Et l'enjeu dépasse le cas individuel : une coopérative qui "
+          + "sélectionne ainsi n'est pas « organisée selon les principes coopératifs », ce qui "
+          + "ouvre la voie de l'article 178 f).",
+      },
+      {
+        type: "exercise",
+        id: "s2e5",
+        kind: "text",
+        title: "La sanction ultime",
+        prompt:
+          "Quelle mesure la juridiction compétente peut-elle prononcer, sur le fondement de "
+          + "l'article 178 f), contre une coopérative qui n'est pas organisée et ne fait pas ses "
+          + "transactions selon les principes coopératifs ? Répondez en un mot.",
+        answer: "dissolution",
+        accept: ["la dissolution", "dissoudre", "dissoudre la cooperative"],
+        hint: "C'est la plus lourde des sanctions du texte, et elle vise l'existence même de la société.",
+        explain:
+          "La dissolution. Article 178 f) : la juridiction compétente peut, sur saisine de "
+          + "l'autorité administrative chargée des coopératives ou de toute personne intéressée, "
+          + "dissoudre la société coopérative « lorsqu'elle n'est pas organisée ou ne fait pas "
+          + "de transactions selon les principes coopératifs ». C'est ce qui fait des principes "
+          + "de l'article 6 une norme et non un préambule décoratif. Le juge doit toutefois "
+          + "laisser un délai de régularisation avant de prononcer la dissolution — cent vingt "
+          + "jours, article 179, que nous verrons en leçon 7.",
+      },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    ordre: 3,
+    titre: "Choisir la forme : SCOOPS ou COOP-CA",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Une décision qu'on ne prend qu'une fois\n\n"
+          + "L'Acte uniforme n'institue que **deux formes** de société coopérative, et "
+          + "l'article 3 oblige à choisir l'une d'elles :\n\n"
+          + "- la **société coopérative simplifiée**, dont la dénomination doit être "
+          + "immédiatement précédée ou suivie, en caractères lisibles, de l'expression « Société "
+          + "Coopérative Simplifiée » et du sigle **« SCOOPS »** (art. 205) ;\n"
+          + "- la **société coopérative avec conseil d'administration**, avec l'expression "
+          + "« Société Coopérative avec Conseil d'Administration » et le sigle **« COOP-CA »** "
+          + "(art. 268).\n\n"
+          + "Ce choix n'est pas cosmétique. Il commande le nombre minimum de membres, les "
+          + "organes, la libération du capital, l'obligation ou non de commissaire aux comptes. "
+          + "Et l'Acte uniforme n'organise **aucune passerelle** entre les deux : changer de "
+          + "forme suppose une modification des statuts dans les conditions de l'assemblée "
+          + "générale extraordinaire, avec toutes les formalités de publicité qui suivent.",
+      },
+      {
+        type: "callout",
+        title: "Le sigle exact, et pourquoi il compte",
+        variant: "warning",
+        content:
+          "Beaucoup de modèles de statuts en circulation — y compris des modèles diffusés par "
+          + "des services officiels — écrivent « SCOOPS-CA » ou « SCOOP-CA » pour la coopérative "
+          + "avec conseil d'administration. Le sigle imposé par l'article 268 est "
+          + "**« COOP-CA »**. Le sigle « SCOOPS », lui, est bien celui de la coopérative "
+          + "simplifiée (art. 205).\n\n"
+          + "Un sigle inexact sur les statuts, l'enseigne et le papier à en-tête n'annule pas la "
+          + "société, mais il se corrige au prix d'une inscription modificative au registre et "
+          + "d'un avis dans un journal d'annonces légales (art. 80 et 81). Autant l'écrire juste "
+          + "du premier coup.",
+      },
+      {
+        type: "md",
+        content:
+          "## Les deux formes, colonne par colonne\n\n"
+          + "| | SCOOPS | COOP-CA |\n"
+          + "|---|---|---|\n"
+          + "| Membres minimum | **5** personnes physiques ou morales (art. 204) | **15** personnes physiques ou morales (art. 267) |\n"
+          + "| Organe de direction | comité de gestion, **3 membres au plus**, portable à **5** par les statuts dès que le nombre de coopérateurs atteint **100** (art. 223) | conseil d'administration, **3 au moins, 12 au plus** (art. 292) |\n"
+          + "| Membres de l'organe de direction | personnes physiques uniquement (art. 223) | personnes physiques **ou morales** (art. 292 et 296) |\n"
+          + "| Organe de contrôle | commission de surveillance, **3 à 5** personnes physiques élues par l'AG (art. 257-258) | conseil de surveillance, **3 à 5** personnes physiques élues parmi les coopérateurs (art. 335) |\n"
+          + "| Rémunération des dirigeants | fonctions **non rémunérées** ; frais remboursables dans les conditions fixées par l'AG (art. 225 et 263) | fonctions **gratuites** ; remboursement des frais de déplacement et de mission, sur justificatifs (art. 305) |\n"
+          + "| Souscription du capital | capital initial indiqué dans les statuts (art. 207) | capital **entièrement souscrit avant l'assemblée générale constitutive** (art. 269) |\n"
+          + "| Libération des apports en numéraire | les coopérateurs sans fonds peuvent s'engager à libérer **par cotisations périodiques**, dans le délai fixé par les statuts (art. 207) | **un quart au moins** à la souscription, le solde dans un délai qui ne peut excéder **trois ans** à compter de l'immatriculation (art. 270) |\n"
+          + "| Commissaire aux comptes | non exigé | exigé si **trois conditions cumulatives** sont réunies (art. 121) |\n",
+      },
+      {
+        type: "md",
+        content:
+          "## Le commissaire aux comptes : trois conditions, et elles sont cumulatives\n\n"
+          + "**Article 121** : les coopératives avec conseil d'administration sont tenues de "
+          + "désigner au moins un commissaire aux comptes lorsqu'elles remplissent les "
+          + "conditions suivantes :\n\n"
+          + "- nombre total de coopérateurs **supérieur à mille** ;\n"
+          + "- chiffre d'affaires **supérieur à cent millions** ;\n"
+          + "- total de bilan **supérieur à cinq millions**.\n\n"
+          + "Le mot à retenir est « **et** » : le texte pose une liste, et l'obligation ne naît "
+          + "que si les trois seuils sont franchis ensemble. Une COOP-CA de 1 200 membres "
+          + "réalisant 80 millions de chiffre d'affaires n'est pas tenue d'en désigner un — ce "
+          + "qui, au passage, dit quelque chose de la solidité du contrôle légal dans les "
+          + "coopératives de taille moyenne, et explique pourquoi le conseil de surveillance et "
+          + "la faîtière comptent autant en pratique (art. 340).\n\n"
+          + "Le commissaire aux comptes est nommé par l'assemblée générale **pour trois "
+          + "exercices** et choisi parmi les commissaires agréés dans l'État concerné. Rien "
+          + "n'interdit à une coopérative non assujettie d'en désigner un volontairement : les "
+          + "bailleurs le demandent souvent, et c'est un argument de dossier.",
+      },
+      {
+        type: "md",
+        content:
+          "## Le non-cumul des mandats, et ce qu'il casse en pratique\n\n"
+          + "**Article 300** : un administrateur — en son nom propre ou comme représentant "
+          + "permanent d'une personne morale — ne peut siéger simultanément dans plus d'un "
+          + "conseil d'administration de coopérative ayant son siège dans un même État. Celui "
+          + "qui se retrouve en infraction dispose de **trois mois** pour se démettre d'un "
+          + "mandat ; passé ce délai, il est réputé démis du nouveau, sans que les délibérations "
+          + "auxquelles il a pris part soient remises en cause.\n\n"
+          + "**Article 326** : nul ne peut présider simultanément deux conseils "
+          + "d'administration, ni deux comités de gestion, ni l'un et l'autre, dans un même État "
+          + "partie.\n\n"
+          + "Ces règles sont importées du droit des sociétés commerciales et elles s'accordent "
+          + "mal avec la vie coopérative réelle. Les unions et les fédérations sont tenues "
+          + "d'adopter la forme coopérative et relèvent des règles des COOP-CA (leçon 8). Or "
+          + "l'administrateur d'une coopérative de base est exactement la personne qu'on "
+          + "voudrait voir siéger au conseil de l'union : c'est lui qui connaît la filière. "
+          + "L'article 300 le lui interdit dans le même État.\n\n"
+          + "Conséquence pratique à anticiper dès la constitution : la faîtière devra être "
+          + "administrée par des coopérateurs qui ne sont pas administrateurs de leur "
+          + "coopérative de base — donc il faut former plus de monde que le strict nécessaire.",
+      },
+      {
+        type: "callout",
+        title: "La grille de décision, en trois questions",
+        variant: "tip",
+        content:
+          "**1. Combien serez-vous, réellement, le jour de l'assemblée constitutive ?** "
+          + "Moins de quinze : la question est tranchée, ce sera une SCOOPS (art. 204 et 267). "
+          + "Ne gonflez pas la liste pour atteindre quinze — l'article 51 permet à tout "
+          + "intéressé de demander la dissolution si le nombre reste sous le seuil légal plus "
+          + "d'un an.\n\n"
+          + "**2. Vos membres peuvent-ils libérer un quart du capital le jour de la "
+          + "souscription ?** Non, et il faudra étaler par cotisations : la SCOOPS l'autorise "
+          + "expressément (art. 207), la COOP-CA impose le quart immédiat (art. 270). C'est "
+          + "souvent le critère décisif en milieu rural.\n\n"
+          + "**3. Avez-vous besoin qu'une personne morale siège à la direction ?** Une union, "
+          + "une autre coopérative, un GIE membre : seul le conseil d'administration peut les "
+          + "accueillir (art. 292 et 296) ; le comité de gestion d'une SCOOPS est réservé aux "
+          + "personnes physiques (art. 223).\n\n"
+          + "Dans le doute, et pour un groupement de producteurs de première constitution : "
+          + "**SCOOPS**. On monte en COOP-CA quand la taille l'impose, pas l'inverse.",
+      },
+      {
+        type: "exercise",
+        id: "s3e1",
+        kind: "number",
+        title: "Le seuil d'entrée",
+        prompt:
+          "Un groupement de neuf riziculteurs veut se constituer en société coopérative avec "
+          + "conseil d'administration. Combien de personnes lui manque-t-il au minimum ?",
+        answer: 6,
+        tolerance: 0,
+        hint: "Le minimum de la COOP-CA figure à l'article 267 ; celui de la SCOOPS, à l'article 204.",
+        explain:
+          "Six. L'article 267 exige au moins quinze personnes physiques ou morales pour une "
+          + "société coopérative avec conseil d'administration ; ils sont neuf, il en manque "
+          + "donc six. Le conseil pratique reste le même : à neuf, la forme adaptée est la "
+          + "SCOOPS, qui n'en demande que cinq (art. 204). Recruter six adhérents pour atteindre "
+          + "un seuil formel produit des membres qui ne participent pas — et l'article 13 b) "
+          + "les rend exclusibles au bout de deux ans, ce qui ramènerait la coopérative sous le "
+          + "seuil et ouvrirait la voie de l'article 51.",
+      },
+      {
+        type: "exercise",
+        id: "s3e2",
+        kind: "choice",
+        title: "Le commissaire aux comptes",
+        prompt:
+          "Une COOP-CA compte 1 400 coopérateurs, réalise 90 millions de chiffre d'affaires et "
+          + "présente un total de bilan de 12 millions. Est-elle tenue de désigner un "
+          + "commissaire aux comptes ?",
+        opts: [
+          "Oui : deux des trois seuils de l'article 121 sont franchis",
+          "Oui : dès mille coopérateurs, la désignation est obligatoire",
+          "Non : les trois conditions de l'article 121 sont cumulatives et le chiffre d'affaires reste sous cent millions",
+          "Non : seules les sociétés commerciales y sont tenues",
+        ],
+        answer: 2,
+        hint: "Relisez la liste de l'article 121 en vous demandant si elle se lit avec « et » ou avec « ou ».",
+        explain:
+          "Non. L'article 121 énonce trois conditions — plus de mille coopérateurs, chiffre "
+          + "d'affaires supérieur à cent millions, total de bilan supérieur à cinq millions — et "
+          + "elles sont cumulatives. Avec 90 millions de chiffre d'affaires, la coopérative "
+          + "n'est pas assujettie. Rien ne l'empêche d'en désigner un volontairement, ce que "
+          + "font beaucoup de coopératives qui sollicitent des financements : le contrôle légal "
+          + "n'est pas le seul motif de faire certifier ses comptes.",
+      },
+      {
+        type: "exercise",
+        id: "s3e3",
+        kind: "choice",
+        title: "Libérer le capital",
+        prompt:
+          "Vingt maraîchères souscrivent chacune 50 000 F de parts. La plupart ne disposeront "
+          + "des fonds qu'après la vente de la prochaine campagne. Quelle forme permet "
+          + "d'échelonner la libération par cotisations périodiques ?",
+        opts: [
+          "La COOP-CA, l'article 270 laissant trois ans pour libérer le solde",
+          "La SCOOPS, l'article 207 autorisant l'engagement de libérer par cotisations périodiques dans le délai fixé par les statuts",
+          "Les deux, sans différence",
+          "Aucune : le capital doit toujours être intégralement libéré à la constitution",
+        ],
+        answer: 1,
+        hint: "L'une des deux formes exige un versement minimum le jour même de la souscription.",
+        explain:
+          "La SCOOPS. L'article 207 prévoit que les associés ne disposant pas des fonds "
+          + "nécessaires « peuvent prendre l'engagement de procéder à cette libération par "
+          + "cotisations périodiques dans un délai fixé par les statuts ». La COOP-CA, elle, "
+          + "impose la libération d'**un quart au moins** de la valeur nominale dès la "
+          + "souscription (art. 270) — le solde pouvant ensuite s'étaler sur trois ans au plus à "
+          + "compter de l'immatriculation. La réponse 0 décrit correctement le délai du solde en "
+          + "COOP-CA, mais oublie le quart immédiat, qui est justement l'obstacle ici.",
+      },
+      {
+        type: "exercise",
+        id: "s3e4",
+        kind: "choice",
+        title: "Le comité de gestion s'élargit",
+        prompt:
+          "Une SCOOPS passe de 80 à 130 coopérateurs. Son comité de gestion compte trois "
+          + "membres. Que permet l'Acte uniforme ?",
+        opts: [
+          "Rien : le comité de gestion est plafonné à trois membres en toutes circonstances",
+          "Le porter à cinq membres, si les statuts le prévoient, le seuil de cent coopérateurs étant atteint",
+          "Le porter à douze membres, comme un conseil d'administration",
+          "Le porter à cinq membres automatiquement, sans base statutaire",
+        ],
+        answer: 1,
+        hint: "L'article 223 pose un plafond, puis une exception qui dépend d'un effectif et d'une clause.",
+        explain:
+          "Article 223 : la SCOOPS est dirigée par un comité de gestion de trois membres au "
+          + "plus ; « lorsque le nombre de coopérateurs est au moins de cent ou lorsque ce seuil "
+          + "est atteint en cours de vie sociale, le nombre des membres du comité de gestion "
+          + "**peut être porté par les statuts** de trois à cinq ». Deux conditions, donc : le "
+          + "seuil de cent, et une clause statutaire. L'élargissement n'est pas automatique — si "
+          + "les statuts sont muets, il faut d'abord les modifier.",
+      },
+      {
+        type: "exercise",
+        id: "s3e5",
+        kind: "text",
+        title: "Le sigle",
+        prompt:
+          "Quel sigle l'article 268 impose-t-il de faire figurer avec la dénomination d'une "
+          + "société coopérative avec conseil d'administration ?",
+        answer: "COOP-CA",
+        accept: ["coopca", "coop ca"],
+        hint: "Ce n'est pas celui que reprennent la plupart des modèles de statuts en circulation.",
+        explain:
+          "« COOP-CA ». Article 268 : la dénomination doit être immédiatement précédée ou "
+          + "suivie, en caractères lisibles, de l'expression « Société Coopérative avec Conseil "
+          + "d'Administration » et du sigle « COOP-CA ». Beaucoup de modèles écrivent "
+          + "« SCOOPS-CA », par symétrie avec le sigle « SCOOPS » de la coopérative simplifiée "
+          + "(art. 205) — l'Acte uniforme ne l'emploie nulle part. L'erreur se corrige au prix "
+          + "d'une inscription modificative au registre (art. 80) et d'un avis publié (art. 81).",
+      },
+      {
+        type: "exercise",
+        id: "s3e6",
+        kind: "choice",
+        title: "Deux mandats dans le même pays",
+        prompt:
+          "Un coopérateur préside le comité de gestion de sa SCOOPS. L'union de la filière, "
+          + "constituée sous forme de COOP-CA dans le même État, souhaite l'élire président de "
+          + "son conseil d'administration. Est-ce possible ?",
+        opts: [
+          "Oui : le cumul n'est prohibé qu'entre deux mandats de même nature",
+          "Oui, à condition que l'assemblée générale de la SCOOPS l'autorise",
+          "Non : l'article 326 interdit expressément de cumuler une présidence de conseil d'administration et une présidence de comité de gestion dans un même État partie",
+          "Non, sauf si les deux structures ont des objets différents",
+        ],
+        answer: 2,
+        hint: "L'article 326 vise successivement trois cumuls, dont un croisé.",
+        explain:
+          "Non. L'article 326 interdit d'exercer simultanément plus d'un mandat de président de "
+          + "conseil d'administration ou de président de comité de gestion dans un même État "
+          + "partie, **et** ajoute expressément qu'on ne peut cumuler une présidence de conseil "
+          + "d'administration et une présidence de comité de gestion. L'article 300 pose la même "
+          + "logique pour les simples administrateurs. C'est l'une des dispositions les plus mal "
+          + "ajustées du texte à la réalité coopérative : elle prive systématiquement les "
+          + "faîtières des dirigeants les plus expérimentés de leur base. À anticiper en formant "
+          + "plus de responsables que le minimum requis.",
+      },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    ordre: 4,
+    titre: "Le capital, les parts et l'argent des membres",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Un capital qui bouge, et pourquoi c'est voulu\n\n"
+          + "**Article 52** : « Le capital de la société coopérative est **variable**. » Une "
+          + "phrase, et tout le régime financier en découle.\n\n"
+          + "Dans une société ordinaire, le capital est fixé aux statuts : l'augmenter ou le "
+          + "réduire suppose une assemblée extraordinaire, une modification statutaire, un dépôt "
+          + "au registre. Dans une coopérative, l'adhésion d'un nouveau membre ou le retrait "
+          + "d'un ancien fait varier le capital **sans aucune de ces formalités** — c'est ce que "
+          + "vise l'article 56 en réservant « les cas de variation du capital initial par "
+          + "retraits ou adhésions de coopérateurs ».\n\n"
+          + "C'est la traduction financière du principe de porte ouverte : on ne peut pas "
+          + "prétendre à une adhésion libre et ouverte si chaque adhésion coûte une assemblée "
+          + "générale extraordinaire.\n\n"
+          + "Le prix à payer est réel : le patrimoine de la coopérative peut fondre. Trois "
+          + "protections y répondent — les réserves impartageables (leçon 7), le délai de "
+          + "remboursement, et la responsabilité des coopérateurs.",
+      },
+      {
+        type: "md",
+        content:
+          "## Les trois apports (art. 30, 33 à 43)\n\n"
+          + "**Article 30** : *chaque* coopérateur doit faire un apport. Il n'y a pas de membre "
+          + "sans apport. **Article 33** : l'apport peut être\n\n"
+          + "### En numéraire (art. 34 à 36)\n\n"
+          + "De l'argent, dont la propriété est transférée à la société. Les apports en "
+          + "numéraire destinés au capital de constitution sont **libérés intégralement** lors "
+          + "de la constitution, « sauf dispositions contraires du présent Acte uniforme » — et "
+          + "ces dispositions contraires existent, ce sont précisément les articles 207 (SCOOPS) "
+          + "et 270 (COOP-CA) vus en leçon 3. En cas de retard, les sommes dues portent **de "
+          + "plein droit intérêt au taux légal**, sans mise en demeure (art. 35).\n\n"
+          + "### En nature (art. 37 à 42)\n\n"
+          + "Un magasin, une décortiqueuse, un terrain, une marque. Ils doivent être **libérés "
+          + "intégralement** à la constitution (art. 37) et l'apporteur en est garant « comme un "
+          + "vendeur envers son acheteur » (art. 38) : si le matériel apporté est vicié, il en "
+          + "répond.\n\n"
+          + "Point de vigilance : **ce sont les coopérateurs eux-mêmes qui évaluent les apports "
+          + "en nature et en garantissent la valeur** (art. 41), l'évaluation figurant dans les "
+          + "statuts (art. 42). Aucun commissaire aux apports n'est imposé. C'est une "
+          + "simplification bienvenue et la principale source de contentieux entre membres : "
+          + "faites évaluer par un tiers même si la loi ne l'exige pas, et annexez le rapport.\n\n"
+          + "### En industrie (art. 43)\n\n"
+          + "De la main-d'œuvre ou du savoir-faire. Deux règles à connaître par cœur :\n\n"
+          + "- **il concourt à la formation du capital social initial** et donne droit à des "
+          + "parts conférant la qualité de coopérateur (art. 54, al. 2) — ce qui distingue "
+          + "nettement le droit coopératif du droit des sociétés commerciales ;\n"
+          + "- **à défaut de clause statutaire**, la part de l'apporteur en industrie est égale "
+          + "à celle du coopérateur **qui a le moins apporté** (art. 43). Il doit en outre "
+          + "compte à la société de tous les gains réalisés par l'activité objet de son apport.\n\n"
+          + "Autrement dit, le silence des statuts a une conséquence chiffrée et souvent "
+          + "défavorable à l'intéressé. Si vous acceptez un apport en industrie, écrivez son "
+          + "régime.",
+      },
+      {
+        type: "md",
+        content:
+          "## Ce qu'est une part sociale, et ce qu'elle n'est pas\n\n"
+          + "**Article 45** : toutes les parts sont nominatives, **leur valeur nominale est la "
+          + "même pour toutes** et fixée dans les statuts ; elles ne peuvent être émises "
+          + "en dessous de cette valeur.\n\n"
+          + "**Article 46** — ce que la part confère : un droit sur les excédents lorsque leur "
+          + "répartition a été décidée conformément aux statuts, un droit aux avantages et "
+          + "prestations de la coopérative, le droit de participer aux décisions collectives et "
+          + "de voter.\n\n"
+          + "**Article 47** — ce qu'elle oblige : participer aux pertes sociales, **et** faire "
+          + "des transactions avec la coopérative conformément à son objet.\n\n"
+          + "**Article 48** : sauf clause contraire sur la répartition des résultats, les droits "
+          + "et obligations de tous les coopérateurs « sont égaux **quel que soit le montant de "
+          + "leurs apports** ».\n\n"
+          + "**Article 49** — le régime de circulation, à citer mot pour mot parce qu'il est "
+          + "souvent déformé : les parts sociales sont « **nominatives, individuelles, non "
+          + "négociables, insaisissables et cessibles selon les conditions fixées par les "
+          + "statuts** ». Elles ne peuvent faire l'objet de nantissement.\n\n"
+          + "Quatre conséquences :\n\n"
+          + "1. **non négociables** — pas de marché, pas de cote, pas de cession à un inconnu ;\n"
+          + "2. **cessibles selon les statuts** — la cession n'est donc pas interdite, elle est "
+          + "encadrée ; des statuts muets sur ce point rendent toute cession impraticable ;\n"
+          + "3. **insaisissables** — le créancier personnel d'un coopérateur ne peut pas saisir "
+          + "ses parts ; c'est une protection considérable pour un producteur endetté ;\n"
+          + "4. **pas de nantissement** — on ne peut donc pas les donner en garantie d'un prêt. "
+          + "L'idée, fréquente, de « gager ses parts pour obtenir un crédit » est juridiquement "
+          + "impossible.",
+      },
+      {
+        type: "callout",
+        title: "Retrait : ce que la coopérative doit rembourser, et en combien de temps",
+        variant: "info",
+        content:
+          "**Article 11.** Le coopérateur ne peut se retirer qu'après en avoir **avisé par "
+          + "écrit** la coopérative ; le retrait prend effet à la date indiquée dans l'avis, ou "
+          + "à celle de sa réception si elle est postérieure. L'organe d'administration le "
+          + "constate par écrit.\n\n"
+          + "**Au cours de l'année suivant la prise d'effet**, la coopérative rembourse, au prix "
+          + "fixé conformément aux statuts, toutes les parts détenues — ainsi que les prêts et "
+          + "autres sommes portées au crédit du membre, sous déduction du solde des prêts "
+          + "qu'elle lui a consentis et des intérêts courus.\n\n"
+          + "**Le délai peut être porté à deux ans** lorsque l'organe de direction estime que le "
+          + "remboursement nuirait à la santé financière de la coopérative — par **décision "
+          + "motivée**, susceptible de recours devant la juridiction compétente. Ce n'est donc "
+          + "ni automatique ni discrétionnaire : il faut motiver, et la motivation est "
+          + "contestable.\n\n"
+          + "Enfin, le sortant reste tenu jusqu'à l'apurement de sa dette, et solidairement tenu "
+          + "des dettes contractées par la coopérative **avant** son retrait (art. 47, 48 et 50). "
+          + "Partir n'efface pas le passé.",
+      },
+      {
+        type: "md",
+        content:
+          "## À quel prix rembourse-t-on ? (art. 50)\n\n"
+          + "L'Acte uniforme ne tranche pas : « **les statuts définissent** les conditions de "
+          + "cession et de remboursement et la détermination de la valeur de ces droits ». "
+          + "C'est encore une décision renvoyée au rédacteur.\n\n"
+          + "Deux options praticables :\n\n"
+          + "- **à la valeur nominale** — simple, prévisible, conforme à la tradition "
+          + "coopérative internationale, et cohérent avec l'idée que la valeur accumulée "
+          + "appartient au collectif ;\n"
+          + "- **à une valeur réévaluée** — pour tenir compte de l'inflation, par exemple par "
+          + "indexation. C'est licite, mais indexer sur la *valeur réelle* de la coopérative "
+          + "reviendrait à permettre au sortant d'emporter une part des réserves, ce que "
+          + "l'article 116 interdit.\n\n"
+          + "**En cas de contestation**, l'article 50 organise une cascade : la valeur est "
+          + "déterminée par l'**organisation faîtière** à laquelle la coopérative est affiliée ; "
+          + "à défaut, par un **expert désigné d'accord parties** ou par la **juridiction "
+          + "compétente** statuant à bref délai. C'est l'une des raisons très concrètes "
+          + "d'adhérer à une union (leçon 8) : elle sert d'arbitre avant le tribunal.",
+      },
+      {
+        type: "md",
+        content:
+          "## Rémunérer le capital, sans le transformer en placement (art. 209)\n\n"
+          + "Les statuts **peuvent** prévoir une rémunération du capital. Trois bornes "
+          + "cumulatives :\n\n"
+          + "1. le taux ne peut être **supérieur au taux d'escompte de la banque centrale de "
+          + "l'État partie** ;\n"
+          + "2. l'intérêt **n'est servi que si des excédents ont été réalisés** au cours de "
+          + "l'exercice ;\n"
+          + "3. il **ne porte que sur le montant des parts sociales libérées** — pas sur les "
+          + "parts souscrites et non versées.\n\n"
+          + "La décision annuelle revient à l'assemblée générale ordinaire, sur proposition du "
+          + "comité de gestion, dans la limite ci-dessus.\n\n"
+          + "S'y ajoute une règle d'assiette souvent oubliée : les **subventions, dons et legs** "
+          + "que la coopérative reçoit « ne sont pas pris en compte pour le calcul des intérêts "
+          + "versés aux parts sociales » (art. 59). Autrement dit, l'argent d'un projet ou d'un "
+          + "bailleur ne peut pas se retrouver, par ricochet, dans la poche des porteurs de "
+          + "parts.\n\n"
+          + "Retenez la différence de nature : l'**intérêt aux parts** rémunère l'associé et il "
+          + "est plafonné ; la **ristourne** rémunère l'usager et elle est proportionnelle aux "
+          + "opérations (art. 112). Confondre les deux est l'erreur comptable la plus fréquente "
+          + "des coopératives en activité.",
+      },
+      {
+        type: "callout",
+        title: "La responsabilité : le point que les membres découvrent trop tard",
+        variant: "warning",
+        content:
+          "**Article 210** : « La responsabilité des coopérateurs est au minimum égale au "
+          + "montant des parts sociales souscrites. Néanmoins les statuts peuvent prévoir une "
+          + "responsabilité plus étendue **qui ne peut excéder cinq fois le montant des parts** "
+          + "sociales souscrites. »\n\n"
+          + "Le mot « souscrites », et non « libérées » : un membre qui a souscrit 100 000 F et "
+          + "n'en a versé que 25 000 répond quand même sur 100 000 — et jusqu'à 500 000 si les "
+          + "statuts ont retenu le multiplicateur maximal.\n\n"
+          + "C'est une clause statutaire, donc une décision consciente à prendre en assemblée "
+          + "constitutive, en l'expliquant en langue locale s'il le faut. Une coopérative qui "
+          + "retient cinq fois sans que ses membres l'aient compris prépare un contentieux à la "
+          + "première difficulté.",
+      },
+      {
+        type: "exercise",
+        id: "s4e1",
+        kind: "number",
+        title: "L'étendue de l'engagement",
+        prompt:
+          "Les statuts d'une SCOOPS retiennent le multiplicateur maximal permis par "
+          + "l'article 210. Un coopérateur a souscrit 80 000 F de parts et n'en a libéré que "
+          + "20 000 F. À hauteur de quel montant, en francs CFA, sa responsabilité peut-elle "
+          + "être engagée ?",
+        answer: 400000,
+        tolerance: 0,
+        unit: "F CFA",
+        hint: "Le texte parle de parts « souscrites », pas de parts libérées.",
+        explain:
+          "400 000 F. L'article 210 plafonne la responsabilité étendue à **cinq fois le montant "
+          + "des parts sociales souscrites** : 80 000 × 5 = 400 000. Le fait que 60 000 F "
+          + "restent à verser ne réduit pas l'assiette — au contraire, ces 60 000 F sont "
+          + "eux-mêmes dus et portent de plein droit intérêt au taux légal depuis la date où le "
+          + "versement aurait dû être effectué (art. 35). Retenir 20 000 × 5 = 100 000 revient à "
+          + "lire « libérées » là où le texte écrit « souscrites ».",
+      },
+      {
+        type: "exercise",
+        id: "s4e2",
+        kind: "choice",
+        title: "Gager ses parts",
+        prompt:
+          "Un coopérateur veut obtenir un prêt personnel auprès d'une institution de "
+          + "microfinance et propose de donner ses parts sociales en garantie. Que répond le "
+          + "droit ?",
+        opts: [
+          "C'est possible si les statuts l'autorisent expressément",
+          "C'est possible avec l'accord de l'assemblée générale",
+          "C'est impossible : les parts sociales ne peuvent faire l'objet de nantissement",
+          "C'est possible, mais seulement au profit de la coopérative elle-même",
+        ],
+        answer: 2,
+        hint: "L'article 49 se termine par une phrase courte, sans réserve statutaire.",
+        explain:
+          "Impossible. L'article 49 dispose que les parts sociales « ne peuvent faire l'objet de "
+          + "nantissement », sans renvoyer aux statuts ni à aucune autorisation. La même "
+          + "disposition les rend **insaisissables**, ce qui protège le coopérateur contre ses "
+          + "propres créanciers : les deux règles vont ensemble. Elles ne sont ni négociables "
+          + "— pas de marché — mais bien **cessibles selon les conditions fixées par les "
+          + "statuts**, ce qui est une autre question.",
+      },
+      {
+        type: "exercise",
+        id: "s4e3",
+        kind: "choice",
+        title: "Un apport en industrie sans clause",
+        prompt:
+          "Un mécanicien rejoint une coopérative de transformation et apporte son savoir-faire. "
+          + "Les statuts sont muets sur le régime de l'apport en industrie. Quelle part lui "
+          + "revient ?",
+        opts: [
+          "Aucune : l'apport en industrie ne donne pas droit à des parts sociales",
+          "Une part égale à la moyenne des apports des autres coopérateurs",
+          "Une part égale à celle du coopérateur qui a le moins apporté",
+          "Une part fixée par le comité de gestion, au cas par cas",
+        ],
+        answer: 2,
+        hint: "L'article 43 pose une règle supplétive, c'est-à-dire une règle qui ne joue qu'à défaut de clause.",
+        explain:
+          "Une part égale à celle du coopérateur qui a le moins apporté (art. 43, al. 2). C'est "
+          + "une règle supplétive : elle ne s'applique qu'à défaut de détermination par les "
+          + "statuts, ce qui est un excellent argument pour écrire ce régime plutôt que le "
+          + "subir. À noter, contre une idée reçue venue du droit des sociétés commerciales : "
+          + "l'apport en industrie **concourt bien à la formation du capital social initial** et "
+          + "donne droit à des parts conférant la qualité de coopérateur (art. 54, al. 2). "
+          + "L'apporteur doit en outre compte à la coopérative de tous les gains qu'il réalise "
+          + "par l'activité objet de son apport.",
+      },
+      {
+        type: "exercise",
+        id: "s4e4",
+        kind: "choice",
+        title: "Un retrait qui tombe mal",
+        prompt:
+          "Un coopérateur notifie son retrait par écrit le 10 mars. Il détient 1 200 000 F de "
+          + "parts, soit un tiers du capital, et la trésorerie ne le permet pas. Que peut faire "
+          + "le comité de gestion ?",
+        opts: [
+          "Refuser le retrait tant que la trésorerie ne le permet pas",
+          "Porter le délai de remboursement à deux ans, par décision motivée susceptible de recours",
+          "Étaler le remboursement sur cinq ans, comme pour la libération du capital",
+          "Imposer au sortant de céder ses parts à un tiers agréé",
+        ],
+        answer: 1,
+        hint: "Le retrait lui-même ne se refuse pas ; c'est son paiement qui peut s'aménager.",
+        explain:
+          "Article 11 : le remboursement intervient au cours de l'année suivant la prise d'effet "
+          + "du retrait, mais lorsque l'organe de direction estime qu'il « est de nature à nuire "
+          + "à la santé financière de la coopérative », il « peut porter le délai de "
+          + "remboursement à deux ans **par décision motivée susceptible de recours devant la "
+          + "juridiction compétente** ». Le retrait, lui, ne se refuse pas : il prend effet à la "
+          + "date de l'avis, l'organe d'administration ne fait que le constater. Et cinq ans "
+          + "n'existe nulle part — c'est le multiplicateur de responsabilité de l'article 210, "
+          + "pas un délai.",
+      },
+      {
+        type: "exercise",
+        id: "s4e5",
+        kind: "choice",
+        title: "Intérêt aux parts ou ristourne ?",
+        prompt:
+          "Une coopérative dégage un excédent. Ses statuts prévoient la rémunération du "
+          + "capital. Elle a par ailleurs reçu 5 millions de subvention d'un projet. Quelle "
+          + "affirmation est exacte ?",
+        opts: [
+          "L'intérêt aux parts se calcule sur l'ensemble des fonds propres, subvention comprise",
+          "L'intérêt aux parts ne peut excéder le taux d'escompte de la banque centrale, ne porte que sur les parts libérées, et la subvention n'entre pas dans son calcul",
+          "L'intérêt aux parts est libre dès lors que l'assemblée générale l'a voté",
+          "L'intérêt aux parts se répartit au prorata des opérations faites avec la coopérative",
+        ],
+        answer: 1,
+        hint: "Trois bornes à l'article 209, plus une règle d'assiette à l'article 59.",
+        explain:
+          "Article 209 : l'intérêt servi au capital ne peut être supérieur au taux d'escompte de "
+          + "la banque centrale de l'État partie, n'est dû que si des excédents ont été réalisés, "
+          + "et **ne porte que sur le montant des parts libérées**. Article 59 : les "
+          + "subventions, dons et legs « ne sont pas pris en compte pour le calcul des intérêts "
+          + "versés aux parts sociales ». La dernière proposition décrit la **ristourne** "
+          + "(art. 112), qui rémunère l'usager au prorata de ses opérations — c'est un autre "
+          + "mécanisme, et les confondre fausse l'affectation du résultat.",
+      },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    ordre: 5,
+    titre: "Rédiger les statuts et le règlement intérieur",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Les statuts sont le contrat de société (art. 17)\n\n"
+          + "Trois exigences de forme, et elles suffisent :\n\n"
+          + "- **acte sous seing privé ou acte notarié** — le notaire n'est pas obligatoire, ce "
+          + "qui divise le coût de constitution par un facteur considérable ;\n"
+          + "- **autant d'originaux qu'il en faut** pour le dépôt au siège et les formalités ;\n"
+          + "- **un exemplaire tenu à la disposition de tout associé au siège social**.\n\n"
+          + "Cette dernière obligation est celle qu'on trouve le plus souvent violée. Dans un "
+          + "grand nombre de coopératives, l'unique exemplaire des statuts est chez le président, "
+          + "à son domicile. Ce n'est pas une négligence sans conséquence : un coopérateur qui ne "
+          + "peut pas lire ses statuts ne peut pas exercer les droits qu'ils organisent.",
+      },
+      {
+        type: "md",
+        content:
+          "## Les dix-huit mentions obligatoires (art. 18)\n\n"
+          + "À vérifier une par une, dans l'ordre du texte. C'est la liste de contrôle du "
+          + "rédacteur :\n\n"
+          + "| N° | Mention |\n"
+          + "|---|---|\n"
+          + "| 1° | la forme de la société coopérative |\n"
+          + "| 2° | sa dénomination suivie, le cas échéant, de son sigle |\n"
+          + "| 3° | la nature et le domaine de son activité, qui forment son objet social |\n"
+          + "| 4° | son siège et sa durée |\n"
+          + "| 5° | **le lien commun** qui réunit les membres |\n"
+          + "| 6° | noms, prénoms et adresse résidentielle de chaque initiateur |\n"
+          + "| 7° | nombre (précis ou min/max) d'administrateurs ou de membres du comité de gestion, et les limitations de leurs pouvoirs |\n"
+          + "| 8° | nombre (précis ou min/max) des membres de l'organe de surveillance et les dispositions assurant l'exercice efficace de ses missions |\n"
+          + "| 9° | la durée du mandat de ces différents organes |\n"
+          + "| 10° | **toute limite au pourcentage maximal de parts qu'un seul membre peut détenir** |\n"
+          + "| 11° | une déclaration précisant que la coopérative est organisée et exploitée selon les principes coopératifs, **et le rappel de ces principes** |\n"
+          + "| 12° | identité des apporteurs en numéraire, montant, nombre et valeur des parts remises |\n"
+          + "| 13° | identité des apporteurs en nature, nature et **évaluation** de l'apport, parts remises, régime des biens apportés au-delà des apports exigés |\n"
+          + "| 14° | montant du capital social, limites minimale et maximale, valeur nominale des catégories de parts, conditions d'émission et de souscription |\n"
+          + "| 15° | les stipulations relatives à la répartition du résultat, **notamment des excédents et des réserves** |\n"
+          + "| 16° | les modalités de fonctionnement de la société coopérative |\n"
+          + "| 17° | **la signature des initiateurs ou l'apposition de leur empreinte digitale** |\n"
+          + "| 18° | **l'étendue des transactions avec les usagers non coopérateurs**, en vue de sauvegarder l'autonomie de la coopérative |\n\n"
+          + "Les statuts **peuvent en outre** comporter le taux de rendement maximal applicable "
+          + "aux prêts et aux épargnes des membres, le taux maximal de rémunération des parts, "
+          + "et toute limite imposée aux activités commerciales de la coopérative.",
+      },
+      {
+        type: "callout",
+        title: "Les quatre mentions qu'on oublie, et ce qu'elles coûtent",
+        variant: "warning",
+        content:
+          "**Le 5° — le lien commun.** Sans lui, plus rien ne permet de dire qui peut adhérer "
+          + "ni à qui une part peut être cédée. C'est la mention structurante de l'article 8.\n\n"
+          + "**Le 10° — le plafond de détention.** L'Acte uniforme n'en fixe aucun ; si les "
+          + "statuts n'en fixent pas non plus, un membre peut concentrer le capital et tenir la "
+          + "coopérative par la menace du retrait (art. 11).\n\n"
+          + "**Le 11° — le rappel des principes.** Ce n'est pas décoratif : c'est ce qui rend "
+          + "l'article 178 f) opposable à l'intérieur même du contrat de société.\n\n"
+          + "**Le 18° — l'étendue des opérations avec les non-coopérateurs.** Trop restrictif, "
+          + "on bloque l'activité ; trop large, la coopérative vit de tiers et perd son "
+          + "autonomie. C'est un pourcentage à discuter en assemblée, pas une phrase à recopier.",
+      },
+      {
+        type: "md",
+        content:
+          "## Ce que le registre vérifiera aussi\n\n"
+          + "Quatre articles complètent l'article 18 et se traduisent par des clauses :\n\n"
+          + "- **Article 19** — la coopérative ne peut prendre la dénomination d'une société "
+          + "déjà immatriculée au registre du commerce et du crédit mobilier **ou** au registre "
+          + "des sociétés coopératives. La dénomination doit figurer sur tous les actes destinés "
+          + "aux tiers, précédée ou suivie du sigle de la forme (SCOOPS ou COOP-CA, art. 205 et "
+          + "268). Vérifiez la disponibilité du nom **avant** l'assemblée constitutive.\n"
+          + "- **Article 20** — l'objet doit être déterminé, décrit et licite ; si l'activité est "
+          + "réglementée, la coopérative se conforme aux règles propres à cette activité. Un "
+          + "objet rédigé en une ligne vague (« toute activité agricole ») est une invitation au "
+          + "refus.\n"
+          + "- **Article 21** — l'objet détermine le caractère civil ou commercial de la "
+          + "coopérative. Cela ne change pas le texte applicable (art. 1er, dernier alinéa), "
+          + "mais emporte des conséquences fiscales et probatoires en droit national.\n"
+          + "- **Article 25 et 29** — la durée est obligatoirement mentionnée ; elle est "
+          + "prorogeable, mais les coopérateurs doivent être consultés **un an au moins** avant "
+          + "l'expiration. Une durée trop courte oblige à une assemblée extraordinaire ; une "
+          + "durée de 99 ans est l'usage.",
+      },
+      {
+        type: "md",
+        content:
+          "## Le règlement intérieur : ce qui n'a pas sa place dans les statuts (art. 67-68)\n\n"
+          + "**Forme** (art. 67) : même régime que les statuts — acte sous seing privé ou "
+          + "notarié, autant d'originaux que nécessaire, un exemplaire à la disposition de tout "
+          + "membre au siège.\n\n"
+          + "**Contenu** (art. 68) : outre les mentions obligatoires des statuts, le règlement "
+          + "intérieur contient\n\n"
+          + "- les conditions de paiement d'indemnités aux membres des organes de gestion et de "
+          + "surveillance, **dans le respect des articles 225 et 305** — c'est-à-dire dans le "
+          + "respect du principe de gratuité des fonctions : on rembourse des frais, on ne verse "
+          + "pas de rémunération déguisée ;\n"
+          + "- la souscription de **parts sociales supplémentaires** et leur nombre par "
+          + "coopérateur ;\n"
+          + "- les critères et conditions de **suspension** des coopérateurs — à ne pas "
+          + "confondre avec l'exclusion, qui relève des articles 12 à 15 ;\n"
+          + "- la possibilité d'un **droit de vote plural** dans les unions, fédérations et "
+          + "confédérations — la seule brèche admise dans le « une personne, une voix » ;\n"
+          + "- toute autre prescription utile, **conforme aux principes coopératifs et aux "
+          + "dispositions impératives** de l'Acte uniforme.\n\n"
+          + "La règle de partage est simple : ce qui définit la société va dans les statuts, ce "
+          + "qui organise la vie quotidienne va dans le règlement intérieur. L'avantage "
+          + "pratique est décisif — modifier les statuts exige une assemblée générale "
+          + "extraordinaire (art. 61) puis une inscription modificative et une publication "
+          + "(art. 80 et 81) ; le règlement intérieur, non.",
+      },
+      {
+        type: "callout",
+        title: "Se servir d'un modèle sans se faire piéger par lui",
+        variant: "tip",
+        content:
+          "Les modèles de statuts en circulation — y compris les modèles officiels de SCOOPS et "
+          + "de coopérative avec conseil d'administration, et les modèles de règlement "
+          + "intérieur — sont utiles pour la structure et dangereux pour le contenu. Quatre "
+          + "réflexes :\n\n"
+          + "**1.** Vérifier le sigle employé (COOP-CA, et non SCOOPS-CA — art. 268).\n\n"
+          + "**2.** Traquer les crochets non remplis. Un modèle laisse des blancs sur "
+          + "précisément les quatre mentions les plus stratégiques : lien commun, plafond de "
+          + "détention, étendue des opérations avec les non-coopérateurs, régime de "
+          + "remboursement des parts. Ce sont des décisions, pas des cases.\n\n"
+          + "**3.** Repérer les clauses qui contredisent une disposition d'ordre public. Les "
+          + "plus fréquentes : partage de l'actif net à la dissolution (art. 196), vote "
+          + "proportionnel au capital (art. 102), rémunération des dirigeants (art. 225 et 305).\n\n"
+          + "**4.** Passer la liste de l'article 18 en dix-huit points avant de signer. C'est "
+          + "long, cela prend une heure, et c'est ce qui distingue un dossier accepté d'un "
+          + "dossier renvoyé.",
+      },
+      {
+        type: "md",
+        content:
+          "## Que se passe-t-il si une mention manque ? (art. 63 à 66)\n\n"
+          + "Contrairement à une crainte répandue, une mention manquante **n'annule pas** la "
+          + "société. Le texte organise une régularisation :\n\n"
+          + "- **Article 63** — si les statuts ne contiennent pas toutes les énonciations "
+          + "exigées, ou si une formalité de constitution a été omise ou irrégulièrement "
+          + "accomplie, **tout intéressé** peut demander à la juridiction compétente ou à "
+          + "l'autorité administrative que soit ordonnée la régularisation. Le ministère public "
+          + "peut agir aux mêmes fins.\n"
+          + "- **Article 64** — cette action se prescrit par **trois ans** à compter de "
+          + "l'immatriculation ou de la publication de l'acte modificatif.\n"
+          + "- **Article 65** — les initiateurs **et les premiers membres des organes de gestion "
+          + "ou d'administration** sont **solidairement responsables** du préjudice causé par le "
+          + "défaut d'une mention obligatoire ou par l'omission d'une formalité. Les dirigeants "
+          + "en fonction encourent la même responsabilité en cas d'irrégularité dans une "
+          + "modification des statuts.\n"
+          + "- **Article 66** — cette action en responsabilité se prescrit par **cinq ans**.\n\n"
+          + "Retenez les deux durées : **trois ans** pour faire régulariser, **cinq ans** pour "
+          + "faire payer. Et retenez surtout que la responsabilité est **solidaire** : le membre "
+          + "du comité de gestion qui a signé sans lire répond du même préjudice que celui qui a "
+          + "rédigé.",
+      },
+      {
+        type: "exercise",
+        id: "s5e1",
+        kind: "choice",
+        title: "Un notaire est-il indispensable ?",
+        prompt:
+          "Un groupement de cinq apicultrices dispose d'un budget très serré pour sa "
+          + "constitution. Les statuts doivent-ils être notariés ?",
+        opts: [
+          "Oui : les statuts d'une société coopérative sont nécessairement notariés",
+          "Non : ils peuvent être établis par acte sous seing privé ou par acte notarié",
+          "Oui, sauf si un apport en nature est effectué",
+          "Non, sauf pour la coopérative avec conseil d'administration",
+        ],
+        answer: 1,
+        hint: "L'article 17 offre une alternative, sans condition tenant à la forme ni aux apports.",
+        explain:
+          "Article 17 : « Les statuts constituent le contrat de société. Ils sont établis par "
+          + "acte sous seing privé ou par acte notarié. » L'alternative vaut pour les deux "
+          + "formes, et l'article 67 pose la même règle pour le règlement intérieur. C'est un "
+          + "choix d'accessibilité assumé par le législateur OHADA : le coût du notaire aurait "
+          + "exclu la majorité des groupements ruraux. À noter tout de même : un apport en nature "
+          + "immobilier peut, lui, appeler des formalités de publicité foncière propres au droit "
+          + "national (art. 40).",
+      },
+      {
+        type: "exercise",
+        id: "s5e2",
+        kind: "text",
+        title: "La mention manquante",
+        prompt:
+          "On vous soumet des statuts complets, sauf sur un point : rien n'indique le critère "
+          + "objectif que les membres possèdent en commun et sur la base duquel ils se "
+          + "regroupent. Quelle mention de l'article 18 manque ? Répondez en deux mots.",
+        answer: "lien commun",
+        accept: ["le lien commun", "liencommun"],
+        hint: "C'est la mention 5°, et elle renvoie à la définition de l'article 8.",
+        explain:
+          "Le lien commun (art. 18, 5°). Il désigne le critère objectif partagé par les "
+          + "coopérateurs — un métier, une filière, un territoire, une forme juridique — et "
+          + "l'article 8 en fait l'élément constitutif du groupement. Sans lui, on ne peut plus "
+          + "instruire une demande d'adhésion (art. 10) ni apprécier une cession de parts "
+          + "(art. 49 et 50). Son absence ouvre l'action en régularisation de l'article 63 "
+          + "pendant trois ans, et engage solidairement les initiateurs pendant cinq (art. 65 "
+          + "et 66).",
+      },
+      {
+        type: "exercise",
+        id: "s5e3",
+        kind: "choice",
+        title: "Statuts ou règlement intérieur ?",
+        prompt:
+          "Une coopérative veut fixer le montant du forfait de déplacement remboursé aux "
+          + "membres du comité de gestion qui se rendent aux réunions de l'union. Où cette règle "
+          + "a-t-elle sa place ?",
+        opts: [
+          "Dans les statuts, toute question financière relevant du contrat de société",
+          "Dans le règlement intérieur, qui traite des conditions de paiement d'indemnités dans le respect des articles 225 et 305",
+          "Dans une simple délibération du comité de gestion, sans autre formalisme",
+          "Nulle part : le remboursement de frais est interdit",
+        ],
+        answer: 1,
+        hint: "L'article 68 énumère quatre catégories de prescriptions ; celle-ci est la première.",
+        explain:
+          "Dans le règlement intérieur. L'article 68 lui réserve « les conditions de paiement "
+          + "d'indemnités aux membres du conseil d'administration ou du comité de gestion, du "
+          + "conseil ou du comité de surveillance, définies dans le respect des dispositions des "
+          + "articles 225 et 305 ». Ces deux articles posent la gratuité des fonctions : on "
+          + "rembourse des frais engagés — sur justificatifs pour les administrateurs (art. 305) "
+          + "— et l'assemblée générale en fixe les conditions (art. 225). L'avantage pratique "
+          + "est décisif : le règlement intérieur se modifie sans assemblée générale "
+          + "extraordinaire ni publication, contrairement aux statuts (art. 61, 80 et 81).",
+      },
+      {
+        type: "exercise",
+        id: "s5e4",
+        kind: "number",
+        title: "Le délai pour faire régulariser",
+        prompt:
+          "Une coopérative a été immatriculée le 12 avril 2024 avec des statuts ne comportant "
+          + "pas toutes les mentions exigées. Combien d'années tout intéressé a-t-il pour "
+          + "demander la régularisation de la constitution ?",
+        answer: 3,
+        tolerance: 0,
+        unit: "ans",
+        hint: "Ne confondez pas ce délai avec celui de l'action en responsabilité contre les initiateurs.",
+        explain:
+          "Trois ans (art. 64), à compter de l'immatriculation ou de la publication de l'acte "
+          + "modifiant les statuts. À ne pas confondre avec les **cinq ans** de l'article 66, "
+          + "qui est le délai de l'action en responsabilité contre les initiateurs et les "
+          + "premiers dirigeants, solidairement responsables du préjudice causé par la mention "
+          + "manquante (art. 65). Deux actions, deux objets, deux délais : régulariser d'un "
+          + "côté, indemniser de l'autre.",
+      },
+      {
+        type: "exercise",
+        id: "s5e5",
+        kind: "choice",
+        title: "Une clause qui trahit un mauvais modèle",
+        prompt:
+          "Dans un projet de statuts, l'article consacré aux assemblées prévoit : « Chaque "
+          + "associé dispose d'un nombre de voix proportionnel au nombre de parts qu'il "
+          + "détient. » Quelle est la conséquence ?",
+        opts: [
+          "La clause est valable si elle a été votée à l'unanimité des initiateurs",
+          "La clause est valable dans une COOP-CA, où le capital est entièrement souscrit",
+          "La clause contredit une disposition d'ordre public et doit être réécrite : chaque coopérateur dispose d'une voix",
+          "La clause entraîne la nullité de la société",
+        ],
+        answer: 2,
+        hint: "L'article 2 dit quel est le régime des dispositions de l'Acte uniforme ; l'article 102 dit ce que la clause contredit.",
+        explain:
+          "L'article 102 pose qu'un coopérateur dispose d'une voix quelle que soit sa "
+          + "participation au capital, et l'article 2 fait des dispositions de l'Acte uniforme "
+          + "des règles d'ordre public sauf autorisation expresse de les écarter — autorisation "
+          + "qui n'existe pas ici. Aucune unanimité ni forme sociale ne rachète la clause. La "
+          + "société n'est pas nulle pour autant : l'article 63 organise une régularisation, "
+          + "ouverte à tout intéressé pendant trois ans, et les initiateurs répondent "
+          + "solidairement du préjudice pendant cinq (art. 65 et 66). Une clause pareille signale "
+          + "presque toujours un modèle de société commerciale recyclé.",
+      },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    ordre: 6,
+    titre: "Constituer et immatriculer : les trois phases et leurs pièges",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Trois phases, deux frontières\n\n"
+          + "L'Acte uniforme distingue trois moments, et ce sont les **deux frontières** entre "
+          + "eux qui produisent tout le contentieux de la constitution.\n\n"
+          + "```\n"
+          + "  FORMATION            │  CONSTITUTION           │  IMMATRICULATION\n"
+          + "  ─────────────────────┼─────────────────────────┼──────────────────────\n"
+          + "  on prépare,          │  AG constitutive        │  inscription au RSCoop\n"
+          + "  on négocie           │  + signature des statuts│  → personnalité juridique\n"
+          + "  (art. 85)            │  (art. 86)              │  (art. 78)\n"
+          + "                       │                         │\n"
+          + "  actes des            │  actes des dirigeants   │  la société agit\n"
+          + "  INITIATEURS          │  sur MANDAT             │  en son nom propre\n"
+          + "  → repris par         │  → repris de plein      │\n"
+          + "    résolution spéciale│    droit (art. 93)      │\n"
+          + "    (art. 90-92)       │                         │\n"
+          + "```\n\n"
+          + "**Article 85** : la société est « en formation » tant qu'elle n'est pas constituée. "
+          + "**Article 86** : elle est constituée « à compter de l'assemblée générale "
+          + "constitutive **et** de la signature de ses statuts par les coopérateurs » — les deux "
+          + "conditions, pas l'une des deux.\n\n"
+          + "Le même article ajoute une asymétrie utile : avant l'immatriculation, l'existence "
+          + "de la coopérative **n'est pas opposable aux tiers, mais les tiers peuvent s'en "
+          + "prévaloir**. Le fournisseur impayé peut donc invoquer la société contre elle ; la "
+          + "société, elle, ne peut pas se prévaloir de son existence contre lui.",
+      },
+      {
+        type: "md",
+        content:
+          "## Les actes passés avant : qui paie si ça tourne mal\n\n"
+          + "C'est le mécanisme le plus utile du chapitre, et le plus ignoré.\n\n"
+          + "### Avant la constitution — les initiateurs (art. 90 à 92)\n\n"
+          + "Quelqu'un a loué un local, avancé les frais de déplacement, commandé un cachet. Ces "
+          + "actes **doivent être portés à la connaissance des coopérateurs lors de l'assemblée "
+          + "constitutive** (art. 90). Leur reprise fait l'objet d'une **résolution spéciale** "
+          + "(art. 91), et l'assemblée doit être « complètement informée sur la nature et la "
+          + "portée de chacun » des actes.\n\n"
+          + "Garantie anti-conflit d'intérêts : **les auteurs des actes ne prennent pas part au "
+          + "vote, et leurs voix ne comptent ni pour le quorum ni pour la majorité.**\n\n"
+          + "Conséquences (art. 92) :\n\n"
+          + "- **repris** → les actes sont réputés avoir été contractés par la coopérative "
+          + "**dès l'origine**, avec effet rétroactif ;\n"
+          + "- **non repris** → ils lui sont **inopposables**, et leurs auteurs sont tenus "
+          + "**solidairement et indéfiniment**. Sur leur patrimoine personnel, sans limite.\n\n"
+          + "### Après la constitution, avant l'immatriculation — le mandat (art. 93)\n\n"
+          + "Les coopérateurs peuvent, dans les statuts ou par acte séparé, **donner mandat** à "
+          + "un ou plusieurs dirigeants de prendre des engagements. À condition que ces "
+          + "engagements soient **déterminés** et leurs **modalités précisées** dans le mandat, "
+          + "l'immatriculation emporte reprise **de plein droit** — pas de vote nécessaire.\n\n"
+          + "Les actes qui excèdent le mandat ou lui sont étrangers ne peuvent être repris qu'en "
+          + "étant approuvés par l'assemblée générale, leurs auteurs ne votant pas.\n\n"
+          + "**Article 88** : à partir de la signature des statuts, les dirigeants sociaux "
+          + "**se substituent aux initiateurs**. Le relais est daté, et il change qui engage "
+          + "quoi.",
+      },
+      {
+        type: "callout",
+        title: "Le conseil pratique qui évite la moitié des litiges de constitution",
+        variant: "tip",
+        content:
+          "Tenez, dès le premier jour de la phase de formation, un **cahier des engagements** : "
+          + "date, nature de l'acte, montant, auteur, pièce justificative. Annexez-le à la "
+          + "convocation de l'assemblée constitutive.\n\n"
+          + "L'article 91 exige que l'assemblée soit « complètement informée sur la nature et la "
+          + "portée de chacun des actes ». Sans document préparatoire, cette information est "
+          + "orale, imprécise, et la résolution de reprise devient contestable — ce qui renvoie "
+          + "l'auteur de l'acte à une responsabilité solidaire et indéfinie sur son patrimoine "
+          + "personnel (art. 92). Un cahier de trois pages évite cela.\n\n"
+          + "Notez aussi l'article 87 : les initiateurs doivent avoir une domiciliation dans un "
+          + "État partie, et **une boîte postale ne suffit pas** — il faut une adresse ou une "
+          + "indication géographique suffisamment précise.",
+      },
+      {
+        type: "md",
+        content:
+          "## L'immatriculation : où, quand, avec quoi\n\n"
+          + "**Où** — au **Registre des Sociétés Coopératives**, institué dans chaque État partie "
+          + "(art. 74) et tenu au niveau local par « l'organe déconcentré ou décentralisé de "
+          + "l'autorité nationale chargée de l'administration territoriale, ou l'autorité "
+          + "compétente », **auquel est immédiatement rattaché le siège** (art. 70). Ce n'est "
+          + "**pas** le registre du commerce et du crédit mobilier, même si les données "
+          + "remontent ensuite aux fichiers national et régional.\n\n"
+          + "L'imprécision de l'article 70 est assumée par le législateur — les administrations "
+          + "nationales n'ont pas la même structure — mais elle produit sur le terrain de vrais "
+          + "conflits de service. **Vérifiez auprès de la préfecture ou de la mairie du siège "
+          + "quel service tient effectivement le registre avant de préparer le dossier.**\n\n"
+          + "**Quand** — « dans le mois de sa constitution » (art. 75), donc dans le mois de "
+          + "l'assemblée constitutive.\n\n"
+          + "**Avec quoi** — l'article 76 énumère les pièces jointes **sous peine de rejet** :\n\n"
+          + "1. **deux copies des statuts** ;\n"
+          + "2. **deux exemplaires de la liste** des membres du comité de gestion ou du conseil "
+          + "d'administration ;\n"
+          + "3. le cas échéant, pour les activités réglementées, **les autorisations préalables "
+          + "requises**.\n\n"
+          + "Trois pièces. Un service qui en exige davantage sort du texte — ce qui arrive, et "
+          + "connaître l'article 76 est le meilleur moyen d'y répondre poliment.\n\n"
+          + "**Article 77** : aucune coopérative ne peut être immatriculée à plusieurs registres "
+          + "ni sous plusieurs numéros. Dès que la demande est en état, l'autorité attribue le "
+          + "numéro et transmet un exemplaire du dossier au Fichier National.",
+      },
+      {
+        type: "md",
+        content:
+          "## Après l'immatriculation : trois délais à tenir\n\n"
+          + "**Article 78** — la coopérative jouit de la personnalité juridique **à compter de "
+          + "son immatriculation**. C'est le moment où elle peut ouvrir un compte, signer un "
+          + "contrat, ester en justice. Le même article rappelle que l'exercice de son activité "
+          + "reste soumis aux règles propres à cette activité : l'immatriculation n'est pas un "
+          + "agrément.\n\n"
+          + "| Événement | Délai | Article |\n"
+          + "|---|---|---|\n"
+          + "| Immatriculation après la constitution | **1 mois** | 75 |\n"
+          + "| Avis d'immatriculation ou de modification dans un journal d'annonces légales | **1 mois** à compter de l'inscription | 81 |\n"
+          + "| Inscription modificative ou complémentaire au registre | **30 jours** à compter de la modification | 80 |\n"
+          + "| Publication au registre de la désignation, révocation ou démission d'un dirigeant | **1 mois** | 98 |\n"
+          + "| Déclaration de la dissolution au registre | **1 mois** | 84 |\n\n"
+          + "**Article 79** — en cas de transfert du siège dans le ressort d'une autre autorité, "
+          + "il faut **d'abord** requérir la radiation à l'ancien registre, **puis** une nouvelle "
+          + "immatriculation, la nouvelle autorité vérifiant la radiation effective. Dans cet "
+          + "ordre, et pas l'inverse : c'est l'article 77 qui l'impose, en prohibant la double "
+          + "immatriculation.",
+      },
+      {
+        type: "exercise",
+        id: "s6e1",
+        kind: "choice",
+        title: "Le jour de la constitution",
+        prompt:
+          "L'assemblée générale constitutive d'une SCOOPS se tient le 3 juin. Les statuts sont "
+          + "signés le 3 juin par tous les coopérateurs. L'immatriculation est demandée le "
+          + "20 juin et obtenue le 28 juin. À quelle date la société est-elle **constituée** ?",
+        opts: [
+          "Le 3 juin, date de l'assemblée constitutive et de la signature des statuts",
+          "Le 20 juin, date de la demande d'immatriculation",
+          "Le 28 juin, date de l'immatriculation",
+          "Le 3 juillet, à l'expiration du délai d'un mois",
+        ],
+        answer: 0,
+        hint: "Distinguez la constitution de l'acquisition de la personnalité juridique : ce sont deux dates différentes.",
+        explain:
+          "Le 3 juin. Article 86 : la société coopérative est constituée « à compter de "
+          + "l'assemblée générale constitutive **et** de la signature de ses statuts par les "
+          + "coopérateurs ». La date du 28 juin est celle de l'acquisition de la **personnalité "
+          + "juridique** (art. 78) — jusque-là, l'existence de la coopérative n'est pas "
+          + "opposable aux tiers, même si ceux-ci peuvent s'en prévaloir (art. 86, al. 2 et 3). "
+          + "La distinction commande le délai d'un mois de l'article 75, qui court à compter de "
+          + "la constitution, donc du 3 juin.",
+      },
+      {
+        type: "exercise",
+        id: "s6e2",
+        kind: "number",
+        title: "Le dossier d'immatriculation",
+        prompt:
+          "Combien de catégories de pièces justificatives l'article 76 impose-t-il de joindre à "
+          + "la demande d'immatriculation, sous peine de rejet ?",
+        answer: 3,
+        tolerance: 0,
+        hint: "Comptez les points numérotés de l'article, le troisième étant conditionnel.",
+        explain:
+          "Trois, et l'article 76 les énumère : deux copies des statuts ; deux exemplaires de la liste des membres du comité "
+          + "de gestion ou du conseil d'administration ; et, le cas échéant pour les activités "
+          + "réglementées, les autorisations préalables requises. L'énumération est limitative "
+          + "et assortie de la sanction du rejet — ce qui joue dans les deux sens : un dossier "
+          + "incomplet est rejeté, mais un service qui exige des pièces supplémentaires sort du "
+          + "texte. Connaître cet article vaut mieux que de discuter au guichet.",
+      },
+      {
+        type: "exercise",
+        id: "s6e3",
+        kind: "choice",
+        title: "Un local loué trop tôt",
+        prompt:
+          "Deux initiateurs ont signé un bail de magasin trois semaines avant l'assemblée "
+          + "constitutive. L'assemblée ne reprend pas cet engagement. Qui est tenu du loyer ?",
+        opts: [
+          "La coopérative, dès son immatriculation, par l'effet rétroactif de l'article 92",
+          "Les deux initiateurs, solidairement et indéfiniment, l'acte étant inopposable à la coopérative",
+          "Personne : l'acte est nul faute de personnalité juridique au jour de la signature",
+          "Le bailleur, qui devait vérifier l'existence de la société",
+        ],
+        answer: 1,
+        hint: "L'article 92 pose deux régimes symétriques selon que l'acte a été repris ou non.",
+        explain:
+          "Article 92, alinéa 2 : les actes et engagements non repris « sont inopposables à "
+          + "[la coopérative] et les personnes qui les ont souscrits sont tenues solidairement "
+          + "et indéfiniment par les obligations qu'ils comportent ». Solidairement : le "
+          + "bailleur peut réclamer la totalité à l'un des deux. Indéfiniment : sur leur "
+          + "patrimoine personnel, sans plafond. La reprise, elle, aurait produit l'effet "
+          + "inverse — l'acte réputé contracté par la coopérative dès l'origine (art. 92, "
+          + "al. 1er) — mais elle suppose une résolution spéciale de l'assemblée constitutive, "
+          + "prise après information complète, sans que les auteurs des actes votent (art. 90 "
+          + "et 91).",
+      },
+      {
+        type: "exercise",
+        id: "s6e4",
+        kind: "choice",
+        title: "Changer de préfecture",
+        prompt:
+          "Une coopérative transfère son siège dans le ressort d'une autre autorité "
+          + "administrative. Quel est l'ordre correct des formalités ?",
+        opts: [
+          "Demander la nouvelle immatriculation, puis la radiation de l'ancienne",
+          "Demander la radiation de l'ancienne immatriculation, puis la nouvelle immatriculation après vérification de la radiation",
+          "Demander une inscription secondaire, l'immatriculation d'origine restant en vigueur",
+          "Aucune formalité : le registre est national",
+        ],
+        answer: 1,
+        hint: "L'article 77 interdit un état intermédiaire qui existerait si l'on procédait dans l'autre sens.",
+        explain:
+          "Article 79 : la coopérative doit requérir sa radiation du registre où elle était "
+          + "immatriculée, **puis** une nouvelle immatriculation auprès de l'autorité du "
+          + "nouveau ressort, « après vérification, par cette autorité, de la radiation "
+          + "effective de la précédente immatriculation ». L'ordre inverse créerait exactement "
+          + "ce que l'article 77 prohibe : une société immatriculée à deux registres. Il faudra "
+          + "fournir à nouveau les renseignements et documents des articles 75 et 76.",
+      },
+      {
+        type: "exercise",
+        id: "s6e5",
+        kind: "number",
+        title: "Le délai d'inscription modificative",
+        prompt:
+          "L'assemblée générale extraordinaire d'une coopérative modifie ses statuts le "
+          + "14 novembre. De combien de jours dispose-t-elle pour formuler la demande de mention "
+          + "rectificative ou complémentaire au Registre des Sociétés Coopératives ?",
+        answer: 30,
+        tolerance: 0,
+        unit: "jours",
+        hint: "L'article 80 compte en jours, là où d'autres délais du même chapitre comptent en mois.",
+        explain:
+          "Trente jours (art. 80), à compter de la modification. À ne pas confondre avec le "
+          + "délai d'**un mois** de l'article 81 pour faire insérer l'avis correspondant dans un "
+          + "journal habilité à publier les annonces légales, qui court à compter de "
+          + "l'inscription de la formalité — ni avec le mois de l'article 98 pour publier au "
+          + "registre la désignation, la révocation ou la démission d'un dirigeant. Trois "
+          + "obligations distinctes, souvent oubliées ensemble : ne pas les tenir alimente le "
+          + "grief de l'article 178 d), qui vise la coopérative qui omet pendant un an d'envoyer "
+          + "aux autorités les avis ou documents exigés.",
+      },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    ordre: 7,
+    titre: "Gouverner, contrôler, répartir les excédents",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## L'assemblée générale, organe souverain\n\n"
+          + "**Article 100** — la participation est personnelle ; la procuration n'est possible "
+          + "que si les statuts ne l'excluent pas, et ce sont eux qui plafonnent le nombre de "
+          + "mandats.\n\n"
+          + "**Article 102** — une personne, une voix.\n\n"
+          + "**Article 104** — toute délibération est constatée par un **procès-verbal** qui "
+          + "indique la date et le lieu, les noms et prénoms des coopérateurs présents ou "
+          + "représentés, l'ordre du jour, les documents et rapports soumis à discussion, **un "
+          + "résumé des débats**, le texte des résolutions mises aux voix et le résultat des "
+          + "votes.\n\n"
+          + "**Article 105** — ces procès-verbaux sont établis **sur un registre spécial tenu au "
+          + "siège social** ; les copies et extraits sont certifiés conformes par le "
+          + "représentant légal.\n\n"
+          + "**Article 106** — au-delà de **cinq cents coopérateurs**, les statuts peuvent "
+          + "prévoir des **assemblées de section** délibérant séparément sur le même ordre du "
+          + "jour et élisant des délégués, lesquels forment ensuite l'assemblée générale.\n\n"
+          + "Le registre spécial de l'article 105 est le document qui manque le plus souvent. "
+          + "C'est pourtant lui qu'on demandera à la coopérative pour prouver qui la dirige — et "
+          + "son absence prolongée alimente le grief de l'article 178 c), qui vise "
+          + "l'inobservation, pendant deux années consécutives, des dispositions sur la tenue "
+          + "des assemblées annuelles.",
+      },
+      {
+        type: "md",
+        content:
+          "## Le rendez-vous annuel (art. 108 à 111)\n\n"
+          + "L'organe de direction **établit un rapport de gestion** exposant la situation de "
+          + "l'exercice écoulé, l'évolution prévisible, les perspectives de continuation de "
+          + "l'activité, l'évolution de la trésorerie et le plan de financement — et, mention "
+          + "propre au droit coopératif, **l'état de promotion des coopérateurs** (art. 108). "
+          + "Autrement dit : ce que l'année a apporté aux membres, pas seulement à la structure.\n\n"
+          + "**Article 110** — les états financiers de synthèse annuels et le rapport de gestion "
+          + "sont présentés à l'assemblée générale ordinaire, qui **doit obligatoirement se "
+          + "tenir dans les six mois de la clôture de l'exercice**. Ces états sont, le cas "
+          + "échéant, adressés à **l'organisation faîtière immédiate** à laquelle la coopérative "
+          + "est affiliée, **quarante-cinq jours au moins** avant l'assemblée.\n\n"
+          + "**Article 113** — c'est l'assemblée générale qui décide de l'affectation du "
+          + "résultat, dans le respect des dispositions légales et statutaires, et qui constitue "
+          + "les dotations aux réserves.",
+      },
+      {
+        type: "md",
+        content:
+          "## Affecter les excédents : l'ordre est imposé\n\n"
+          + "Le texte parle d'**excédents nets d'exploitation** et non de bénéfices — le "
+          + "vocabulaire dit la finalité. Trois étages, dans cet ordre :\n\n"
+          + "### 1. Les réserves légales, avant toute autre affectation (art. 114)\n\n"
+          + "Deux réserves, constituées par prélèvements annuels sur les excédents nets :\n\n"
+          + "- une **réserve générale** ;\n"
+          + "- une **réserve destinée à la formation, à l'éducation et à la sensibilisation aux "
+          + "principes coopératifs**.\n\n"
+          + "« Tant que **chacune** de ces réserves légales n'atteint pas le montant du capital "
+          + "fixé par les statuts, les prélèvements opérés au titre de **chaque** réserve ne "
+          + "peuvent être inférieurs à **vingt pour cent** des excédents nets d'exploitation. »\n\n"
+          + "Lisez bien : 20 % **chacune**, donc **40 % au minimum** partent en réserves tant "
+          + "que le plafond n'est pas atteint. C'est le calcul que les coopératives ratent le "
+          + "plus souvent.\n\n"
+          + "### 2. Les réserves facultatives (art. 115)\n\n"
+          + "Les statuts peuvent en prévoir ; leur total ne peut **dépasser vingt pour cent** "
+          + "des excédents nets.\n\n"
+          + "### 3. Ce qui reste : intérêt aux parts et ristournes\n\n"
+          + "L'intérêt au capital est plafonné au taux d'escompte de la banque centrale et ne "
+          + "porte que sur les parts libérées (art. 209) ; la ristourne est proportionnelle aux "
+          + "opérations faites avec la coopérative (art. 112). Ni l'un ni l'autre n'est "
+          + "obligatoire : l'assemblée peut décider de tout garder pour investir.",
+      },
+      {
+        type: "callout",
+        title: "Impartageables — le mot qui protège la coopérative d'elle-même",
+        variant: "info",
+        content:
+          "**Article 116** : « Les coopérateurs démissionnaires ou exclus ne peuvent prétendre à "
+          + "aucun droit sur les sommes affectées à la réserve générale et à la réserve de "
+          + "formation, d'éducation et de sensibilisation. De même, les réserves facultatives "
+          + "prévues à l'article 115 ne peuvent pas être réparties entre les coopérateurs. »\n\n"
+          + "Et **article 196** : à la liquidation, le boni est dévolu à d'autres coopératives ou "
+          + "à des organismes œuvrant pour la promotion du mouvement coopératif.\n\n"
+          + "Ces deux articles ferment ensemble toutes les portes de la **démutualisation** — la "
+          + "tentation de sortir du statut coopératif pour encaisser la valeur accumulée. Ni en "
+          + "partant, ni en excluant, ni en dissolvant, on ne récupère les réserves.\n\n"
+          + "Une seule voie reste ouverte, et elle est étroite : l'article 57 permet une "
+          + "augmentation de capital par **incorporation des réserves libres d'affectation** — "
+          + "les réserves libres, pas les réserves légales de l'article 114.",
+      },
+      {
+        type: "md",
+        content:
+          "## Trois outils de contrôle, du plus léger au plus lourd\n\n"
+          + "### La procédure d'alerte (art. 119)\n\n"
+          + "Le conseil ou la commission de surveillance **demande par écrit ou oralement des "
+          + "explications** à l'organe de direction, qui **est tenu de répondre**, sur tout fait "
+          + "de nature à compromettre la continuité de la coopérative relevé à l'occasion de sa "
+          + "mission. C'est l'outil de première intention : rapide, interne, gratuit.\n\n"
+          + "Les articles 262 (SCOOPS) et 340 (COOP-CA) ajoutent que l'organe de surveillance "
+          + "peut **vérifier ou faire vérifier à tout moment** la gestion, **informe la faîtière** "
+          + "de toute irrégularité constatée, et **convoque le cas échéant une assemblée "
+          + "générale** qui statue sur les mesures à prendre.\n\n"
+          + "### L'expertise de gestion (art. 120)\n\n"
+          + "Des coopérateurs représentant **au moins vingt-cinq pour cent** des membres, groupés "
+          + "sous la forme qu'ils jugent appropriée, peuvent demander au président de la "
+          + "juridiction compétente du siège la désignation d'un ou plusieurs **experts** chargés "
+          + "de présenter un rapport sur une ou plusieurs opérations de gestion.\n\n"
+          + "Si le juge fait droit à la demande, il détermine l'étendue de la mission et les "
+          + "pouvoirs des experts. **Les honoraires sont supportés par la coopérative** ; le "
+          + "rapport est adressé au demandeur **et** aux organes de gestion.\n\n"
+          + "Le seuil se compte **en membres**, pas en capital — cohérent avec l'article 102.\n\n"
+          + "### Le commissaire aux comptes (art. 121)\n\n"
+          + "Obligatoire pour les seules COOP-CA réunissant les **trois** conditions cumulatives "
+          + "vues en leçon 3, nommé pour trois exercices.\n\n"
+          + "### Et le règlement des litiges (art. 117 et 118)\n\n"
+          + "Tout litige entre coopérateurs, ou entre un coopérateur et la coopérative, relève de "
+          + "la juridiction compétente — mais il « peut également être soumis à la **médiation, à "
+          + "la conciliation ou à l'arbitrage** ». Mieux : les coopératives et leurs faîtières "
+          + "peuvent **créer en leur sein des organes d'arbitrage, de conciliation et de "
+          + "médiation** (art. 118). Dans un contexte où la distance au tribunal est réelle, "
+          + "c'est une des dispositions les plus utiles du texte, et l'une des moins utilisées.",
+      },
+      {
+        type: "md",
+        content:
+          "## Quand ça tourne mal : responsabilités et dissolution\n\n"
+          + "**Article 122** — chaque dirigeant est responsable **individuellement envers les "
+          + "tiers** des fautes commises dans l'exercice de ses fonctions ; si plusieurs ont "
+          + "participé aux mêmes faits, la responsabilité est **solidaire** à l'égard des tiers "
+          + "et des coopérateurs, la juridiction déterminant ensuite leur part contributive "
+          + "entre eux.\n\n"
+          + "**Article 128** — l'**action sociale** répare le dommage subi par la coopérative "
+          + "elle-même ; elle est intentée par les autres dirigeants sociaux.\n\n"
+          + "**Article 177** — les causes ordinaires de dissolution : expiration de la durée, "
+          + "réalisation ou extinction de l'objet, annulation du contrat de société, décision "
+          + "des coopérateurs aux conditions de modification des statuts, dissolution anticipée "
+          + "prononcée par le juge pour justes motifs, jugement de liquidation des biens, ou "
+          + "toute autre cause prévue par les statuts.\n\n"
+          + "**Article 178** — la dissolution judiciaire, sur saisine de l'autorité "
+          + "administrative chargée des coopératives **ou de toute personne intéressée**, dans "
+          + "six cas : pas d'opérations dans les deux ans de l'immatriculation ; pas d'activités "
+          + "statutaires pendant deux années consécutives ; inobservation pendant deux années "
+          + "consécutives des règles de tenue des assemblées annuelles ; omission pendant un an "
+          + "d'envoyer aux autorités les avis ou documents exigés ; **absence d'organe de "
+          + "gestion, d'administration ou de contrôle depuis au moins trois mois** ; organisation "
+          + "ou transactions non conformes aux principes coopératifs.\n\n"
+          + "**Article 179** — mais la dissolution ne peut intervenir sans un **préavis de cent "
+          + "vingt jours** notifiant l'intention **et la réversibilité de la mesure** en cas de "
+          + "régularisation, ni sans **publication d'un avis** dans une publication accessible au "
+          + "grand public.\n\n"
+          + "Trois de ces six cas se règlent en tenant une assemblée annuelle et en gardant des "
+          + "organes en fonction. La dissolution de l'article 178 n'est pas une peine : c'est "
+          + "une mesure d'assainissement, et le préavis de 120 jours le dit.",
+      },
+      {
+        type: "exercise",
+        id: "s7e1",
+        kind: "number",
+        title: "L'affectation obligatoire",
+        prompt:
+          "Une coopérative dégage 8 400 000 F d'excédents nets d'exploitation. Ni la réserve "
+          + "générale ni la réserve de formation n'atteignent encore le montant du capital fixé "
+          + "par les statuts. Quel montant minimum, en francs CFA, doit être affecté aux "
+          + "réserves légales ?",
+        answer: 3360000,
+        tolerance: 0,
+        unit: "F CFA",
+        hint: "L'article 114 fixe un minimum « au titre de chaque réserve », et il y en a deux.",
+        explain:
+          "3 360 000 F. L'article 114 impose, tant que **chacune** des deux réserves légales "
+          + "n'atteint pas le montant du capital fixé par les statuts, un prélèvement d'au moins "
+          + "vingt pour cent des excédents **au titre de chaque réserve** : 20 % pour la réserve "
+          + "générale et 20 % pour la réserve de formation, d'éducation et de sensibilisation, "
+          + "soit 40 % au total. 8 400 000 × 0,40 = 3 360 000. Répondre 1 680 000 revient à "
+          + "n'appliquer les 20 % qu'une fois — c'est l'erreur d'affectation la plus fréquente, "
+          + "et elle prive la coopérative de son budget de formation.",
+      },
+      {
+        type: "exercise",
+        id: "s7e2",
+        kind: "number",
+        title: "Le seuil de l'expertise de gestion",
+        prompt:
+          "Une coopérative compte 96 membres. Combien de coopérateurs au minimum doivent se "
+          + "grouper pour demander au juge la désignation d'un expert de gestion ?",
+        answer: 24,
+        tolerance: 0,
+        hint: "Le pourcentage de l'article 120 se calcule sur le nombre de membres, pas sur le capital.",
+        explain:
+          "Vingt-quatre. L'article 120 exige que les demandeurs atteignent « au moins le "
+          + "pourcentage de vingt-cinq pour cent des membres de la société coopérative » : "
+          + "96 × 0,25 = 24. Le seuil se compte en personnes et non en parts, ce qui est "
+          + "cohérent avec l'article 102. Deux précisions utiles à retenir : les honoraires des "
+          + "experts sont **supportés par la coopérative**, et le rapport est adressé au "
+          + "demandeur **et** aux organes de gestion — l'expertise n'est pas une arme secrète.",
+      },
+      {
+        type: "exercise",
+        id: "s7e3",
+        kind: "choice",
+        title: "Un membre exclu réclame sa part de réserves",
+        prompt:
+          "Un coopérateur exclu réclame, outre le remboursement de ses parts, une fraction des "
+          + "réserves accumulées pendant ses douze années de présence. Que lui répond le droit ?",
+        opts: [
+          "Il y a droit au prorata de son ancienneté",
+          "Il y a droit au prorata de ses parts sociales",
+          "Il n'y a droit sur aucune des réserves : les coopérateurs démissionnaires ou exclus ne peuvent prétendre à aucun droit sur elles",
+          "Il y a droit sur les seules réserves facultatives",
+        ],
+        answer: 2,
+        hint: "L'article 116 vise nommément les démissionnaires et les exclus, puis ajoute une phrase sur les réserves facultatives.",
+        explain:
+          "Article 116 : « Les coopérateurs démissionnaires ou exclus ne peuvent prétendre à "
+          + "aucun droit sur les sommes affectées à la réserve générale et à la réserve de "
+          + "formation, d'éducation et de sensibilisation. De même, les réserves facultatives "
+          + "prévues à l'article 115 ci-dessus ne peuvent pas être réparties entre les "
+          + "coopérateurs. » Les trois catégories de réserves sont donc fermées. Il conserve en "
+          + "revanche le droit au remboursement de ses parts et des sommes portées à son crédit, "
+          + "dans les mêmes conditions que le coopérateur qui se retire (art. 11 et 15).",
+      },
+      {
+        type: "exercise",
+        id: "s7e4",
+        kind: "choice",
+        title: "Trois ans sans assemblée",
+        prompt:
+          "Une coopérative n'a tenu aucune assemblée générale annuelle depuis trois ans et n'a "
+          + "plus de commission de surveillance depuis huit mois. L'autorité administrative "
+          + "chargée des coopératives saisit le juge. Que doit-il se passer avant une éventuelle "
+          + "dissolution ?",
+        opts: [
+          "Rien : les manquements de l'article 178 entraînent la dissolution de plein droit",
+          "Un préavis de cent vingt jours notifiant l'intention et la réversibilité de la mesure en cas de régularisation, et la publication d'un avis accessible au grand public",
+          "Une mise en demeure de trente jours adressée au président",
+          "Une expertise de gestion préalable, aux frais de la coopérative",
+        ],
+        answer: 1,
+        hint: "L'article qui suit immédiatement l'article 178 conditionne son application.",
+        explain:
+          "Article 179 : la dissolution de l'article 178 « ne peut intervenir » sans que "
+          + "l'autorité administrative ou la juridiction ait donné à la coopérative et à ses "
+          + "organes un **préavis de cent vingt jours**, notifiant son intention **et la "
+          + "réversibilité de la mesure en cas de régularisation**, et sans avoir publié un avis "
+          + "de cette intention dans une publication accessible au grand public. Deux griefs "
+          + "sont ici constitués — l'article 178 c) pour les assemblées annuelles et le e) pour "
+          + "l'absence d'organe de contrôle depuis plus de trois mois — mais les deux se "
+          + "régularisent en convoquant une assemblée qui élira une nouvelle commission de "
+          + "surveillance. C'est exactement ce que le préavis rend possible.",
+      },
+      {
+        type: "exercise",
+        id: "s7e5",
+        kind: "choice",
+        title: "L'assemblée annuelle est en retard",
+        prompt:
+          "L'exercice d'une coopérative est clos le 31 décembre. Elle est affiliée à une union. "
+          + "Quelles sont ses deux échéances ?",
+        opts: [
+          "Assemblée générale ordinaire avant le 30 juin, et envoi des états financiers à l'union au moins 45 jours avant cette assemblée",
+          "Assemblée générale ordinaire avant le 31 mars, et envoi des états financiers à l'union dans les 30 jours suivants",
+          "Assemblée générale ordinaire avant le 30 juin, sans obligation envers l'union",
+          "Assemblée générale ordinaire dans les 45 jours de la clôture, l'union n'étant informée qu'à sa demande",
+        ],
+        answer: 0,
+        hint: "L'article 110 pose deux délais : l'un court après la clôture, l'autre avant l'assemblée.",
+        explain:
+          "Article 110 : les états financiers de synthèse annuels et le rapport de gestion sont "
+          + "présentés à l'assemblée générale ordinaire, « qui doit obligatoirement se tenir "
+          + "dans les six mois de la clôture de l'exercice » — soit le 30 juin au plus tard — et "
+          + "ces états sont, le cas échéant, adressés à l'organisation faîtière immédiate "
+          + "**quarante-cinq jours au moins avant** la date de l'assemblée. Ne pas tenir "
+          + "l'assemblée deux années de suite ouvre le grief de l'article 178 c).",
+      },
+      {
+        type: "exercise",
+        id: "s7e6",
+        kind: "text",
+        title: "Le document qu'on ne trouve jamais",
+        prompt:
+          "Sur quel support l'article 105 impose-t-il d'établir les procès-verbaux des "
+          + "délibérations, et où doit-il être tenu ? Répondez par les deux mots qui désignent "
+          + "ce support.",
+        answer: "registre spécial",
+        accept: ["un registre special", "le registre special"],
+        hint: "Deux mots, dont le second précise que ce n'est pas n'importe quel cahier.",
+        explain:
+          "Un **registre spécial**, tenu au siège social (art. 105). Les copies ou extraits en "
+          + "sont valablement certifiés conformes par le représentant légal de la coopérative. "
+          + "C'est ce registre qui prouve qui dirige, ce qui a été décidé et à quelle majorité — "
+          + "donc ce qu'on demandera à la coopérative dans presque toutes ses démarches. Son "
+          + "contenu est fixé par l'article 104 : date et lieu, présents et représentés, ordre "
+          + "du jour, documents soumis, **résumé des débats**, texte des résolutions et résultat "
+          + "des votes.",
+      },
+    ],
+  },
+  // ─────────────────────────────────────────────────────────────────────────
+  {
+    ordre: 8,
+    titre: "Se fédérer : unions, fédérations, confédérations, réseaux — et l'interprofession",
+    points: 100,
+    cellules: [
+      {
+        type: "md",
+        content:
+          "## Pourquoi une coopérative seule ne pèse rien\n\n"
+          + "Une coopérative de quatre-vingts producteurs de riz négocie mal. Elle achète ses "
+          + "intrants au prix de détail, vend sa production à un intermédiaire qui fixe le prix, "
+          + "ne finance pas de magasin de stockage, et n'a personne pour la représenter quand "
+          + "une politique de filière se décide.\n\n"
+          + "Le regroupement est donc la suite normale du parcours, et l'Acte uniforme lui "
+          + "consacre un chapitre entier. Curieusement, « la coopération entre les "
+          + "coopératives » ne figure pas dans l'énumération de l'article 6 (leçon 2) — mais "
+          + "elle est de très loin la partie la mieux organisée du texte.",
+      },
+      {
+        type: "md",
+        content:
+          "## Quatre étages, et ce qu'il faut pour monter\n\n"
+          + "| Niveau | Composé de | Minimum | Article |\n"
+          + "|---|---|---|---|\n"
+          + "| **Union** | sociétés coopératives ayant **le ou les mêmes objets** | 2 | 133 |\n"
+          + "| **Fédération** | unions, **même si elles ont des objets différents** | 2 unions | 141 |\n"
+          + "| **Confédération** | fédérations, **même d'objets différents** | 2 fédérations | 152 |\n"
+          + "| **Réseau** | coopératives, unions, fédérations, confédérations **n'ayant pas le même lien commun** | — | 160 |\n\n"
+          + "Deux passerelles évitent que le système ne bloque ceux qui sont isolés :\n\n"
+          + "- une **fédération** peut accepter comme affiliées des coopératives « se trouvant "
+          + "dans l'impossibilité de former ou d'adhérer à une union » (art. 141) ;\n"
+          + "- une **confédération** peut accepter des unions et des coopératives dans la même "
+          + "situation à l'égard d'une fédération (art. 152).\n\n"
+          + "**La constitution est la même aux trois premiers étages** : adoption des statuts "
+          + "par une assemblée générale constitutive réunissant **au moins trois délégués dûment "
+          + "mandatés par chacun** des membres fondateurs (art. 134, 142 et 153). Trois délégués "
+          + "**par membre**, pas trois délégués en tout — c'est une erreur de lecture fréquente "
+          + "et elle fait annuler des assemblées.\n\n"
+          + "Toutes s'immatriculent au Registre des Sociétés Coopératives et acquièrent la "
+          + "personnalité juridique dans les mêmes conditions que les coopératives (art. 135, "
+          + "143, 154).\n\n"
+          + "Et pour tout ce qui n'est pas expressément prévu, ce sont **les règles de la COOP-CA "
+          + "qui s'appliquent** aux unions (art. 140), aux fédérations (art. 150) et aux "
+          + "confédérations (art. 159).",
+      },
+      {
+        type: "callout",
+        title: "Le vote plural : la seule brèche dans « une personne, une voix »",
+        variant: "info",
+        content:
+          "L'article 102 est intangible dans les coopératives de base. Mais aux étages "
+          + "supérieurs, l'Acte uniforme autorise expressément un correctif : la fédération "
+          + "(art. 147) et la confédération (art. 156) « peuvent prévoir dans leurs statuts et "
+          + "règlement intérieur la possibilité de **vote plural** pour certains de leurs "
+          + "membres et en déterminer les critères ». L'article 68 le mentionne parmi les "
+          + "prescriptions du règlement intérieur.\n\n"
+          + "C'est un arbitrage de bon sens : sans lui, une union de 3 000 producteurs et une "
+          + "union de 60 pèseraient exactement pareil dans la fédération, et la grande refuserait "
+          + "d'adhérer. Avec lui, on peut pondérer — mais il faut **écrire les critères**, et les "
+          + "écrire avant que quiconque sache qui en profitera.\n\n"
+          + "Au niveau de l'union, notez la règle de représentation de l'article 137 : chaque "
+          + "coopérative membre est représentée **de droit** par son président ou, à défaut, par "
+          + "une personne physique choisie parmi ses membres par le conseil d'administration ou "
+          + "le comité de gestion, et pouvant justifier de son mandat.",
+      },
+      {
+        type: "md",
+        content:
+          "## Ce que chaque étage fait — et le principe de subsidiarité\n\n"
+          + "### L'union (art. 133, 136)\n\n"
+          + "Elle gère les intérêts communs de coopératives ayant les mêmes objets, et « peut "
+          + "exercer toutes activités économiques » — c'est ici que se logent la centrale "
+          + "d'achat d'intrants, le magasin de stockage, l'unité de conditionnement, la "
+          + "négociation d'un contrat cadre.\n\n"
+          + "**Mais** ces activités s'exercent « dans le respect du **principe de subsidiarité** "
+          + "par rapport aux activités des sociétés coopératives affiliées ». L'union ne fait pas "
+          + "ce que ses membres font déjà : elle fait ce qu'ils ne peuvent pas faire seuls. "
+          + "C'est le garde-fou contre la faîtière qui concurrence sa propre base.\n\n"
+          + "En l'absence de fédération ou de confédération, ou en concertation avec elles, "
+          + "l'union exerce tout ou partie de leurs missions à l'égard de ses affiliées "
+          + "(art. 136, al. 2).\n\n"
+          + "### La fédération (art. 141, 144 à 147)\n\n"
+          + "Ses missions, notamment : **veiller à l'application des principes coopératifs** au "
+          + "sein de ses affiliées ; leur fournir toute assistance pour la constitution, "
+          + "l'administration et la gestion ; promouvoir le mouvement coopératif et la "
+          + "coopération entre organisations à caractère coopératif. Elle **définit les règles "
+          + "administratives** applicables à ses affiliées, sous réserve des dispositions légales "
+          + "(art. 146). Et elle peut exercer des activités économiques, également sous "
+          + "subsidiarité (art. 145).\n\n"
+          + "### La confédération (art. 151 à 155)\n\n"
+          + "Elle peut revêtir **une autre forme juridique** que la forme coopérative, selon la "
+          + "législation nationale ; si elle opte pour la forme coopérative, l'Acte uniforme "
+          + "s'applique (art. 151). Elle s'immatricule dans tous les cas (art. 154).\n\n"
+          + "Aux missions de la fédération s'ajoutent trois missions de veille et de "
+          + "représentation (art. 155) : une **campagne permanente de vulgarisation** de l'Acte "
+          + "uniforme et des normes auxquelles il renvoie ; un **suivi continu de l'évolution de "
+          + "la législation coopérative** ; la **défense, aux plans national et international**, "
+          + "des intérêts de ses membres.\n\n"
+          + "Sa stabilité est protégée : une confédération de plus de deux fédérations n'est pas "
+          + "dissoute par le retrait ou la disparition d'un membre — elle continue de plein droit "
+          + "entre les autres (art. 158).",
+      },
+      {
+        type: "md",
+        content:
+          "## Le réseau coopératif : l'outil souple, et transfrontalier\n\n"
+          + "**Article 160** — coopératives, unions, fédérations et confédérations **n'ayant pas "
+          + "le même lien commun** peuvent se regrouper en réseaux de moyens ou d'objectifs, "
+          + "« ayant pour but exclusif de mettre en œuvre, **pour une durée déterminée**, tous "
+          + "les moyens propres à faciliter ou développer l'activité de leurs membres, à en "
+          + "améliorer ou accroître les résultats, ou à réaliser des objectifs destinés à la "
+          + "promotion des principes coopératifs ».\n\n"
+          + "Quatre caractéristiques qui en font un outil différent :\n\n"
+          + "- **pas de lien commun requis** — une coopérative de riziculteurs et une COOPEC "
+          + "peuvent en faire partie ;\n"
+          + "- **durée déterminée** — c'est un instrument de projet, pas une institution ;\n"
+          + "- **transfrontalier** — l'article 161 admet expressément les réseaux entre "
+          + "organisations « ne relevant pas du même ressort territorial, ou **non constituées "
+          + "dans le même État Partie** ». C'est le seul niveau d'intégration qui franchit les "
+          + "frontières ;\n"
+          + "- **formalités allégées** — celles de la SCOOPS (art. 162), et l'organisation "
+          + "interne est fixée par une **convention signée des membres** (art. 163), y compris "
+          + "le contrôle de la gestion et des états financiers (art. 164).\n\n"
+          + "À la dissolution, après paiement des dettes, l'excédent d'actif est dévolu à "
+          + "d'autres réseaux ou à des sociétés coopératives (art. 166) : la règle "
+          + "d'impartageabilité suit le réseau comme elle suit la coopérative.",
+      },
+      {
+        type: "callout",
+        title: "L'interprofession : ce que l'Acte uniforme fournit, et ce qu'il ne fournit pas",
+        variant: "warning",
+        content:
+          "Une **interprofession** de filière réunit les familles professionnelles d'un même "
+          + "produit : producteurs, transformateurs, commerçants, exportateurs, parfois "
+          + "fournisseurs d'intrants. Elle sert à négocier des prix indicatifs, à financer la "
+          + "recherche et le conseil, à porter la filière devant les pouvoirs publics.\n\n"
+          + "**L'Acte uniforme n'organise pas l'interprofession.** Il n'en parle nulle part. Ce "
+          + "qu'il organise, c'est **le collège des producteurs** — l'escalier coopérative → "
+          + "union → fédération → confédération qui permet aux producteurs d'arriver à la table "
+          + "avec une personne morale, des comptes certifiés et un mandat.\n\n"
+          + "L'interprofession elle-même relève du **droit national** : au Togo comme dans "
+          + "plusieurs États de la sous-région, ce sont des textes propres — loi d'orientation "
+          + "agricole, décrets de reconnaissance des organisations interprofessionnelles — qui "
+          + "fixent qui la compose, comment elle est reconnue, et quelle valeur ont ses accords.\n\n"
+          + "**Conséquence pratique pour le praticien :** ne promettez jamais qu'une "
+          + "immatriculation OHADA suffit à créer une interprofession. Elle rend le collège "
+          + "producteur constituable, ce qui est déjà la moitié du travail — l'autre moitié se "
+          + "traite au ministère de tutelle, texte national en main.",
+      },
+      {
+        type: "md",
+        content:
+          "## Monter l'architecture d'une filière : l'ordre des opérations\n\n"
+          + "Prenons une filière soja dans trois préfectures, avec environ 2 000 producteurs "
+          + "organisés en groupements de fait.\n\n"
+          + "**1. Les coopératives de base.** Une par bassin, en SCOOPS (5 membres minimum, "
+          + "libération étalée possible — leçon 3). Objet précis, lien commun explicite, "
+          + "statuts conformes à l'article 18, immatriculation dans le mois.\n\n"
+          + "**2. L'union.** Dès que deux coopératives ayant le même objet existent (art. 133). "
+          + "C'est elle qui portera la centrale d'achat d'intrants et le magasin de stockage, "
+          + "sous subsidiarité (art. 136). Prévoir dès l'assemblée constitutive **trois délégués "
+          + "mandatés par coopérative** (art. 134), et des administrateurs qui ne sont pas déjà "
+          + "administrateurs d'une coopérative de base dans le même État (art. 300 — voir "
+          + "leçon 3).\n\n"
+          + "**3. La fédération.** Quand deux unions existent (art. 141), ou pour accueillir des "
+          + "coopératives isolées qui ne peuvent adhérer à aucune union. C'est le niveau du "
+          + "contrôle par les pairs — veiller à l'application des principes coopératifs "
+          + "(art. 144) — et de l'arbitrage des valeurs de remboursement de parts (art. 50).\n\n"
+          + "**4. Le réseau, s'il faut aller vite ou franchir une frontière.** Un projet régional "
+          + "de trois ans avec des coopératives du Bénin et du Burkina n'a pas besoin d'une "
+          + "confédération : un réseau de moyens à durée déterminée suffit (art. 160-163).\n\n"
+          + "**5. L'interprofession.** Dossier séparé, texte national, une fois le collège "
+          + "producteur constitué et représentable.\n\n"
+          + "Le piège classique est de commencer par le haut — créer la faîtière d'abord, parce "
+          + "qu'un bailleur la finance — et d'espérer que la base suive. Une union sans "
+          + "coopératives immatriculées n'a pas de membres fondateurs valables : l'article 134 "
+          + "exige des délégués **mandatés par des sociétés coopératives**.",
+      },
+      {
+        type: "exercise",
+        id: "s8e1",
+        kind: "number",
+        title: "L'assemblée constitutive d'une union",
+        prompt:
+          "Quatre sociétés coopératives de maraîchage décident de constituer une union. Combien "
+          + "de délégués dûment mandatés l'assemblée générale constitutive doit-elle réunir au "
+          + "minimum ?",
+        answer: 12,
+        tolerance: 0,
+        hint: "L'article 134 exprime le minimum « par chacune des sociétés coopératives membres fondatrices ».",
+        explain:
+          "Douze. L'article 134 exige une assemblée générale constitutive « réunissant au moins "
+          + "trois délégués dûment mandatés **par chacune** des sociétés coopératives membres "
+          + "fondatrices » : 4 × 3 = 12. Répondre 3 revient à lire « trois délégués en tout », "
+          + "erreur fréquente qui rend l'assemblée irrégulière — et l'irrégularité d'une "
+          + "formalité de constitution ouvre l'action en régularisation de l'article 63 et la "
+          + "responsabilité solidaire des initiateurs de l'article 65. La même règle vaut pour "
+          + "la fédération (art. 142) et la confédération (art. 153).",
+      },
+      {
+        type: "exercise",
+        id: "s8e2",
+        kind: "choice",
+        title: "Une union qui prend trop de place",
+        prompt:
+          "Une union crée un service de collecte et de vente directe qui double exactement "
+          + "l'activité que ses coopératives membres exercent déjà. Sur quel fondement cette "
+          + "activité est-elle contestable ?",
+        opts: [
+          "L'union ne peut exercer aucune activité économique",
+          "L'activité est contestable au titre du principe de subsidiarité, qui subordonne les activités économiques de l'union à celles de ses affiliées",
+          "L'activité est contestable faute d'autorisation de la fédération",
+          "L'activité est régulière : l'union est libre de son objet",
+        ],
+        answer: 1,
+        hint: "L'article 136 autorise « toutes activités économiques », puis pose immédiatement une réserve.",
+        explain:
+          "Article 136 : « L'union des sociétés coopératives peut exercer toutes activités "
+          + "économiques. **Toutefois**, ces activités économiques s'exercent dans le respect du "
+          + "principe de subsidiarité par rapport aux activités des sociétés coopératives "
+          + "affiliées. » La faîtière fait ce que la base ne peut pas faire seule — elle ne la "
+          + "concurrence pas. La même réserve pèse sur la fédération (art. 145). C'est l'une des "
+          + "causes les plus fréquentes de conflit entre une union et ses membres, et le texte "
+          + "donne aux affiliées un argument juridique, pas seulement politique.",
+      },
+      {
+        type: "exercise",
+        id: "s8e3",
+        kind: "choice",
+        title: "Un projet régional sur trois ans",
+        prompt:
+          "Une coopérative togolaise de karité, une COOPEC béninoise et une fédération "
+          + "burkinabè veulent mutualiser un dispositif de certification pendant trois ans. "
+          + "Elles n'ont pas le même lien commun. Quelle structure de l'Acte uniforme convient ?",
+        opts: [
+          "Une union, seule structure ouverte aux coopératives de plusieurs pays",
+          "Une confédération, qui a mission de défendre les intérêts de ses membres au plan international",
+          "Un réseau coopératif de moyens ou d'objectifs, prévu pour des membres sans lien commun, pour une durée déterminée, et admis entre organisations d'États différents",
+          "Aucune : l'Acte uniforme ne connaît que des groupements nationaux",
+        ],
+        answer: 2,
+        hint: "Trois indices dans l'énoncé : pas de lien commun, une durée, et deux frontières.",
+        explain:
+          "Le réseau coopératif de moyens ou d'objectifs. L'article 160 vise expressément les "
+          + "organisations « n'ayant pas le même lien commun » et un but poursuivi « pour une "
+          + "durée déterminée » ; l'article 161 admet les réseaux entre organisations « non "
+          + "constituées dans le même État Partie ». L'union, elle, suppose des coopératives "
+          + "ayant le ou les mêmes objets (art. 133), et les unions, fédérations et "
+          + "confédérations sont en principe nationales. Les formalités de constitution du "
+          + "réseau sont celles de la SCOOPS (art. 162) et son fonctionnement est fixé par une "
+          + "convention signée des membres (art. 163).",
+      },
+      {
+        type: "exercise",
+        id: "s8e4",
+        kind: "choice",
+        title: "Pondérer les voix dans une fédération",
+        prompt:
+          "Une fédération réunit une union de 3 200 producteurs et une union de 70. La grande "
+          + "union refuse d'adhérer si elle ne pèse pas davantage. Que permet l'Acte uniforme ?",
+        opts: [
+          "Rien : l'article 102 impose une voix par membre à tous les niveaux",
+          "Prévoir dans les statuts et le règlement intérieur de la fédération un vote plural pour certains membres, en en déterminant les critères",
+          "Attribuer des voix au prorata du capital détenu",
+          "Créer deux collèges disposant chacun d'une voix",
+        ],
+        answer: 1,
+        hint: "L'exception au « une personne, une voix » n'existe qu'à partir d'un certain étage.",
+        explain:
+          "Article 147 : « La fédération de sociétés coopératives peut prévoir dans ses statuts "
+          + "et règlement intérieur la possibilité de vote plural pour certains de ses membres et "
+          + "en déterminer les critères. » L'article 156 dit la même chose pour la "
+          + "confédération, et l'article 68 range cette possibilité parmi les prescriptions du "
+          + "règlement intérieur. C'est la seule brèche admise dans le principe de l'article 102, "
+          + "et elle est réservée aux étages supérieurs : dans une coopérative de base, une "
+          + "personne vaut toujours une voix. Le vote plural n'est pas pour autant un vote "
+          + "censitaire — les critères sont libres mais doivent être écrits, et rien n'oblige à "
+          + "les indexer sur le capital.",
+      },
+      {
+        type: "exercise",
+        id: "s8e5",
+        kind: "choice",
+        title: "Créer l'interprofession",
+        prompt:
+          "Un projet vous demande de « créer l'interprofession de la filière soja conformément à "
+          + "l'OHADA ». Quelle est la réponse professionnellement correcte ?",
+        opts: [
+          "Immatriculer une confédération : c'est le nom que l'Acte uniforme donne à l'interprofession",
+          "Constituer un réseau coopératif : c'est la forme interprofessionnelle prévue par l'Acte uniforme",
+          "Expliquer que l'Acte uniforme n'organise pas l'interprofession, qu'il permet de constituer et représenter le collège des producteurs, et que la reconnaissance de l'interprofession relève du droit national",
+          "Refuser : une interprofession est illégale en zone OHADA",
+        ],
+        answer: 2,
+        hint: "Cherchez le mot « interprofession » dans l'Acte uniforme avant de répondre.",
+        explain:
+          "L'Acte uniforme ne mentionne pas l'interprofession. Il organise l'escalier "
+          + "coopérative → union (art. 133) → fédération (art. 141) → confédération (art. 152), "
+          + "auquel s'ajoute le réseau (art. 160), ce qui permet au **collège des producteurs** "
+          + "d'exister comme personne morale, de tenir des comptes et de mandater des "
+          + "représentants — la confédération ayant précisément mission de défendre les intérêts "
+          + "de ses membres aux plans national et international (art. 155). Mais la composition "
+          + "de l'interprofession, sa reconnaissance et la portée de ses accords relèvent du "
+          + "droit national de chaque État. Promettre l'inverse, c'est engager un projet sur une "
+          + "base qui ne tiendra pas devant le ministère de tutelle.",
+      },
+      {
+        type: "resource",
+        title: "Modèles de statuts et de règlement intérieur",
+        url: "https://www.ohada.com/textes-ohada/actes-uniformes.html",
+        desc:
+          "Des modèles de statuts de SCOOPS, de coopérative avec conseil d'administration et de "
+          + "règlement intérieur circulent largement. Utilisez-les pour la structure, jamais tels "
+          + "quels : reprenez la liste des dix-huit mentions de l'article 18, vérifiez le sigle "
+          + "(COOP-CA, art. 268) et traquez les clauses de partage de l'actif net, qui trahissent "
+          + "un modèle de société commerciale recyclé.",
+        provider: "OHADA",
+      },
+    ],
+  },
+];

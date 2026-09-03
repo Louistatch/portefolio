@@ -21,6 +21,7 @@ import {
 } from "../shared/exercises";
 import { LECONS_FCA_01 } from "../shared/fca-01";
 import { LECONS_FCQ_01 } from "../shared/fcq-01";
+import { LECONS_SCOOP_01 } from "../shared/scoop-01";
 
 let pass = 0;
 const failures: string[] = [];
@@ -109,6 +110,7 @@ for (const file of files) {
 const coursTs: { nom: string; lecons: { titre: string; cellules: any[] }[] }[] = [
   { nom: "shared/fca-01.ts", lecons: LECONS_FCA_01 as any },
   { nom: "shared/fcq-01.ts", lecons: LECONS_FCQ_01 as any },
+  { nom: "shared/scoop-01.ts", lecons: LECONS_SCOOP_01 as any },
 ];
 
 for (const cours of coursTs) {

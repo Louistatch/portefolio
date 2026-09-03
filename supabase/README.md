@@ -31,6 +31,15 @@ base. Lisez cette page avant d'en lancer un.
 | 20 | `academy_cron_runs.sql` | Journal des tâches planifiées — c'est l'ABSENCE de ligne récente qui alerte |
 | 21 | `academy_tentatives.sql` | Compteur de tentatives sur une leçon — sans lui, un échec ne coûte rien |
 | 22 | `tof_exercices_notes.sql` | TOF-FIN-01 : les douze quiz deviennent des exercices notés |
+| 23 | `academy_cours_fca_01.sql` | Cours **FCA-01** — risque climatique et crédit agricole (6 leçons) |
+| 24 | `academy_cours_fcq_01.sql` | Cours **FCQ-01** — portefeuille agricole en Python (7 leçons) |
+| 25 | `academy_cours_scoop_01.sql` | Cours **SCOOP-01** — droit coopératif OHADA (8 leçons, 42 exercices notés) |
+
+Les trois derniers sont des **artefacts générés**, pas des sources : le contenu vit dans
+`shared/fca-01.ts`, `shared/fcq-01.ts` et `shared/scoop-01.ts`, et le SQL en est la projection
+(`npx tsx script/generate-<code>-sql.ts > supabase/academy_cours_<code>.sql`). Pour corriger une
+leçon, on édite le TypeScript et l'on régénère. Le script de génération refuse de produire un
+fichier dont un exercice ne se corrige pas à 100 % avec sa propre clé.
 
 ## Verrouillage RLS (`academy_rls_lockdown.sql`)
 
