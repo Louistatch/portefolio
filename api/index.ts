@@ -4532,7 +4532,7 @@ async function parcoursDuCours(courseId: number): Promise<string | null> {
 app.get("/api/academy/paiements", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data } = await supabase.from("academy_paiements")
-    .select("program_id, montant, devise, statut, paye_at, created_at")
+    .select("reference, program_id, montant, devise, statut, paye_at, created_at")
     .eq("student_id", sid).order("created_at", { ascending: false }).limit(20);
   const { data: ancien } = await supabase.from("academy_gratuite_historique")
     .select("student_id").eq("student_id", sid).maybeSingle();
@@ -4599,7 +4599,14 @@ app.post("/api/academy/paiement/attestation", rateLimit(10, 15 * 60 * 1000), req
         prenom: etu.first_name || undefined,
         email: etu.email,
       },
-      retourUrl: `${SITE_URL}/academy/dashboard?paiement=${encodeURIComponent(reference)}`,
+      // ── Où l'opérateur renvoie l'étudiant ──
+      //
+      // Vers la page de paiement, et non vers le tableau de bord. Le tableau de bord
+      // ignorait le paramètre : on revenait d'un règlement de 10 000 F sur un écran
+      // ordinaire, sans un mot. Pire, le webhook encaisse mais ne délivre pas — c'est la
+      // page de retour qui redemande l'attestation une fois le paiement confirmé. Sans
+      // elle, l'argent arrivait et le document n'était jamais établi.
+      retourUrl: `${SITE_URL}/academy/paiement/${courseId}?retour=${encodeURIComponent(reference)}`,
       // Identifiants internes seulement : ils permettent de rapprocher une ligne du
       // tableau de bord de l'opérateur sans ouvrir notre base, et n'exposent rien.
       metadonnees: { parcours: programId ?? "inconnu", cours: String(courseId) },

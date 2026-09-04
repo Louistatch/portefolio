@@ -391,26 +391,13 @@ export default function AcademyClassroom() {
       const data = await res.json();
 
       if (res.status === 402 && data.paiementRequis) {
-        // On n'annonce pas le prix ici comme une surprise : il a été affiché à
-        // l'inscription, accepté après le test et rappelé à mi-parcours. À ce stade,
-        // c'est un rappel, pas une révélation.
-        const ok = window.confirm(
-          `Votre attestation est prête.\n\n`
-          + `Établie à votre nom, signée, avec son code de vérification.\n`
-          + `${Number(data.prix).toLocaleString("fr-FR")} F CFA pour la débloquer.\n\n`
-          + `Vous allez être redirigé vers le paiement sécurisé (Mobile Money ou carte).`,
-        );
-        if (!ok) return;
-
-        const p = await studentFetch("/api/academy/paiement/attestation", {
-          method: "POST", body: JSON.stringify({ course_id: courseId }),
-        });
-        const paiement = await p.json();
-        if (!p.ok) throw new Error(paiement.message || "Paiement impossible pour le moment.");
-        // Redirection plein écran plutôt qu'un nouvel onglet : sur un téléphone, un onglet
-        // ouvert en arrière-plan pendant un paiement se perd, et l'étudiant croit avoir
-        // payé dans le vide.
-        window.location.href = paiement.url;
+        // Vers une PAGE, pas une boîte de dialogue du navigateur.
+        //
+        // Le règlement se demandait ici même dans un `window.confirm`, précédé de
+        // « www.louisfarm.com indique ». Réclamer dix mille francs au terme de treize
+        // semaines dans ce contenant-là, c'est se saborder : on n'y montre pas ce qu'on
+        // achète, on n'y inspire pas confiance, et sa laideur suggère l'arnaque.
+        navigate(`/academy/paiement/${courseId}`);
         return;
       }
 

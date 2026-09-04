@@ -34,6 +34,7 @@ const VerifyCertificate = lazy(() => import("@/pages/academy/verify-certificate"
 const AcademyLive = lazy(() => import("@/pages/academy/live"));
 const AcademyParcours = lazy(() => import("@/pages/academy/parcours"));
 const AcademyProgramTest = lazy(() => import("@/pages/academy/program-test"));
+const AcademyPaiement = lazy(() => import("@/pages/academy/paiement"));
 
 // Admin
 const AdminLogin = lazy(() => import("@/pages/admin/login"));
@@ -135,6 +136,7 @@ function App() {
             <Route path="/academy/dashboard">{() => <RequireStudentAuth><AcademyLayout><AcademyDashboard /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/classroom/:id">{() => <Layout><RequireStudentAuth><AcademyClassroom /></RequireStudentAuth></Layout>}</Route>
             <Route path="/academy/test/:id">{() => <RequireStudentAuth><AcademyLayout><AcademyProgramTest /></AcademyLayout></RequireStudentAuth>}</Route>
+            <Route path="/academy/paiement/:courseId">{() => <RequireStudentAuth><AcademyLayout><AcademyPaiement /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/parcours/:id">{() => <RequireStudentAuth><AcademyLayout><AcademyParcours /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/group-work">{() => <RequireStudentAuth><AcademyLayout><AcademyGroupWork /></AcademyLayout></RequireStudentAuth>}</Route>
             {/* Publique : le lien de validation arrive par email et s'ouvre souvent sur un autre
