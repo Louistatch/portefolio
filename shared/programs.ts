@@ -190,9 +190,11 @@ export const PROGRAMS: Program[] = [
     // de 13. Le droit ne se révise pas en accéléré — chaque semaine porte un acte de la vie
     // de la coopérative, dans l'ordre où on le rencontre sur le terrain.
     //
-    // Il reste donc CINQ semaines pour COOP-02, « organiser les acteurs et structurer la
-    // filière ». C'est une contrainte, pas une marge : un second cours de six leçons ferait
-    // quatorze semaines et ne tiendrait plus dans la fenêtre.
+    // Les CINQ semaines restantes sont celles de COOP-02, « organiser les acteurs et
+    // structurer la filière », écrit d'après la méthode d'analyse de filière du FIDA. Cinq
+    // leçons exactement : c'était une contrainte, pas une marge — une sixième aurait porté
+    // le parcours à quatorze semaines et ne tiendrait plus dans la fenêtre. Le total est
+    // donc de 13 semaines pour 13 disponibles, et npm run verify:rythme le vérifie.
     //
     // Public : responsables de groupements de producteurs, agents d'ONG et de projets qui
     // accompagnent des coopératives, conseillers d'unions et de faîtières, agents de

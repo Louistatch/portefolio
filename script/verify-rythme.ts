@@ -17,11 +17,36 @@
 
 import { PROGRAMS, type Program } from "../shared/programs.js";
 import { leconOuverte, AVANCE_MAX_MS, SEMAINE_MS, type EtatLecon } from "../shared/rythme.js";
+import { LECONS_FCA_01 } from "../shared/fca-01.js";
+import { LECONS_FCQ_01 } from "../shared/fcq-01.js";
+import { LECONS_COOP_01 } from "../shared/coop-01.js";
+import { LECONS_COOP_02 } from "../shared/coop-02.js";
 
 const JOUR_MS = 24 * 60 * 60 * 1000;
 
 /** Le cursus MEAL tel qu'il est en base aujourd'hui : trois cours, 7 + 7 + 6 leçons. */
 const MEAL_REEL = [7, 7, 6];
+
+/**
+ * Le découpage réel de chaque parcours en cours, et le nombre de leçons de chacun.
+ *
+ * Il était auparavant remplacé par un forfait de douze leçons pour tout parcours autre que
+ * MEAL. Le contrôle passait donc au vert sans rien savoir des cours réellement publiés :
+ * le parcours « coop » compte treize leçons pour une fenêtre de treize semaines, et le
+ * forfait de douze le déclarait confortable alors qu'il est exactement à la limite. Les
+ * cours écrits en TypeScript se comptent tout seuls ; le jour où l'un d'eux gagne une
+ * leçon, ce script le dira.
+ *
+ * TOF n'a pas de source TypeScript — son contenu ne vit qu'en base — et garde donc le
+ * forfait, signalé comme tel dans l'affichage pour qu'on ne le prenne pas pour une mesure.
+ */
+const DECOUPAGE: Record<string, number[]> = {
+  meal: MEAL_REEL,
+  fca: [LECONS_FCA_01.length],
+  fcq: [LECONS_FCQ_01.length],
+  coop: [LECONS_COOP_01.length, LECONS_COOP_02.length],
+};
+const FORFAIT = [12];
 
 type Lecon = { cours: number; rang: number; ouvertureAt: number; statut: EtatLecon };
 
@@ -117,15 +142,27 @@ console.log(`Avance permise : ${(AVANCE_MAX_MS / SEMAINE_MS).toFixed(0)} semaine
 // l'étudiant paierait de sa poche une échéance que le calendrier lui interdit d'atteindre.
 console.log();
 for (const p of PROGRAMS as Program[]) {
-  // On ne connaît pas ici le découpage réel en cours de chaque parcours ; un cours unique
-  // de N leçons donne le même plancher, la séquence des cours n'ajoutant que des arrondis
-  // de semaine.
-  const total = p.id === "meal" ? MEAL_REEL.reduce((a, b) => a + b, 0) : 12;
-  const jours = joursPourTerminer([total], p.lessonsPerWeek);
+  const tailles = DECOUPAGE[p.id] ?? FORFAIT;
+  const mesure = p.id in DECOUPAGE;
+  const total = tailles.reduce((a, b) => a + b, 0);
+  const jours = joursPourTerminer(tailles, p.lessonsPerWeek);
   const fenetre = 13 * 7;
-  console.log(`  ${p.id.padEnd(5)} ${String(total).padStart(2)} leçons, ${p.lessonsPerWeek}/semaine `
-    + `→ ${String(jours).padStart(3)} jours`);
+  console.log(`  ${p.id.padEnd(5)} ${String(total).padStart(2)} leçons (${tailles.join(" + ")}), `
+    + `${p.lessonsPerWeek}/semaine → ${String(jours).padStart(3)} jours`
+    + (mesure ? "" : "   ⚠ forfait, contenu hors TypeScript"));
   v(`${p.id} : tient dans la fenêtre d'admission`, jours <= fenetre, `${jours} jours > ${fenetre}`);
+
+  // Le plancher ci-dessus mesure un sprint : combien de jours il faut à qui valide tout ce
+  // qu'on lui ouvre, avance d'une semaine comprise. Ce n'est PAS la contrainte qui décide
+  // qu'une leçon est atteignable — c'est sa date d'ouverture. Une leçon qui s'ouvre en
+  // semaine 14 reste fermée jusqu'au bout pour un étudiant admis pour treize semaines,
+  // quelle que soit sa vitesse. Les deux mesures sont donc gardées séparées : coop tient en
+  // 77 jours de sprint mais occupe exactement les treize semaines de calendrier, et c'est
+  // cette seconde ligne qu'une sixième leçon de COOP-02 ferait passer au rouge.
+  const semaines = tailles.reduce((a, n) => a + Math.ceil(n / p.lessonsPerWeek), 0);
+  v(`${p.id} : la dernière leçon s'ouvre dans la fenêtre`, semaines <= 13,
+    `dernière ouverture en semaine ${semaines}, fenêtre de 13`);
+  console.log(`        calendrier : ${semaines} semaine(s) sur 13`);
 }
 
 // ── Les propriétés que la borne ne doit pas casser ───────────────────────────
