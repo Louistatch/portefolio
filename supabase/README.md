@@ -34,6 +34,7 @@ base. Lisez cette page avant d'en lancer un.
 | 23 | `academy_cours_fca_01.sql` | Cours **FCA-01** — risque climatique et crédit agricole (6 leçons) |
 | 24 | `academy_cours_fcq_01.sql` | Cours **FCQ-01** — portefeuille agricole en Python (7 leçons) |
 | 25 | `academy_cours_scoop_01.sql` | Cours **SCOOP-01** — droit coopératif OHADA (8 leçons, 42 exercices notés) |
+| 26 | `academy_cron_verrou.sql` | Verrou quotidien des tâches planifiées : `unique (tache, jour)` + qui a déclenché |
 
 Les trois derniers sont des **artefacts générés**, pas des sources : le contenu vit dans
 `shared/fca-01.ts`, `shared/fcq-01.ts` et `shared/scoop-01.ts`, et le SQL en est la projection

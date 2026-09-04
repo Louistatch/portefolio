@@ -679,7 +679,7 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
     supabase.from("attestations").select("student_id, cert_type, status, issued_at").order("issued_at", { ascending: false }).limit(20),
     supabase.from("contact_messages").select("name, subject, created_at").order("created_at", { ascending: false }).limit(10),
     supabase.from("comments").select("author_name, created_at").order("created_at", { ascending: false }).limit(10),
-    supabase.from("cron_runs").select("tache, demarre_at, termine_at, ok, resume, erreur")
+    supabase.from("cron_runs").select("tache, jour, demarre_at, termine_at, ok, resume, erreur, declencheur, tentatives")
       .order("demarre_at", { ascending: false }).limit(60),
     supabase.from("attestations")
       .select("id, student_id, course_id, certificate_no, final_score")
@@ -800,7 +800,9 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
   // et une tâche quotidienne qui n'a rien écrit depuis 36 heures est déclarée muette —
   // une journée et demie, soit un cycle manqué plus une marge pour un décalage horaire.
   const executions = tachesQ.data || [];
-  const taches = ["verify-reminders", "late-warnings"].map(nom => {
+  // La liste vient du registre et non d'un tableau recopié ici : ajouter une tâche ne doit
+  // pas demander de penser à ce tableau-là, sinon la nouvelle tâche naît hors surveillance.
+  const taches = Object.keys(TACHES_PLANIFIEES).map(nom => {
     const siennes = executions.filter((r: any) => r.tache === nom);
     const derniere = siennes[0] || null;
     const dernierSucces = siennes.find((r: any) => r.ok === true) || null;
@@ -815,10 +817,17 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
       ok: derniere?.ok ?? null,
       erreur: derniere?.erreur ?? null,
       resume: derniere?.resume ?? null,
+      // Qui a fait le travail. C'est le renseignement qui manquait pour savoir si
+      // l'ordonnanceur de la plateforme fonctionne ou si seul le filet du dépôt tient.
+      declencheur: derniere?.declencheur ?? null,
+      tentatives: derniere?.tentatives ?? null,
       // Jamais exécutée compte comme muette : c'est exactement l'état qu'on a vécu.
       muette: heures === null || heures > TACHE_SILENCE_HEURES,
-      // `ok = null` sur la dernière ligne : la tâche a démarré et n'a jamais rendu la main.
-      interrompue: !!derniere && derniere.ok === null && !!derniere.demarre_at,
+      // `ok = null` passé le délai du verrou : la tâche a démarré et n'a jamais rendu la
+      // main. En deçà, elle est simplement en train de tourner — l'annoncer interrompue
+      // ferait clignoter une alerte à chaque exécution normale.
+      interrompue: !!derniere && derniere.ok === null && !!derniere.demarre_at
+        && now - new Date(derniere.demarre_at).getTime() > VERROU_MINUTES * 60_000,
     };
   });
 
@@ -2482,10 +2491,28 @@ const VERIFY_REMINDER_GIVE_UP_DAYS = 30;
  * est posé par la plateforme sur ses propres appels ; le jeton porteur sert au déclenchement
  * manuel depuis un terminal, le jour où il faut rattraper une exécution manquée.
  */
-function cronAutorise(req: Request): boolean {
+/**
+ * Qui a le droit de déclencher une tâche, et sous quel nom.
+ *
+ * Trois sources, et il est utile de savoir LAQUELLE a travaillé : c'est le seul moyen de
+ * répondre à « est-ce que l'ordonnanceur de la plateforme fonctionne, oui ou non ? » sans
+ * accès à sa console.
+ *
+ * Sur la solidité de l'en-tête `x-vercel-cron` : il est posé par l'ordonnanceur de la
+ * plateforme, et je n'ai pas pu vérifier depuis cet environnement qu'elle le retire bien
+ * des requêtes entrantes. On ne fait donc pas reposer la sécurité dessus. Ce qui borne
+ * réellement un appel non désiré, c'est le verrou du jour — une tâche ne s'exécute qu'une
+ * fois par jour, quel que soit le nombre d'appels — et la déduplication des emails, qui
+ * fait qu'un rejeu n'écrit ni n'envoie rien deux fois. `CRON_SECRET` reste la vraie
+ * serrure, et le workflow du dépôt s'en sert.
+ */
+type Declencheur = "vercel-cron" | "externe" | "manuel";
+
+function declencheurDeLAppel(req: Request): Declencheur | null {
+  if (req.headers["x-vercel-cron"] !== undefined) return "vercel-cron";
   const secret = process.env.CRON_SECRET;
-  if (req.headers["x-vercel-cron"] !== undefined) return true;
-  return !!secret && req.headers.authorization === `Bearer ${secret}`;
+  if (secret && req.headers.authorization === `Bearer ${secret}`) return "externe";
+  return null;
 }
 
 /** Adresse qui reçoit les alertes d'exploitation. Jamais celle d'un étudiant. */
@@ -2493,6 +2520,92 @@ const EMAIL_ALERTE = process.env.ADMIN_ALERT_EMAIL || "contact@louisfarm.com";
 
 /** Délai au-delà duquel une tâche quotidienne est considérée comme muette. */
 export const TACHE_SILENCE_HEURES = 36;
+
+/**
+ * Délai au-delà duquel une prise de verrou restée inachevée est présumée morte.
+ *
+ * Quinze minutes pour une fonction dont le temps imparti est de trente secondes : très
+ * large à dessein. Reprendre trop tôt ferait travailler deux instances en parallèle ;
+ * reprendre trop tard laisserait la journée sans envoi. Entre les deux, on choisit de
+ * perdre du temps plutôt que de doubler le travail.
+ */
+const VERROU_MINUTES = 15;
+
+type OptionsTache = {
+  /** Fourni par une route déjà authentifiée (l'administration), qui n'a ni en-tête ni jeton. */
+  declencheur?: Declencheur;
+  /** Passer outre le verrou du jour. Réservé au déclenchement manuel. */
+  forcer?: boolean;
+};
+
+type PriseDeVerrou =
+  | { pris: true; id: number | null; tentative: number }
+  | { pris: false; resume: unknown; declencheur: string | null };
+
+/**
+ * Prend le verrou de la journée pour une tâche, ou dit pourquoi il n'est pas à prendre.
+ *
+ * ── Pourquoi une contrainte d'unicité plutôt qu'un verrou applicatif ──
+ *
+ * Deux ordonnanceurs visent désormais les mêmes tâches (voir supabase/academy_cron_verrou.sql).
+ * Un « lire puis écrire » côté serveur laisserait une fenêtre de course de quelques
+ * millisecondes, largement suffisante sur deux instances sans état qui démarrent en même
+ * temps. `unique (tache, jour)` supprime la fenêtre : c'est la base qui arbitre, en une
+ * seule opération, et le perdant l'apprend par un code d'erreur.
+ *
+ * ── Ce qui reste reprenable ──
+ *
+ * Une journée déjà RÉUSSIE est close : le second ordonnanceur repart sans rien faire.
+ * Une journée en ÉCHEC ou restée inachevée depuis trop longtemps se reprend — sinon le
+ * filet ne rattraperait jamais rien, ce qui est précisément sa raison d'être. La reprise
+ * met à jour la ligne du jour au lieu d'en insérer une seconde, et `tentatives` sert à la
+ * fois de compteur et de numéro de version pour la mise à jour conditionnelle : deux
+ * instances qui reprennent en même temps lisent le même compteur, tentent toutes deux de
+ * l'incrémenter, et une seule voit sa mise à jour aboutir.
+ */
+async function prendreLeVerrou(
+  nom: string, jour: string, declencheur: Declencheur, forcer: boolean,
+): Promise<PriseDeVerrou> {
+  const { data: insere, error } = await supabase.from("cron_runs")
+    .insert({ tache: nom, jour, declencheur }).select("id").single();
+
+  if (!error) return { pris: true, id: insere?.id ?? null, tentative: 1 };
+
+  // 23505 : violation d'unicité, donc la journée est déjà prise. Tout autre code est une
+  // panne du journal — et on ne renonce PAS à envoyer les relances parce que le carnet de
+  // bord est cassé. On travaille sans verrou, en le disant.
+  if ((error as any).code !== "23505") {
+    console.error(`cron ${nom} : journal indisponible, exécution sans verrou —`, error.message);
+    return { pris: true, id: null, tentative: 1 };
+  }
+
+  const { data: existante } = await supabase.from("cron_runs")
+    .select("id, ok, demarre_at, tentatives, resume, declencheur")
+    .eq("tache", nom).eq("jour", jour).maybeSingle();
+  if (!existante) return { pris: true, id: null, tentative: 1 };
+
+  const morte = existante.ok === null
+    && Date.now() - new Date(existante.demarre_at).getTime() > VERROU_MINUTES * 60_000;
+  const reprenable = forcer || existante.ok === false || morte;
+  if (!reprenable) {
+    return { pris: false, resume: existante.resume, declencheur: existante.declencheur };
+  }
+
+  const tentative = (existante.tentatives ?? 1) + 1;
+  const { data: reprise } = await supabase.from("cron_runs")
+    .update({
+      demarre_at: new Date().toISOString(), termine_at: null,
+      ok: null, erreur: null, declencheur, tentatives: tentative,
+    })
+    .eq("id", existante.id)
+    .eq("tentatives", existante.tentatives ?? 1)   // garde optimiste
+    .select("id").maybeSingle();
+
+  // Aucune ligne mise à jour : une autre instance a repris entre-temps. Elle travaille,
+  // on s'efface.
+  if (!reprise) return { pris: false, resume: existante.resume, declencheur: existante.declencheur };
+  return { pris: true, id: reprise.id, tentative };
+}
 
 /**
  * Exécute une tâche planifiée en laissant une trace, quoi qu'il arrive.
@@ -2506,14 +2619,20 @@ export const TACHE_SILENCE_HEURES = 36;
  *      l'email part quand même : c'est le cas où il est le plus utile.
  *   3. L'envoi de l'alerte est lui-même protégé. Une erreur d'expédition ne doit pas
  *      remplacer l'erreur d'origine dans les journaux de la plateforme.
+ *
+ * Et depuis le verrou du jour, une quatrième : la tâche est INSENSIBLE au nombre
+ * d'appelants. On peut lui envoyer deux ordonnanceurs et un clic manuel le même matin,
+ * le travail n'a lieu qu'une fois.
  */
 async function executerTache(
   nom: string,
   req: Request,
   res: Response,
   corps: () => Promise<Record<string, unknown>>,
+  options: OptionsTache = {},
 ) {
-  if (!cronAutorise(req)) {
+  const declencheur = options.declencheur ?? declencheurDeLAppel(req);
+  if (!declencheur) {
     // Un refus ne laissait AUCUNE trace : le garde-fou répond avant l'écriture du
     // journal, si bien que « appelée puis refusée » et « jamais appelée » se
     // ressemblaient trait pour trait dans le tableau de bord. C'est le défaut qui
@@ -2541,41 +2660,53 @@ async function executerTache(
 
   // Le pendant du refus : une ligne à l'entrée, avant toute écriture en base. Si le
   // journal lui-même est injoignable, il reste au moins la preuve que l'appel est arrivé.
-  console.log(`cron ${nom} : appel accepté (${req.method})`);
+  console.log(`cron ${nom} : appel accepté (${req.method}, ${declencheur})`);
 
-  const { data: ligne } = await supabase.from("cron_runs")
-    .insert({ tache: nom }).select("id").maybeSingle()
-    .then(r => r, () => ({ data: null } as any));
+  const jour = new Date().toISOString().slice(0, 10);
+  const verrou = await prendreLeVerrou(nom, jour, declencheur, options.forcer === true);
 
+  if (!verrou.pris) {
+    // 200 et non 409 : ce n'est pas une erreur, c'est le filet qui constate que le
+    // premier ordonnanceur a fait le travail. Un workflow planifié qui échouerait ici
+    // enverrait une alerte tous les matins où tout va bien.
+    console.log(`cron ${nom} : déjà exécutée aujourd'hui par « ${verrou.declencheur} », rien à faire.`);
+    return res.json({
+      tache: nom, jour, ignore: true,
+      message: `Déjà exécutée aujourd'hui (déclenchée par ${verrou.declencheur ?? "?"}).`,
+      resume: verrou.resume,
+    });
+  }
+
+  const ligne = verrou.id;
   const clore = async (champs: Record<string, unknown>) => {
-    if (!ligne?.id) return;
+    if (!ligne) return;
     await supabase.from("cron_runs")
       .update({ termine_at: new Date().toISOString(), ...champs })
-      .eq("id", ligne.id).then(() => {}, () => {});
+      .eq("id", ligne).then(() => {}, () => {});
   };
 
   try {
     const resume = await corps();
     await clore({ ok: true, resume });
-    res.json(resume);
+    res.json({ tache: nom, jour, declencheur, tentative: verrou.tentative, ...resume });
   } catch (e: any) {
     const message = String(e?.message || e).slice(0, 2000);
     console.error(`cron ${nom} : échec —`, message);
     await clore({ ok: false, erreur: message });
     // Une alerte par tâche et par jour : un échec qui se répète mérite un rappel
-    // quotidien, pas un email par tentative.
+    // quotidien, pas un email par tentative. La ligne restant en `ok = false`, le second
+    // ordonnanceur la reprendra tout à l'heure — c'est exactement ce qu'on veut.
     await sendAcademyEmail({
       studentId: null, to: EMAIL_ALERTE, type: "cron_echec",
       subject: `⚠️ Tâche planifiée en échec : ${nom}`,
       html: tacheEchoueeEmailHtml(nom, message),
-      dedupeKey: `cron_echec:${nom}:${new Date().toISOString().slice(0, 10)}`,
+      dedupeKey: `cron_echec:${nom}:${jour}`,
     }).catch(() => {});
-    res.status(500).json({ message: "Tâche en échec", tache: nom });
+    res.status(500).json({ message: "Tâche en échec", tache: nom, tentative: verrou.tentative });
   }
 }
 
-const relancesDeVerification = (req: Request, res: Response) =>
-  executerTache("verify-reminders", req, res, async () => {
+async function corpsRelancesDeVerification(): Promise<Record<string, unknown>> {
 
   const now = Date.now();
   const horizon = new Date(now - VERIFY_REMINDER_GIVE_UP_DAYS * 86400000).toISOString();
@@ -2620,7 +2751,10 @@ const relancesDeVerification = (req: Request, res: Response) =>
 
   console.log(`verify-reminders: ${envoyees} relance(s) envoyée(s), ${ignorees} ignorée(s) sur ${students?.length ?? 0} compte(s) non vérifié(s).`, parEtape);
   return { candidats: students?.length ?? 0, envoyees, ignorees, parEtape };
-});
+}
+
+const relancesDeVerification = (req: Request, res: Response) =>
+  executerTache("verify-reminders", req, res, corpsRelancesDeVerification);
 
 // ══════════════════════════════════════════════════════════════
 // GET *et* POST, et c'est GET qui compte.
@@ -2656,8 +2790,7 @@ app.post("/api/cron/verify-reminders", relancesDeVerification);
  * La clé d'idempotence porte la date d'admission : un étudiant remis à zéro puis réadmis
  * repart avec une série d'alertes neuve, au lieu d'être considéré comme déjà prévenu.
  */
-const alertesDeRetard = (req: Request, res: Response) =>
-  executerTache("late-warnings", req, res, async () => {
+async function corpsAlertesDeRetard(): Promise<Record<string, unknown>> {
 
   const constat = await constatDeRetard();
   let envoyees = 0, ignorees = 0;
@@ -2694,10 +2827,77 @@ const alertesDeRetard = (req: Request, res: Response) =>
 
   console.log(`late-warnings: ${envoyees} alerte(s) envoyée(s), ${ignorees} ignorée(s) sur ${constat.length} admis.`, parPalier);
   return { admis: constat.length, envoyees, ignorees, parPalier };
-});
+}
+
+const alertesDeRetard = (req: Request, res: Response) =>
+  executerTache("late-warnings", req, res, corpsAlertesDeRetard);
 
 app.get("/api/cron/late-warnings", alertesDeRetard);
 app.post("/api/cron/late-warnings", alertesDeRetard);
+
+/**
+ * Registre des tâches quotidiennes.
+ *
+ * Il existe pour une seule raison : permettre de lancer une tâche depuis
+ * l'administration, sans passer par l'ordonnanceur. Ce n'est pas un confort — c'est ce
+ * qui rend la chaîne VÉRIFIABLE. Jusqu'ici, savoir si une tâche marchait supposait
+ * d'attendre 09h00 UTC puis de regarder si quelque chose s'était passé ; et comme rien
+ * ne se passait jamais, on ne savait pas distinguer « l'ordonnanceur ne part pas » de
+ * « la tâche est cassée ». Un bouton tranche la question en dix secondes.
+ */
+const TACHES_PLANIFIEES: Record<string, () => Promise<Record<string, unknown>>> = {
+  "verify-reminders": corpsRelancesDeVerification,
+  "late-warnings": corpsAlertesDeRetard,
+};
+
+/**
+ * Lancer une tâche à la main depuis l'administration.
+ *
+ * `?forcer=1` passe outre le verrou du jour. C'est sans danger et c'est le mode utile :
+ * les emails portent tous une clé d'idempotence (`dedupeKey`), donc un second passage
+ * dans la même journée ne renvoie rien à personne — il recalcule, il journalise, et il
+ * vous rend le résumé. C'est un test à blanc qui dit la vérité.
+ *
+ * Sans `forcer`, la route se comporte exactement comme un ordonnanceur : si la journée
+ * est déjà faite, elle le dit et ne refait rien.
+ */
+app.post("/api/admin/cron/:tache", requireAuth, async (req, res) => {
+  const nom = String(req.params.tache);
+  const corps = TACHES_PLANIFIEES[nom];
+  if (!corps) {
+    return res.status(404).json({
+      message: `Tâche inconnue : ${nom}`, connues: Object.keys(TACHES_PLANIFIEES),
+    });
+  }
+  await executerTache(nom, req, res, corps, {
+    declencheur: "manuel",
+    forcer: req.query.forcer === "1" || req.query.forcer === "true",
+  });
+});
+
+/**
+ * État des tâches planifiées, pour l'administration.
+ *
+ * Renvoie la dernière ligne de chaque tâche connue — y compris `null` quand il n'y en a
+ * aucune, ce qui est le cas depuis la création de la table et le renseignement le plus
+ * important de tous. `declencheur` répond à la question qu'on ne pouvait pas poser :
+ * lequel des deux ordonnanceurs fait réellement le travail.
+ */
+app.get("/api/admin/cron", requireAuth, async (_req, res) => {
+  const { data } = await supabase.from("cron_runs")
+    .select("tache, jour, demarre_at, termine_at, ok, declencheur, tentatives, resume, erreur")
+    .order("demarre_at", { ascending: false }).limit(60);
+  const lignes = data || [];
+  res.json({
+    taches: Object.keys(TACHES_PLANIFIEES).map(nom => ({
+      nom,
+      derniere: lignes.find(l => l.tache === nom) ?? null,
+      executions30j: lignes.filter(l => l.tache === nom).length,
+    })),
+    secretConfigure: !!process.env.CRON_SECRET,
+    journal: lignes.slice(0, 20),
+  });
+});
 
 // ── Renvoyer l'email de validation ──
 app.post("/api/academy/resend-verify", rateLimit(5, 15 * 60 * 1000), requireStudent, async (req, res) => {
@@ -4041,13 +4241,29 @@ const JOUR_MS = 24 * 60 * 60 * 1000;
 
 /** Constat de retard de tous les admis. Lecture seule — ne modifie rien. */
 async function constatDeRetard() {
-  const { data: admis } = await supabase.from("students")
+  // ── Pourquoi ces quatre `error` sont désormais lus ──
+  //
+  // Ils ne l'étaient pas, et le test de la tâche l'a montré crûment : avec une base
+  // injoignable, `late-warnings` répondait « 0 admis, 0 alerte envoyée » et se déclarait
+  // RÉUSSIE. C'est exactement la panne que la table cron_runs a été créée pour rendre
+  // visible — « rien à faire » et « je n'ai rien pu lire » produisant la même trace — et
+  // elle passait encore par cette porte-là.
+  //
+  // Une lecture en échec est une panne, pas un constat vide. On la fait remonter :
+  // l'enveloppe de la tâche l'enregistre en `ok = false` et vous envoie l'alerte, et la
+  // journée reste reprenable par le second ordonnanceur.
+  const lire = <T>(r: { data: T | null; error: { message: string } | null }, quoi: string): T | null => {
+    if (r.error) throw new Error(`lecture ${quoi} : ${r.error.message}`);
+    return r.data;
+  };
+
+  const admis = lire(await supabase.from("students")
     .select("id, full_name, email, admitted_at, admission_expires, course_emails")
-    .not("admitted_at", "is", null);
+    .not("admitted_at", "is", null), "des étudiants admis");
   if (!admis?.length) return [];
 
-  const { data: lp } = await supabase.from("lesson_progress")
-    .select("student_id, course_id, status, due_at");
+  const lp = lire(await supabase.from("lesson_progress")
+    .select("student_id, course_id, status, due_at"), "des plannings de leçons");
 
   // Ne compter que les leçons des parcours auxquels l'étudiant est admis.
   //
@@ -4061,14 +4277,14 @@ async function constatDeRetard() {
   // Le filtre est posé ici plutôt que par un nettoyage de la base, pour la même raison
   // qu'à la lecture du planning : il corrige les dix-sept d'un coup sans rien détruire, et
   // il tient encore le jour où une ligne réapparaît.
-  const { data: cours } = await supabase.from("sms_courses").select("id, code");
+  const cours = lire(await supabase.from("sms_courses").select("id, code"), "du catalogue de cours");
   const parcoursDuCours = new Map<number, string | null>(
     (cours || []).map((c: any) => [c.id, programOf(c.code)?.id ?? null]));
 
   // Une seule lecture des admissions par parcours, plutôt qu'un parcoursAdmis() par
   // étudiant : cette fonction tourne sur toute la promotion, à chaque passage de la tâche.
-  const { data: admissionsParcours } = await supabase.from("academy_program_admissions")
-    .select("student_id, program_id").not("admitted_at", "is", null);
+  const admissionsParcours = lire(await supabase.from("academy_program_admissions")
+    .select("student_id, program_id").not("admitted_at", "is", null), "des admissions par parcours");
   const parcoursDe = new Map<number, Set<string>>();
   for (const s of admis as any[]) parcoursDe.set(s.id, new Set(["meal"]));
   for (const r of admissionsParcours || []) parcoursDe.get(r.student_id)?.add(r.program_id);

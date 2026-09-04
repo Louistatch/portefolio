@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Link } from "wouter";
-import { AlertTriangle, ChevronDown, ChevronUp, ChevronRight } from "lucide-react";
+import { AlertTriangle, ChevronDown, ChevronUp, ChevronRight, Play, Loader2 } from "lucide-react";
 
 // ══════════════════════════════════════════════════════════════
 // Ce qui demande une décision, en tête du tableau de bord.
@@ -36,7 +36,18 @@ export type PointAttention = {
   resume: string;
   /** Le détail, replié. */
   detail: ReactNode;
-  action?: { libelle: string; href: string };
+  /**
+   * L'issue proposée, s'il y en a une.
+   *
+   * Deux formes, parce qu'un sujet se règle soit ailleurs, soit ici. `href` mène à la page
+   * qui traite le sujet ; `onClick` agit sur place. La seconde a été ajoutée pour les
+   * tâches planifiées : la seule question qu'on se pose devant « jamais exécutée » est
+   * « est-ce que ça marcherait si on l'appelait ? », et y répondre demandait jusqu'ici
+   * d'attendre 09h00 UTC.
+   */
+  action?:
+    | { libelle: string; href: string }
+    | { libelle: string; onClick: () => void; enCours?: boolean; resultat?: string | null };
 };
 
 const PUCE = {
@@ -85,12 +96,31 @@ export function PointsAttention({ points }: { points: PointAttention[] }) {
               {estOuvert && (
                 <div className="px-5 pb-4 pl-10 text-[13px] text-muted-foreground leading-relaxed space-y-2">
                   {p.detail}
-                  {p.action && (
+                  {p.action && ("href" in p.action ? (
                     <Link href={p.action.href}
                       className="inline-flex items-center gap-1 text-[13px] font-semibold text-primary hover:text-accent transition-colors pt-0.5">
                       {p.action.libelle} <ChevronRight className="w-3.5 h-3.5" />
                     </Link>
-                  )}
+                  ) : (
+                    <div className="pt-0.5 space-y-1.5">
+                      <button
+                        type="button"
+                        onClick={p.action.onClick}
+                        disabled={p.action.enCours}
+                        className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-primary hover:text-accent transition-colors disabled:opacity-50 disabled:cursor-wait"
+                      >
+                        {p.action.enCours
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Play className="w-3.5 h-3.5" />}
+                        {p.action.enCours ? "En cours…" : p.action.libelle}
+                      </button>
+                      {p.action.resultat && (
+                        <p className="font-mono text-[12px] break-words text-foreground/80">
+                          {p.action.resultat}
+                        </p>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
             </li>

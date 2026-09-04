@@ -157,7 +157,7 @@ const ICONES_ACTIVITE: Record<string, any> = {
 
 export default function Dashboard() {
   const [jours, setJours] = useState(30);
-  const { data, isLoading, error } = useQuery<any>({
+  const { data, isLoading, error, refetch } = useQuery<any>({
     queryKey: ["admin-dashboard", jours],
     queryFn: async () => {
       const r = await adminFetch(`/api/admin/dashboard?jours=${jours}`);
@@ -165,6 +165,36 @@ export default function Dashboard() {
       return r.json();
     },
   });
+
+  // Lancement manuel des tâches planifiées.
+  //
+  // Devant « jamais exécutée », la seule question utile est « est-ce que ça marcherait si
+  // on l'appelait ? ». Y répondre demandait d'attendre 09h00 UTC puis de constater
+  // l'absence de trace — c'est-à-dire d'attendre un jour pour ne rien apprendre. Ce
+  // bouton force l'exécution : les emails portant tous une clé d'idempotence, un second
+  // passage dans la journée ne renvoie rien à personne.
+  const [tacheEnCours, setTacheEnCours] = useState<string | null>(null);
+  const [resultatTache, setResultatTache] = useState<string | null>(null);
+
+  const lancerLesTaches = async (noms: string[]) => {
+    setTacheEnCours(noms.join(", "));
+    setResultatTache(null);
+    const lignes: string[] = [];
+    for (const nom of noms) {
+      try {
+        const r = await adminFetch(`/api/admin/cron/${nom}?forcer=1`, { method: "POST" });
+        const j = await r.json().catch(() => ({}));
+        lignes.push(r.ok
+          ? `${nom} : ${JSON.stringify(j)}`
+          : `${nom} : HTTP ${r.status} — ${j?.message ?? "erreur"}`);
+      } catch (e: any) {
+        lignes.push(`${nom} : ${String(e?.message || e)}`);
+      }
+    }
+    setResultatTache(lignes.join("  ·  "));
+    setTacheEnCours(null);
+    refetch();
+  };
 
   if (isLoading) return <SqueletteBord />;
 
@@ -225,11 +255,18 @@ export default function Dashboard() {
             ))}
           </ul>
           <p>
-            À vérifier dans l'ordre : l'onglet Cron Jobs du projet Vercel, les journaux de la
-            fonction, puis la table <span className="font-mono">cron_runs</span>.
+            Lancez-les ici pour savoir si la panne est dans l'ordonnanceur ou dans la tâche.
+            Un envoi déjà parti aujourd'hui ne repart pas : chaque email porte une clé
+            d'idempotence.
           </p>
         </>
       ),
+      action: {
+        libelle: tachesEnDefaut.length === 1 ? "Lancer maintenant" : "Lancer les deux maintenant",
+        onClick: () => lancerLesTaches(tachesEnDefaut.map((t: any) => t.nom)),
+        enCours: tacheEnCours !== null,
+        resultat: resultatTache,
+      },
     });
   }
 

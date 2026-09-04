@@ -1,0 +1,117 @@
+# ══════════════════════════════════════════════════════════════
+# Filet des tâches quotidiennes
+#
+# ── Pourquoi ce fichier existe ──
+#
+# Les deux tâches quotidiennes de l'Academy — relances de vérification d'email et alertes
+# de retard — sont déclarées dans vercel.json et n'ont JAMAIS tourné. La table cron_runs,
+# créée précisément pour rendre visible une tâche muette, est restée vide : aucune
+# exécution, aucun échec, aucun refus. Les routes ont été corrigées, le filet d'alerte
+# posé, la trace de refus ajoutée. Rien n'est venu.
+#
+# Le diagnostic bute sur ce qu'on ne peut pas observer : la configuration de
+# l'ordonnanceur de la plateforme d'hébergement. Plutôt que de continuer à l'aveugle, on
+# cesse d'en dépendre — ce workflow est un SECOND ordonnanceur, et il a l'avantage
+# décisif d'avoir ses propres journaux, consultables dans l'onglet Actions du dépôt.
+#
+# À partir de maintenant, « est-ce que les relances partent ? » a une réponse en trois
+# clics, sans accès à aucune console d'hébergeur.
+#
+# ── Il ne remplace pas l'ordonnanceur de la plateforme ──
+#
+# Celui-ci reste en place et passe en premier (09h00 et 09h30 UTC). Ce workflow passe
+# après, à 09h40 : si la plateforme a fait le travail, chaque tâche répond « déjà
+# exécutée aujourd'hui » et le workflow reste vert. Le verrou du jour
+# (supabase/academy_cron_verrou.sql) garantit qu'aucun travail n'est fait deux fois, quel
+# que soit le nombre d'ordonnanceurs.
+#
+# Le champ `declencheur` de cron_runs dira lequel des deux travaille réellement. C'est le
+# renseignement qui manquait.
+#
+# ── Ce qu'il faut pour qu'il fonctionne ──
+#
+#   1. Un secret de dépôt CRON_SECRET (Settings → Secrets and variables → Actions),
+#      avec EXACTEMENT la même valeur que la variable d'environnement CRON_SECRET de
+#      l'hébergeur. Sans lui, l'API répond 401 et ce workflow échoue bruyamment — ce qui
+#      est le comportement voulu : mieux vaut un échec visible qu'un silence.
+#   2. Rien d'autre. Pas de dépendance, pas d'installation, pas de conteneur particulier.
+#
+# ── Les limites, dites franchement ──
+#
+#   — Les workflows planifiés de GitHub sont au mieux approximatifs : un retard de
+#     quelques minutes est courant, et il peut atteindre une heure aux heures de pointe.
+#     Sans importance ici : ces tâches sont quotidiennes et le palier d'alerte se déduit
+#     du retard constaté, pas d'un compteur d'exécutions.
+#   — Un workflow planifié est DÉSACTIVÉ automatiquement après 60 jours sans activité sur
+#     le dépôt. GitHub prévient les administrateurs par email avant de le faire. Si le
+#     dépôt dort deux mois, il faudra le réactiver d'un clic.
+# ══════════════════════════════════════════════════════════════
+name: Tâches quotidiennes de l'Academy
+
+on:
+  schedule:
+    # 09h40 UTC, après les deux fenêtres de l'ordonnanceur de la plateforme.
+    - cron: "40 9 * * *"
+  workflow_dispatch:
+
+# Deux exécutions simultanées ne casseraient rien — le verrou du jour est en base — mais
+# elles brouilleraient les journaux pour rien.
+concurrency:
+  group: taches-quotidiennes
+  cancel-in-progress: false
+
+jobs:
+  declencher:
+    name: Déclencher les tâches quotidiennes
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Vérifier que le secret est en place
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Le secret de dépôt CRON_SECRET est absent."
+            echo "Settings → Secrets and variables → Actions → New repository secret,"
+            echo "nom CRON_SECRET, avec la même valeur que la variable d'environnement"
+            echo "CRON_SECRET côté hébergeur."
+            exit 1
+          fi
+          echo "Secret présent."
+
+      - name: Relances de vérification d'email
+        id: relances
+        env:
+          BASE: ${{ vars.SITE_URL || 'https://louisfarm.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "→ GET $BASE/api/cron/verify-reminders"
+          # --fail-with-body : le corps de la réponse est affiché MÊME en cas d'erreur.
+          # C'est ce corps qui porte le diagnostic ; l'avaler rendrait ce filet aussi
+          # muet que la panne qu'il rattrape.
+          curl --fail-with-body -sS --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$BASE/api/cron/verify-reminders" | tee reponse.json
+          echo
+
+      - name: Alertes de retard
+        # `always()` : une tâche en échec ne doit pas cacher l'état de l'autre. Les deux
+        # sont indépendantes, on veut les deux verdicts.
+        if: always() && steps.relances.outcome != 'skipped'
+        env:
+          BASE: ${{ vars.SITE_URL || 'https://louisfarm.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          echo "→ GET $BASE/api/cron/late-warnings"
+          curl --fail-with-body -sS --max-time 60 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$BASE/api/cron/late-warnings" | tee reponse.json
+          echo
+
+      - name: Lire le verdict
+        if: always()
+        run: |
+          echo "Un corps contenant \"ignore\": true signifie que l'ordonnanceur de la"
+          echo "plateforme avait déjà fait le travail — c'est un succès, pas un doublon."
+          echo "Le champ \"declencheur\" du journal cron_runs dit qui a travaillé."
