@@ -1,8 +1,6 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import {
-  Loader2, ChevronLeft, ChevronRight, CheckCircle2, Clock, ArrowRight, Trophy, ArrowLeft,
-} from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
 import { isStudentLoggedIn, studentFetch } from "@/lib/student";
@@ -18,7 +16,39 @@ import { BANQUES_ADMISSION } from "@shared/tests-parcours";
  *
  * Le score est calculé CÔTÉ SERVEUR uniquement. Le navigateur n'a que les énoncés et les
  * options ; la clé de correction ne quitte jamais api/.
+ *
+ * ── Sur l'allure de cette page ──
+ *
+ * Registre visuel de l'épreuve écrite, pas de l'application : hiérarchie portée par la
+ * typographie et l'espace plutôt que par des cartes empilées, filets d'un pixel, chiffres
+ * tabulaires pour que les compteurs ne sautillent pas d'une question à l'autre, et une
+ * seule couleur — l'accent du parcours — employée avec parcimonie.
+ *
+ * Ce n'est pas une préférence esthétique. Cette page annonce, en cas de réussite, une
+ * attestation à 10 000 F CFA : le candidat doit avoir le sentiment d'avoir passé quelque
+ * chose qui compte. Une page d'examen qui ressemble à un formulaire d'inscription à une
+ * infolettre dévalue ce qu'elle délivre, et le prix devient plus difficile à défendre.
+ *
+ * La sélection d'une réponse ne repose JAMAIS sur la seule couleur : bordure appuyée, fond
+ * léger et coche explicite. C'est ce qui la rend lisible en daltonisme, et sur les écrans
+ * de téléphone en plein soleil — le cas courant de nos étudiants.
  */
+
+/** Cadre commun des écrans d'état : filet accentué, label, contenu. */
+function EcranAdministratif({ accent, label, children }: {
+  accent: string; label: string; children: React.ReactNode;
+}) {
+  return (
+    <div className="mx-auto max-w-5xl px-4 sm:px-8 py-10 sm:py-16">
+      <div className="border-t-2 pt-6 max-w-2xl" style={{ borderColor: accent }}>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
+          {label}
+        </p>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 export default function ProgramTest() {
   const [, navigate] = useLocation();
@@ -54,20 +84,27 @@ export default function ProgramTest() {
   const questions = BANQUES_ADMISSION[programId] ?? [];
 
   if (chargement) {
-    return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
+    return (
+      <div className="mx-auto max-w-5xl px-4 sm:px-8 py-24">
+        <div className="h-0.5 w-24 bg-muted overflow-hidden" role="status" aria-label="Chargement">
+          <div className="h-full w-1/3 animate-pulse" style={{ background: parcours?.accent ?? "currentColor" }} />
+        </div>
+        <p className="mt-4 text-xs text-muted-foreground">Chargement de l'épreuve…</p>
+      </div>
+    );
   }
 
   if (!parcours || questions.length === 0 || erreur) {
     return (
-      <div className="max-w-lg mx-auto py-24 text-center">
-        <p className="font-semibold">Test indisponible</p>
-        <p className="text-sm text-muted-foreground mt-2">
+      <EcranAdministratif accent="#7f1d1d" label="Épreuve indisponible">
+        <p className="mt-4 leading-7 text-muted-foreground">
           {erreur || "Ce parcours n'a pas de test d'admission en ligne pour le moment."}
         </p>
-        <Button variant="outline" className="mt-5 gap-2" onClick={() => navigate("/academy/dashboard")}>
+        <Button variant="outline" className="mt-6 gap-2 min-h-11 rounded-none"
+          onClick={() => navigate("/academy/dashboard")}>
           <ArrowLeft className="w-4 h-4" /> Retour à mon espace
         </Button>
-      </div>
+      </EcranAdministratif>
     );
   }
 
@@ -76,18 +113,18 @@ export default function ProgramTest() {
   // ── Déjà admis ──
   if (statut?.passed && !resultat) {
     return (
-      <div className="max-w-lg mx-auto py-24 text-center">
-        <CheckCircle2 className="w-14 h-14 mx-auto mb-5" style={{ color: accent }} />
-        <h1 className="text-2xl font-bold">Vous êtes déjà admis(e)</h1>
-        <p className="text-muted-foreground mt-2">
+      <EcranAdministratif accent={accent} label="Statut du dossier">
+        <h1 className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight">Admission acquise</h1>
+        <p className="mt-4 leading-7 text-muted-foreground">
           Votre admission au parcours « {parcours.title} » est active. Il n'y a pas lieu de
-          repasser le test.
+          repasser l'épreuve.
         </p>
-        <Button className="mt-6 gap-2 border-0 text-white" style={{ background: accent }}
+        <Button className="mt-6 gap-2 min-h-11 rounded-none border-0 text-white"
+          style={{ background: accent }}
           onClick={() => navigate(`/academy/parcours/${programId}`)}>
           Ouvrir le parcours <ArrowRight className="w-4 h-4" />
         </Button>
-      </div>
+      </EcranAdministratif>
     );
   }
 
@@ -96,19 +133,29 @@ export default function ProgramTest() {
     const quand = new Date(statut.nextTestAllowed).toLocaleDateString("fr-FR",
       { day: "numeric", month: "long", year: "numeric" });
     return (
-      <div className="max-w-lg mx-auto py-24 text-center">
-        <Clock className="w-14 h-14 text-amber-500 mx-auto mb-5" />
-        <h1 className="text-2xl font-bold">Patientez avant de réessayer</h1>
-        <p className="text-muted-foreground mt-2">
-          Vous avez déjà passé ce test sans atteindre le score requis.
+      <EcranAdministratif accent={accent} label="Délai de reprise">
+        <h1 className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight">
+          Nouvelle tentative différée
+        </h1>
+        <p className="mt-4 leading-7 text-muted-foreground">
+          Vous avez déjà passé cette épreuve sans atteindre le score requis. Le délai
+          d'une semaine existe pour vous laisser réviser, pas pour vous écarter.
         </p>
-        <p className="text-sm mt-3">
-          Nouvelle tentative possible à partir du <strong style={{ color: accent }}>{quand}</strong>.
-        </p>
-        <Button variant="outline" className="mt-6" onClick={() => navigate("/academy/dashboard")}>
+        <dl className="mt-6 border-t border-border pt-4 text-sm">
+          <div className="flex justify-between gap-4 py-1">
+            <dt className="text-muted-foreground">Tentatives</dt>
+            <dd className="font-mono tabular-nums">{statut.attempts ?? 0}</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-1">
+            <dt className="text-muted-foreground">Reprise possible à partir du</dt>
+            <dd className="font-medium">{quand}</dd>
+          </div>
+        </dl>
+        <Button variant="outline" className="mt-6 min-h-11 rounded-none"
+          onClick={() => navigate("/academy/dashboard")}>
           Retour à mon espace
         </Button>
-      </div>
+      </EcranAdministratif>
     );
   }
 
@@ -119,87 +166,110 @@ export default function ProgramTest() {
     // deux endroits finit par différer, et c'est l'étudiant qui découvre l'écart en payant.
     const prixAttestation = Number(resultat.prixAttestation ?? 0);
     return (
-      <div className="max-w-xl mx-auto py-16 text-center">
-        <div className="w-28 h-28 rounded-full mx-auto mb-6 flex flex-col items-center justify-center border-4"
-          style={{ borderColor: admis ? accent : "hsl(var(--destructive))" }}>
-          <span className="text-3xl font-black">{resultat.score}</span>
-          <span className="text-xs text-muted-foreground">sur {resultat.nbQuestions}</span>
-        </div>
-        <h1 className="text-2xl font-bold">
-          {admis ? "Félicitations, vous êtes admis(e)" : "Score insuffisant"}
-        </h1>
-        <p className="text-muted-foreground mt-3">
-          {admis
-            ? `Le parcours « ${parcours.title} » vous est ouvert. Vos premières leçons sont disponibles dès maintenant.`
-            : `Il fallait ${resultat.seuil} bonnes réponses sur ${resultat.nbQuestions}. Vous pourrez repasser le test dans une semaine.`}
-        </p>
-        {resultat.message && (
-          <p className="text-sm text-destructive mt-4 max-w-md mx-auto">{resultat.message}</p>
-        )}
-        {admis && parcours.credential && (
-          <p className="flex items-center justify-center gap-2 text-sm mt-5">
-            <Trophy className="w-4 h-4" style={{ color: accent }} />
-            Ce parcours mène au <strong>{parcours.credential}</strong>.
+      <div className="mx-auto max-w-5xl px-4 sm:px-8 py-10 sm:py-16">
+        <div className="border-t-2 pt-6" style={{ borderColor: accent }}>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
+            Résultat de l'épreuve
           </p>
-        )}
 
-        {/* ── Le tarif, annoncé au sommet de l'engagement ──
+          {/* Le score est un fait administratif : composé comme tel, cadré à gauche, sans
+              médaille ni cercle. Le chiffre porte l'information, la phrase dit la suite. */}
+          <div className="mt-8 grid gap-8 md:grid-cols-2 md:gap-16">
+            <div>
+              <p className="font-mono text-6xl font-semibold tabular-nums tracking-tight leading-none">
+                {resultat.score}
+                <span className="text-2xl text-muted-foreground"> / {resultat.nbQuestions}</span>
+              </p>
+              <p className="mt-3 text-sm text-muted-foreground">
+                Seuil d'admission : <span className="font-mono tabular-nums">{resultat.seuil}</span> bonnes
+                réponses sur <span className="font-mono tabular-nums">{resultat.nbQuestions}</span>.
+              </p>
+            </div>
 
-            C'est ici que le prix doit être lu, et nulle part plus tard. La personne vient
-            de réussir un test et de s'entendre dire qu'elle est admise : c'est le moment
-            où elle est le plus disposée à accepter une condition, et le seul où l'annonce
-            reste honnête. À la semaine huit, la même somme découverte pour la première
-            fois se lirait comme un piège — et un seul message de ce genre circulant sur
-            WhatsApp coûte plus cher que dix inscriptions.
-
-            La case n'est pas un verrou : l'admission est déjà accordée, la retirer à qui
-            ne coche pas serait hostile. C'est un enregistrement — la date et le montant
-            affiché à cet instant — parce que le tarif changera et que ce qui a été accepté
-            ne doit pas changer avec lui. */}
-        {admis && prixAttestation > 0 && (
-          <div className="mt-7 text-left rounded-2xl border border-border/60 bg-muted/30 p-5 max-w-md mx-auto">
-            <p className="text-[13.5px] leading-relaxed">
-              <strong>La formation est gratuite.</strong> À la fin du parcours, l'attestation
-              vérifiable — à votre nom, signée, avec son code de vérification — coûte{" "}
-              <strong className="whitespace-nowrap">
-                {prixAttestation.toLocaleString("fr-FR")} F CFA
-              </strong>. Vous ne réglez rien avant de l'avoir terminé.
-            </p>
-            <label className="flex items-start gap-2.5 mt-4 cursor-pointer">
-              <input type="checkbox" className="mt-0.5 w-4 h-4 shrink-0 accent-primary"
-                checked={engage} onChange={e => setEngage(e.target.checked)} />
-              <span className="text-[13px] text-muted-foreground leading-relaxed">
-                Je m'engage à suivre {parcours.lessonsPerWeek === 1 ? "une leçon" : `${parcours.lessonsPerWeek} leçons`} par
-                semaine, et je sais que l'attestation coûte {prixAttestation.toLocaleString("fr-FR")} F CFA à la fin.
-              </span>
-            </label>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight">
+                {admis ? "Vous êtes admis(e)" : "Score insuffisant"}
+              </h1>
+              <p className="mt-4 leading-7 text-muted-foreground">
+                {admis
+                  ? `Le parcours « ${parcours.title} » vous est ouvert. Vos premières leçons sont disponibles dès maintenant.`
+                  : "Vous pourrez repasser l'épreuve dans une semaine. Les questions porteront sur les mêmes domaines."}
+              </p>
+              {admis && parcours.credential && (
+                <p className="mt-4 text-sm leading-6">
+                  Ce parcours mène au <strong>{parcours.credential}</strong>.
+                </p>
+              )}
+              {resultat.message && (
+                <p className="mt-4 text-sm text-destructive leading-6">{resultat.message}</p>
+              )}
+            </div>
           </div>
-        )}
 
-        <div className="flex flex-wrap justify-center gap-3 mt-8">
-          <Button className="gap-2 border-0 text-white disabled:opacity-50"
-            style={{ background: accent }}
-            disabled={admis && prixAttestation > 0 && !engage}
-            onClick={async () => {
-              if (admis && prixAttestation > 0 && engage) {
-                // L'enregistrement ne doit pas retenir l'étudiant : s'il échoue, on
-                // continue. Le rappel de mi-parcours reste là pour rattraper.
-                await studentFetch(`/api/academy/programs/${programId}/engagement`, { method: "POST" })
-                  .catch(() => {});
-              }
-              navigate(admis ? `/academy/parcours/${programId}` : "/academy/dashboard");
-            }}>
-            {admis ? "Commencer le parcours" : "Retour à mon espace"} <ArrowRight className="w-4 h-4" />
-          </Button>
+          {/* ── Le tarif, annoncé au sommet de l'engagement ──
+
+              C'est ici que le prix doit être lu, et nulle part plus tard. La personne vient
+              de réussir une épreuve et de s'entendre dire qu'elle est admise : c'est le
+              moment où elle est le plus disposée à accepter une condition, et le seul où
+              l'annonce reste honnête. À la semaine huit, la même somme découverte pour la
+              première fois se lirait comme un piège — et un seul message de ce genre
+              circulant sur WhatsApp coûte plus cher que dix inscriptions.
+
+              La case n'est pas un verrou : l'admission est déjà accordée, la retirer à qui
+              ne coche pas serait hostile. C'est un enregistrement — la date et le montant
+              affiché à cet instant — parce que le tarif changera et que ce qui a été accepté
+              ne doit pas changer avec lui. */}
+          {admis && prixAttestation > 0 && (
+            <section className="mt-12 max-w-2xl border-t border-border pt-6">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
+                Conditions financières
+              </p>
+              <h2 className="mt-3 text-xl font-semibold">La formation est gratuite, l'attestation ne l'est pas</h2>
+              <p className="mt-4 leading-7 text-muted-foreground">
+                À la fin du parcours, l'attestation vérifiable — à votre nom, signée, avec son
+                code de vérification — coûte{" "}
+                <strong className="whitespace-nowrap text-foreground">
+                  {prixAttestation.toLocaleString("fr-FR")} F CFA
+                </strong>. Vous ne réglez rien avant de l'avoir terminé.
+              </p>
+              <label className="mt-6 flex min-h-14 items-start gap-3 border border-border p-4 text-sm leading-6 cursor-pointer">
+                <input type="checkbox" className="mt-1 w-4 h-4 shrink-0"
+                  style={{ accentColor: accent }}
+                  checked={engage} onChange={e => setEngage(e.target.checked)} />
+                <span>
+                  Je m'engage à suivre {parcours.lessonsPerWeek === 1 ? "une leçon" : `${parcours.lessonsPerWeek} leçons`} par
+                  semaine, et je sais que l'attestation coûte {prixAttestation.toLocaleString("fr-FR")} F CFA à la fin.
+                </span>
+              </label>
+            </section>
+          )}
+
+          <div className="mt-8">
+            <Button className="gap-2 min-h-11 rounded-none border-0 text-white disabled:opacity-50"
+              style={{ background: accent }}
+              disabled={admis && prixAttestation > 0 && !engage}
+              onClick={async () => {
+                if (admis && prixAttestation > 0 && engage) {
+                  // L'enregistrement ne doit pas retenir l'étudiant : s'il échoue, on
+                  // continue. Le rappel de mi-parcours reste là pour rattraper.
+                  await studentFetch(`/api/academy/programs/${programId}/engagement`, { method: "POST" })
+                    .catch(() => {});
+                }
+                navigate(admis ? `/academy/parcours/${programId}` : "/academy/dashboard");
+              }}>
+              {admis ? "Commencer le parcours" : "Retour à mon espace"} <ArrowRight className="w-4 h-4" />
+            </Button>
+          </div>
         </div>
       </div>
     );
   }
 
-  // ── Le test ──
+  // ── L'épreuve ──
   const q = questions[idx];
   const choisie = reponses[idx];
   const repondues = Object.keys(reponses).length;
+  const restantes = questions.length - repondues;
 
   async function envoyer() {
     setEnvoi(true);
@@ -219,90 +289,125 @@ export default function ProgramTest() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto py-10" translate="no">
+    <div className="mx-auto max-w-5xl px-4 sm:px-8 py-8 sm:py-12" translate="no">
       <SEO title={`Test d'admission — ${parcours.title}`} description={parcours.subtitle} />
 
-      <div className="mb-6">
-        <p className="text-xs uppercase tracking-wide font-semibold" style={{ color: accent }}>
-          Test d'admission
+      <header className="border-t-2 pt-6" style={{ borderColor: accent }}>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
+          Épreuve d'admission
         </p>
-        <h1 className="text-xl font-bold mt-1">{parcours.title}</h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          {statut?.nbQuestions ?? questions.length} questions · {statut?.seuil ?? "—"} bonnes
-          réponses requises · aucune pénalité en cas d'erreur
+        <h1 className="mt-2 text-xl font-semibold leading-tight">{parcours.title}</h1>
+        <p className="mt-2 text-xs leading-5 text-muted-foreground">
+          <span className="font-mono tabular-nums">{statut?.nbQuestions ?? questions.length}</span> questions ·{" "}
+          <span className="font-mono tabular-nums">{statut?.seuil ?? "—"}</span> bonnes réponses requises ·
+          aucune pénalité en cas d'erreur
         </p>
-      </div>
+      </header>
 
-      <div className="mb-6">
-        <div className="flex items-center justify-between mb-2 text-sm">
-          <span className="font-medium">Question {idx + 1} / {questions.length}</span>
-          <span className="text-muted-foreground">{repondues} répondues</span>
+      {/* Deux colonnes à partir de lg : la progression tient dans une colonne étroite, la
+          question occupe la principale. En dessous, tout s'empile — c'est l'écran de 390 px
+          qui commande, puisque c'est celui de la plupart de nos étudiants. */}
+      {/* ── L'ordre, et pourquoi il n'est pas le même selon l'écran ──
+
+          Sur téléphone, la grille de vingt cases placée avant la question la repoussait
+          sous la ligne de flottaison : on ouvrait l'épreuve et on voyait un damier, pas
+          une question. La grille passe donc APRÈS sur mobile — c'est un moyen de
+          navigation, pas le contenu — et revient dans la colonne de gauche à partir de
+          lg, où la place ne manque plus. Constaté sur une capture à 390 px, pas supposé. */}
+      <div className="mt-8 grid gap-10 lg:grid-cols-[220px_1fr] lg:gap-16">
+        <aside className="order-last lg:order-first border-t border-border pt-6 lg:border-t-0 lg:pt-0">
+          <p className="font-mono text-xs tabular-nums text-muted-foreground">
+            {repondues} répondue{repondues > 1 ? "s" : ""} · {restantes} restante{restantes > 1 ? "s" : ""}
+          </p>
+
+          {/* Une seule expression de la progression : une grille de cases, comme le report
+              de copies d'un examen. Cliquables, donc utiles — une barre ne l'aurait pas
+              été, et afficher les deux aurait dit deux fois la même chose. */}
+          <div className="mt-3 grid grid-cols-5 gap-1.5">
+            {questions.map((_, i) => {
+              const courante = i === idx;
+              const faite = reponses[i] !== undefined;
+              return (
+                <button key={i} onClick={() => setIdx(i)}
+                  aria-label={`Question ${i + 1}${faite ? ", répondue" : ""}`}
+                  aria-current={courante ? "step" : undefined}
+                  className={`flex min-h-11 items-center justify-center border font-mono text-xs tabular-nums transition-colors ${
+                    courante
+                      ? "border-2 font-bold"
+                      : faite
+                        ? "border-border bg-muted"
+                        : "border-dashed border-border text-muted-foreground hover:bg-muted/50"
+                  }`}
+                  style={courante ? { borderColor: accent } : undefined}>
+                  {faite && !courante ? <Check className="w-3.5 h-3.5" /> : i + 1}
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <div>
+          <p className="font-mono text-sm tabular-nums">
+            Question {idx + 1} sur {questions.length}
+          </p>
+          <p className="mt-3 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">
+            {q.domaine}
+          </p>
+          <p className="mt-3 text-2xl sm:text-3xl font-semibold leading-snug tracking-tight">{q.q}</p>
+
+          <div className="mt-8 flex flex-col gap-2">
+            {q.opts.map((o, i) => {
+              const prise = choisie === i;
+              return (
+                // La clé inclut l'index de question : sans elle, React réutilise les nœuds
+                // d'une question à l'autre et les options restent figées sur la première.
+                <button key={`${idx}-${i}`}
+                  onClick={() => setReponses({ ...reponses, [idx]: i })}
+                  aria-pressed={prise}
+                  className={`flex min-h-14 items-start gap-4 border px-4 py-3 text-left text-sm leading-6 transition-colors ${
+                    prise ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted/50"
+                  }`}>
+                  <span className="flex w-6 h-6 shrink-0 items-center justify-center border font-mono text-xs"
+                    style={prise ? { borderColor: accent, color: accent } : undefined}>
+                    {["A", "B", "C", "D"][i]}
+                  </span>
+                  <span>{o}</span>
+                  {prise && <Check className="ml-auto mt-0.5 w-4 h-4 shrink-0" style={{ color: accent }} />}
+                </button>
+              );
+            })}
+          </div>
+
+          {erreur && <p className="mt-4 text-sm text-destructive">{erreur}</p>}
+
+          <div className="mt-10 border-t border-border pt-5 flex items-center justify-between gap-3">
+            <Button variant="outline" className="gap-1.5 min-h-11 rounded-none" disabled={idx === 0}
+              onClick={() => setIdx(i => Math.max(0, i - 1))}>
+              <ChevronLeft className="w-4 h-4" /> Précédente
+            </Button>
+
+            {idx < questions.length - 1 ? (
+              <Button className="gap-1.5 min-h-11 rounded-none border-0 text-white" style={{ background: accent }}
+                onClick={() => setIdx(i => Math.min(questions.length - 1, i + 1))}>
+                Suivante <ChevronRight className="w-4 h-4" />
+              </Button>
+            ) : (
+              <Button className="gap-1.5 min-h-11 rounded-none border-0 text-white" style={{ background: accent }}
+                disabled={envoi} onClick={envoyer}>
+                {envoi ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Terminer et remettre
+              </Button>
+            )}
+          </div>
+
+          {restantes > 0 && idx === questions.length - 1 && (
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">
+              {restantes} question{restantes > 1 ? "s" : ""} sans réponse. Aucune pénalité :
+              répondez au jugé plutôt que de laisser vide.
+            </p>
+          )}
         </div>
-        <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-500"
-            style={{ width: `${((idx + 1) / questions.length) * 100}%`, background: accent }} />
-        </div>
-        <div className="flex gap-1 mt-2 flex-wrap">
-          {questions.map((_, i) => (
-            <button key={i} onClick={() => setIdx(i)} aria-label={`Question ${i + 1}`}
-              className="w-5 h-1.5 rounded-full transition-colors"
-              style={{
-                background: reponses[i] !== undefined ? accent
-                  : i === idx ? `${accent}66` : "hsl(var(--muted))",
-              }} />
-          ))}
-        </div>
       </div>
-
-      <div className="bg-card rounded-2xl border border-border/60 p-6">
-        <p className="text-[11px] font-medium text-muted-foreground mb-2">{q.domaine}</p>
-        <p className="font-semibold leading-snug mb-5">{q.q}</p>
-        <div className="space-y-2">
-          {q.opts.map((o, i) => (
-            // La clé inclut l'index de question : sans elle, React réutilise les nœuds d'une
-            // question à l'autre et les options restent figées sur celles de la première.
-            <button key={`${idx}-${i}`}
-              onClick={() => setReponses({ ...reponses, [idx]: i })}
-              className={`w-full text-left px-4 py-3 rounded-xl border text-sm transition-colors ${
-                choisie === i ? "border-transparent" : "border-border/60 hover:bg-muted/50"}`}
-              style={choisie === i ? { background: `${accent}1A`, borderColor: accent } : undefined}>
-              <span className="font-semibold mr-2" style={{ color: accent }}>
-                {["A", "B", "C", "D"][i]}.
-              </span>
-              {o}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      {erreur && <p className="text-sm text-destructive mt-4 text-center">{erreur}</p>}
-
-      <div className="flex items-center justify-between gap-3 mt-6">
-        <Button variant="outline" className="gap-1.5" disabled={idx === 0}
-          onClick={() => setIdx(i => Math.max(0, i - 1))}>
-          <ChevronLeft className="w-4 h-4" /> Précédente
-        </Button>
-
-        {idx < questions.length - 1 ? (
-          <Button className="gap-1.5 border-0 text-white" style={{ background: accent }}
-            onClick={() => setIdx(i => Math.min(questions.length - 1, i + 1))}>
-            Suivante <ChevronRight className="w-4 h-4" />
-          </Button>
-        ) : (
-          <Button className="gap-1.5 border-0 text-white" style={{ background: accent }}
-            disabled={envoi} onClick={envoyer}>
-            {envoi ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            Terminer et envoyer
-          </Button>
-        )}
-      </div>
-
-      {repondues < questions.length && idx === questions.length - 1 && (
-        <p className="text-xs text-muted-foreground text-center mt-3">
-          {questions.length - repondues} question{questions.length - repondues > 1 ? "s" : ""} sans
-          réponse. Aucune pénalité : répondez au jugé plutôt que de laisser vide.
-        </p>
-      )}
     </div>
   );
 }
