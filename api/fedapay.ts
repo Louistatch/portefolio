@@ -65,12 +65,32 @@ export function transactionEstPayee(statut: unknown): boolean {
   return typeof statut === "string" && STATUTS_PAYES.has(statut);
 }
 
-/** Le mot à inscrire sur la ligne de paiement quand la transaction n'ouvre pas de droit. */
-export function categorieStatut(statut: unknown): "paye" | "rembourse" | "annule" | "echoue" {
+/**
+ * Statuts qui signifient vraiment que la transaction a échoué.
+ *
+ * La liste est FERMÉE, et c'est tout l'enjeu. La version précédente concluait à l'échec
+ * par défaut — « tout ce qui n'est pas payé est raté » — et s'est trompée dès le premier
+ * essai réel : l'opérateur émet un événement `transaction.created` portant le statut
+ * `pending` À LA CRÉATION, c'est-à-dire avant même que l'étudiant ait saisi son numéro. Les
+ * deux paiements de test se sont donc retrouvés marqués « échoué » alors que rien n'avait
+ * échoué, et la page de retour aurait annoncé « le paiement n'a pas abouti » à quelqu'un
+ * dont le paiement n'avait pas commencé. Qui lit cela paie une seconde fois.
+ *
+ * D'où la règle, la même que côté écran : on ne conclut JAMAIS à l'échec sur un statut
+ * qu'on ne connaît pas. L'inconnu et l'attente se ressemblent trop pour qu'on les sépare
+ * au jugé, et se tromper dans ce sens-là coûte de l'argent à l'étudiant.
+ */
+const STATUTS_ECHOUES = new Set(["declined", "failed", "expired"]);
+
+/** Le mot à inscrire sur la ligne de paiement, d'après ce que l'opérateur affirme. */
+export function categorieStatut(statut: unknown): "paye" | "rembourse" | "annule" | "echoue" | "en_attente" {
   if (transactionEstPayee(statut)) return "paye";
-  if (typeof statut === "string" && STATUTS_REMBOURSES.has(statut)) return "rembourse";
+  if (typeof statut !== "string") return "en_attente";
+  if (STATUTS_REMBOURSES.has(statut)) return "rembourse";
   if (statut === "canceled") return "annule";
-  return "echoue";
+  if (STATUTS_ECHOUES.has(statut)) return "echoue";
+  // pending, created, et tout ce que l'opérateur ajoutera un jour : on attend.
+  return "en_attente";
 }
 
 // ══════════════ Vérification de signature ══════════════

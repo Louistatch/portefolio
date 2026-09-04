@@ -95,8 +95,21 @@ v("« refunded » est classé remboursement", categorieStatut("refunded") === "r
 v("« approved_partially_refunded » est classé remboursement", categorieStatut("approved_partially_refunded") === "rembourse");
 v("« canceled » est classé annulation", categorieStatut("canceled") === "annule");
 v("« declined » est classé échec", categorieStatut("declined") === "echoue");
+v("« failed » est classé échec", categorieStatut("failed") === "echoue");
+
+// ── Le défaut trouvé sur les données réelles ──
+//
+// L'opérateur émet `transaction.created` avec le statut « pending » à la CRÉATION de la
+// transaction, avant que l'étudiant ait saisi quoi que ce soit. La version précédente
+// concluait à l'échec par défaut : les deux premiers paiements de test se sont retrouvés
+// marqués « échoué » sans que rien n'ait échoué, et la page de retour aurait annoncé un
+// échec à quelqu'un dont le paiement n'avait pas commencé. Qui lit cela paie deux fois.
+v("« pending » n'est PAS un échec", categorieStatut("pending") === "en_attente");
+v("« created » n'est pas un échec", categorieStatut("created") === "en_attente");
+v("un statut inconnu attend plutôt que d'échouer", categorieStatut("chose_inattendue") === "en_attente");
+v("un statut absent attend", categorieStatut(undefined) === "en_attente");
 v("« approved » est classé payé", categorieStatut("approved") === "paye");
-v("un statut inconnu est classé échec", categorieStatut("chose_inattendue") === "echoue");
+
 
 console.log(ko === 0 ? "\nTOUT PASSE" : `\n${ko} ÉCHEC(S)`);
 process.exit(ko ? 1 : 0);
