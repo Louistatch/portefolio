@@ -7,8 +7,7 @@ import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
 import { isStudentLoggedIn, studentFetch } from "@/lib/student";
 import { programById, type Program } from "@shared/programs";
-import { QUESTIONS_TOF } from "@shared/tof-test";
-import { QUESTIONS_FCA } from "@shared/fca-test";
+import { BANQUES_ADMISSION } from "@shared/tests-parcours";
 
 /**
  * Test d'admission d'un parcours.
@@ -20,11 +19,6 @@ import { QUESTIONS_FCA } from "@shared/fca-test";
  * Le score est calculé CÔTÉ SERVEUR uniquement. Le navigateur n'a que les énoncés et les
  * options ; la clé de correction ne quitte jamais api/.
  */
-
-const BANQUES: Record<string, { domaine: string; q: string; opts: string[] }[]> = {
-  tof: QUESTIONS_TOF,
-  fca: QUESTIONS_FCA,
-};
 
 export default function ProgramTest() {
   const [, navigate] = useLocation();
@@ -57,7 +51,7 @@ export default function ProgramTest() {
 
   let parcours: Program | null = null;
   try { parcours = programById(programId); } catch { parcours = null; }
-  const questions = BANQUES[programId] ?? [];
+  const questions = BANQUES_ADMISSION[programId] ?? [];
 
   if (chargement) {
     return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;

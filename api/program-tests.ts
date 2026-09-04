@@ -10,10 +10,7 @@
  * supabase/academy_program_admissions.sql.
  */
 import { PROGRAMS } from "../shared/programs.js";
-import { QUESTIONS_TOF } from "../shared/tof-test.js";
-import { QUESTIONS_FCA } from "../shared/fca-test.js";
-import { QUESTIONS_FCQ } from "../shared/fcq-test.js";
-import { QUESTIONS_COOP } from "../shared/coop-test.js";
+import { BANQUES_ADMISSION } from "../shared/tests-parcours.js";
 import { TOF_ANSWER_KEY } from "./tof-answers.js";
 import { FCA_ANSWER_KEY } from "./fca-answers.js";
 import { FCQ_ANSWER_KEY } from "./fcq-answers.js";
@@ -26,12 +23,32 @@ export interface TestParcours {
   cle: number[];
 }
 
-export const TESTS_PARCOURS: Record<string, TestParcours> = {
-  tof: { questions: QUESTIONS_TOF, cle: TOF_ANSWER_KEY },
-  fca: { questions: QUESTIONS_FCA, cle: FCA_ANSWER_KEY },
-  fcq: { questions: QUESTIONS_FCQ, cle: FCQ_ANSWER_KEY },
-  coop: { questions: QUESTIONS_COOP, cle: COOP_ANSWER_KEY },
+/**
+ * Les clés de correction, et elles seules.
+ *
+ * Séparées des énoncés parce qu'elles n'ont pas le même destin : les énoncés partent au
+ * navigateur, les clés jamais. Les tenir dans deux structures rend la faute visible — une
+ * clé importée dans un fichier de shared/ sauterait aux yeux à la relecture.
+ */
+const CLES: Record<string, number[]> = {
+  tof: TOF_ANSWER_KEY,
+  fca: FCA_ANSWER_KEY,
+  fcq: FCQ_ANSWER_KEY,
+  coop: COOP_ANSWER_KEY,
 };
+
+/**
+ * Test complet = énoncés partagés + clé serveur.
+ *
+ * Assemblé depuis BANQUES_ADMISSION plutôt que réécrit ici : c'est ce qui garantit que le
+ * navigateur et le serveur parlent du même test. La version précédente recopiait la liste,
+ * et la copie côté navigateur a fini par oublier FCQ et COOP.
+ */
+export const TESTS_PARCOURS: Record<string, TestParcours> = Object.fromEntries(
+  Object.entries(BANQUES_ADMISSION)
+    .filter(([id]) => CLES[id])
+    .map(([id, questions]) => [id, { questions, cle: CLES[id] }]),
+);
 
 /**
  * Incohérences entre les parcours déclarés et les tests disponibles.

@@ -16,11 +16,13 @@
  * sa propre copie ne contrôle rien.
  */
 import { existsSync, readFileSync, readdirSync } from "fs";
-import { programById } from "../shared/programs.js";
+import { PROGRAMS, programById } from "../shared/programs.js";
 import { QUESTIONS_TOF } from "../shared/tof-test.js";
 import { QUESTIONS_FCA } from "../shared/fca-test.js";
 import { QUESTIONS_FCQ } from "../shared/fcq-test.js";
 import { QUESTIONS_COOP } from "../shared/coop-test.js";
+import { BANQUES_ADMISSION, aUnTestEnLigne } from "../shared/tests-parcours.js";
+import { TESTS_PARCOURS } from "../api/program-tests.js";
 import { TOF_ANSWER_KEY, TOF_CORRECT_TEXTS } from "../api/tof-answers.js";
 import { FCA_ANSWER_KEY, FCA_CORRECT_TEXTS } from "../api/fca-answers.js";
 import { FCQ_ANSWER_KEY, FCQ_CORRECT_TEXTS } from "../api/fcq-answers.js";
@@ -78,6 +80,58 @@ const SUITES: Suite[] = [
 ];
 
 let ko = 0;
+
+// ══════════════════════════════════════════════════════════════
+// Tout parcours à test doit être ATTEIGNABLE depuis le navigateur.
+//
+// Le contrôle qui manquait, et la panne qu'il aurait évitée : FCQ et COOP avaient leur
+// banque de questions côté serveur et n'apparaissaient pas dans la liste que la page de
+// test recopiait de son côté. Le serveur répondait « ce test existe », la page ne trouvait
+// aucune question, et affichait « Ce parcours n'a pas de test d'admission en ligne » — sa
+// propre invention. Personne ne pouvait entrer dans le parcours payant, sans une erreur
+// nulle part.
+//
+// Les deux listes n'en font plus qu'une (shared/tests-parcours.ts). Ce contrôle vérifie
+// qu'elle couvre bien tous les parcours qui en dépendent, pour que l'oubli redevienne
+// impossible plutôt que seulement improbable.
+// ══════════════════════════════════════════════════════════════
+{
+  const sansBanque = PROGRAMS
+    .filter(p => !p.admission.surStudents)
+    .filter(p => !aUnTestEnLigne(p.id))
+    .map(p => p.id);
+  if (sansBanque.length) {
+    console.log(`  KO  parcours sans banque de questions : ${sansBanque.join(", ")}`
+      + "  → porte murée, aucune inscription possible");
+    ko++;
+  } else {
+    console.log("  ok  chaque parcours à test a sa banque de questions, serveur et navigateur");
+  }
+
+  // Et l'inverse : une banque orpheline signale un parcours renommé ou supprimé sans que
+  // son test suive. Sans ce contrôle, elle resterait à charger dans le navigateur de tout
+  // le monde pour rien.
+  const connus = new Set(PROGRAMS.map(p => p.id));
+  const orphelines = Object.keys(BANQUES_ADMISSION).filter(id => !connus.has(id));
+  if (orphelines.length) {
+    console.log(`  KO  banques sans parcours correspondant : ${orphelines.join(", ")}`);
+    ko++;
+  } else {
+    console.log("  ok  aucune banque orpheline");
+  }
+
+  // Les clés ne doivent jamais transiter par shared/ : ce répertoire part au navigateur.
+  const cotePartage = Object.keys(BANQUES_ADMISSION).length;
+  const coteServeur = Object.keys(TESTS_PARCOURS).length;
+  if (cotePartage !== coteServeur) {
+    console.log(`  KO  ${cotePartage} banques partagées pour ${coteServeur} tests assemblés côté serveur`);
+    ko++;
+  } else {
+    console.log(`  ok  ${coteServeur} tests assemblés, autant que de banques`);
+  }
+}
+
+
 
 for (const s of SUITES) {
   const parcours = programById(s.programId);
