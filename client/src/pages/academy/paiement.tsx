@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation, useRoute } from "wouter";
 import { Loader2, ArrowRight, ArrowLeft, Check, ShieldCheck, Smartphone } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -100,6 +100,7 @@ export default function PaiementAttestation() {
   // Transaction ouverte : le formulaire de l'opérateur s'affiche alors DANS la page.
   const [transaction, setTransaction] = useState<any>(null);
   const [replie, setReplie] = useState(false);
+  const cadreRef = useRef<HTMLDivElement>(null);
 
   const lire = useCallback(async () => {
     if (!courseId) return;
@@ -151,6 +152,44 @@ export default function PaiementAttestation() {
       else setErreur(d?.message || "Paiement enregistré, mais l'attestation n'a pas pu être établie.");
     })();
   }, [paiement, attestation, courseId]);
+
+  // ── Monter le formulaire de l'opérateur dans notre cadre ──
+  //
+  // Deux signatures existent, et c'était le défaut : le composant officiel appelle
+  // `FedaPay.init(element, options)` pour un BOUTON, mais `options.container = element`
+  // puis `FedaPay.init(options)` — un seul argument — pour un CADRE INTÉGRÉ. Appeler la
+  // première forme en croyant faire la seconde ne lève aucune erreur : le cadre reste
+  // simplement vide, et rien dans la console ne dit pourquoi.
+  //
+  // Le montage se fait ici plutôt que dans un setTimeout après le clic : le cadre n'existe
+  // qu'une fois que React l'a rendu, et attendre soixante millisecondes en espérant que ce
+  // soit fait est un pari, pas une garantie. Cet effet ne s'exécute qu'avec la référence en
+  // main.
+  useEffect(() => {
+    if (!transaction || !replie || !cadreRef.current) return;
+    const d = transaction;
+    try {
+      const FedaPay = (window as any).FedaPay;
+      FedaPay.init({
+        public_key: d.clePublique,
+        environment: d.environnement === "live" ? "live" : "sandbox",
+        locale: "fr",
+        container: cadreRef.current,
+        // L'identifiant suffit : la transaction existe déjà, avec son montant.
+        transaction: { id: Number(d.transactionId), amount: d.montant, description: "Attestation" },
+        currency: { iso: d.devise || "XOF" },
+        onComplete: (resp: any) => {
+          // Fermeture volontaire : on ne conclut pas à l'échec, la transaction reste
+          // ouverte et l'étudiant peut reprendre.
+          if (resp?.reason === (window as any).FedaPay?.DIALOG_DISMISSED) { setReplie(false); return; }
+          navigate(`/academy/paiement/${courseId}?retour=${encodeURIComponent(d.reference)}`);
+        },
+      });
+    } catch {
+      // Porte de secours : plutôt sortir du site que laisser un cadre vide.
+      window.location.href = d.url;
+    }
+  }, [transaction, replie, courseId]);
 
   const accent = parcours?.accent ?? ACCENT_PAR_DEFAUT;
 
@@ -324,28 +363,9 @@ export default function PaiementAttestation() {
       try { FedaPay = await chargerCheckout(); }
       catch { window.location.href = d.url; return; }
 
+      // Le montage se fait dans l'effet ci-dessous, quand React a posé le cadre.
       setTransaction(d);
       setReplie(true);
-      // Laisser React poser le cadre avant que l'opérateur ne s'y installe.
-      setTimeout(() => {
-        try {
-          FedaPay.init("#cadre-paiement", {
-            public_key: d.clePublique,
-            environment: d.environnement === "live" ? "live" : "sandbox",
-            locale: "fr",
-            container: "#cadre-paiement",
-            // L'identifiant suffit : la transaction existe déjà, avec son montant.
-            transaction: { id: Number(d.transactionId), amount: d.montant, description: "Attestation" },
-            currency: { iso: d.devise || "XOF" },
-            onComplete: (resp: any) => {
-              // Fermeture volontaire : on ne conclut pas à l'échec, la transaction reste
-              // ouverte et l'étudiant peut reprendre.
-              if (resp?.reason === (window as any).FedaPay?.DIALOG_DISMISSED) { setReplie(false); return; }
-              navigate(`/academy/paiement/${courseId}?retour=${encodeURIComponent(d.reference)}`);
-            },
-          });
-        } catch { window.location.href = d.url; }
-      }, 60);
     } catch (e: any) {
       setErreur(String(e?.message || e));
       setEnvoi(false);
@@ -369,7 +389,7 @@ export default function PaiementAttestation() {
           </p>
           {/* Hauteur généreuse : le formulaire de l'opérateur s'adapte mal à un cadre trop
               court, et un formulaire de paiement tronqué ne se remplit pas. */}
-          <div id="cadre-paiement" className="mt-6 min-h-[520px] border border-border" />
+          <div ref={cadreRef} className="mt-6 min-h-[520px] border border-border" />
           <Button variant="outline" className="mt-4 min-h-11 rounded-none"
             onClick={() => { setReplie(false); setTransaction(null); setEnvoi(false); }}>
             Revenir au récapitulatif
