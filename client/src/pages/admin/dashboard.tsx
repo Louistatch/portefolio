@@ -281,6 +281,17 @@ export default function Dashboard() {
   // prudent. On la signale, sans en faire une alerte.
   const bloquantes = manquantes.filter((v: any) => v.nom !== "FEDAPAY_ENV");
 
+  // Un désaccord entre l'environnement de paiement et les clés ne se voit nulle part
+  // ailleurs : tout paraît configuré, et seules les notifications échouent, en silence.
+  if (data.incoherencePaiement) {
+    points.push({
+      cle: "paiement-incoherent",
+      ton: "grave",
+      resume: "Les clés de paiement ne correspondent pas à l'environnement déclaré",
+      detail: <p>{data.incoherencePaiement}</p>,
+    });
+  }
+
   if (bloquantes.length) {
     points.push({
       cle: "configuration",

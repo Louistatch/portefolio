@@ -40,6 +40,49 @@ export type EtatVariable = {
 /** Les seuls noms dont la valeur a le droit de sortir. Toute autre est un secret. */
 export const VARIABLES_AFFICHABLES = ["FEDAPAY_ENV", "SITE_URL"] as const;
 
+/**
+ * L'environnement qu'une clé annonce par son préfixe, sans jamais lire sa valeur.
+ *
+ * `sk_live_…`, `pk_sandbox_…` : l'opérateur préfixe ses clés par leur environnement. On
+ * n'en garde QUE cette information — jamais la clé, jamais un fragment de la clé.
+ */
+function environnementDeLaCle(nom: string): "live" | "sandbox" | null {
+  const v = process.env[nom] || "";
+  if (/^[a-z]{2}_live_/.test(v)) return "live";
+  if (/^[a-z]{2}_sandbox_/.test(v)) return "sandbox";
+  return null;
+}
+
+/**
+ * Les clés de paiement sont-elles cohérentes avec l'environnement déclaré ?
+ *
+ * ── Le piège que ce contrôle ferme ──
+ *
+ * Passer de la production au bac à sable demande de changer QUATRE variables : les deux
+ * clés, le secret du webhook et l'environnement. En oublier une ne provoque aucune erreur
+ * visible — la transaction se crée chez un opérateur, la notification revient signée par
+ * l'autre, la signature ne concorde pas, et le webhook est refusé en silence. L'argent
+ * bouge, l'attestation ne se délivre jamais, et rien dans l'interface ne dit pourquoi.
+ *
+ * Le préfixe des clés suffit à détecter la moitié de ce désaccord. Le secret du webhook,
+ * lui, n'est pas préfixé : on ne peut donc pas le vérifier, et c'est dit plutôt que tu.
+ */
+export function incoherenceDePaiement(): string | null {
+  const env = environnementFedapay();
+  const secrete = environnementDeLaCle("FEDAPAY_SECRET_KEY");
+  const publique = environnementDeLaCle("FEDAPAY_PUBLIC_KEY");
+  const fautives = [
+    secrete && secrete !== env ? `la clé secrète est une clé « ${secrete} »` : null,
+    publique && publique !== env ? `la clé publique est une clé « ${publique} »` : null,
+  ].filter(Boolean);
+  if (!fautives.length) return null;
+  return `L'environnement déclaré est « ${env} », mais ${fautives.join(" et ")}. `
+    + "Les paiements partiront chez un opérateur et les notifications reviendront de "
+    + "l'autre : elles seront refusées, et l'attestation ne se délivrera jamais. "
+    + "Vérifiez aussi FEDAPAY_WEBHOOK_SECRET, qui diffère entre test et production et "
+    + "que rien ne permet de contrôler d'ici.";
+}
+
 export function configurationDuServeur(siteUrl: string): EtatVariable[] {
   const presente = (nom: string) => !!process.env[nom];
   return [
