@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   ChevronLeft, ChevronRight, CheckCircle2, PlayCircle, Terminal,
   FileCode2, Loader2, Trophy, Lock, X, BookOpen, Star, Info, Lightbulb,
-  AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon, PenLine, Clock,
+  AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon, PenLine, Clock, Award,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn } from "@/lib/student";
 // Ce module ne pèse que quelques kilo-octets et ne tire aucune dépendance : il ne
@@ -234,6 +234,7 @@ export default function AcademyClassroom() {
   // pas proposer les autres leçons de la semaine.
   const [weekPlan, setWeekPlan] = useState<any[]>([]);
   const [completeError, setCompleteError] = useState<string | null>(null);
+  const [confirmation, setConfirmation] = useState<string | null>(null);
   // Réponses saisies pour les exercices de la leçon courante, et correction renvoyée par le serveur.
   const [exAnswers, setExAnswers] = useState<Record<string, any>>({});
   const [exResults, setExResults] = useState<Record<string, { correct: boolean; explain: string | null }>>({});
@@ -402,9 +403,21 @@ export default function AcademyClassroom() {
       }
 
       if (!res.ok) throw new Error(data.message);
-      alert(`Demande d'attestation envoyée ! N° ${data.certificate_no} — Score final : ${data.final_score}%`);
-      navigate("/academy/dashboard");
-    } catch (e: any) { alert(e.message); } finally { setSubmitting(false); }
+      // Annoncé DANS la page, pas dans une alerte du navigateur.
+      //
+      // C'était le dernier « www.louisfarm.com indique » du parcours, et il tombait au pire
+      // moment : clore treize semaines de travail par une boîte grise du système. Pire, le
+      // message « Attestation déjà demandée » s'y lisait comme un refus alors que c'est une
+      // bonne nouvelle — le document existe.
+      //
+      // Et surtout on ne renvoie PAS vers la page de règlement : le même bouton sert les
+      // quatre parcours gratuits, qui y trouveraient « cette attestation n'est pas
+      // payante » après une demande pourtant réussie.
+      setConfirmation(data.certificate_no
+        ? `Attestation demandée. Numéro ${data.certificate_no}${
+            data.final_score != null ? ` — score final ${data.final_score} %` : ""}.`
+        : "Attestation demandée. Elle est en cours de validation.");
+    } catch (e: any) { setCompleteError(String(e?.message || e)); } finally { setSubmitting(false); }
   }
 
   if (loading) return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -729,6 +742,19 @@ export default function AcademyClassroom() {
             <div>
               <p className="font-medium text-sm">Leçon validée — {lessonScore.score}/{lessonScore.max} points</p>
               <p className="text-xs text-muted-foreground">La correction de chaque exercice est affichée ci-dessus.</p>
+            </div>
+          </div>
+        )}
+
+        {/* Attestation demandée — annoncé ici plutôt que dans une alerte du navigateur. */}
+        {confirmation && (
+          <div className="bg-primary/5 border border-primary/30 rounded-2xl p-4 mb-4 flex items-start gap-3">
+            <Award className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-medium">{confirmation}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Vous la retrouverez sur votre tableau de bord dès qu'elle sera validée.
+              </p>
             </div>
           </div>
         )}

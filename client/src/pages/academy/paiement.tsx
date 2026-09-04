@@ -372,10 +372,27 @@ export default function PaiementAttestation() {
     }
   }
 
-  // Le formulaire de l'opérateur, une fois la transaction ouverte.
+  // ── Le formulaire de l'opérateur, une fois la transaction ouverte ──
+  //
+  // ── Ce que nous ne pouvons PAS habiller ──
+  //
+  // Le contenu de ce cadre est une iframe servie par l'opérateur : le choix de Moov ou de
+  // Togocel, la saisie du numéro, les boutons, tout y appartient à son domaine. Aucune
+  // feuille de style de ce site ne l'atteint, et c'est voulu — c'est ce qui garantit que
+  // nous ne pouvons pas lire ce qui s'y saisit.
+  //
+  // ── Ce que nous pouvons faire, et qui compte ──
+  //
+  // Ne pas l'étrangler. La version précédente lui imposait une hauteur figée de 520 px,
+  // une bordure, et les marges de 16 px du gabarit : sur un téléphone de 390 px, leur
+  // formulaire disposait de 358 px et se retrouvait tronqué ou à faire défiler de côté.
+  //
+  // Il prend donc toute la largeur sur mobile — marges négatives pour sortir du gabarit —
+  // et sa hauteur suit son contenu au lieu de la contraindre. Le cadre ne se dessine plus
+  // qu'à partir de la tablette, là où la place ne manque pas.
   if (transaction && replie) {
     return (
-      <div className="mx-auto max-w-5xl px-4 sm:px-8 py-10 sm:py-16">
+      <div className="mx-auto max-w-5xl px-4 sm:px-8 py-8 sm:py-16">
         <div className="border-t-2 pt-6 max-w-2xl" style={{ borderColor: accent }}>
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
             Paiement — {montant} F CFA
@@ -384,15 +401,25 @@ export default function PaiementAttestation() {
             {parcours.credential || "Attestation de fin de parcours"}
           </h1>
           <p className="mt-2 text-xs leading-5 text-muted-foreground">
-            Formulaire sécurisé de notre opérateur de paiement. Vos identifiants ne
+            Formulaire sécurisé de notre opérateur. Vos identifiants de paiement ne
             transitent jamais par nous.
           </p>
-          {/* Hauteur généreuse : le formulaire de l'opérateur s'adapte mal à un cadre trop
-              court, et un formulaire de paiement tronqué ne se remplit pas. */}
-          <div ref={cadreRef} className="mt-6 min-h-[520px] border border-border" />
-          <Button variant="outline" className="mt-4 min-h-11 rounded-none"
+
+          <div className="relative mt-5 -mx-4 sm:mx-0 sm:border sm:border-border">
+            {/* Un cadre vide inquiète. Cette attente reste DERRIÈRE l'iframe : quand
+                l'opérateur peint son formulaire par-dessus, elle disparaît d'elle-même,
+                sans qu'on ait à deviner le moment où il a fini. */}
+            <div className="absolute inset-0 -z-10 flex items-center justify-center py-16">
+              <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                <Loader2 className="w-4 h-4 animate-spin" /> Ouverture du paiement sécurisé…
+              </p>
+            </div>
+            <div ref={cadreRef} className="min-h-[460px]" />
+          </div>
+
+          <Button variant="outline" className="mt-5 min-h-11 rounded-none"
             onClick={() => { setReplie(false); setTransaction(null); setEnvoi(false); }}>
-            Revenir au récapitulatif
+            <ArrowLeft className="w-4 h-4" /> Revenir au récapitulatif
           </Button>
         </div>
       </div>
