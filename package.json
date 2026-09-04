@@ -20,6 +20,7 @@
     "verify:python": "node script/verify-python.mjs",
     "verify:poids": "node script/verify-poids.mjs",
     "verify:lecons": "node script/verify-lecons.mjs",
+    "verify:fedapay": "tsx script/verify-fedapay.ts",
     "verify:support": "tsx script/verify-support.ts"
   },
   "dependencies": {

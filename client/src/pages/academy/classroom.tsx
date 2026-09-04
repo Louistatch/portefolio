@@ -373,6 +373,14 @@ export default function AcademyClassroom() {
     } finally { setSubmitting(false); }
   }
 
+  /**
+   * Demander l'attestation — et, si elle est payante, ouvrir le paiement.
+   *
+   * Le serveur répond 402 « Payment Required » quand un règlement manque. Ce code-là a été
+   * choisi précisément pour être distinguable ici : 403 aurait voulu dire « vous n'y avez
+   * pas droit », ce qui est faux et décourageant après huit semaines de travail. 402 veut
+   * dire « il manque un paiement », et c'est un écran, pas un mur.
+   */
   async function requestAttestation() {
     if (!courseId) return;
     setSubmitting(true);
@@ -381,6 +389,31 @@ export default function AcademyClassroom() {
         method: "POST", body: JSON.stringify({ course_id: courseId }),
       });
       const data = await res.json();
+
+      if (res.status === 402 && data.paiementRequis) {
+        // On n'annonce pas le prix ici comme une surprise : il a été affiché à
+        // l'inscription, accepté après le test et rappelé à mi-parcours. À ce stade,
+        // c'est un rappel, pas une révélation.
+        const ok = window.confirm(
+          `Votre attestation est prête.\n\n`
+          + `Établie à votre nom, signée, avec son code de vérification.\n`
+          + `${Number(data.prix).toLocaleString("fr-FR")} F CFA pour la débloquer.\n\n`
+          + `Vous allez être redirigé vers le paiement sécurisé (Mobile Money ou carte).`,
+        );
+        if (!ok) return;
+
+        const p = await studentFetch("/api/academy/paiement/attestation", {
+          method: "POST", body: JSON.stringify({ course_id: courseId }),
+        });
+        const paiement = await p.json();
+        if (!p.ok) throw new Error(paiement.message || "Paiement impossible pour le moment.");
+        // Redirection plein écran plutôt qu'un nouvel onglet : sur un téléphone, un onglet
+        // ouvert en arrière-plan pendant un paiement se perd, et l'étudiant croit avoir
+        // payé dans le vide.
+        window.location.href = paiement.url;
+        return;
+      }
+
       if (!res.ok) throw new Error(data.message);
       alert(`Demande d'attestation envoyée ! N° ${data.certificate_no} — Score final : ${data.final_score}%`);
       navigate("/academy/dashboard");

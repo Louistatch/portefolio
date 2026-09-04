@@ -1,9 +1,9 @@
 /**
- * Projette le contenu du cours SCOOP-01 en SQL, et le contrôle au passage.
+ * Projette le contenu du cours COOP-01 en SQL, et le contrôle au passage.
  *
- *   npx tsx script/generate-scoop-01-sql.ts > supabase/academy_cours_scoop_01.sql
+ *   npx tsx script/generate-coop-01-sql.ts > supabase/academy_cours_coop_01.sql
  *
- * Le contenu vit dans shared/scoop-01.ts. Ce script n'en est que la projection : pour
+ * Le contenu vit dans shared/coop-01.ts. Ce script n'en est que la projection : pour
  * corriger une leçon, on édite le TypeScript et l'on régénère.
  *
  * Le contrôle importe autant que la génération. Chaque leçon est corrigée avec sa propre clé
@@ -16,23 +16,24 @@
  * article dans son explication. Une correction qui affirme sans renvoyer au texte apprend à
  * faire confiance au formateur, alors que tout ce cours apprend à aller vérifier soi-même.
  */
-import { SCOOP_01, LECONS_SCOOP_01 } from "../shared/scoop-01.js";
+import { COOP_01, LECONS_COOP_01 } from "../shared/coop-01.js";
 import { gradeLessonExercises } from "../shared/exercises.js";
 
 const q = (t: string) => "'" + t.replace(/'/g, "''") + "'";
 const lignes: string[] = [];
 
-lignes.push(`-- ══════════════ Cours SCOOP-01 — Droit coopératif OHADA ══════════════
+lignes.push(`-- ══════════════ Cours COOP-01 — le cadre juridique ══════════════
 --
--- Cinquième parcours de LouisFarm : monter, immatriculer et gouverner une société
+-- Premier des deux cours du parcours « Coopératives et organisation des acteurs » :
+-- monter, immatriculer et gouverner une société
 -- coopérative conforme à l'Acte uniforme relatif au droit des sociétés coopératives,
 -- adopté le 15 décembre 2010 à Lomé, publié au Journal Officiel de l'OHADA n° 23 du
 -- 15 février 2011 et applicable depuis le 15 mai 2011.
 --
 -- ── Ce fichier est un artefact, pas la source ──
 --
--- Le contenu vit dans shared/scoop-01.ts, typé et versionné. Ce SQL en est la projection,
--- produite par script/generate-scoop-01-sql.ts. Pour corriger une leçon, on édite le
+-- Le contenu vit dans shared/coop-01.ts, typé et versionné. Ce SQL en est la projection,
+-- produite par script/generate-coop-01-sql.ts. Pour corriger une leçon, on édite le
 -- TypeScript et l'on régénère — jamais l'inverse, sous peine de voir les deux diverger.
 --
 -- Les insertions de leçons sont gardées par un \`not exists\` sur (course_id, order_index) :
@@ -51,17 +52,17 @@ lignes.push(`-- ══════════════ Cours SCOOP-01 — Dr
 -- partir de configurations réellement rencontrées.
 
 insert into sms_courses (code, title, description, tools, level, total_lessons, order_index, is_published)
-values (${q(SCOOP_01.code)}, ${q(SCOOP_01.titre)}, ${q(SCOOP_01.description)},
-  array[${SCOOP_01.outils.map(q).join(",")}]::text[], ${q(SCOOP_01.niveau)}, ${LECONS_SCOOP_01.length}, 30, true)
+values (${q(COOP_01.code)}, ${q(COOP_01.titre)}, ${q(COOP_01.description)},
+  array[${COOP_01.outils.map(q).join(",")}]::text[], ${q(COOP_01.niveau)}, ${LECONS_COOP_01.length}, 30, true)
 on conflict (code) do update set
   title = excluded.title, description = excluded.description, tools = excluded.tools,
   level = excluded.level, total_lessons = excluded.total_lessons, is_published = excluded.is_published;`);
 
-for (const l of LECONS_SCOOP_01) {
+for (const l of LECONS_COOP_01) {
   const contenu = JSON.stringify({ cells: l.cellules });
   lignes.push(`insert into sms_lessons (course_id, title, content, type, points, order_index)
 select c.id, ${q(l.titre)}, ${q(contenu)}::jsonb, 'lesson', ${l.points}, ${l.ordre}
-from sms_courses c where c.code = ${q(SCOOP_01.code)}
+from sms_courses c where c.code = ${q(COOP_01.code)}
   and not exists (select 1 from sms_lessons x where x.course_id = c.id and x.order_index = ${l.ordre});`);
 }
 
@@ -69,7 +70,7 @@ console.log(lignes.join("\n\n"));
 
 // Contrôle : chaque exercice doit être corrigeable, et la bonne réponse doit passer.
 let ko = 0;
-for (const l of LECONS_SCOOP_01) {
+for (const l of LECONS_COOP_01) {
   const ex = l.cellules.filter((c: any) => c.type === "exercise") as any[];
   const bonnes: any = {};
   for (const e of ex) bonnes[e.id] = e.answer;
@@ -79,7 +80,7 @@ for (const l of LECONS_SCOOP_01) {
   else console.error(`  ok  leçon ${l.ordre} — ${ex.length} exercices, corrigés à 100 % avec la clé`);
 }
 
-const tous = LECONS_SCOOP_01.flatMap(l => l.cellules.filter((c: any) => c.type === "exercise")) as any[];
+const tous = LECONS_COOP_01.flatMap(l => l.cellules.filter((c: any) => c.type === "exercise")) as any[];
 
 const vides = tous.filter(e => !e.explain);
 if (vides.length) { console.error(`  KO  ${vides.length} exercices sans explication`); ko++; }

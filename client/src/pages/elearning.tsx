@@ -20,7 +20,7 @@ import {
 import { QUESTIONS_TOF } from "@shared/tof-test";
 import { QUESTIONS_FCA } from "@shared/fca-test";
 import { QUESTIONS_FCQ } from "@shared/fcq-test";
-import { QUESTIONS_SCOOPS } from "@shared/scoops-test";
+import { QUESTIONS_COOP } from "@shared/coop-test";
 import { programById } from "@shared/programs";
 
 /**
@@ -41,7 +41,7 @@ const BANQUES_PARCOURS: Record<string, { domain: string; q: string; opts: string
   tof: QUESTIONS_TOF.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
   fca: QUESTIONS_FCA.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
   fcq: QUESTIONS_FCQ.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
-  scoops: QUESTIONS_SCOOPS.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
+  coop: QUESTIONS_COOP.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
 };
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -612,12 +612,19 @@ export default function ELearning() {
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("tof") },
               },
               {
-                code: "SCOOP-01", teinte: "#1E3A8A", titre: "Droit coopératif OHADA",
-                texte: "Passer d'un groupement de fait à une société coopérative immatriculée : choisir la forme, rédiger des statuts conformes, immatriculer, affecter les excédents, se fédérer.",
-                lignes: [["Leçons", "8"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"], ["Public", "Responsables de groupements"]],
-                titreDelivre: "Certificat de Praticien du Droit Coopératif OHADA",
+                code: "COOP-01", teinte: "#1E3A8A", titre: "Coopératives et organisation des acteurs",
+                texte: "Passer d'un groupement de fait à une organisation solide et reconnue : choisir la forme juridique, rédiger des statuts conformes, immatriculer, affecter les excédents, fédérer — puis organiser les acteurs de la filière autour d'elle.",
+                // Le prix est annoncé ICI, avant l'inscription, et non découvert à la
+                // semaine huit. Un tarif révélé à la fin se lit comme un piège, et un seul
+                // message — « j'ai fait huit semaines et à la fin ils réclament 10 000 » —
+                // coûte plus cher que dix inscriptions. Annoncé au premier écran, le même
+                // fait se lit comme de la clarté. Celui que la somme rebute part maintenant,
+                // et il ne coûte rien.
+                lignes: [["Leçons", "8"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"],
+                         ["Formation", "Gratuite"], ["Attestation", "10 000 F CFA"]],
+                titreDelivre: "Certificat de Spécialiste en Organisation des Acteurs et Structuration des Filières",
                 fond: "bg-blue-50 dark:bg-blue-950/30", encre: "text-blue-900 dark:text-blue-300",
-                action: { libelle: "Passer le test", onClick: () => demarrerTest("scoops") },
+                action: { libelle: "Passer le test", onClick: () => demarrerTest("coop") },
               },
             ].map(p => (
               <Spotlight key={p.code} className="lift border border-border rounded-lg bg-card overflow-hidden flex flex-col">

@@ -25,6 +25,9 @@ import {
 import { TESTS_PARCOURS, type TestParcours } from "./program-tests.js";
 import { qrSvg, urlVerification } from "./qr.js";
 import {
+  creerTransaction, verifierSignature, transactionEstPayee, environnementFedapay,
+} from "./fedapay.js";
+import {
   GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_MAX_MEMBERS,
   GROUP_WORK_ELIGIBILITY_WEEKS, GROUP_FORMATION_LEAD_WEEKS,
   PEER_REVIEW_CRITERIA, PEER_REVIEW_MAX_PER_CRITERION, INSTRUCTOR_RUBRIC,
@@ -142,7 +145,17 @@ function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 const app = express();
-app.use(express.json({ limit: "5mb" }));
+// `verify` conserve le corps EXACT, octet pour octet, avant analyse.
+//
+// La signature d'un webhook porte sur la chaîne reçue, pas sur l'objet obtenu après
+// analyse : re-sérialiser JSON.stringify(req.body) donne un texte différent — ordre des
+// clés, échappement Unicode, espaces — et la signature ne concordera jamais. C'est
+// l'erreur classique de ce type d'intégration, et elle se manifeste par un « ça marche en
+// test, ça échoue en production » sans explication.
+app.use(express.json({
+  limit: "5mb",
+  verify: (req, _res, buf) => { (req as any).corpsBrut = buf.toString("utf8"); },
+}));
 app.use(express.urlencoded({ extended: false }));
 
 // ── En-têtes de sécurité (équivalent helmet, sans dépendance) ──
@@ -4413,6 +4426,226 @@ app.get("/api/academy/transcript", requireStudent, async (req, res) => {
 });
 
 // ── Demander une attestation ──
+// ══════════════════════════════════════════════════════════════
+// Paiement de l'attestation
+//
+// ── Le modèle, et ce qu'il change ──
+//
+// La formation reste gratuite. Ce qui se paie, c'est le document vérifiable délivré à la
+// fin. Conséquence à regarder en face : la recette n'est plus proportionnelle aux
+// inscriptions mais aux ACHÈVEMENTS — 38 inscrits pour 4 cours terminés au moment
+// d'écrire ceci. Tout ce qui fait terminer un étudiant devient une ligne de chiffre
+// d'affaires, à commencer par les relances quotidiennes.
+//
+// ── Le principe qui gouverne tout le reste ──
+//
+// Le déverrouillage ne vient JAMAIS du navigateur. Un client qui peut dire « j'ai payé »
+// le dira. Seul un webhook signé par l'opérateur fait foi, et sa signature est vérifiée
+// sur le corps brut. C'est la même règle que partout ailleurs ici : les clés de
+// correction vivent sous api/, les corrigés ne partent qu'à la réussite. Le paiement
+// n'est pas l'endroit où l'on baisse la garde.
+// ══════════════════════════════════════════════════════════════
+
+type VerdictPaiement = { du: boolean; prix: number; motif: string };
+
+/**
+ * L'attestation de ce parcours est-elle due par cet étudiant ?
+ *
+ * Trois raisons de ne rien devoir, dans cet ordre :
+ *
+ *   1. le parcours est gratuit (`prixAttestation: 0`) ;
+ *   2. l'étudiant relève de l'ANTÉRIORITÉ — il s'est inscrit sous la promesse publiée
+ *      « c'est gratuit, et ça le restera », et cette promesse est tenue. La liste est en
+ *      base (academy_gratuite_historique) et non déduite d'une date en dur : une date se
+ *      déplace au gré d'un déploiement, une liste posée une fois ne bouge plus ;
+ *   3. il a déjà payé.
+ */
+async function attestationEstDue(sid: number, programId: string | null): Promise<VerdictPaiement> {
+  const parcours = programId ? PROGRAMS.find(p => p.id === programId) : null;
+  const prix = parcours?.prixAttestation ?? 0;
+  if (!parcours || prix <= 0) return { du: false, prix: 0, motif: "attestation gratuite" };
+
+  const { data: ancien } = await supabase.from("academy_gratuite_historique")
+    .select("student_id").eq("student_id", sid).maybeSingle();
+  if (ancien) return { du: false, prix, motif: "gratuité d'antériorité" };
+
+  const { data: paye } = await supabase.from("academy_paiements")
+    .select("id").eq("student_id", sid).eq("program_id", parcours.id)
+    .eq("statut", "paye").limit(1).maybeSingle();
+  if (paye) return { du: false, prix, motif: "déjà payée" };
+
+  return { du: true, prix, motif: "paiement requis" };
+}
+
+/** Parcours d'un cours, par son identifiant. */
+async function parcoursDuCours(courseId: number): Promise<string | null> {
+  const { data: c } = await supabase.from("sms_courses").select("code").eq("id", courseId).maybeSingle();
+  return c?.code ? programOf(c.code)?.id ?? null : null;
+}
+
+// ── Où en est mon paiement ? ──
+app.get("/api/academy/paiements", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data } = await supabase.from("academy_paiements")
+    .select("program_id, montant, devise, statut, paye_at, created_at")
+    .eq("student_id", sid).order("created_at", { ascending: false }).limit(20);
+  const { data: ancien } = await supabase.from("academy_gratuite_historique")
+    .select("student_id").eq("student_id", sid).maybeSingle();
+  res.json({
+    paiements: data || [],
+    gratuiteHistorique: !!ancien,
+    // Le prix affiché vient du registre, jamais d'une constante recopiée côté client :
+    // un tarif écrit à deux endroits finit par différer, et c'est l'étudiant qui découvre
+    // l'écart au moment de payer.
+    tarifs: PROGRAMS.filter(p => p.prixAttestation > 0)
+      .map(p => ({ programId: p.id, titre: p.title, prix: p.prixAttestation, devise: "XOF" })),
+  });
+});
+
+// ── Ouvrir un paiement ──
+app.post("/api/academy/paiement/attestation", rateLimit(10, 15 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const courseId = Number(req.body?.course_id);
+  if (!courseId) return res.status(400).json({ message: "course_id requis" });
+
+  const programId = await parcoursDuCours(courseId);
+  const verdict = await attestationEstDue(sid, programId);
+  if (!verdict.du) {
+    return res.status(409).json({ message: `Aucun paiement requis : ${verdict.motif}.`, ...verdict });
+  }
+
+  // On ne fait payer que ce qui est fini. Ouvrir un paiement avant la fin du parcours
+  // reviendrait à vendre une attestation que l'étudiant pourrait ne jamais obtenir.
+  const { data: enr } = await supabase.from("enrollments")
+    .select("progress").eq("student_id", sid).eq("course_id", courseId).maybeSingle();
+  if (!enr || enr.progress < 100) {
+    return res.status(403).json({ message: "Terminez le cours à 100 % avant de régler l'attestation." });
+  }
+
+  const { data: etu } = await supabase.from("students")
+    .select("full_name, first_name, last_name, email, email_verified").eq("id", sid).single();
+  if (!etu?.email) return res.status(400).json({ message: "Adresse email manquante." });
+  if (etu.email_verified === false) {
+    return res.status(403).json({ message: "Confirmez votre adresse email avant de payer.", needVerification: true });
+  }
+
+  // Notre référence, générée AVANT l'appel. C'est elle qui rendra le webhook idempotent :
+  // rejoué dix fois, il retrouvera cette ligne au lieu d'en créer dix.
+  const reference = `ATT-${verdict.prix}-${sid}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
+
+  const { error: errLigne } = await supabase.from("academy_paiements").insert({
+    student_id: sid, program_id: programId, montant: verdict.prix,
+    devise: "XOF", reference, statut: "en_attente",
+  });
+  if (errLigne) return res.status(500).json({ message: "Impossible d'ouvrir le paiement." });
+
+  try {
+    const { transactionId, url } = await creerTransaction({
+      montant: verdict.prix,
+      description: `Attestation — ${PROGRAMS.find(p => p.id === programId)?.title ?? programId}`,
+      reference,
+      payeur: {
+        nom: etu.last_name || etu.full_name || "Étudiant",
+        prenom: etu.first_name || undefined,
+        email: etu.email,
+      },
+      retourUrl: `${SITE_URL}/academy/dashboard?paiement=${encodeURIComponent(reference)}`,
+    });
+    await supabase.from("academy_paiements")
+      .update({ transaction_id: transactionId, updated_at: new Date().toISOString() })
+      .eq("reference", reference);
+    res.json({ url, reference, montant: verdict.prix, devise: "XOF", environnement: environnementFedapay() });
+  } catch (e: any) {
+    const message = String(e?.message || e);
+    console.error("paiement : création de transaction en échec —", message.slice(0, 500));
+    await supabase.from("academy_paiements")
+      .update({ statut: "echoue", updated_at: new Date().toISOString() })
+      .eq("reference", reference);
+    // Le message de l'opérateur ne remonte PAS au navigateur : il peut contenir l'écho de
+    // ce qu'on a envoyé, y compris l'adresse email de l'étudiant.
+    res.status(502).json({ message: "L'opérateur de paiement est injoignable. Réessayez dans un moment." });
+  }
+});
+
+// ── Le webhook, seule source de vérité sur un paiement ──
+app.post("/api/paiements/fedapay", async (req, res) => {
+  const corpsBrut = (req as any).corpsBrut as string | undefined;
+  const entete = req.headers["x-fedapay-signature"] as string | undefined;
+
+  const verdict = verifierSignature(corpsBrut ?? "", entete, process.env.FEDAPAY_WEBHOOK_SECRET);
+  if (!verdict.valide) {
+    // On journalise la RAISON, jamais la signature reçue ni le secret attendu. Un journal
+    // d'exploitation qui contient de quoi forger la prochaine tentative n'est plus un
+    // journal.
+    console.warn("webhook FedaPay REFUSÉ —", verdict.raison, {
+      agent: String(req.headers["user-agent"] || "—").slice(0, 80),
+    });
+    return res.status(401).json({ message: "Signature invalide" });
+  }
+
+  const evenement = req.body ?? {};
+  const entite = evenement.entity ?? evenement.data ?? {};
+  const reference: string | undefined = entite.merchant_reference || entite.reference;
+  const transactionId = entite.id != null ? String(entite.id) : null;
+
+  const { data: ligne } = await supabase.from("academy_paiements")
+    .select("id, student_id, program_id, montant, devise, statut")
+    .or([
+      reference ? `reference.eq.${reference}` : null,
+      transactionId ? `transaction_id.eq.${transactionId}` : null,
+    ].filter(Boolean).join(",") || "reference.eq.__aucune__")
+    .maybeSingle();
+
+  if (!ligne) {
+    // 200 et non 404 : la signature est valide, l'événement est authentique, il ne nous
+    // concerne simplement pas. Répondre en erreur ferait réessayer l'opérateur
+    // indéfiniment pour une livraison qui n'aboutira jamais.
+    console.warn("webhook FedaPay : aucune ligne pour", { reference, transactionId, evenement: evenement.name });
+    return res.json({ ignore: true });
+  }
+
+  // Déjà réglé : un rejeu ne doit ni réécrire la date de paiement, ni rouvrir quoi que ce
+  // soit. C'est le cas NORMAL, pas une anomalie — les webhooks se rejouent par conception.
+  if (ligne.statut === "paye") return res.json({ deja: true });
+
+  if (!transactionEstPayee(entite.status)) {
+    await supabase.from("academy_paiements")
+      .update({ statut: entite.status === "canceled" ? "annule" : "echoue",
+                charge: evenement, updated_at: new Date().toISOString() })
+      .eq("id", ligne.id);
+    return res.json({ statut: entite.status ?? "inconnu" });
+  }
+
+  // ── La seconde barrière ──
+  //
+  // Le montant est fixé côté serveur à la création de la transaction, donc il ne devrait
+  // pas pouvoir dériver. On le revérifie quand même à l'arrivée : une seule barrière n'en
+  // est pas une, et c'est le seul endroit où l'on peut encore refuser avant de délivrer.
+  const montantRecu = Number(entite.amount);
+  const deviseRecue = String(entite.currency?.iso ?? entite.currency ?? "XOF").toUpperCase();
+  if (!Number.isFinite(montantRecu) || montantRecu < ligne.montant || deviseRecue !== ligne.devise) {
+    console.error("webhook FedaPay : montant ou devise inattendus", {
+      attendu: `${ligne.montant} ${ligne.devise}`, recu: `${montantRecu} ${deviseRecue}`, reference,
+    });
+    await supabase.from("academy_paiements")
+      .update({ statut: "echoue", charge: evenement, updated_at: new Date().toISOString() })
+      .eq("id", ligne.id);
+    return res.json({ ignore: true, raison: "montant ou devise inattendus" });
+  }
+
+  const { error } = await supabase.from("academy_paiements")
+    .update({ statut: "paye", paye_at: new Date().toISOString(),
+              transaction_id: transactionId ?? undefined, charge: evenement,
+              updated_at: new Date().toISOString() })
+    .eq("id", ligne.id);
+  // Ici, en revanche, on veut être réessayé : l'argent est arrivé et nous n'avons pas su
+  // l'enregistrer.
+  if (error) return res.status(500).json({ message: "Écriture impossible" });
+
+  console.log(`paiement encaissé : ${ligne.montant} ${ligne.devise}, étudiant ${ligne.student_id}, parcours ${ligne.program_id}`);
+  res.json({ ok: true });
+});
+
 app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { course_id } = req.body;
@@ -4426,6 +4659,24 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   const { data: verif } = await supabase.from("students").select("email_verified").eq("id", sid).single();
   if (verif && verif.email_verified === false)
     return res.status(403).json({ message: "Confirmez votre adresse email pour recevoir votre attestation.", needVerification: true });
+
+  // ── Le verrou de paiement ──
+  //
+  // Posé APRÈS le contrôle de progression et celui de l'email, et pas avant : on ne
+  // demande pas d'argent à quelqu'un qui n'a pas fini, ni à quelqu'un dont on ne pourra
+  // pas confirmer l'identité. L'ordre des refus est aussi un message.
+  //
+  // 402 « Payment Required » plutôt que 403 : c'est exactement ce que ce code veut dire,
+  // et il permet au navigateur de distinguer « il vous manque un paiement » de « vous
+  // n'avez pas le droit ». Les deux appellent des écrans différents.
+  const parcoursVise = await parcoursDuCours(course_id);
+  const du = await attestationEstDue(sid, parcoursVise);
+  if (du.du) {
+    return res.status(402).json({
+      message: `L'attestation de ce parcours coûte ${du.prix.toLocaleString("fr-FR")} F CFA.`,
+      paiementRequis: true, prix: du.prix, devise: "XOF", programId: parcoursVise,
+    });
+  }
 
   // Ne regarder que les attestations DE COURS : l'attestation d'admission et le certificat final
   // sont rattachés au même course_id et feraient croire, à tort, à une demande déjà déposée.

@@ -32,13 +32,13 @@
  * répondant la même lettre partout.
  */
 
-export interface QuestionScoops {
+export interface QuestionCoop {
   domaine: string;
   q: string;
   opts: string[];
 }
 
-export const QUESTIONS_SCOOPS: QuestionScoops[] = [
+export const QUESTIONS_COOP: QuestionCoop[] = [
   // ── Formes juridiques ──
   {
     domaine: "Formes juridiques",

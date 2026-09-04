@@ -20,11 +20,11 @@ import { programById } from "../shared/programs.js";
 import { QUESTIONS_TOF } from "../shared/tof-test.js";
 import { QUESTIONS_FCA } from "../shared/fca-test.js";
 import { QUESTIONS_FCQ } from "../shared/fcq-test.js";
-import { QUESTIONS_SCOOPS } from "../shared/scoops-test.js";
+import { QUESTIONS_COOP } from "../shared/coop-test.js";
 import { TOF_ANSWER_KEY, TOF_CORRECT_TEXTS } from "../api/tof-answers.js";
 import { FCA_ANSWER_KEY, FCA_CORRECT_TEXTS } from "../api/fca-answers.js";
 import { FCQ_ANSWER_KEY, FCQ_CORRECT_TEXTS } from "../api/fcq-answers.js";
-import { SCOOPS_ANSWER_KEY, SCOOPS_CORRECT_TEXTS } from "../api/scoops-answers.js";
+import { COOP_ANSWER_KEY, COOP_CORRECT_TEXTS } from "../api/coop-answers.js";
 
 const LETTRES = ["A", "B", "C", "D"];
 
@@ -65,10 +65,10 @@ const SUITES: Suite[] = [
       "Crédit et portefeuille", "Méthode et rigueur"],
   },
   {
-    programId: "scoops",
-    questions: QUESTIONS_SCOOPS,
-    cle: SCOOPS_ANSWER_KEY,
-    textes: SCOOPS_CORRECT_TEXTS,
+    programId: "coop",
+    questions: QUESTIONS_COOP,
+    cle: COOP_ANSWER_KEY,
+    textes: COOP_CORRECT_TEXTS,
     // Aucun thème ne porte sur l'Acte uniforme : le test vérifie les PRÉREQUIS du parcours
     // — savoir lire un texte réglementaire, connaître la vie d'une assemblée, compter — et
     // non son contenu, qui s'apprend pendant les huit semaines.

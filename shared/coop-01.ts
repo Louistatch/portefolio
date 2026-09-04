@@ -1,5 +1,8 @@
 /**
- * Contenu du cours SCOOP-01 — Droit coopératif OHADA : monter et gouverner une SCOOPS.
+ * Contenu du cours COOP-01 — le cadre juridique : monter et gouverner une société coopérative.
+ *
+ * Premier des deux cours du parcours « Coopératives et organisation des acteurs ». Celui-ci
+ * donne la structure ; COOP-02 apprendra à organiser les acteurs d'une filière autour d'elle.
  *
  * ── Pourquoi ce cours existe ──
  *
@@ -48,16 +51,16 @@ export type Cellule =
     }
   | { type: "resource"; title: string; url: string; desc: string; provider: string };
 
-export interface LeconScoop {
+export interface LeconCoop {
   ordre: number;
   titre: string;
   points: number;
   cellules: Cellule[];
 }
 
-export const SCOOP_01 = {
-  code: "SCOOP-01",
-  titre: "Droit coopératif OHADA : monter et gouverner une société coopérative",
+export const COOP_01 = {
+  code: "COOP-01",
+  titre: "Monter et gouverner une société coopérative — le cadre OHADA",
   description:
     "Huit semaines pour passer d'un groupement de fait à une société coopérative "
     + "immatriculée, gouvernée et fédérable. Choix de la forme entre SCOOPS et COOP-CA, "
@@ -69,7 +72,7 @@ export const SCOOP_01 = {
   outils: ["Acte uniforme OHADA", "Statuts et règlement intérieur", "Registre des sociétés coopératives"],
 };
 
-export const LECONS_SCOOP_01: LeconScoop[] = [
+export const LECONS_COOP_01: LeconCoop[] = [
   // ─────────────────────────────────────────────────────────────────────────
   {
     ordre: 1,
@@ -339,10 +342,22 @@ export const LECONS_SCOOP_01: LeconScoop[] = [
         title: "Acte uniforme relatif au droit des sociétés coopératives",
         url: "https://www.ohada.com/textes-ohada/actes-uniformes.html",
         desc:
-          "Le texte intégral, 397 articles. À garder ouvert pendant tout le parcours : chaque "
-          + "leçon renvoie à ses articles, et l'habitude d'aller vérifier soi-même vaut mieux "
-          + "que n'importe quel résumé.",
+          "Le texte intégral, 397 articles, adopté le 15 décembre 2010 à Lomé et publié au "
+          + "Journal Officiel de l'OHADA n° 23 du 15 février 2011. À garder ouvert pendant tout "
+          + "le parcours : chaque leçon renvoie à ses articles, et l'habitude d'aller vérifier "
+          + "soi-même vaut mieux que n'importe quel résumé.",
         provider: "OHADA",
+      },
+      {
+        type: "resource",
+        title: "Directives opérationnelles sur le développement des filières agricoles en faveur des pauvres",
+        url: "https://www.ifad.org/fr/w/publications",
+        desc:
+          "Le cadre de référence du second cours du parcours (COOP-02) : ciblage et "
+          + "désagrégation des ménages, priorisation des chaînes de valeur, cartographie des "
+          + "acteurs. C'est la méthode qu'emploient les projets qui recruteront les titulaires "
+          + "de ce certificat — la lire tôt évite d'apprendre deux vocabulaires successifs.",
+        provider: "FIDA — Division production durable, marchés et institutions",
       },
     ],
   },

@@ -13,11 +13,11 @@ import { PROGRAMS } from "../shared/programs.js";
 import { QUESTIONS_TOF } from "../shared/tof-test.js";
 import { QUESTIONS_FCA } from "../shared/fca-test.js";
 import { QUESTIONS_FCQ } from "../shared/fcq-test.js";
-import { QUESTIONS_SCOOPS } from "../shared/scoops-test.js";
+import { QUESTIONS_COOP } from "../shared/coop-test.js";
 import { TOF_ANSWER_KEY } from "./tof-answers.js";
 import { FCA_ANSWER_KEY } from "./fca-answers.js";
 import { FCQ_ANSWER_KEY } from "./fcq-answers.js";
-import { SCOOPS_ANSWER_KEY } from "./scoops-answers.js";
+import { COOP_ANSWER_KEY } from "./coop-answers.js";
 
 export interface TestParcours {
   /** Énoncés et options — partent côté client. */
@@ -30,7 +30,7 @@ export const TESTS_PARCOURS: Record<string, TestParcours> = {
   tof: { questions: QUESTIONS_TOF, cle: TOF_ANSWER_KEY },
   fca: { questions: QUESTIONS_FCA, cle: FCA_ANSWER_KEY },
   fcq: { questions: QUESTIONS_FCQ, cle: FCQ_ANSWER_KEY },
-  scoops: { questions: QUESTIONS_SCOOPS, cle: SCOOPS_ANSWER_KEY },
+  coop: { questions: QUESTIONS_COOP, cle: COOP_ANSWER_KEY },
 };
 
 /**

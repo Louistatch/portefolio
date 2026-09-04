@@ -2,7 +2,7 @@
  * Clé de correction du test d'admission du parcours « droit coopératif OHADA ».
  *
  * Sous api/, donc jamais incluse dans le paquet envoyé au navigateur. Les énoncés et les
- * options vivent dans shared/scoops-test.ts et partent bien côté client : c'est cette
+ * options vivent dans shared/coop-test.ts et partent bien côté client : c'est cette
  * séparation qui empêche un candidat de lire les réponses dans le code de la page.
  *
  * Deux tableaux, même raison que pour les autres parcours : les index servent à corriger,
@@ -11,12 +11,12 @@
  * le test continuerait de corriger — en se trompant.
  */
 
-export const SCOOPS_ANSWER_KEY: number[] = [
+export const COOP_ANSWER_KEY: number[] = [
   2, 0, 3, 1, 0, 2, 1, 3, 3, 1, 2, 0, 1, 3, 0, 2, 3, 1, 0, 2,
 ];
 
 /** Texte attendu de la bonne réponse, dans l'ordre des questions. Vérification seulement. */
-export const SCOOPS_CORRECT_TEXTS: string[] = [
+export const COOP_CORRECT_TEXTS: string[] = [
   "Un groupement doté d'une existence juridique propre, distincte de celle de ses membres",
   "Il n'a pas de personnalité juridique, donc il ne peut être titulaire d'un compte",
   "La première vise à dégager et partager un bénéfice, la seconde vise d'abord à servir ses membres",
