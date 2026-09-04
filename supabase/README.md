@@ -207,3 +207,69 @@ curl -X POST https://www.louisfarm.com/api/cron/verify-reminders \
 ```
 
 La réponse détaille le résultat : `{"candidats":5,"envoyees":3,"ignorees":2,"parEtape":{"J+1":1,"J+3":1,"J+7":1}}`.
+
+
+## Paiement de l'attestation (FedaPay)
+
+L'attestation du parcours `coop` coûte 10 000 F CFA. La formation reste gratuite ; seul le
+document est payant, et seulement une fois le cours terminé à 100 %.
+
+### L'adresse du webhook à déclarer — et le piège
+
+Dans le tableau de bord FedaPay, l'URL du webhook doit être **exactement** :
+
+```
+https://www.louisfarm.com/api/paiements/fedapay
+```
+
+**Avec `www`.** L'apex `louisfarm.com` répond `307` et renvoie vers `www` : un navigateur
+suit cette redirection sans broncher, mais rien ne garantit qu'un émetteur de webhooks le
+fasse — beaucoup ne suivent aucune redirection et enregistrent simplement une livraison en
+échec. Le symptôme est le pire qui soit : des paiements qui aboutissent chez l'opérateur et
+des attestations qui ne se délivrent jamais, sans une seule erreur dans les journaux.
+Vérifié le 4 septembre 2026 : `GET https://louisfarm.com/api/health` → `307` vers
+`https://www.louisfarm.com/api/health`.
+
+### Variables d'environnement à définir sur Vercel
+
+| Variable | Rôle |
+|---|---|
+| `FEDAPAY_SECRET_KEY` | clé secrète `sk_…` de l'opérateur — jamais dans le dépôt |
+| `FEDAPAY_WEBHOOK_SECRET` | secret affiché à la création du webhook, sert à vérifier la signature |
+| `FEDAPAY_ENV` | `sandbox` ou `live` — toute autre valeur, ou l'absence, vaut `sandbox` |
+
+Une variable ajoutée ne s'applique qu'au **déploiement suivant** : redéployer après l'avoir
+posée, sinon la fonction continue de tourner avec l'ancien environnement.
+
+### Ce que la vérification de signature exige du serveur
+
+L'en-tête `X-FEDAPAY-SIGNATURE` a la forme `t=<horodatage>,s=<hmac hexadécimal>`, et le
+condensat couvre `` `${horodatage}.${corps brut}` ``. **Le corps brut**, octet pour octet :
+une charge re-sérialisée depuis l'objet analysé ne redonne pas la même chaîne et la
+signature ne correspondra jamais. C'est pourquoi `express.json` est monté avec un `verify`
+qui conserve le corps d'origine dans `req.corpsBrut`. Tolérance : 300 secondes.
+
+### Les statuts, et pourquoi notre liste diffère de celle du SDK
+
+Le SDK officiel expose `PAID_STATUS = [approved, transferred, refunded,
+approved_partially_refunded, transferred_partially_refunded]`. Cette liste répond à « de
+l'argent est-il arrivé un jour ? ». La question posée ici est « cette personne a-t-elle
+droit à son attestation ? », et seuls `approved` et `transferred` l'ouvrent : reprendre la
+liste du SDK délivrerait une attestation à quelqu'un intégralement remboursé.
+
+Un remboursement n'est pas pour autant un échec. La ligne de paiement porte donc
+`rembourse`, `annule` ou `echoue` selon le cas — confondre un geste commercial avec un
+incident technique enverrait chercher une panne qui n'existe pas.
+
+### La référence marchande doit être unique
+
+`merchant_reference` est refusé par l'opérateur s'il a déjà servi. La référence porte donc
+six octets aléatoires (`ATT-<prix>-<étudiant>-<aléa>`). La « simplifier » en
+`ATT-<étudiant>-<parcours>` casserait toutes les reprises : un étudiant qui abandonne un
+paiement puis y revient verrait son second essai refusé, sans autre message que
+« paiement impossible ».
+
+### Vérifier sans rien envoyer
+
+`npm run verify:fedapay` rejoue la vérification de signature contre des en-têtes produits
+par l'algorithme du SDK officiel, et fige l'écart de statuts ci-dessus.

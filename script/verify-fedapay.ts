@@ -12,7 +12,7 @@
  * la chaîne `horodatage.corps`, HMAC-SHA256 en hexadécimal.
  */
 import crypto from "crypto";
-import { verifierSignature, entetePourTest, transactionEstPayee } from "../api/fedapay.js";
+import { verifierSignature, entetePourTest, transactionEstPayee, categorieStatut } from "../api/fedapay.js";
 
 const SECRET = "wh_secret_de_test";
 const CORPS = JSON.stringify({
@@ -78,6 +78,25 @@ v("« pending » ne vaut pas paiement", !transactionEstPayee("pending"));
 v("« declined » ne vaut pas paiement", !transactionEstPayee("declined"));
 v("« canceled » ne vaut pas paiement", !transactionEstPayee("canceled"));
 v("un statut absent ne vaut pas paiement", !transactionEstPayee(undefined));
+
+// ── Les trois statuts de remboursement du SDK ──
+//
+// `PAID_STATUS` du SDK officiel les compte comme « payés », parce qu'il répond à « de
+// l'argent est-il arrivé un jour ? ». Notre question est autre : « cette personne a-t-elle
+// droit à son attestation ? ». Ces assertions figent l'écart pour que personne ne
+// « corrige » un jour notre liste en recopiant la leur — ce qui délivrerait une
+// attestation à quelqu'un intégralement remboursé.
+v("« refunded » n'ouvre PAS le droit à l'attestation", !transactionEstPayee("refunded"));
+v("« approved_partially_refunded » n'ouvre pas le droit", !transactionEstPayee("approved_partially_refunded"));
+v("« transferred_partially_refunded » n'ouvre pas le droit", !transactionEstPayee("transferred_partially_refunded"));
+
+// ── Et pourtant un remboursement n'est pas un échec ──
+v("« refunded » est classé remboursement", categorieStatut("refunded") === "rembourse");
+v("« approved_partially_refunded » est classé remboursement", categorieStatut("approved_partially_refunded") === "rembourse");
+v("« canceled » est classé annulation", categorieStatut("canceled") === "annule");
+v("« declined » est classé échec", categorieStatut("declined") === "echoue");
+v("« approved » est classé payé", categorieStatut("approved") === "paye");
+v("un statut inconnu est classé échec", categorieStatut("chose_inattendue") === "echoue");
 
 console.log(ko === 0 ? "\nTOUT PASSE" : `\n${ko} ÉCHEC(S)`);
 process.exit(ko ? 1 : 0);

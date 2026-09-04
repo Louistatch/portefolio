@@ -41,16 +41,36 @@ function baseApi(): string {
 }
 
 /**
- * Statuts de transaction qui valent « l'argent est arrivé ».
+ * Ce que valent les statuts de transaction de l'opérateur.
  *
- * Repris de la liste du SDK, restreint à ce qui nous concerne : `approved` et
- * `transferred`. Les statuts de remboursement partiel existent chez l'opérateur mais
- * n'ont pas de sens ici — une attestation ne se rembourse pas à moitié.
+ * Le SDK expose une liste `PAID_STATUS` de cinq valeurs :
+ *
+ *   approved · transferred · refunded · approved_partially_refunded · transferred_partially_refunded
+ *
+ * Elle répond à la question « de l'argent est-il arrivé un jour ? ». Ce n'est PAS la
+ * question posée ici, qui est « cette personne a-t-elle droit à son attestation
+ * maintenant ? ». Reprendre la liste telle quelle délivrerait une attestation à quelqu'un
+ * intégralement remboursé. Le droit à l'attestation se limite donc à deux statuts.
+ *
+ * Les trois autres ne sont pas pour autant des échecs, et les confondre abîmerait le
+ * tableau de bord : un remboursement est une décision commerciale, un échec est un
+ * incident. `categorieStatut` les sépare pour que la ligne porte le bon mot.
  */
 const STATUTS_PAYES = new Set(["approved", "transferred"]);
+const STATUTS_REMBOURSES = new Set([
+  "refunded", "approved_partially_refunded", "transferred_partially_refunded",
+]);
 
 export function transactionEstPayee(statut: unknown): boolean {
   return typeof statut === "string" && STATUTS_PAYES.has(statut);
+}
+
+/** Le mot à inscrire sur la ligne de paiement quand la transaction n'ouvre pas de droit. */
+export function categorieStatut(statut: unknown): "paye" | "rembourse" | "annule" | "echoue" {
+  if (transactionEstPayee(statut)) return "paye";
+  if (typeof statut === "string" && STATUTS_REMBOURSES.has(statut)) return "rembourse";
+  if (statut === "canceled") return "annule";
+  return "echoue";
 }
 
 // ══════════════ Vérification de signature ══════════════
@@ -176,14 +196,24 @@ export type Payeur = { nom: string; prenom?: string; email: string };
  */
 export async function creerTransaction(opts: {
   montant: number; description: string; reference: string;
-  payeur: Payeur; retourUrl: string;
+  payeur: Payeur; retourUrl: string; metadonnees?: Record<string, string>;
 }): Promise<{ transactionId: string; url: string }> {
   const cree = await appel("/transactions", {
     description: opts.description,
     amount: opts.montant,
     currency: { iso: "XOF" },
     callback_url: opts.retourUrl,
+    // ⚠ `merchant_reference` DOIT être unique à chaque transaction : l'opérateur refuse
+    // la création si la référence a déjà servi. Ce n'est pas une préférence de style,
+    // c'est une contrainte de leur API, et elle ne se voit qu'au deuxième essai — celui
+    // d'un étudiant qui a abandonné un paiement puis y revient. La référence porte donc
+    // six octets aléatoires (voir son point de fabrication) ; la « simplifier » en
+    // ATT-<étudiant>-<parcours> casserait toutes les reprises, en silence.
     merchant_reference: opts.reference,
+    // Données de rapprochement, visibles dans le tableau de bord de l'opérateur.
+    // Uniquement des identifiants internes : leur documentation demande expressément de
+    // n'y mettre aucune donnée personnelle, et l'email a déjà sa place dans `customer`.
+    ...(opts.metadonnees ? { custom_metadata: opts.metadonnees } : {}),
     customer: {
       firstname: opts.payeur.prenom || opts.payeur.nom,
       lastname: opts.payeur.nom,

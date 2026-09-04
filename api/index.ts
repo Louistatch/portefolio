@@ -25,7 +25,7 @@ import {
 import { TESTS_PARCOURS, type TestParcours } from "./program-tests.js";
 import { qrSvg, urlVerification } from "./qr.js";
 import {
-  creerTransaction, verifierSignature, transactionEstPayee, environnementFedapay,
+  creerTransaction, verifierSignature, transactionEstPayee, categorieStatut, environnementFedapay,
 } from "./fedapay.js";
 import {
   GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_MAX_MEMBERS,
@@ -4574,6 +4574,11 @@ app.post("/api/academy/paiement/attestation", rateLimit(10, 15 * 60 * 1000), req
 
   // Notre référence, générée AVANT l'appel. C'est elle qui rendra le webhook idempotent :
   // rejoué dix fois, il retrouvera cette ligne au lieu d'en créer dix.
+  //
+  // Les six octets aléatoires ne sont pas décoratifs : l'opérateur refuse une transaction
+  // dont le `merchant_reference` a déjà servi. Sans eux, un étudiant qui ouvre un paiement,
+  // abandonne, puis revient se verrait refuser le second essai — et l'échec se lirait
+  // « paiement impossible » sans autre indice.
   const reference = `ATT-${verdict.prix}-${sid}-${crypto.randomBytes(6).toString("hex").toUpperCase()}`;
 
   const { error: errLigne } = await supabase.from("academy_paiements").insert({
@@ -4593,6 +4598,9 @@ app.post("/api/academy/paiement/attestation", rateLimit(10, 15 * 60 * 1000), req
         email: etu.email,
       },
       retourUrl: `${SITE_URL}/academy/dashboard?paiement=${encodeURIComponent(reference)}`,
+      // Identifiants internes seulement : ils permettent de rapprocher une ligne du
+      // tableau de bord de l'opérateur sans ouvrir notre base, et n'exposent rien.
+      metadonnees: { parcours: programId ?? "inconnu", cours: String(courseId) },
     });
     await supabase.from("academy_paiements")
       .update({ transaction_id: transactionId, updated_at: new Date().toISOString() })
@@ -4652,8 +4660,10 @@ app.post("/api/paiements/fedapay", async (req, res) => {
   if (ligne.statut === "paye") return res.json({ deja: true });
 
   if (!transactionEstPayee(entite.status)) {
+    // Un remboursement n'est pas un échec. Les confondre ferait lire un geste commercial
+    // comme un incident technique — et l'on chercherait une panne qui n'existe pas.
     await supabase.from("academy_paiements")
-      .update({ statut: entite.status === "canceled" ? "annule" : "echoue",
+      .update({ statut: categorieStatut(entite.status),
                 charge: evenement, updated_at: new Date().toISOString() })
       .eq("id", ligne.id);
     return res.json({ statut: entite.status ?? "inconnu" });
