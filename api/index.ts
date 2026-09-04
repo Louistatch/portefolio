@@ -4614,7 +4614,22 @@ app.post("/api/academy/paiement/attestation", rateLimit(10, 15 * 60 * 1000), req
     await supabase.from("academy_paiements")
       .update({ transaction_id: transactionId, updated_at: new Date().toISOString() })
       .eq("reference", reference);
-    res.json({ url, reference, montant: verdict.prix, devise: "XOF", environnement: environnementFedapay() });
+    // ── Ce qui part au navigateur, et ce qui n'en part pas ──
+    //
+    // `transactionId` et la clé PUBLIQUE suffisent à ouvrir le formulaire de l'opérateur
+    // dans notre page. Le montant, lui, a été fixé ici et il est déjà inscrit sur la
+    // transaction : le navigateur ne fait que désigner une transaction existante, il n'en
+    // crée pas. Et si quelqu'un parvenait malgré tout à faire payer moins, le webhook
+    // recompare le montant reçu à celui de notre ligne avant de délivrer quoi que ce soit.
+    //
+    // `url` reste renvoyée : c'est la porte de secours si le script de l'opérateur ne se
+    // charge pas — réseau coupé, blocage. Mieux vaut une redirection qu'un cul-de-sac.
+    res.json({
+      url, reference, transactionId,
+      montant: verdict.prix, devise: "XOF",
+      environnement: environnementFedapay(),
+      clePublique: process.env.FEDAPAY_PUBLIC_KEY || null,
+    });
   } catch (e: any) {
     const message = String(e?.message || e);
     console.error("paiement : création de transaction en échec —", message.slice(0, 500));

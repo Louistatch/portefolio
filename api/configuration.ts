@@ -61,6 +61,12 @@ export function configurationDuServeur(siteUrl: string): EtatVariable[] {
         + "toute notification étant refusée faute de pouvoir en vérifier l'origine.",
     },
     {
+      nom: "FEDAPAY_PUBLIC_KEY", presente: presente("FEDAPAY_PUBLIC_KEY"),
+      role: "Ouvre le formulaire de paiement DANS le site, sans redirection",
+      consequence: "Sans elle le paiement fonctionne encore, mais en envoyant l'étudiant "
+        + "sur le site de l'opérateur — ce qui fait perdre du monde à l'étape la plus fragile.",
+    },
+    {
       nom: "FEDAPAY_ENV", presente: presente("FEDAPAY_ENV"),
       role: "Choisit l'environnement de paiement",
       consequence: "Absente, vaut « sandbox » : les paiements sont fictifs et aucun franc n'est encaissé.",

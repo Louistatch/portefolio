@@ -59,6 +59,29 @@ function Cadre({ accent, label, children }: {
 
 const ACCENT_PAR_DEFAUT = "#1e3a8a";
 
+/**
+ * Charge checkout.js de l'opérateur, une seule fois.
+ *
+ * Chargé À LA DEMANDE, sur cette page seulement : un script tiers dans le paquet principal
+ * serait téléchargé par tous les visiteurs, y compris les 37 étudiants qui ne paient rien.
+ * La version est épinglée — un script tiers non versionné peut changer sous nos pieds entre
+ * deux visites, et c'est le formulaire de paiement.
+ */
+const SCRIPT_OPERATEUR = "https://cdn.fedapay.com/checkout.js?v=1.1.2";
+
+function chargerCheckout(): Promise<any> {
+  const w = window as any;
+  if (w.FedaPay) return Promise.resolve(w.FedaPay);
+  return new Promise((resolve, reject) => {
+    const existant = document.querySelector(`script[src="${SCRIPT_OPERATEUR}"]`);
+    const el = (existant as HTMLScriptElement) ?? document.createElement("script");
+    const fini = () => (w.FedaPay ? resolve(w.FedaPay) : reject(new Error("checkout.js chargé sans FedaPay")));
+    el.addEventListener("load", fini);
+    el.addEventListener("error", () => reject(new Error("checkout.js injoignable")));
+    if (!existant) { el.src = SCRIPT_OPERATEUR; el.async = true; document.body.appendChild(el); }
+  });
+}
+
 export default function PaiementAttestation() {
   const [, navigate] = useLocation();
   const [, params] = useRoute("/academy/paiement/:courseId");
@@ -74,6 +97,9 @@ export default function PaiementAttestation() {
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const [tentatives, setTentatives] = useState(0);
+  // Transaction ouverte : le formulaire de l'opérateur s'affiche alors DANS la page.
+  const [transaction, setTransaction] = useState<any>(null);
+  const [replie, setReplie] = useState(false);
 
   const lire = useCallback(async () => {
     if (!courseId) return;
@@ -267,6 +293,21 @@ export default function PaiementAttestation() {
   }
 
   // ══════════════ Avant le paiement : ce que l'on achète ══════════════
+  //
+  // ── Le paiement se fait ICI, sans quitter le site ──
+  //
+  // La transaction est créée par NOTRE serveur : c'est lui qui fixe le montant, et le
+  // navigateur ne reçoit que son identifiant. Il ne crée rien, il désigne. Le formulaire
+  // de l'opérateur s'ouvre ensuite dans un cadre de cette page.
+  //
+  // Ce n'est pas un confort. Renvoyer quelqu'un sur process.fedapay.com au moment de
+  // payer, c'est le sortir du site qui vient de lui promettre un document : l'adresse
+  // change, la marque disparaît, et une partie des gens s'arrête là. C'est l'étape la plus
+  // fragile de tout le tunnel.
+  //
+  // La redirection reste comme PORTE DE SECOURS. Si le script de l'opérateur ne se charge
+  // pas — réseau coupé, blocage, coupure d'antenne — on renvoie vers sa page plutôt que de
+  // laisser l'étudiant devant un cadre vide. Mieux vaut sortir du site que ne pas payer.
   async function payer() {
     setEnvoi(true);
     setErreur(null);
@@ -276,14 +317,66 @@ export default function PaiementAttestation() {
       });
       const d = await r.json();
       if (!r.ok || !d.url) throw new Error(d?.message || "Le paiement n'a pas pu être ouvert.");
-      // Redirection plein écran plutôt qu'un nouvel onglet : sur un téléphone, un onglet
-      // ouvert en arrière-plan pendant un paiement se perd, et l'étudiant croit avoir payé
-      // dans le vide.
-      window.location.href = d.url;
+
+      if (!d.clePublique || !d.transactionId) { window.location.href = d.url; return; }
+
+      let FedaPay: any;
+      try { FedaPay = await chargerCheckout(); }
+      catch { window.location.href = d.url; return; }
+
+      setTransaction(d);
+      setReplie(true);
+      // Laisser React poser le cadre avant que l'opérateur ne s'y installe.
+      setTimeout(() => {
+        try {
+          FedaPay.init("#cadre-paiement", {
+            public_key: d.clePublique,
+            environment: d.environnement === "live" ? "live" : "sandbox",
+            locale: "fr",
+            container: "#cadre-paiement",
+            // L'identifiant suffit : la transaction existe déjà, avec son montant.
+            transaction: { id: Number(d.transactionId), amount: d.montant, description: "Attestation" },
+            currency: { iso: d.devise || "XOF" },
+            onComplete: (resp: any) => {
+              // Fermeture volontaire : on ne conclut pas à l'échec, la transaction reste
+              // ouverte et l'étudiant peut reprendre.
+              if (resp?.reason === (window as any).FedaPay?.DIALOG_DISMISSED) { setReplie(false); return; }
+              navigate(`/academy/paiement/${courseId}?retour=${encodeURIComponent(d.reference)}`);
+            },
+          });
+        } catch { window.location.href = d.url; }
+      }, 60);
     } catch (e: any) {
       setErreur(String(e?.message || e));
       setEnvoi(false);
     }
+  }
+
+  // Le formulaire de l'opérateur, une fois la transaction ouverte.
+  if (transaction && replie) {
+    return (
+      <div className="mx-auto max-w-5xl px-4 sm:px-8 py-10 sm:py-16">
+        <div className="border-t-2 pt-6 max-w-2xl" style={{ borderColor: accent }}>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
+            Paiement — {montant} F CFA
+          </p>
+          <h1 className="mt-3 text-xl font-semibold leading-tight">
+            {parcours.credential || "Attestation de fin de parcours"}
+          </h1>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            Formulaire sécurisé de notre opérateur de paiement. Vos identifiants ne
+            transitent jamais par nous.
+          </p>
+          {/* Hauteur généreuse : le formulaire de l'opérateur s'adapte mal à un cadre trop
+              court, et un formulaire de paiement tronqué ne se remplit pas. */}
+          <div id="cadre-paiement" className="mt-6 min-h-[520px] border border-border" />
+          <Button variant="outline" className="mt-4 min-h-11 rounded-none"
+            onClick={() => { setReplie(false); setTransaction(null); setEnvoi(false); }}>
+            Revenir au récapitulatif
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -336,9 +429,16 @@ export default function PaiementAttestation() {
               </dd>
             </dl>
 
+            {/* Les frais de l'opérateur s'ajoutent au montant — environ 256 F pour 10 000
+                relevés en Mobile Money. Les taire ferait découvrir un écart au dernier
+                écran, c'est-à-dire à l'instant précis où l'on décide de renoncer. */}
+            <p className="mt-3 text-xs leading-5 text-muted-foreground">
+              Les frais de l'opérateur s'ajoutent à ce montant et vous seront indiqués avant
+              validation.
+            </p>
             <p className="mt-5 flex items-start gap-2.5 text-xs leading-5 text-muted-foreground">
               <Smartphone className="w-4 h-4 shrink-0 mt-0.5" />
-              Mobile Money ou carte bancaire, sur la page sécurisée de l'opérateur.
+              Mobile Money ou carte bancaire, sans quitter le site.
             </p>
             <p className="mt-2.5 flex items-start gap-2.5 text-xs leading-5 text-muted-foreground">
               <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
