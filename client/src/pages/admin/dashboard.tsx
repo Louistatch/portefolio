@@ -270,6 +270,45 @@ export default function Dashboard() {
     });
   }
 
+  // ── Configuration du serveur ──
+  //
+  // Une variable absente n'affiche aucune erreur : elle éteint une fonction, et le reste
+  // du site continue comme si de rien n'était. C'est ainsi que les relances sont restées
+  // muettes des semaines. La ligne ci-dessous rend visible ce qui, sans elle, ne se
+  // découvre qu'en devinant qu'il faut regarder.
+  const manquantes = (data.configuration || []).filter((v: any) => !v.presente);
+  // FEDAPAY_ENV absente n'est pas une panne : elle vaut « sandbox », ce qui est le réglage
+  // prudent. On la signale, sans en faire une alerte.
+  const bloquantes = manquantes.filter((v: any) => v.nom !== "FEDAPAY_ENV");
+
+  if (bloquantes.length) {
+    points.push({
+      cle: "configuration",
+      ton: "grave",
+      resume: bloquantes.length === 1
+        ? `Une variable d'environnement manque : ${bloquantes[0].nom}`
+        : `${bloquantes.length} variables d'environnement manquent`,
+      detail: (
+        <>
+          <p>
+            Chacune éteint une fonction du site sans provoquer la moindre erreur visible.
+            Elles se posent dans Vercel, puis il faut <strong>redéployer</strong> : une
+            variable ajoutée ne s'applique qu'au déploiement suivant.
+          </p>
+          <ul className="space-y-1.5">
+            {bloquantes.map((v: any) => (
+              <li key={v.nom}>
+                <span className="font-mono font-semibold text-foreground">{v.nom}</span>
+                {" — "}{v.role}
+                <span className="block text-[12px] mt-0.5">{v.consequence}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ),
+    });
+  }
+
   if (enAttente.length) {
     points.push({
       cle: "attestations",
@@ -576,6 +615,49 @@ export default function Dashboard() {
               ))}
             </div>
           )}
+        </Panneau>
+
+        {/*
+          Configuration du serveur.
+          Ce panneau reste affiché quand tout va bien, et c'est délibéré : une alerte qui
+          n'apparaît qu'en cas de panne ne dit jamais « c'est en place ». Après avoir posé
+          une variable et redéployé, on veut la confirmation, pas l'absence d'alarme —
+          les deux se ressemblent trop.
+        */}
+        <Panneau titre="Configuration du serveur" className="lg:col-span-2">
+          <div className="p-3 space-y-1">
+            {(data.configuration || []).map((v: any) => (
+              <div key={v.nom} className="flex items-start gap-3 px-2 py-2">
+                <span
+                  className={`w-2 h-2 rounded-full shrink-0 mt-1.5 ${v.presente ? "bg-emerald-500" : "bg-red-500"}`}
+                  aria-hidden
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[13px] font-mono font-semibold truncate">{v.nom}</p>
+                  <p className="text-[11px] text-muted-foreground">{v.role}</p>
+                  {!v.presente && (
+                    <p className="text-[11px] text-red-700 dark:text-red-300 mt-0.5">{v.consequence}</p>
+                  )}
+                </div>
+                <span className="text-[11px] shrink-0 text-right">
+                  {/*
+                    La valeur n'est affichée que pour les réglages qui n'ont rien de secret
+                    et dont la valeur EST le renseignement — l'environnement de paiement,
+                    l'adresse du site. Le serveur ne renvoie jamais celle d'une clé.
+                  */}
+                  {v.valeur
+                    ? <span className="font-mono break-all">{v.valeur}</span>
+                    : <span className={v.presente ? "text-emerald-700 dark:text-emerald-400" : "text-red-700 dark:text-red-300"}>
+                        {v.presente ? "définie" : "absente"}
+                      </span>}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground px-5 pb-4">
+            Présence seule : aucune valeur de clé secrète n'est transmise au navigateur.
+            Une variable ajoutée dans Vercel ne s'applique qu'au déploiement suivant.
+          </p>
         </Panneau>
       </div>
     </div>

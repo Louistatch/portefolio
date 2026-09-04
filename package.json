@@ -21,7 +21,8 @@
     "verify:poids": "node script/verify-poids.mjs",
     "verify:lecons": "node script/verify-lecons.mjs",
     "verify:fedapay": "tsx script/verify-fedapay.ts",
-    "verify:support": "tsx script/verify-support.ts"
+    "verify:support": "tsx script/verify-support.ts",
+    "verify:config": "tsx script/verify-configuration.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

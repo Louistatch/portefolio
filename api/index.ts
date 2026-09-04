@@ -24,6 +24,7 @@ import {
 } from "../shared/support.js";
 import { TESTS_PARCOURS, type TestParcours } from "./program-tests.js";
 import { qrSvg, urlVerification } from "./qr.js";
+import { configurationDuServeur } from "./configuration.js";
 import {
   creerTransaction, verifierSignature, transactionEstPayee, categorieStatut, environnementFedapay,
 } from "./fedapay.js";
@@ -846,6 +847,7 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
 
   res.json({
     taches,
+    configuration: configurationDuServeur(SITE_URL),
     attestationsEnAttente: attentes,
     periode: { jours, debut: debut.toISOString(), fin: new Date(now).toISOString() },
     kpis: {

@@ -273,3 +273,18 @@ paiement puis y revient verrait son second essai refusé, sans autre message que
 
 `npm run verify:fedapay` rejoue la vérification de signature contre des en-têtes produits
 par l'algorithme du SDK officiel, et fige l'écart de statuts ci-dessus.
+
+### Voir d'un coup d'œil ce qui est configuré
+
+Le tableau de bord d'administration porte un panneau **Configuration du serveur** : une
+ligne par variable d'environnement, avec sa présence, son rôle, et — quand elle manque —
+ce qu'elle éteint. Il reste affiché quand tout va bien, délibérément : après avoir posé une
+variable et redéployé, on veut la confirmation, pas l'absence d'alarme. Les deux se
+ressemblent trop.
+
+Le panneau n'affiche **jamais** la valeur d'une clé secrète, seulement sa présence. Les
+deux seules valeurs montrées sont `FEDAPAY_ENV` — confondre `sandbox` et `live` se paie en
+argent réel — et `SITE_URL`, qui décide de l'adresse du webhook. `npm run verify:config`
+remplit l'environnement de valeurs reconnaissables et échoue si l'une d'elles ressort :
+c'est ce qui protège le jour où quelqu'un ajoutera la valeur d'une clé « juste pour
+déboguer ».
