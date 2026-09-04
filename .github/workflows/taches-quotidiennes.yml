@@ -36,6 +36,18 @@
 #      est le comportement voulu : mieux vaut un échec visible qu'un silence.
 #   2. Rien d'autre. Pas de dépendance, pas d'installation, pas de conteneur particulier.
 #
+# ── L'adresse doit porter le www, et c'est piégeux ──
+#
+# louisfarm.com répond 307 et renvoie vers www.louisfarm.com. `curl` ne suit pas les
+# redirections sans -L, et -L ne sauverait rien ici : en changeant d'hôte, curl SUPPRIME
+# l'en-tête Authorization — c'est une protection délibérée de curl, pas un défaut. Le
+# résultat, avec la première version de ce fichier, aurait été le pire possible : un 307
+# n'étant pas une erreur au sens de --fail, l'étape passait au VERT sans avoir rien
+# déclenché. Un filet qui rattrape une tâche muette en étant muet lui-même.
+#
+# D'où deux corrections : l'adresse par défaut porte le www, et le code HTTP est vérifié
+# explicitement — tout ce qui n'est pas 2xx, redirections comprises, fait échouer l'étape.
+#
 # ── Les limites, dites franchement ──
 #
 #   — Les workflows planifiés de GitHub sont au mieux approximatifs : un retard de
@@ -83,31 +95,47 @@ jobs:
       - name: Relances de vérification d'email
         id: relances
         env:
-          BASE: ${{ vars.SITE_URL || 'https://louisfarm.com' }}
+          BASE: ${{ vars.SITE_URL || 'https://www.louisfarm.com' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
-          echo "→ GET $BASE/api/cron/verify-reminders"
-          # --fail-with-body : le corps de la réponse est affiché MÊME en cas d'erreur.
-          # C'est ce corps qui porte le diagnostic ; l'avaler rendrait ce filet aussi
-          # muet que la panne qu'il rattrape.
-          curl --fail-with-body -sS --max-time 60 \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$BASE/api/cron/verify-reminders" | tee reponse.json
-          echo
+          appeler() {
+            echo "→ GET $BASE/api/cron/$1"
+            # Le corps est écrit sur disque puis affiché QUOI QU'IL ARRIVE : c'est lui
+            # qui porte le diagnostic, et l'avaler rendrait ce filet aussi muet que la
+            # panne qu'il rattrape.
+            code=$(curl -sS --max-time 60 -o reponse.json -w "%{http_code}" \
+              -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/cron/$1")
+            cat reponse.json; echo
+            if [ "$code" -ge 300 ]; then
+              echo "::error::HTTP $code sur $BASE/api/cron/$1"
+              if [ "$code" -lt 400 ]; then
+                echo "C'est une redirection. L'adresse n'est pas la bonne : curl ne la suit pas,"
+                echo "et supprimerait de toute façon l'en-tête d'autorisation en changeant d'hôte."
+                echo "Vérifiez la variable de dépôt SITE_URL — elle doit porter le www."
+              fi
+              exit 1
+            fi
+            echo "HTTP $code"
+          }
+          appeler verify-reminders
 
       - name: Alertes de retard
         # `always()` : une tâche en échec ne doit pas cacher l'état de l'autre. Les deux
         # sont indépendantes, on veut les deux verdicts.
         if: always() && steps.relances.outcome != 'skipped'
         env:
-          BASE: ${{ vars.SITE_URL || 'https://louisfarm.com' }}
+          BASE: ${{ vars.SITE_URL || 'https://www.louisfarm.com' }}
           CRON_SECRET: ${{ secrets.CRON_SECRET }}
         run: |
           echo "→ GET $BASE/api/cron/late-warnings"
-          curl --fail-with-body -sS --max-time 60 \
-            -H "Authorization: Bearer $CRON_SECRET" \
-            "$BASE/api/cron/late-warnings" | tee reponse.json
-          echo
+          code=$(curl -sS --max-time 60 -o reponse.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/cron/late-warnings")
+          cat reponse.json; echo
+          if [ "$code" -ge 300 ]; then
+            echo "::error::HTTP $code sur $BASE/api/cron/late-warnings"
+            exit 1
+          fi
+          echo "HTTP $code"
 
       - name: Lire le verdict
         if: always()
