@@ -143,6 +143,27 @@ export default function AcademyParcours() {
                 <div className="h-full rounded-full transition-all duration-500"
                   style={{ width: `${pourcent}%`, background: parcours.accent }} />
               </div>
+
+              {/* ── Le rappel de mi-parcours ──
+
+                  Troisième et dernier point d'affichage du tarif. Il apparaît une fois la
+                  moitié franchie, et pas avant : au premier jour il inquiéterait, à la fin
+                  il surprendrait. À mi-chemin, il se lit comme ce qu'il est — une échéance
+                  connue qui approche.
+
+                  Formulé en progression et non en réclamation : « il vous reste X » plutôt
+                  que « vous devrez payer ». La différence n'est pas cosmétique — la
+                  première phrase parle de ce que l'étudiant a déjà fait, la seconde de ce
+                  qu'il doit. */}
+              {parcours.prixAttestation > 0 && pourcent >= 50 && pourcent < 100 && (
+                <p className="mt-3 text-[12.5px] text-muted-foreground leading-relaxed">
+                  Vous avez passé la moitié. Votre attestation vérifiable —{" "}
+                  <span className="whitespace-nowrap font-medium text-foreground">
+                    {parcours.prixAttestation.toLocaleString("fr-FR")} F CFA
+                  </span>{" "}
+                  — vous attend à la fin du parcours.
+                </p>
+              )}
             </div>
           ) : (
             // Ne pas afficher un planning vide comme si l'étudiant avait pris du retard :

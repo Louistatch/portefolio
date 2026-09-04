@@ -37,6 +37,7 @@ export default function ProgramTest() {
   const [reponses, setReponses] = useState<Record<number, number>>({});
   const [envoi, setEnvoi] = useState(false);
   const [resultat, setResultat] = useState<any>(null);
+  const [engage, setEngage] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
   useEffect(() => {
@@ -120,6 +121,9 @@ export default function ProgramTest() {
   // ── Résultat ──
   if (resultat) {
     const admis = resultat.passed;
+    // Le tarif vient du serveur, jamais d'une constante recopiée ici : un prix écrit à
+    // deux endroits finit par différer, et c'est l'étudiant qui découvre l'écart en payant.
+    const prixAttestation = Number(resultat.prixAttestation ?? 0);
     return (
       <div className="max-w-xl mx-auto py-16 text-center">
         <div className="w-28 h-28 rounded-full mx-auto mb-6 flex flex-col items-center justify-center border-4"
@@ -144,9 +148,53 @@ export default function ProgramTest() {
             Ce parcours mène au <strong>{parcours.credential}</strong>.
           </p>
         )}
+
+        {/* ── Le tarif, annoncé au sommet de l'engagement ──
+
+            C'est ici que le prix doit être lu, et nulle part plus tard. La personne vient
+            de réussir un test et de s'entendre dire qu'elle est admise : c'est le moment
+            où elle est le plus disposée à accepter une condition, et le seul où l'annonce
+            reste honnête. À la semaine huit, la même somme découverte pour la première
+            fois se lirait comme un piège — et un seul message de ce genre circulant sur
+            WhatsApp coûte plus cher que dix inscriptions.
+
+            La case n'est pas un verrou : l'admission est déjà accordée, la retirer à qui
+            ne coche pas serait hostile. C'est un enregistrement — la date et le montant
+            affiché à cet instant — parce que le tarif changera et que ce qui a été accepté
+            ne doit pas changer avec lui. */}
+        {admis && prixAttestation > 0 && (
+          <div className="mt-7 text-left rounded-2xl border border-border/60 bg-muted/30 p-5 max-w-md mx-auto">
+            <p className="text-[13.5px] leading-relaxed">
+              <strong>La formation est gratuite.</strong> À la fin du parcours, l'attestation
+              vérifiable — à votre nom, signée, avec son code de vérification — coûte{" "}
+              <strong className="whitespace-nowrap">
+                {prixAttestation.toLocaleString("fr-FR")} F CFA
+              </strong>. Vous ne réglez rien avant de l'avoir terminé.
+            </p>
+            <label className="flex items-start gap-2.5 mt-4 cursor-pointer">
+              <input type="checkbox" className="mt-0.5 w-4 h-4 shrink-0 accent-primary"
+                checked={engage} onChange={e => setEngage(e.target.checked)} />
+              <span className="text-[13px] text-muted-foreground leading-relaxed">
+                Je m'engage à suivre {parcours.lessonsPerWeek === 1 ? "une leçon" : `${parcours.lessonsPerWeek} leçons`} par
+                semaine, et je sais que l'attestation coûte {prixAttestation.toLocaleString("fr-FR")} F CFA à la fin.
+              </span>
+            </label>
+          </div>
+        )}
+
         <div className="flex flex-wrap justify-center gap-3 mt-8">
-          <Button className="gap-2 border-0 text-white" style={{ background: accent }}
-            onClick={() => navigate(admis ? `/academy/parcours/${programId}` : "/academy/dashboard")}>
+          <Button className="gap-2 border-0 text-white disabled:opacity-50"
+            style={{ background: accent }}
+            disabled={admis && prixAttestation > 0 && !engage}
+            onClick={async () => {
+              if (admis && prixAttestation > 0 && engage) {
+                // L'enregistrement ne doit pas retenir l'étudiant : s'il échoue, on
+                // continue. Le rappel de mi-parcours reste là pour rattraper.
+                await studentFetch(`/api/academy/programs/${programId}/engagement`, { method: "POST" })
+                  .catch(() => {});
+              }
+              navigate(admis ? `/academy/parcours/${programId}` : "/academy/dashboard");
+            }}>
             {admis ? "Commencer le parcours" : "Retour à mon espace"} <ArrowRight className="w-4 h-4" />
           </Button>
         </div>

@@ -2301,14 +2301,57 @@ app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000),
     }
   }
 
+  // ── L'email d'admission ──
+  //
+  // Il n'existait pas : réussir le test d'un parcours n'envoyait rien du tout. L'étudiant
+  // avait sa page de résultat, et plus rien ensuite — aucune trace dans sa boîte, rien à
+  // rouvrir dans deux semaines quand il aura oublié où c'était. C'est le troisième point
+  // où le tarif doit apparaître, et c'était surtout un email manquant.
+  if (passed) {
+    const { data: etu } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
+    if (etu?.email) {
+      sendAcademyEmail({
+        studentId: sid, to: etu.email, type: "program_admission",
+        subject: `🎓 Admis(e) — ${parcours.title}`,
+        html: admissionParcoursEmailHtml(etu.full_name, parcours, score, admissionExpires),
+        // Une seule fois par parcours : une réadmission après expiration en renverra un,
+        // la date d'admission faisant partie de la clé.
+        dedupeKey: `prog_admission:${sid}:${programId}:${(admissionExpires ?? "").slice(0, 10)}`,
+      }).catch(() => {});
+    }
+  }
+
   res.json({
     passed, score, correct,
     programId, title: parcours.title, credential: parcours.credential,
     seuil: parcours.admission.seuil,
     nbQuestions: parcours.admission.nbQuestions,
+    // Le tarif part avec le résultat. C'est le deuxième des cinq points d'affichage, et le
+    // plus important : au sommet de l'engagement, juste après « vous êtes admis ».
+    prixAttestation: parcours.prixAttestation,
     admissionExpires,
     nextTestAllowed: passed ? null : prochainEssai,
   });
+});
+
+/**
+ * Reconnaissance du tarif par l'étudiant.
+ *
+ * Enregistrement, jamais condition : l'admission a été accordée à la réussite du test, et
+ * la retirer à qui n'a pas coché serait hostile. Ce qui est conservé, c'est la date ET le
+ * montant affiché à cet instant — sans cette copie, une hausse de tarif réécrirait
+ * rétroactivement ce que chacun avait accepté.
+ */
+app.post("/api/academy/programs/:id/engagement", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const r = parcoursAvecTest(String(req.params.id));
+  if (!r.ok) return res.status(r.statut).json({ message: r.message });
+
+  const { error } = await supabase.from("academy_program_admissions")
+    .update({ engagement_at: new Date().toISOString(), prix_annonce: r.parcours.prixAttestation })
+    .eq("student_id", sid).eq("program_id", r.parcours.id);
+  if (error) return res.status(500).json({ message: "Enregistrement impossible." });
+  res.json({ ok: true, prixAnnonce: r.parcours.prixAttestation });
 });
 
 // ── Test d'admission du cursus MEAL ──
@@ -5863,6 +5906,52 @@ function retardEmailHtml(name: string, a: ReturnType<typeof alerteDeRetard>) {
        <p class="muted">Vous pouvez répondre directement à cet email : il arrive dans une boîte lue par une personne.</p>
      </div>`
   );
+}
+
+/**
+ * Email d'admission à un parcours.
+ *
+ * ── Ce qu'il dit du tarif, et comment ──
+ *
+ * Il l'annonce, sans en faire l'objet du message. L'étudiant vient de réussir un test ;
+ * le sujet de l'email est cette réussite. Le tarif y figure comme un fait de calendrier —
+ * ce qui se passera à la fin — au même rang que la date d'expiration de l'admission.
+ *
+ * C'est tout l'intérêt de l'annoncer tôt : à ce moment-là, dix mille francs contre huit
+ * semaines de travail à venir est une information ; à la semaine huit, la même somme
+ * découverte pour la première fois serait un piège. Le nombre ne change pas, le point de
+ * comparaison si.
+ *
+ * Quand le parcours est gratuit, le bloc disparaît entièrement plutôt que d'afficher
+ * « 0 F » : une gratuité qui s'annonce comme un prix n'en est plus une.
+ */
+function admissionParcoursEmailHtml(
+  name: string, parcours: Program, score: number, expire: string | null,
+) {
+  const fin = expire
+    ? new Date(expire).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
+    : null;
+  const prix = parcours.prixAttestation;
+  return academyEmailLayout(
+    `<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div>`
+    + `<h1>Vous êtes admis(e) 🎓</h1><p class="sub">${parcours.title}</p></div>`
+    + `<div class="bd">`
+    + `<span class="badge">✅ ${score}/${parcours.admission.nbQuestions} au test d'admission</span>`
+    + `<p>Bonjour ${name},</p>`
+    + `<p>Le parcours <strong>${parcours.title}</strong> vous est ouvert. Vos premières leçons `
+    + `sont disponibles dès maintenant, au rythme d'${parcours.lessonsPerWeek === 1 ? "une leçon" : parcours.lessonsPerWeek + " leçons"} par semaine.</p>`
+    + (parcours.credential
+        ? `<div class="info"><p style="margin:0"><strong>À la clé :</strong> ${parcours.credential}</p></div>` : "")
+    + (fin ? `<p class="muted">Votre admission court jusqu'au <strong>${fin}</strong>. Passé cette date, il faudra repasser le test.</p>` : "")
+    + (prix > 0
+        ? `<div class="info" style="border-color:#bfdbfe;background:#eff6ff">`
+          + `<p style="margin:0"><strong>La formation est gratuite.</strong></p>`
+          + `<p style="margin-top:6px;font-size:14px;color:#374151">À la fin du parcours, l'attestation vérifiable — `
+          + `établie à votre nom, signée, avec son code de vérification — coûte `
+          + `<strong>${prix.toLocaleString("fr-FR")} F CFA</strong>. Vous ne réglez rien avant de l'avoir terminé.</p></div>`
+        : "")
+    + `<p style="text-align:center"><a href="${SITE_URL}/academy/parcours/${parcours.id}" class="btn">Commencer le parcours</a></p>`
+    + `</div>`);
 }
 
 function admissionResetEmailHtml(name: string, joursDeRetard: number, faites: number, total: number) {

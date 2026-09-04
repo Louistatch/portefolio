@@ -37,6 +37,7 @@ base. Lisez cette page avant d'en lancer un.
 | 26 | `academy_cron_verrou.sql` | Verrou quotidien des tâches planifiées : `unique (tache, jour)` + qui a déclenché |
 | 27 | `academy_renommage_coop.sql` | Renommage `SCOOP-01` → `COOP-01` (à ne rejouer que sur une base créée avant le renommage) |
 | 28 | `academy_paiements.sql` | Paiement de l'attestation + liste d'antériorité des inscrits sous la promesse de gratuité |
+| 29 | `academy_engagement_tarif.sql` | Date et montant du tarif reconnu à l'admission — copie datée, pour qu'une hausse ne réécrive pas ce qui a été accepté |
 
 Les trois derniers sont des **artefacts générés**, pas des sources : le contenu vit dans
 `shared/fca-01.ts`, `shared/fcq-01.ts` et `shared/coop-01.ts`, et le SQL en est la projection
