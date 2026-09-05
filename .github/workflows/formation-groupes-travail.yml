@@ -1,0 +1,83 @@
+# ══════════════════════════════════════════════════════════════
+# Constitution des équipes de travaux de groupe
+#
+# ── Pourquoi ce workflow ──
+#
+# La formation d'une équipe n'avait lieu qu'en effet de bord d'une visite étudiante (tableau
+# de bord ou page « Travaux de groupe ») : tant qu'aucun membre de la cohorte n'ouvrait l'une
+# de ces deux pages après le passage de sa semaine 3, l'équipe ne se tirait jamais au sort —
+# aucune erreur, juste rien qui se passe. Ce workflow appelle la même logique chaque jour,
+# pour chaque étudiant admis au cursus MEAL, indépendamment de ce qu'un étudiant choisit
+# d'ouvrir.
+#
+# Vercel (offre gratuite) n'accepte que deux tâches planifiées dans vercel.json — déjà prises.
+# Comme pour classement-hebdo.yml et correction-ia-group-work.yml, GitHub Actions est donc le
+# SEUL ordonnanceur de cette tâche, avec ses propres journaux (onglet Actions du dépôt).
+#
+# ── Ce qu'il faut pour qu'il fonctionne ──
+#
+#   Le même secret de dépôt CRON_SECRET que les trois autres workflows.
+#
+# ── L'adresse doit porter le www ──
+#
+# louisfarm.com répond 307 vers www.louisfarm.com ; curl ne suit pas les redirections sans
+# -L, et -L supprimerait l'en-tête Authorization en changeant d'hôte. D'où l'adresse par
+# défaut avec www, et la vérification explicite du code HTTP.
+# ══════════════════════════════════════════════════════════════
+name: Formation des équipes de travaux de groupe
+
+on:
+  schedule:
+    # 09h15 UTC — avant les autres tâches quotidiennes, puisque la correction IA (10h00)
+    # et l'usage normal du site dépendent d'équipes déjà constituées.
+    - cron: "15 9 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: formation-groupes-travail
+  cancel-in-progress: false
+
+jobs:
+  former:
+    name: Constituer les équipes en attente
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Vérifier que le secret est en place
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Le secret de dépôt CRON_SECRET est absent."
+            echo "Settings → Secrets and variables → Actions → New repository secret,"
+            echo "nom CRON_SECRET, avec la même valeur que la variable d'environnement"
+            echo "CRON_SECRET côté hébergeur."
+            exit 1
+          fi
+          echo "Secret présent."
+
+      - name: Lancer la formation des équipes
+        env:
+          BASE: ${{ vars.SITE_URL || 'https://www.louisfarm.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -sS --max-time 120 -o reponse.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/cron/formation-groupes-travail")
+          cat reponse.json; echo
+          if [ "$code" -ge 300 ]; then
+            echo "::error::HTTP $code sur $BASE/api/cron/formation-groupes-travail"
+            if [ "$code" -lt 400 ]; then
+              echo "C'est une redirection : l'adresse n'est pas la bonne (il manque le www),"
+              echo "ou la variable de dépôt SITE_URL ne le porte pas."
+            fi
+            exit 1
+          fi
+          echo "HTTP $code"
+
+      - name: Lire le verdict
+        if: always()
+        run: |
+          echo "\"ignoree\": true signifie qu'aucun travail de groupe n'est encore publié —"
+          echo "ce n'est pas un échec. Sinon, le corps de la réponse donne etudiantsEligibles"
+          echo "(en semaine 2 ou moins depuis leur admission MEAL), traites, et echecs."
