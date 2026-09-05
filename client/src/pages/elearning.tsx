@@ -534,7 +534,6 @@ export default function ELearning() {
     const seuil = pageData?.seuilAdmission ?? 21;
     const questions = pageData?.questionsTest ?? QUESTIONS.length;
     const mois = pageData?.moisAcces ?? 3;   // ADMISSION_MONTHS côté serveur
-    const seuilEx = pageData?.seuilExercices ?? 70;
     const connecte = isStudentLoggedIn();
     // Une seule vérité pour le mois de démarrage annoncé : la session ouverte s'il y en a une,
     // sinon la prochaine. Le calendrier, le bandeau d'avis et l'appel final la partagent.
@@ -719,7 +718,7 @@ export default function ELearning() {
             <div className="grid sm:grid-cols-2 lg:grid-cols-4 divide-y sm:divide-y-0 lg:divide-x divide-border">
               {[
                 ["1 · Admission", `Test corrigé côté serveur — la clé de réponses ne quitte jamais le serveur. Échec : une nouvelle tentative après sept jours.`],
-                ["2 · Leçons", `Exercices « faire faire », corrigés à la réponse produite, ${seuilEx} % pour valider. Une leçon ne se valide pas en cliquant.`],
+                ["2 · Leçons", `Exercices « à vous de jouer » chronométrés, à faire une seule fois : la note reflète directement les réponses produites. Une leçon ne se valide pas en cliquant.`],
                 ["3 · Travaux de groupe", "Trois rendus collectifs notés sur 100 par grille, plus l'évaluation des coéquipiers sur quatre critères."],
                 ["4 · Certificat", "Numéro unique et page de vérification publique. Un recruteur contrôle sans passer par vous."],
               ].map(([titre, texte]) => (
@@ -761,7 +760,7 @@ export default function ELearning() {
             <CarteValeur icone={Target} titre="Compétences recherchées"
               texte="KoboCollect, QGIS et Python figurent dans la plupart des offres MEAL." />
             <CarteValeur icone={ClipboardCheck} titre="Apprentissage par la pratique"
-              texte={`Les exercices sont notés : il faut ${seuilEx} % pour valider une leçon.`} />
+              texte="Les exercices « à vous de jouer » sont chronométrés et notés sur vos réponses réelles, en un seul passage." />
             <CarteValeur icone={Clock} titre="Flexibilité"
               texte={`${mois} mois d'accès, à votre rythme, sans horaire imposé.`} />
             <CarteValeur icone={Rocket} titre="Ouverture de carrières"
@@ -844,7 +843,7 @@ export default function ELearning() {
             </div>
             <div>
               <Etape n={4} titre="Vous progressez, vous êtes noté(e)"
-                texte={`Chaque leçon se valide par ses exercices, à ${seuilEx} % minimum. La leçon suivante s'ouvre alors, et un e-mail vous le signale.`} />
+                texte="Chaque leçon se valide par son quiz chronométré « à vous de jouer », passé une seule fois. La leçon suivante s'ouvre alors, et un e-mail vous le signale." />
               <Etape n={5} titre="Vous obtenez votre attestation"
                 texte="Une attestation par module terminé, et un certificat final à l'issue des trois. Chacun porte un code de vérification." />
               <div className="flex gap-3.5">

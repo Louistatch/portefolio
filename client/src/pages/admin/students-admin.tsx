@@ -33,6 +33,10 @@ export default function AdminStudents() {
     queryKey: ["academy-stats"],
     queryFn: async () => (await adminFetch("/api/admin/academy/stats")).json(),
   });
+  const { data: leaderboard } = useQuery<{ student_id: number; full_name: string; total: number }[]>({
+    queryKey: ["academy-leaderboard"],
+    queryFn: async () => (await adminFetch("/api/admin/academy/leaderboard")).json(),
+  });
   const { data: students, isLoading, isError, refetch } = useQuery<Student[]>({
     queryKey: ["academy-students"],
     queryFn: async () => (await adminFetch("/api/admin/academy/students")).json(),
@@ -164,6 +168,22 @@ export default function AdminStudents() {
         </div>
       )}
 
+      {/* Top 10 — cumul des points, tous cours confondus */}
+      {leaderboard && leaderboard.length > 0 && (
+        <div className="bg-card rounded-2xl border border-border/50 p-5">
+          <div className="flex items-center gap-2 mb-3"><Trophy className="w-4 h-4 text-primary" /><h3 className="text-sm font-semibold">Top 10 de la promotion (cumul des points)</h3></div>
+          <div className="divide-y divide-border/30">
+            {leaderboard.map((s, i) => (
+              <div key={s.student_id} className="flex items-center gap-3 py-2">
+                <span className={`w-6 text-center text-xs font-bold shrink-0 ${i < 3 ? "text-primary" : "text-muted-foreground"}`}>{i + 1}</span>
+                <span className="flex-1 text-sm truncate">{s.full_name}</span>
+                <span className="text-sm font-semibold chiffres-tabulaires">{s.total} pts</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Search + filters */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="relative flex-1 min-w-[200px]">
@@ -292,6 +312,29 @@ export default function AdminStudents() {
                   {!detail.student.admitted_at && <Button size="sm" className="gap-1.5" onClick={() => action.mutate({ id: detail.student.id, act: "admit" })}><UserCheck className="w-3.5 h-3.5" /> Admettre</Button>}
                   {!detail.student.admitted_at && <Button size="sm" variant="outline" className="gap-1.5" onClick={() => action.mutate({ id: detail.student.id, act: "reset_test" })}><RotateCcw className="w-3.5 h-3.5" /> Autoriser une nouvelle tentative</Button>}
                 </div>
+
+                {/* Progression par cours — l'inscription porte le pourcentage réel de leçons
+                    terminées, quand le graphe ci-dessous ne trace que les notes obtenues :
+                    un étudiant à 40 % de progression mais sans exercice raté ne se voyait
+                    nulle part avant cette liste. */}
+                {detail.enrollments?.length > 0 && (
+                  <div>
+                    <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5"><BookOpen className="w-4 h-4 text-primary" /> Progression par cours</h3>
+                    <div className="space-y-2">
+                      {detail.enrollments.map((e: any) => (
+                        <div key={e.course_id} className="bg-muted/40 rounded-lg px-3 py-2">
+                          <div className="flex items-center justify-between text-xs mb-1.5">
+                            <span className="truncate flex-1 font-medium">{e.sms_courses?.title || e.sms_courses?.code || "Cours"}</span>
+                            <span className="font-semibold ml-2 shrink-0">{e.progress ?? 0}%</span>
+                          </div>
+                          <div className="h-1.5 rounded-full bg-border/60 overflow-hidden">
+                            <div className="h-full rounded-full bg-primary" style={{ width: `${Math.min(100, e.progress ?? 0)}%` }} />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {/* Graphe notes */}
                 {chartData.length > 0 && (

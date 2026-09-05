@@ -284,7 +284,13 @@ export default function AcademyProfile() {
       {/* Relevé de notes (transcript) */}
       {transcript && transcript.grades?.length > 0 && (
         <section className="bg-card rounded-2xl border border-border/50 p-6 mb-5">
-          <h2 className="font-semibold mb-4 flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> Relevé de notes</h2>
+          <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+            <h2 className="font-semibold flex items-center gap-2"><FileText className="w-4 h-4 text-primary" /> Relevé de notes</h2>
+            <Button size="sm" variant="outline" className="gap-1.5"
+              onClick={() => downloadStudentFile("/api/academy/transcript/pdf", "releve-de-notes").catch(() => alert("Téléchargement impossible, réessayez."))}>
+              <Download className="w-3.5 h-3.5" /> PDF
+            </Button>
+          </div>
           <div className="flex items-center gap-4 mb-4 flex-wrap">
             <div className="bg-primary/10 rounded-xl px-4 py-2">
               <p className="text-xs text-muted-foreground">Moyenne générale</p>

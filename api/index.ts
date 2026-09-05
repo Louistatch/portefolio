@@ -3386,7 +3386,6 @@ app.get("/api/academy/landing", async (_req, res) => {
     seuilAdmission: ADMISSION_PASS_SCORE,
     questionsTest: 30,
     moisAcces: ADMISSION_MONTHS,
-    seuilExercices: EXERCISE_PASS_PCT,
     // Les chiffres portent sur les modules RÉELLEMENT présentés, pas sur tout le catalogue.
     // La base contient aussi des cours hors cursus MEAL (formations de formateurs, par
     // exemple) : les compter ici afficherait « 4 modules » au-dessus de trois cartes, et
@@ -4850,8 +4849,8 @@ app.post("/api/admin/academy/late-students/reset", requireAuth, async (req, res)
 });
 
 // ── Relevé de notes complet (transcript WQU) ──
-app.get("/api/academy/transcript", requireStudent, async (req, res) => {
-  const sid = (req as any).student.sid;
+/** Construit le relevé de notes d'un étudiant — factorisé pour servir à la fois le JSON et le PDF. */
+async function construireTranscript(sid: number) {
   const { data: grades } = await supabase.from("grades")
     .select("*, sms_courses(code, title)").eq("student_id", sid).order("graded_at", { ascending: true });
   const { data: stud } = await supabase.from("students")
@@ -4873,7 +4872,114 @@ app.get("/api/academy/transcript", requireStudent, async (req, res) => {
   }
   const courseAverages = Object.values(byCourse).map(v => ({ code: v.code, title: v.title, average: Math.round(v.sum / v.n) }));
   const overall = arr.length ? Math.round(arr.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / arr.length) : 0;
-  res.json({ student: stud, grades: arr, courseAverages, overall, totalGrades: arr.length });
+  return { student: stud, grades: arr, courseAverages, overall, totalGrades: arr.length };
+}
+
+app.get("/api/academy/transcript", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  res.json(await construireTranscript(sid));
+});
+
+/**
+ * Relevé de notes en PDF — texte pur, pas de décor à rasteriser.
+ *
+ * Contrairement au certificat (SVG → PNG → pdf-lib + fontkit, ~2,45 Mo à froid mesurés), ce
+ * document n'embarque aucune police maison : Helvetica standard suffit, son encodage WinAnsi
+ * couvre les caractères accentués du français, donc seul pdf-lib est chargé — pas de fontkit,
+ * pas de sharp, pas de police à charger dans le PDF.
+ */
+async function transcriptPdf(t: Awaited<ReturnType<typeof construireTranscript>>): Promise<Buffer> {
+  const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  const gras = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const normal = await pdf.embedFont(StandardFonts.Helvetica);
+
+  const LARGEUR = 595.28, HAUTEUR = 841.89; // A4 portrait, en points
+  const MARGE = 50;
+  const noir = rgb(0.06, 0.09, 0.16);
+  const gris = rgb(0.42, 0.46, 0.53);
+  const accent = rgb(0.05, 0.58, 0.53);
+  const rouge = rgb(0.74, 0.18, 0.18);
+  const ambre = rgb(0.82, 0.55, 0.06);
+  const filet = rgb(0.85, 0.87, 0.90);
+
+  let page = pdf.addPage([LARGEUR, HAUTEUR]);
+  let y = HAUTEUR - MARGE;
+
+  function nouvellePage() { page = pdf.addPage([LARGEUR, HAUTEUR]); y = HAUTEUR - MARGE; }
+  function placeDispo(besoin = 20) { if (y < MARGE + besoin) nouvellePage(); }
+  function texte(s: string, x: number, taille: number, police = normal, couleur = noir) {
+    page.drawText(s, { x, y, size: taille, font: police, color: couleur });
+  }
+  function tronque(s: string, n: number) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+  texte("LouisFarm Learning", MARGE, 11, gras, accent);
+  y -= 24;
+  texte("Relevé de notes", MARGE, 22, gras, noir);
+  y -= 22;
+  texte(t.student?.full_name || "—", MARGE, 13, gras, noir);
+  y -= 16;
+  texte(`Généré le ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`, MARGE, 10, normal, gris);
+  y -= 32;
+
+  texte(`Moyenne générale : ${t.overall} %`, MARGE, 13, gras, accent);
+  y -= 16;
+  texte(`${t.totalGrades} évaluation${t.totalGrades > 1 ? "s" : ""} enregistrée${t.totalGrades > 1 ? "s" : ""}`, MARGE, 10, normal, gris);
+  y -= 30;
+
+  if (t.courseAverages.length) {
+    texte("Moyenne par cours", MARGE, 13, gras, noir);
+    y -= 20;
+    for (const ca of t.courseAverages) {
+      placeDispo();
+      texte(tronque(ca.title, 60), MARGE, 10.5, normal, noir);
+      texte(`${ca.average} %`, LARGEUR - MARGE - 40, 10.5, gras, accent);
+      y -= 18;
+    }
+    y -= 12;
+  }
+
+  placeDispo(40);
+  texte("Détail des évaluations", MARGE, 13, gras, noir);
+  y -= 20;
+  const colDate = MARGE, colCours = MARGE + 75, colIntitule = MARGE + 160, colScore = LARGEUR - MARGE - 95;
+  texte("Date", colDate, 9, gras, gris);
+  texte("Cours", colCours, 9, gras, gris);
+  texte("Évaluation", colIntitule, 9, gras, gris);
+  texte("Score", colScore, 9, gras, gris);
+  y -= 6;
+  page.drawLine({ start: { x: MARGE, y }, end: { x: LARGEUR - MARGE, y }, thickness: 0.5, color: filet });
+  y -= 14;
+
+  for (const g of t.grades) {
+    placeDispo();
+    const pct = Math.round(Number(g.score) / Number(g.max_score) * 100);
+    const date = (g as any).graded_at ? new Date((g as any).graded_at).toLocaleDateString("fr-FR") : "—";
+    const cours = (g as any).sms_courses?.code || ((g as any).type === "group_work" ? "GW" : "ADM");
+    const couleurScore = pct >= 70 ? accent : pct >= 50 ? ambre : rouge;
+    texte(date, colDate, 9.5, normal, gris);
+    texte(cours, colCours, 9.5, normal, noir);
+    texte(tronque(g.title || "—", 32), colIntitule, 9.5, normal, noir);
+    texte(`${g.score}/${g.max_score} (${pct}%)`, colScore, 9.5, gras, couleurScore);
+    y -= 16;
+  }
+
+  if (!t.grades.length) { texte("Aucune évaluation enregistrée pour le moment.", MARGE, 10, normal, gris); }
+
+  return Buffer.from(await pdf.save());
+}
+
+app.get("/api/academy/transcript/pdf", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const transcript = await construireTranscript(sid);
+  if (!transcript.student) return res.status(404).json({ message: "Étudiant introuvable." });
+  const pdf = await transcriptPdf(transcript);
+  const nomFichier = String(transcript.student.full_name || "etudiant")
+    .normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    .replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="Releve_de_notes_${nomFichier}.pdf"`);
+  res.send(pdf);
 });
 
 // ── Demander une attestation ──
@@ -6119,6 +6225,30 @@ app.get("/api/admin/academy/stats", requireAuth, async (_req, res) => {
     pendingAttestations: attestations.count || 0,
     courses: courses.count || 0,
   });
+});
+
+// ── Classement de la promotion : cumul des points, tous cours confondus ──
+//
+// « Cumul » et non « moyenne » : un étudiant sur cinq cours pèse plus qu'un étudiant sur un
+// seul, et c'est voulu — c'est un tableau d'assiduité et de volume, pas une moyenne pondérée
+// qui favoriserait quelqu'un n'ayant tenté qu'une leçon facile. Agrégé ici en JS plutôt qu'en
+// SQL : la table `grades` reste modeste (quelques centaines de lignes au plus), et supabase-js
+// n'exprime pas un GROUP BY sans fonction Postgres dédiée à écrire et maintenir pour ça seul.
+app.get("/api/admin/academy/leaderboard", requireAuth, async (_req, res) => {
+  const { data: grades } = await supabase.from("grades").select("student_id, score");
+  const totaux = new Map<number, number>();
+  for (const g of grades || []) {
+    totaux.set(g.student_id, (totaux.get(g.student_id) || 0) + Number(g.score || 0));
+  }
+  const ids = [...totaux.keys()];
+  if (!ids.length) return res.json([]);
+  const { data: eleves } = await supabase.from("students").select("id, full_name").in("id", ids);
+  const noms = new Map((eleves || []).map((e: any) => [e.id, e.full_name]));
+  const classement = [...totaux.entries()]
+    .map(([student_id, total]) => ({ student_id, full_name: noms.get(student_id) || "—", total }))
+    .sort((a, b) => b.total - a.total)
+    .slice(0, 10);
+  res.json(classement);
 });
 
 

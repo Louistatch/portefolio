@@ -367,7 +367,7 @@ export default function AcademyDashboard() {
         <section className="mb-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold flex items-center gap-2"><TrendingUp className="w-5 h-5 text-primary" /> Mon relevé de notes</h2>
-            <button onClick={() => navigate("/academy/profile")} className="text-xs text-primary hover:underline flex items-center gap-1">Détail complet <ChevronRight className="w-3 h-3" /></button>
+            <button onClick={() => navigate("/academy/grades")} className="text-xs text-primary hover:underline flex items-center gap-1">Détail complet <ChevronRight className="w-3 h-3" /></button>
           </div>
           <div className="bg-card rounded-2xl border border-border/50 p-5">
             <div className="flex gap-3 flex-wrap mb-4">
