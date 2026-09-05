@@ -6588,9 +6588,14 @@ async function classementPoints(idsCours?: number[]): Promise<{ student_id: numb
   }
   const ids = [...totaux.keys()];
   if (!ids.length) return [];
-  const { data: eleves } = await supabase.from("students").select("id, full_name").in("id", ids);
+  const { data: eleves } = await supabase.from("students").select("id, full_name, exclude_from_leaderboard").in("id", ids);
   const noms = new Map((eleves || []).map((e: any) => [e.id, e.full_name]));
+  // Un compte de test ou d'administration (exclude_from_leaderboard) garde ses notes — utiles
+  // pour vérifier que la notation fonctionne — mais ne doit apparaître dans aucun classement :
+  // il n'est pas en compétition avec la promotion qu'il sert à tester.
+  const exclus = new Set((eleves || []).filter((e: any) => e.exclude_from_leaderboard).map((e: any) => e.id));
   return [...totaux.entries()]
+    .filter(([student_id]) => !exclus.has(student_id))
     .map(([student_id, total]) => ({ student_id, full_name: noms.get(student_id) || "—", total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 10);
