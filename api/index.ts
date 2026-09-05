@@ -15,7 +15,8 @@ import {
   plafondDeNote, resultatsSansCorrection,
 } from "../shared/exercises.js";
 import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
-import { leconOuverte } from "../shared/rythme.js";
+import { leconOuverte, semainesNecessaires, FENETRE_ADMISSION_SEMAINES } from "../shared/rythme.js";
+import { validerLecon, idsExercices } from "../shared/valider-cours.js";
 import { raisonDeNePasNotifier, FENETRE_NOTIF_FORUM_MS } from "../shared/notifications.js";
 import { RETARD_EXCLUSION_JOURS, RETARD_PALIERS, alerteDeRetard } from "../shared/retard.js";
 import {
@@ -4921,19 +4922,124 @@ app.get("/api/academy/my-credentials", requireStudent, async (req, res) => {
 });
 
 
-// ── ADMIN : créer un cours + notifier les étudiants par email ──
-app.post("/api/admin/academy/courses", requireAuth, async (req, res) => {
-  const { code, title, description, tools, level, total_lessons, notify } = req.body;
-  if (!code || !title) return res.status(400).json({ message: "Code et titre requis" });
+// ══════════════ ADMIN : auteur de cours ══════════════
+//
+// Jusqu'ici, publier un cours demandait d'écrire du TypeScript (shared/<code>.ts), de le
+// projeter en SQL (script/generate-<code>-sql.ts) et de déployer. Cette route existait déjà
+// mais s'arrêtait à la création d'un cours vide, sans leçon, sans validation du préfixe, et
+// publiait immédiatement (`is_published: true`, `notify` pouvait mailer toute la
+// promotion) — un cours à moitié écrit pouvait donc partir en production dans le même
+// geste que sa création. Aucun écran ne l'appelait : elle n'a jamais servi.
+//
+// Ce que les routes ci-dessous ouvrent : ajouter un COURS à un PARCOURS EXISTANT, avec ses
+// leçons et ses exercices corrigés, depuis le panneau d'administration. Ce qu'elles
+// n'ouvrent PAS : créer un nouveau PARCOURS — nouveau prix, nouvelle banque de questions
+// d'admission, nouvelle couleur d'accent séparable sous daltonisme — qui reste une décision
+// de produit, pas seulement de contenu, et donc un changement de code (shared/programs.ts).
+//
+// La garantie du pipeline TypeScript est reconstruite ici plutôt que contournée :
+// shared/valider-cours.ts refuse toute leçon dont la correction ne rend pas 100 % avec sa
+// propre clé, ou dont un exercice n'a pas d'explication — les deux contrôles que
+// script/generate-*-sql.ts fait depuis un terminal, appliqués maintenant à l'écriture.
+
+/**
+ * Le calendrier tient-il encore, une fois ce cours compté ?
+ *
+ * Même formule que script/verify-rythme.ts, mais lue en base plutôt que dans les tableaux
+ * de tailles figés au build : un cours créé depuis ce panneau n'a pas de source
+ * TypeScript, verify:rythme ne le verra jamais. C'est ici, et nulle part ailleurs, que la
+ * fenêtre d'admission de treize semaines reste gardée pour un cours auteuré en base.
+ * Un avertissement, pas un refus : l'admin peut avoir une raison d'aller au-delà.
+ */
+async function avertissementRythme(programId: string): Promise<string | null> {
+  const parcours = programById(programId);
+  if (!parcours) return null;
+  const { data: cours } = await supabase.from("sms_courses").select("code, total_lessons");
+  const tailles = (cours || [])
+    .filter((c: any) => programOf(c.code)?.id === programId)
+    .map((c: any) => c.total_lessons || 0);
+  const semaines = semainesNecessaires(tailles, parcours.lessonsPerWeek);
+  if (semaines <= FENETRE_ADMISSION_SEMAINES) return null;
+  return `La dernière leçon de ce parcours s'ouvrirait en semaine ${semaines}, au-delà de la `
+    + `fenêtre d'admission de ${FENETRE_ADMISSION_SEMAINES} semaines : un étudiant admis ne `
+    + "pourrait jamais l'atteindre.";
+}
+
+app.get("/api/admin/academy/courses", requireAuth, async (_req, res) => {
   const { data, error } = await supabase.from("sms_courses")
-    .insert({ code, title, description, tools, level: level || "debutant", total_lessons: total_lessons || 0,
-              order_index: 99, is_published: true })
+    .select("id, code, title, description, tools, level, total_lessons, order_index, is_published, created_at")
+    .order("order_index", { ascending: true });
+  if (error) return res.status(500).json({ message: error.message });
+  res.json((data || []).map((c: any) => ({ ...c, programId: programOf(c.code)?.id ?? null })));
+});
+
+app.post("/api/admin/academy/courses", requireAuth, async (req, res) => {
+  const { code, title, description, tools, level, is_published, notify } = req.body;
+  if (!code || !title) return res.status(400).json({ message: "Code et titre requis." });
+
+  const programId = programOf(code)?.id;
+  if (!programId) {
+    return res.status(400).json({
+      message: `Aucun parcours ne reconnaît le préfixe de « ${code} ». Créer un nouveau `
+        + "parcours (prix, test d'admission, couleur) reste un changement de code, pas de "
+        + "contenu — voir shared/programs.ts.",
+    });
+  }
+
+  const { data: existant } = await supabase.from("sms_courses").select("id").eq("code", code).maybeSingle();
+  if (existant) return res.status(409).json({ message: `Le code « ${code} » est déjà utilisé.` });
+
+  const { data: max } = await supabase.from("sms_courses")
+    .select("order_index").order("order_index", { ascending: false }).limit(1).maybeSingle();
+
+  const { data, error } = await supabase.from("sms_courses")
+    .insert({
+      code, title, description: description || "", tools: tools || [], level: level || "debutant",
+      total_lessons: 0, order_index: (max?.order_index ?? 0) + 1, is_published: !!is_published,
+    })
     .select().single();
   if (error) return res.status(400).json({ message: error.message });
 
-  // Notifier tous les étudiants actifs ayant accepté les emails de cours (idempotent par étudiant/cours)
-  const notified = notify ? await notifyNewCourseEmails({ id: data.id, code, title, description }) : 0;
-  res.status(201).json({ course: data, notified: !!notify, notifiedCount: notified });
+  // Notifier n'a de sens que si le cours est publié : mailer la promotion pour un cours
+  // encore vide, sans une seule leçon, serait la relance qui n'apprend rien à personne.
+  const notified = (notify && data.is_published)
+    ? await notifyNewCourseEmails({ id: data.id, code, title, description }) : 0;
+  res.status(201).json({
+    course: data, programId, notifiedCount: notified,
+    avertissementRythme: await avertissementRythme(programId),
+  });
+});
+
+app.put("/api/admin/academy/courses/:id", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  // Le code décide du parcours et figure sur les certificats déjà émis : le changer
+  // déplacerait silencieusement un cours d'un parcours à l'autre. Il ne s'édite pas ici —
+  // supprimer et recréer est le chemin volontairement plus lourd pour un geste qui l'est.
+  const { title, description, tools, level, order_index, is_published } = req.body;
+  const update: Record<string, any> = {};
+  if (title !== undefined) update.title = title;
+  if (description !== undefined) update.description = description;
+  if (tools !== undefined) update.tools = tools;
+  if (level !== undefined) update.level = level;
+  if (order_index !== undefined) update.order_index = order_index;
+  if (is_published !== undefined) update.is_published = is_published;
+  if (!Object.keys(update).length) return res.status(400).json({ message: "Rien à modifier." });
+
+  const { data, error } = await supabase.from("sms_courses").update(update).eq("id", id).select().single();
+  if (error) return res.status(400).json({ message: error.message });
+  res.json(data);
+});
+
+app.delete("/api/admin/academy/courses/:id", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { count } = await supabase.from("enrollments").select("id", { count: "exact", head: true }).eq("course_id", id);
+  if (count) return res.status(409).json({ message: `${count} étudiant(s) inscrit(s) à ce cours : suppression refusée.` });
+
+  const { error: errLecons } = await supabase.from("sms_lessons").delete().eq("course_id", id);
+  if (errLecons) return res.status(400).json({ message: errLecons.message });
+  const { error } = await supabase.from("sms_courses").delete().eq("id", id);
+  if (error) return res.status(400).json({ message: error.message });
+  res.json({ message: "Cours supprimé." });
 });
 
 // ── ADMIN : notifier manuellement d'un cours existant ──
@@ -4945,6 +5051,96 @@ app.post("/api/admin/academy/notify-course/:id", requireAuth, async (req, res) =
   res.json({ message: `Notification envoyée à ${count} étudiant(s)`, count });
 });
 
+// ── Leçons d'un cours : contenu ET clés de correction, réservé à l'admin ──
+//
+// Contrairement à ce que le navigateur d'un étudiant reçoit (stripExerciseAnswers), ces
+// routes renvoient les cellules complètes, réponse comprise — c'est précisément ce qu'un
+// auteur doit pouvoir relire et corriger.
+
+app.get("/api/admin/academy/courses/:id/lessons", requireAuth, async (req, res) => {
+  const courseId = Number(req.params.id);
+  const { data, error } = await supabase.from("sms_lessons")
+    .select("id, course_id, title, content, type, points, order_index")
+    .eq("course_id", courseId).order("order_index", { ascending: true });
+  if (error) return res.status(500).json({ message: error.message });
+  res.json(data);
+});
+
+app.post("/api/admin/academy/courses/:id/lessons", requireAuth, async (req, res) => {
+  const courseId = Number(req.params.id);
+  const { title, points, order_index, cellules } = req.body;
+
+  const { data: course } = await supabase.from("sms_courses").select("id, code").eq("id", courseId).maybeSingle();
+  if (!course) return res.status(404).json({ message: "Cours introuvable." });
+
+  // Un identifiant d'exercice sert de clé de correction : un doublon avec une AUTRE leçon
+  // du même cours écraserait l'une des deux réponses au moment de noter.
+  const { data: autres } = await supabase.from("sms_lessons").select("content").eq("course_id", courseId);
+  const idsAilleurs = new Set((autres || []).flatMap((l: any) => idsExercices(l.content?.cells || [])));
+
+  const verdict = validerLecon({ titre: title, cellules: cellules || [] }, idsAilleurs);
+  if (!verdict.ok) return res.status(400).json({ message: "Leçon invalide.", erreurs: verdict.erreurs });
+
+  const { data: max } = await supabase.from("sms_lessons").select("order_index")
+    .eq("course_id", courseId).order("order_index", { ascending: false }).limit(1).maybeSingle();
+
+  const { data, error } = await supabase.from("sms_lessons")
+    .insert({
+      course_id: courseId, title, content: { cells: cellules }, type: "lesson",
+      points: points || 100, order_index: order_index ?? (max?.order_index ?? 0) + 1,
+    })
+    .select().single();
+  if (error) return res.status(400).json({ message: error.message });
+
+  const { count } = await supabase.from("sms_lessons").select("id", { count: "exact", head: true }).eq("course_id", courseId);
+  await supabase.from("sms_courses").update({ total_lessons: count || 0 }).eq("id", courseId);
+
+  const programId = programOf(course.code)?.id;
+  res.status(201).json({
+    lesson: data,
+    avertissementRythme: programId ? await avertissementRythme(programId) : null,
+  });
+});
+
+app.put("/api/admin/academy/lessons/:id", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { title, points, order_index, cellules } = req.body;
+
+  const { data: lecon } = await supabase.from("sms_lessons").select("course_id").eq("id", id).maybeSingle();
+  if (!lecon) return res.status(404).json({ message: "Leçon introuvable." });
+
+  const { data: autres } = await supabase.from("sms_lessons").select("id, content")
+    .eq("course_id", lecon.course_id).neq("id", id);
+  const idsAilleurs = new Set((autres || []).flatMap((l: any) => idsExercices(l.content?.cells || [])));
+
+  const verdict = validerLecon({ titre: title, cellules: cellules || [] }, idsAilleurs);
+  if (!verdict.ok) return res.status(400).json({ message: "Leçon invalide.", erreurs: verdict.erreurs });
+
+  const update: Record<string, any> = { content: { cells: cellules } };
+  if (title !== undefined) update.title = title;
+  if (points !== undefined) update.points = points;
+  if (order_index !== undefined) update.order_index = order_index;
+
+  const { data, error } = await supabase.from("sms_lessons").update(update).eq("id", id).select().single();
+  if (error) return res.status(400).json({ message: error.message });
+  res.json(data);
+});
+
+app.delete("/api/admin/academy/lessons/:id", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { data: lecon } = await supabase.from("sms_lessons").select("course_id").eq("id", id).maybeSingle();
+  if (!lecon) return res.status(404).json({ message: "Leçon introuvable." });
+
+  const { count } = await supabase.from("lesson_progress").select("id", { count: "exact", head: true }).eq("lesson_id", id);
+  if (count) return res.status(409).json({ message: `${count} progression(s) d'étudiant enregistrée(s) sur cette leçon : suppression refusée.` });
+
+  const { error } = await supabase.from("sms_lessons").delete().eq("id", id);
+  if (error) return res.status(400).json({ message: error.message });
+
+  const { count: total } = await supabase.from("sms_lessons").select("id", { count: "exact", head: true }).eq("course_id", lecon.course_id);
+  await supabase.from("sms_courses").update({ total_lessons: total || 0 }).eq("id", lecon.course_id);
+  res.json({ message: "Leçon supprimée." });
+});
 
 // ── ADMIN : diagnostic de la configuration email ──
 app.get("/api/admin/academy/email-status", requireAuth, async (_req, res) => {

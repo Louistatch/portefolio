@@ -26,6 +26,22 @@ export const SEMAINE_MS = 7 * 24 * 60 * 60 * 1000;
  */
 export const AVANCE_MAX_MS = 1 * SEMAINE_MS;
 
+/** Fenêtre d'admission, en semaines. Voir ADMISSION_MONTHS dans shared/programs.ts. */
+export const FENETRE_ADMISSION_SEMAINES = 13;
+
+/**
+ * Semaine à laquelle s'ouvre la dernière leçon d'un parcours, cours après cours.
+ *
+ * C'est le calcul que script/verify-rythme.ts fait pour chaque parcours écrit en
+ * TypeScript, à partir de tableaux de tailles figés à la compilation. Ici, la même formule
+ * sert à l'API admin quand un cours est créé ou modifié EN BASE, sans passer par le
+ * TypeScript — le contrôle doit donc rester vrai même pour un contenu qui n'existe nulle
+ * part ailleurs qu'en base.
+ */
+export function semainesNecessaires(taillesCours: number[], lessonsPerWeek: number): number {
+  return taillesCours.reduce((total, n) => total + Math.ceil(n / lessonsPerWeek), 0);
+}
+
 export type EtatLecon = "locked" | "available" | "missed" | "completed";
 
 export type ContexteLecon = {

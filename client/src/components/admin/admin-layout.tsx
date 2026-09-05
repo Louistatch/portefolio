@@ -5,7 +5,7 @@ import { adminFetch, clearToken, ADMIN_BASE } from "@/lib/admin";
 import {
   LayoutDashboard, GraduationCap, Calendar, Video, Mail, MessageSquare,
   Newspaper, Users, Star, FileText, BookOpen, UserCircle,
-  LogOut, Menu, X, Search, Bell, Sun, Moon, ExternalLink, ChevronRight, Send, LifeBuoy,
+  LogOut, Menu, X, Search, Bell, Sun, Moon, ExternalLink, ChevronRight, Send, LifeBuoy, Library,
 } from "lucide-react";
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
@@ -34,6 +34,7 @@ const SECTIONS: Section[] = [
     titre: "Academy",
     items: [
       { href: `${ADMIN_BASE}/students`, label: "Étudiants", icon: GraduationCap, badge: "emailsNonVerifies" },
+      { href: `${ADMIN_BASE}/courses`, label: "Cours", icon: Library },
       { href: `${ADMIN_BASE}/student-messages`, label: "Écrire à un étudiant", icon: Send },
       { href: `${ADMIN_BASE}/meetings`, label: "Rencontres en ligne", icon: Video },
       { href: `${ADMIN_BASE}/group-work`, label: "Travaux de groupe", icon: Users },
