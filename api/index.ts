@@ -1943,7 +1943,7 @@ async function applyGroupWorkGrade(submissionId: number) {
   await supabase.from("grades").insert(ids.map(id => ({
     student_id: id, course_id: null, lesson_id: null,
     title: etiquette, score: sub.score, max_score: max, type: "group_work",
-    feedback: sub.feedback ?? null,
+    feedback: sub.feedback ?? null, program_id: "meal", // GW n'existe que dans le modèle WQU du cursus MEAL
   }))).then(() => {}, () => {});
 
   await supabase.from("group_work_progress")
@@ -2385,6 +2385,7 @@ app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000),
   await supabase.from("grades").insert({
     student_id: sid, title: `Test d'admission — ${parcours.title}`,
     score, max_score: parcours.admission.nbQuestions, type: "entry_test",
+    program_id: programId,
   }).then(() => {}, () => {});
 
   let admissionExpires: string | null = null;
@@ -2524,7 +2525,7 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
   if (existingTest) {
     await supabase.from("grades").update({ score, graded_at: now.toISOString() }).eq("id", existingTest.id);
   } else {
-    await supabase.from("grades").insert({ student_id: sid, title: "Test d'admission MEAL", score, max_score: 30, type: "entry_test" });
+    await supabase.from("grades").insert({ student_id: sid, title: "Test d'admission MEAL", score, max_score: 30, type: "entry_test", program_id: "meal" });
   }
 
   let admissionExpires: string | null = null;
@@ -4953,7 +4954,45 @@ async function construireTranscript(sid: number) {
   }
   const courseAverages = Object.values(byCourse).map(v => ({ code: v.code, title: v.title, average: Math.round(v.sum / v.n) }));
   const overall = arr.length ? Math.round(arr.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / arr.length) : 0;
-  return { student: stud, grades: arr, courseAverages, overall, totalGrades: arr.length };
+
+  // ── Détail par parcours ──
+  //
+  // Un étudiant inscrit à plusieurs cursus (le MEAL et les Coopératives, par exemple) voyait
+  // ses notes des deux entremêlées dans une seule liste chronologique — impossible d'y lire
+  // sa progression dans un cursus précis. Chaque note appartient à un seul parcours : celui
+  // du cours pour une leçon (programOf sur son code) ; grades.program_id pour un test
+  // d'admission ou un travail de groupe, qui n'ont pas de cours à interroger.
+  const parProgramme: Record<string, any[]> = {};
+  for (const g of arr) {
+    const code = (g as any).sms_courses?.code as string | undefined;
+    const pid = (code ? programOf(code)?.id : null) ?? (g as any).program_id ?? null;
+    if (!pid) continue; // parcours inconnu : absent du détail, reste dans le global ci-dessus
+    (parProgramme[pid] ||= []).push(g);
+  }
+  const parcours = PROGRAMS
+    .filter(p => parProgramme[p.id]?.length)
+    .map(p => {
+      const notes = parProgramme[p.id];
+      const parCours: Record<string, { sum: number; n: number; code: string; title: string }> = {};
+      for (const g of notes) {
+        const horsCours = (g as any).type === "group_work"
+          ? { code: "GROUP-WORK", title: "Travaux de groupe" }
+          : { code: "ADMISSION", title: "Test d'admission" };
+        const code = (g as any).sms_courses?.code || horsCours.code;
+        if (!parCours[code]) parCours[code] = { sum: 0, n: 0, code, title: (g as any).sms_courses?.title || horsCours.title };
+        parCours[code].sum += Number(g.score) / Number(g.max_score) * 100;
+        parCours[code].n++;
+      }
+      return {
+        programId: p.id, titre: p.title, accent: p.accent,
+        overall: Math.round(notes.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / notes.length),
+        totalGrades: notes.length,
+        courseAverages: Object.values(parCours).map(v => ({ code: v.code, title: v.title, average: Math.round(v.sum / v.n) })),
+        grades: notes,
+      };
+    });
+
+  return { student: stud, grades: arr, courseAverages, overall, totalGrades: arr.length, parcours };
 }
 
 app.get("/api/academy/transcript", requireStudent, async (req, res) => {
@@ -4993,6 +5032,33 @@ async function transcriptPdf(t: Awaited<ReturnType<typeof construireTranscript>>
     page.drawText(s, { x, y, size: taille, font: police, color: couleur });
   }
   function tronque(s: string, n: number) { return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+  function rgbDeHex(hex: string) {
+    const h = hex.replace("#", "");
+    return rgb(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255);
+  }
+  const colDate = MARGE, colCours = MARGE + 75, colIntitule = MARGE + 160, colScore = LARGEUR - MARGE - 95;
+  function enTeteTableau() {
+    placeDispo(30);
+    texte("Date", colDate, 9, gras, gris);
+    texte("Cours", colCours, 9, gras, gris);
+    texte("Évaluation", colIntitule, 9, gras, gris);
+    texte("Score", colScore, 9, gras, gris);
+    y -= 6;
+    page.drawLine({ start: { x: MARGE, y }, end: { x: LARGEUR - MARGE, y }, thickness: 0.5, color: filet });
+    y -= 14;
+  }
+  function ligneNote(g: any, couleurAccent = accent) {
+    placeDispo();
+    const pct = Math.round(Number(g.score) / Number(g.max_score) * 100);
+    const date = g.graded_at ? new Date(g.graded_at).toLocaleDateString("fr-FR") : "—";
+    const cours = g.sms_courses?.code || (g.type === "group_work" ? "GW" : "ADM");
+    const couleurScore = pct >= 70 ? couleurAccent : pct >= 50 ? ambre : rouge;
+    texte(date, colDate, 9.5, normal, gris);
+    texte(cours, colCours, 9.5, normal, noir);
+    texte(tronque(g.title || "—", 32), colIntitule, 9.5, normal, noir);
+    texte(`${g.score}/${g.max_score} (${pct}%)`, colScore, 9.5, gras, couleurScore);
+    y -= 16;
+  }
 
   texte("LouisFarm Learning", MARGE, 11, gras, accent);
   y -= 24;
@@ -5003,46 +5069,49 @@ async function transcriptPdf(t: Awaited<ReturnType<typeof construireTranscript>>
   texte(`Généré le ${new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}`, MARGE, 10, normal, gris);
   y -= 32;
 
-  texte(`Moyenne générale : ${t.overall} %`, MARGE, 13, gras, accent);
+  texte(`Moyenne générale, tous parcours confondus : ${t.overall} %`, MARGE, 13, gras, accent);
   y -= 16;
   texte(`${t.totalGrades} évaluation${t.totalGrades > 1 ? "s" : ""} enregistrée${t.totalGrades > 1 ? "s" : ""}`, MARGE, 10, normal, gris);
   y -= 30;
 
-  if (t.courseAverages.length) {
-    texte("Moyenne par cours", MARGE, 13, gras, noir);
+  // ── Un relevé par parcours ──
+  //
+  // Un étudiant inscrit à plusieurs cursus voyait ses notes entremêlées dans une seule liste
+  // chronologique — impossible d'y lire sa progression dans un cursus précis. Chaque parcours
+  // a désormais sa propre section, avec sa moyenne et son détail.
+  const idsVus = new Set<number>();
+  for (const p of t.parcours) {
+    placeDispo(70);
+    const couleurParcours = rgbDeHex(p.accent);
+    texte(p.titre, MARGE, 15, gras, couleurParcours);
+    y -= 4;
+    page.drawLine({ start: { x: MARGE, y }, end: { x: MARGE + normal.widthOfTextAtSize(p.titre, 15) + 4, y }, thickness: 1.5, color: couleurParcours });
+    y -= 16;
+    texte(`Moyenne : ${p.overall} % — ${p.totalGrades} évaluation${p.totalGrades > 1 ? "s" : ""}`, MARGE, 10, normal, gris);
     y -= 20;
-    for (const ca of t.courseAverages) {
+
+    for (const ca of p.courseAverages) {
       placeDispo();
-      texte(tronque(ca.title, 60), MARGE, 10.5, normal, noir);
-      texte(`${ca.average} %`, LARGEUR - MARGE - 40, 10.5, gras, accent);
-      y -= 18;
+      texte(tronque(ca.title, 55), MARGE + 8, 10, normal, noir);
+      texte(`${ca.average} %`, LARGEUR - MARGE - 40, 10, gras, couleurParcours);
+      y -= 16;
     }
-    y -= 12;
+    y -= 8;
+
+    enTeteTableau();
+    for (const g of p.grades) { ligneNote(g, couleurParcours); idsVus.add(g.id); }
+    y -= 22;
   }
 
-  placeDispo(40);
-  texte("Détail des évaluations", MARGE, 13, gras, noir);
-  y -= 20;
-  const colDate = MARGE, colCours = MARGE + 75, colIntitule = MARGE + 160, colScore = LARGEUR - MARGE - 95;
-  texte("Date", colDate, 9, gras, gris);
-  texte("Cours", colCours, 9, gras, gris);
-  texte("Évaluation", colIntitule, 9, gras, gris);
-  texte("Score", colScore, 9, gras, gris);
-  y -= 6;
-  page.drawLine({ start: { x: MARGE, y }, end: { x: LARGEUR - MARGE, y }, thickness: 0.5, color: filet });
-  y -= 14;
-
-  for (const g of t.grades) {
-    placeDispo();
-    const pct = Math.round(Number(g.score) / Number(g.max_score) * 100);
-    const date = (g as any).graded_at ? new Date((g as any).graded_at).toLocaleDateString("fr-FR") : "—";
-    const cours = (g as any).sms_courses?.code || ((g as any).type === "group_work" ? "GW" : "ADM");
-    const couleurScore = pct >= 70 ? accent : pct >= 50 ? ambre : rouge;
-    texte(date, colDate, 9.5, normal, gris);
-    texte(cours, colCours, 9.5, normal, noir);
-    texte(tronque(g.title || "—", 32), colIntitule, 9.5, normal, noir);
-    texte(`${g.score}/${g.max_score} (${pct}%)`, colScore, 9.5, gras, couleurScore);
-    y -= 16;
+  // Filet de sécurité : une note dont le parcours n'a pu être déterminé ne doit jamais
+  // disparaître du document, seulement rester hors section.
+  const orphelines = t.grades.filter(g => !idsVus.has((g as any).id));
+  if (orphelines.length) {
+    placeDispo(50);
+    texte("Autres évaluations", MARGE, 15, gras, noir);
+    y -= 20;
+    enTeteTableau();
+    for (const g of orphelines) ligneNote(g);
   }
 
   if (!t.grades.length) { texte("Aucune évaluation enregistrée pour le moment.", MARGE, 10, normal, gris); }
