@@ -50,7 +50,7 @@ function initiales(nom?: string | null) {
 }
 
 /** Recherche — Ctrl/⌘ + K. Porte sur les cours et les leçons du planning de l'étudiant. */
-function Palette({ ouvert, setOuvert }: { ouvert: boolean; setOuvert: (v: boolean) => void }) {
+function Palette({ ouvert, setOuvert, admisMeal }: { ouvert: boolean; setOuvert: (v: boolean) => void; admisMeal: boolean }) {
   const [, navigate] = useLocation();
   const [q, setQ] = useState("");
 
@@ -85,7 +85,8 @@ function Palette({ ouvert, setOuvert }: { ouvert: boolean; setOuvert: (v: boolea
               <CommandEmpty>Aucun résultat pour « {q.trim()} ».</CommandEmpty>
             )}
             <CommandGroup heading="Navigation">
-              {NAV.filter(i => !q.trim() || i.label.toLowerCase().includes(q.trim().toLowerCase()))
+              {NAV.filter(i => i.href !== "/academy/group-work" || admisMeal)
+                .filter(i => !q.trim() || i.label.toLowerCase().includes(q.trim().toLowerCase()))
                 .map(i => (
                   <CommandItem key={i.href} value={i.href} onSelect={() => aller(i.href)} className="gap-2.5">
                     <i.icon className="w-4 h-4 text-muted-foreground" />
@@ -156,6 +157,16 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
 
   const nom = bord?.etudiant?.nom || etudiant?.full_name;
 
+  // Les travaux de groupe n'existent que dans le modèle WQU du cursus MEAL (voir
+  // applyGroupWorkGrade côté serveur) : un étudiant admis seulement à un autre parcours
+  // (formation de formateurs, finance climatique…) n'a jamais de groupe, et cliquer sur ce
+  // lien ne lui montrait qu'un message d'admission déroutant — comme s'il lui manquait
+  // quelque chose, alors que ce dispositif ne le concerne simplement pas.
+  // `bord.etudiant.admis` est déjà spécifiquement l'admission MEAL (students.admitted_at) :
+  // l'admission des autres parcours vit ailleurs (academy_program_admissions).
+  const admisMeal = bord?.etudiant?.admis === true;
+  const navItems = NAV.filter(item => item.href !== "/academy/group-work" || admisMeal);
+
   const menu = (
     <>
       <div className="px-4 pt-1 pb-6">
@@ -171,7 +182,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       <nav className="flex-1 overflow-y-auto px-3 space-y-0.5">
-        {NAV.map(item => {
+        {navItems.map(item => {
           const actif = item.exact ? location === item.href : false;
           return (
             <Link key={item.href} href={item.href}
@@ -327,7 +338,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 p-4 sm:p-6 lg:p-8">{children}</main>
       </div>
 
-      <Palette ouvert={paletteOuverte} setOuvert={setPaletteOuverte} />
+      <Palette ouvert={paletteOuverte} setOuvert={setPaletteOuverte} admisMeal={admisMeal} />
     </div>
   );
 }

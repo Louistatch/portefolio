@@ -3274,6 +3274,52 @@ app.get("/api/cron/classement-hebdo", classementHebdomadaire);
 app.post("/api/cron/classement-hebdo", classementHebdomadaire);
 
 /**
+ * Constitution des équipes de travaux de groupe, indépendamment de toute visite.
+ *
+ * Jusqu'ici, un groupe ne se formait qu'en effet de bord d'une requête d'un étudiant de la
+ * cohorte — visite du tableau de bord ou de la page « Travaux de groupe » (voir
+ * ensureGroupsForGw, appelée depuis refreshGroupWorkStates). Tant qu'aucun étudiant de la
+ * cohorte n'ouvrait l'une de ces deux pages après le passage de sa semaine 3, l'équipe ne se
+ * tirait jamais au sort — ni email, ni groupe, en silence complet. Cette tâche fait le même
+ * travail, mais pour CHAQUE étudiant MEAL éligible, chaque jour : elle ne dépend plus de ce
+ * qu'un étudiant choisit d'ouvrir.
+ *
+ * Idempotente de bout en bout : generateGroupWorkSchedule ne réécrit que ce qui manque ou a
+ * changé, ensureGroupsForGw renvoie immédiatement le groupe existant s'il y en a déjà un, et
+ * formGroupsForGw est protégée par le verrou unique (cohorte, travail) — l'appeler chaque
+ * jour pour tout le monde ne forme jamais deux fois la même équipe.
+ */
+async function corpsFormationGroupesTravail(): Promise<Record<string, unknown>> {
+  const gws = await getGroupWorks();
+  if (!gws.length) return { ignoree: true, raison: "Aucun travail de groupe publié." };
+
+  const { data: admis } = await supabase.from("students")
+    .select("id, admitted_at").not("admitted_at", "is", null);
+  const eligibles = (admis || []).filter((s: any) => eligibleAuxTravauxDeGroupe(s.admitted_at));
+
+  let traites = 0, echecs = 0;
+  for (const s of eligibles) {
+    try {
+      await generateGroupWorkSchedule(s.id, new Date(s.admitted_at));
+      await refreshGroupWorkStates(s.id);
+      traites++;
+    } catch (e: any) {
+      echecs++;
+      console.error(`formation-groupes-travail : échec pour l'étudiant ${s.id} —`, e?.message || e);
+    }
+  }
+
+  console.log(`formation-groupes-travail : ${traites} étudiant(s) MEAL passé(s) en revue, ${echecs} échec(s).`);
+  return { etudiantsEligibles: eligibles.length, traites, echecs };
+}
+
+const formationGroupesTravail = (req: Request, res: Response) =>
+  executerTache("formation-groupes-travail", req, res, corpsFormationGroupesTravail);
+
+app.get("/api/cron/formation-groupes-travail", formationGroupesTravail);
+app.post("/api/cron/formation-groupes-travail", formationGroupesTravail);
+
+/**
  * Registre des tâches quotidiennes.
  *
  * Il existe pour une seule raison : permettre de lancer une tâche depuis
@@ -3287,6 +3333,7 @@ const TACHES_PLANIFIEES: Record<string, () => Promise<Record<string, unknown>>> 
   "verify-reminders": corpsRelancesDeVerification,
   "late-warnings": corpsAlertesDeRetard,
   "classement-hebdo": corpsClassementHebdomadaire,
+  "formation-groupes-travail": corpsFormationGroupesTravail,
   "correction-ia-group-work": corpsCorrectionIAGroupWork,
 };
 

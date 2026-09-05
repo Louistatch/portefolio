@@ -262,7 +262,7 @@ export default function Dashboard() {
         </>
       ),
       action: {
-        libelle: tachesEnDefaut.length === 1 ? "Lancer maintenant" : "Lancer les deux maintenant",
+        libelle: tachesEnDefaut.length === 1 ? "Lancer maintenant" : `Lancer les ${tachesEnDefaut.length} maintenant`,
         onClick: () => lancerLesTaches(tachesEnDefaut.map((t: any) => t.nom)),
         enCours: tacheEnCours !== null,
         resultat: resultatTache,
