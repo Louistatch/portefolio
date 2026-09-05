@@ -6636,6 +6636,23 @@ app.get("/api/admin/academy/groups", requireAuth, async (_req, res) => {
   res.json({ parTravail, travaux });
 });
 
+// ── État de la correction IA, pour les cartes KPI du panneau admin ──
+app.get("/api/admin/academy/group-work-ia-status", requireAuth, async (_req, res) => {
+  const jour = new Date().toISOString().slice(0, 10);
+  const quotaMax = Math.max(1, Number(process.env.GEMINI_DAILY_QUOTA) || 45);
+  const { data: quotaLigne } = await supabase.from("academy_gemini_quota")
+    .select("utilisees").eq("jour", jour).maybeSingle();
+  const { count: corrigesAujourdhui } = await supabase.from("academy_group_submissions")
+    .select("id", { count: "exact", head: true })
+    .eq("graded_by", "ia").gte("graded_at", `${jour}T00:00:00.000Z`).lt("graded_at", `${jour}T23:59:59.999Z`);
+
+  res.json({
+    configuree: !!process.env.GEMINI_API_KEY,
+    quotaUtilisee: quotaLigne?.utilisees ?? 0, quotaMax,
+    corrigesAujourdhui: corrigesAujourdhui ?? 0,
+  });
+});
+
 app.post("/api/admin/academy/groups", requireAuth, async (req, res) => {
   const { name, cohort } = req.body || {};
   if (!name || !cohort) return res.status(400).json({ message: "name et cohort requis" });
@@ -6696,6 +6713,49 @@ app.delete("/api/admin/academy/groups/:id/members/:studentId", requireAuth, asyn
     .delete().eq("group_id", Number(req.params.id)).eq("student_id", Number(req.params.studentId));
   if (error) return res.status(400).json({ message: error.message });
   res.json({ message: "Retiré du groupe" });
+});
+
+/**
+ * Détail d'un groupe : ses rendus (fichiers, notation, correction IA) et les évaluations
+ * que ses membres se sont données entre eux.
+ *
+ * Chargé seulement quand l'administration ouvre un groupe (voir PanneauDetail côté client)
+ * — c'est ce qui évite de tirer les évaluations par les pairs de toute une promotion à
+ * chaque affichage de la liste, alors que la plupart des groupes restent fermés.
+ */
+app.get("/api/admin/academy/groups/:id/detail", requireAuth, async (req, res) => {
+  const groupId = Number(req.params.id);
+
+  const { data: rendus, error } = await supabase.from("academy_group_submissions")
+    .select("id, group_work_id, status, score, feedback, content, submitted_at, graded_at, students:submitted_by(full_name), report_url, report_name, archive_url, archive_name, rubric_scores, graded_by, ai_attempts, ai_error")
+    .eq("group_id", groupId);
+  if (error) return res.status(500).json({ message: error.message });
+
+  const { data: avis } = await supabase.from("academy_group_peer_reviews")
+    .select("group_work_id, reviewer_id, reviewee_id, scores, total, comment")
+    .eq("group_id", groupId);
+
+  // Le nom de l'évalué, pas son identifiant : cet écran s'affiche à un formateur, pas à un export.
+  const idsEvalues = [...new Set((avis || []).map((a: any) => a.reviewee_id))];
+  const { data: studsEvalues } = idsEvalues.length
+    ? await supabase.from("students").select("id, full_name").in("id", idsEvalues)
+    : { data: [] as any[] };
+  const nomDe = (id: number) => studsEvalues?.find((s: any) => s.id === id)?.full_name || `#${id}`;
+
+  res.json({
+    rendus: (rendus || []).map((r: any) => ({
+      id: r.id, groupWorkId: r.group_work_id, statut: r.status, note: r.score, feedback: r.feedback,
+      contenu: r.content, le: r.submitted_at, corrigeLe: r.graded_at, par: r.students?.full_name ?? null,
+      rapport: r.report_url ? { url: r.report_url, nom: r.report_name } : null,
+      archive: r.archive_url ? { url: r.archive_url, nom: r.archive_name } : null,
+      notesParCritere: r.rubric_scores ?? null,
+      corrigePar: r.graded_by, tentativesIA: r.ai_attempts ?? 0, erreurIA: r.ai_error ?? null,
+    })),
+    pairs: (avis || []).map((a: any) => ({
+      groupWorkId: a.group_work_id, evalue: nomDe(a.reviewee_id),
+      scores: a.scores, total: a.total, commentaire: a.comment,
+    })),
+  });
 });
 
 /**
