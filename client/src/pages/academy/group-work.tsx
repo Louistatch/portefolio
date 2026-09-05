@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   Users, Loader2, Lock, Clock, CheckCircle2, Send, AlertCircle, Link2,
   Plus, X, Mail, Trophy, FileText, MessageSquare, Download,
-  Paperclip, Upload, Pin, Shuffle,
+  Paperclip, Upload, Pin, Shuffle, Calendar, BarChart3, PencilLine, Sparkles, BookOpen,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn, getStudent } from "@/lib/student";
 import {
@@ -46,6 +46,26 @@ const jourCourt = (d?: string | null) =>
   d ? new Date(d).toLocaleDateString("fr-FR", { day: "numeric", month: "short" }) : "—";
 const dateHeure = (d?: string | null) =>
   d ? new Date(d).toLocaleString("fr-FR", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—";
+// L'heure exacte de l'échéance, en UTC explicite : le fuseau réel de chaque étudiant n'est
+// pas connu côté serveur, et afficher une heure locale non précisée aurait fait croire à
+// une heure de Lomé alors que c'est l'instant UTC brut stocké en base.
+const heureUTC = (d?: string | null) =>
+  d ? `${new Date(d).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit", timeZone: "UTC" })} (UTC)` : "";
+
+/** Progression de la fenêtre de dépôt d'un travail — entre son ouverture et son échéance. */
+function fenetreDeDepot(t: Travail) {
+  if (!t.ouvertureLe || !t.echeanceLe) return null;
+  const debut = new Date(t.ouvertureLe).getTime();
+  const fin = new Date(t.echeanceLe).getTime();
+  const maintenant = Date.now();
+  const total = Math.max(1, fin - debut);
+  const pct = Math.round((Math.min(total, Math.max(0, maintenant - debut)) / total) * 100);
+  return {
+    pct,
+    enRetard: maintenant > fin,
+    joursRestants: Math.max(0, Math.ceil((fin - maintenant) / 86400000)),
+  };
+}
 
 const TON: Record<GroupWorkStatus, { badge: string; icone: any }> = {
   locked:    { badge: "bg-muted text-muted-foreground", icone: Lock },
@@ -242,6 +262,149 @@ function Bloc({ titre, children }: { titre: string; children: React.ReactNode })
   );
 }
 
+/**
+ * L'échéance, en priorité visuelle — la carte que l'œil doit trouver en premier.
+ *
+ * Trois états, jamais la même carte : verrouillé (aucune échéance n'existe encore, donc
+ * aucune ne s'affiche), ouvert (la seule vraie échéance, sa date ET son heure, jamais une
+ * date d'ouverture), corrigé (l'échéance est de l'histoire ancienne, la note prime).
+ */
+function CarteEcheance({ t }: { t: Travail }) {
+  if (t.statut === "locked") {
+    return (
+      <div className="rounded-2xl border border-dashed border-border/60 bg-muted/30 p-5 flex items-center gap-3">
+        <Lock className="w-5 h-5 text-muted-foreground shrink-0" />
+        <div>
+          <p className="text-sm font-medium">Le dépôt n'est pas encore ouvert</p>
+          <p className="text-sm text-muted-foreground mt-0.5">Ouverture le {jour(t.ouvertureLe)}.</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (t.statut === "completed") {
+    return (
+      <div className="rounded-2xl p-5 sm:p-6 text-white" style={{ background: "linear-gradient(135deg, #085e41, #043823)" }}>
+        <div className="flex items-center gap-2 text-white/70 text-[11px] font-semibold uppercase tracking-wide">
+          <CheckCircle2 className="w-4 h-4" /> Travail corrigé
+        </div>
+        <p className="titre-affichage text-2xl sm:text-3xl font-semibold mt-2">{t.note}/{t.maxScore}</p>
+        <p className="text-sm text-white/80 mt-1">Rendu déposé le {jour(t.rendu?.le)}</p>
+      </div>
+    );
+  }
+
+  const fenetre = fenetreDeDepot(t);
+  return (
+    <div className="rounded-2xl p-5 sm:p-6 text-white" style={{ background: "linear-gradient(135deg, #085e41, #043823)" }}>
+      <div className="flex items-center gap-2 text-white/70 text-[11px] font-semibold uppercase tracking-wide">
+        <Calendar className="w-4 h-4" /> Date limite de soumission
+      </div>
+      <p className="titre-affichage text-2xl sm:text-3xl font-semibold mt-2">{jour(t.echeanceLe)}</p>
+      <p className="text-sm text-white/80 mt-1">{heureUTC(t.echeanceLe)}</p>
+      {fenetre && (
+        <>
+          <div className="h-1.5 rounded-full bg-white/20 overflow-hidden mt-4">
+            <div className="h-full rounded-full bg-white transition-[width]" style={{ width: `${fenetre.pct}%` }} />
+          </div>
+          <p className="text-xs text-white/80 mt-1.5 chiffres-tabulaires">
+            {fenetre.enRetard ? "Échéance dépassée" : `${fenetre.joursRestants} jour${fenetre.joursRestants > 1 ? "s" : ""} restant${fenetre.joursRestants > 1 ? "s" : ""}`}
+          </p>
+        </>
+      )}
+      <div className="flex items-start gap-2 bg-white/10 rounded-xl px-3 py-2.5 mt-4">
+        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+        <p className="text-xs text-white/90">Après cette date, aucune modification ni dépôt ne sera accepté.</p>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Le calendrier du travail, en ligne du temps — mais fait des seuls jalons RÉELS
+ * (formation de l'équipe, ouverture, dépôt, échéance ou correction). Rien n'est inventé :
+ * pas de plan de travail au jour le jour, que rien dans le modèle de données ne porte.
+ */
+function PlanningTravail({ t }: { t: Travail }) {
+  const maintenant = Date.now();
+  type Etape = { label: string; date: string | null; fait: boolean; alerte?: boolean };
+  const etapes: Etape[] = [];
+  if (t.groupeLe) etapes.push({ label: "Équipe tirée au sort", date: t.groupeLe, fait: !!t.groupe });
+  if (t.ouvertureLe) etapes.push({ label: "Ouverture du dépôt", date: t.ouvertureLe, fait: maintenant >= new Date(t.ouvertureLe).getTime() });
+  if (t.rendu) {
+    etapes.push({
+      label: t.rendu.parMoi ? "Rendu déposé par vous" : `Rendu déposé par ${t.rendu.par || "un membre"}`,
+      date: t.rendu.le, fait: true,
+    });
+  }
+  if (t.echeanceLe) {
+    etapes.push({
+      label: t.statut === "completed" ? "Correction reçue" : "Soumission finale",
+      date: t.statut === "completed" ? (t.rendu?.le ?? t.echeanceLe) : t.echeanceLe,
+      fait: t.statut === "completed",
+      // Rouge seulement une fois le dépôt réellement ouvert : une échéance verrouillée,
+      // loin devant, n'a rien d'une urgence — la marquer en rouge l'aurait fait paraître
+      // comme telle.
+      alerte: t.statut === "available" || t.statut === "missed",
+    });
+  }
+  if (!etapes.length) return null;
+
+  return (
+    <div className="rounded-xl border border-border/60 p-4">
+      <p className="text-sm font-semibold mb-3">Calendrier de ce travail</p>
+      <ol className="space-y-3">
+        {etapes.map((e, i) => (
+          <li key={i} className="flex items-start gap-2.5">
+            {e.fait
+              ? <CheckCircle2 className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+              : e.alerte
+                ? <span className="w-2.5 h-2.5 rounded-full bg-destructive shrink-0 mt-1 ml-[3px]" />
+                : <span className="w-2.5 h-2.5 rounded-full border-2 border-muted-foreground/40 shrink-0 mt-1 ml-[3px]" />}
+            <div className="min-w-0">
+              <p className={`text-sm ${e.alerte && !e.fait ? "text-destructive font-medium" : ""}`}>{e.label}</p>
+              <p className="text-xs text-muted-foreground">{jourCourt(e.date)}</p>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+const COULEURS_GRILLE = [
+  { tint: "bg-emerald-500/10", text: "text-emerald-600", icone: BarChart3 },
+  { tint: "bg-blue-500/10", text: "text-blue-600", icone: PencilLine },
+  { tint: "bg-purple-500/10", text: "text-purple-600", icone: Sparkles },
+  { tint: "bg-amber-500/10", text: "text-amber-600", icone: FileText },
+];
+
+/** La grille de notation, visible AVANT le dépôt : un étudiant devrait savoir sur quoi il
+ *  est jugé avant de rendre, pas seulement le découvrir dans sa correction. */
+function GrilleNotation({ grille, maxScore }: { grille: { cle: string; libelle: string; points: number }[]; maxScore: number }) {
+  if (!grille.length) return null;
+  return (
+    <div>
+      <p className="text-sm font-semibold mb-2.5">Grille de notation ({maxScore} points)</p>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        {grille.map((c, i) => {
+          const s = COULEURS_GRILLE[i % COULEURS_GRILLE.length];
+          const Icone = s.icone;
+          return (
+            <div key={c.cle} className="rounded-xl border border-border/50 p-3.5">
+              <div className={`w-8 h-8 rounded-lg ${s.tint} ${s.text} grid place-items-center mb-2`}>
+                <Icone className="w-4 h-4" />
+              </div>
+              <p className="text-lg font-bold chiffres-tabulaires">{c.points} pts</p>
+              <p className="text-xs text-muted-foreground mt-0.5 leading-snug">{c.libelle}</p>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function CarteTravail({ travail: t, moiId, consignes, onChange }:
   { travail: Travail; moiId?: number; consignes: any; onChange: () => Promise<void> }) {
   const [depot, setDepot] = useState(false);
@@ -264,19 +427,17 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
       t.statut === "available" || t.statut === "missed" ? "border-primary/40" : "border-border/50"}`}>
 
       {/* ── En-tête ── */}
-      <div className="flex items-center gap-3 px-4 sm:px-5 py-3.5 border-b border-border/40">
-        <span className={`w-10 h-10 rounded-xl grid place-items-center shrink-0 ${ton.badge}`}>
-          <Icone className="w-[18px] h-[18px]" />
+      <div className="flex items-center gap-3 px-4 sm:px-5 py-4 border-b border-border/40">
+        <span className={`w-11 h-11 rounded-xl grid place-items-center shrink-0 ${ton.badge}`}>
+          <Icone className="w-5 h-5" />
         </span>
         <div className="min-w-0 flex-1">
-          <p className="font-semibold text-sm truncate">{t.titre}</p>
-          <p className="text-[11px] text-muted-foreground truncate">
-            Semaine {t.semaine} · {verrouille
-              ? `s'ouvre le ${jourCourt(t.ouvertureLe)}`
-              : `à rendre avant le ${jourCourt(t.echeanceLe)}`}
+          <p className="titre-affichage font-semibold text-lg truncate">{t.titre}</p>
+          <p className="text-xs text-muted-foreground truncate mt-0.5">
+            Semaine {t.semaine}{t.groupe ? ` · ${t.groupe.nom} · promotion ${t.groupe.cohorte}` : ""}
           </p>
         </div>
-        <span className={`text-[10px] font-semibold px-2 py-1 rounded-full shrink-0 ${ton.badge}`}>
+        <span className={`text-[11px] font-semibold px-2.5 py-1.5 rounded-full shrink-0 ${ton.badge}`}>
           {t.statut === "completed" && t.note != null
             ? `${t.note}/${t.maxScore}`
             : GROUP_WORK_STATUS_LABEL[t.statut]}
@@ -285,28 +446,44 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
 
       <div className="px-4 sm:px-5 py-4 space-y-5">
 
+        {/* ── L'échéance, priorité visuelle ── */}
+        <CarteEcheance t={t} />
+
         {/* ── 1. Le groupe, en tête, comme dans le modèle ── */}
-        <TableauGroupe groupe={t.groupe} groupeLe={t.groupeLe} moiId={moiId} />
+        <TableauGroupe groupe={t.groupe} groupeLe={t.groupeLe} moiId={moiId} rendu={t.rendu} />
+
+        {/* ── Le calendrier de ce travail ── */}
+        <PlanningTravail t={t} />
+
+        {/* ── La grille de notation, avant le dépôt : on sait sur quoi on est jugé ── */}
+        {t.statut !== "completed" && <GrilleNotation grille={t.grille} maxScore={t.maxScore} />}
 
         {/* ── 2. Les documents ── */}
         {(t.enonceUrl || t.modeleUrl) && (
-          <div className="flex flex-wrap gap-2">
+          <div className="grid sm:grid-cols-2 gap-2.5">
             {t.enonceUrl && <Document url={t.enonceUrl} libelle="Énoncé et grille de notation (PDF)" />}
             {t.modeleUrl && <Document url={t.modeleUrl} libelle="Modèle de rapport (DOCX)" />}
           </div>
         )}
 
-        {/* ── 3. Les consignes de rendu ── */}
-        {consignes && (
-          <div className="space-y-3">
-            <p className="text-sm">Lisez attentivement les consignes de dépôt ci-dessous :</p>
-            {[consignes.avant, consignes.pret].map((bloc: any) => (
-              <div key={bloc.titre}>
-                <p className="text-sm font-semibold mb-1">{bloc.titre} :</p>
+        {/* ── 3. Les consignes de rendu, en deux cartes ── */}
+        {consignes && t.statut !== "completed" && (
+          <div className="grid sm:grid-cols-2 gap-3">
+            {[
+              { bloc: consignes.avant, tint: "bg-blue-500/10", text: "text-blue-600", icone: BookOpen },
+              { bloc: consignes.pret, tint: "bg-amber-500/10", text: "text-amber-600", icone: Send },
+            ].map(({ bloc, tint, text, icone: IconeBloc }) => (
+              <div key={bloc.titre} className="rounded-xl border border-border/50 p-4">
+                <div className="flex items-center gap-2 mb-2.5">
+                  <span className={`w-7 h-7 rounded-lg ${tint} ${text} grid place-items-center shrink-0`}>
+                    <IconeBloc className="w-3.5 h-3.5" />
+                  </span>
+                  <p className="text-sm font-semibold">{bloc.titre}</p>
+                </div>
                 <ul className="space-y-1.5">
                   {bloc.points.map((pt: string, i: number) => (
                     <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="w-1 h-1 rounded-full bg-primary mt-[7px] shrink-0" />
+                      <span className="w-1 h-1 rounded-full bg-muted-foreground/50 mt-[7px] shrink-0" />
                       <span>{pt}</span>
                     </li>
                   ))}
@@ -353,11 +530,7 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
           </div>
         )}
 
-        {verrouille ? (
-          <p className="text-sm text-muted-foreground">
-            Le dépôt s'ouvrira le {jour(t.ouvertureLe)}.
-          </p>
-        ) : (
+        {verrouille ? null : (
           <>
             {/* ── 4. Le rendu : déposant, date, fichiers ── */}
             {rendu ? (
@@ -369,7 +542,7 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
                   <p className="text-sm text-muted-foreground">{jour(rendu.le)}</p>
                 </Bloc>
                 <Bloc titre="Fichiers déposés :">
-                  <div className="flex flex-wrap gap-2">
+                  <div className="grid sm:grid-cols-2 gap-2.5">
                     {rendu.rapport && <Document url={rendu.rapport.url} libelle={rendu.rapport.nom || "Rapport"} sombre />}
                     {rendu.archive && <Document url={rendu.archive.url} libelle={rendu.archive.nom || "Archive"} sombre />}
                     {!rendu.rapport && !rendu.archive && <span className="text-sm text-muted-foreground">—</span>}
@@ -428,13 +601,12 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
 }
 
 /**
- * Le tableau du groupe, en tête de fiche.
- *
- * Un tableau et non des cartes : c'est la forme du modèle de référence, et elle a une
- * raison — on vient y chercher un nom et une adresse, pas contempler des avatars.
+ * L'équipe, en cartes plutôt qu'en tableau : un coéquipier se reconnaît d'un coup d'œil à
+ * son avatar, et la carte de celui qui a déposé le rendu du groupe porte une mention
+ * dédiée — utile pour savoir sans demander à qui écrire en cas de question sur le dépôt.
  */
-function TableauGroupe({ groupe, groupeLe, moiId }:
-  { groupe: Groupe | null; groupeLe: string | null; moiId?: number }) {
+function TableauGroupe({ groupe, groupeLe, moiId, rendu }:
+  { groupe: Groupe | null; groupeLe: string | null; moiId?: number; rendu?: Travail["rendu"] }) {
   if (!groupe) {
     return (
       <div className="rounded-xl border border-dashed border-border/60 p-4 flex items-start gap-3">
@@ -452,52 +624,58 @@ function TableauGroupe({ groupe, groupeLe, moiId }:
 
   return (
     <div className="rounded-xl border border-border/60 overflow-hidden">
-      <div className="px-3.5 py-2 bg-muted/40 border-b border-border/40">
+      <div className="px-3.5 py-2.5 bg-muted/40 border-b border-border/40">
         <p className="text-sm font-semibold">{groupe.nom} · promotion {groupe.cohorte}</p>
       </div>
-      <table className="w-full">
-        <tbody>
-          {groupe.membres.map(m => (
-            <tr key={m.studentId} className="border-b border-border/30 last:border-0">
-              <td className="px-3.5 py-2.5">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-7 h-7 rounded-full bg-primary/15 text-primary grid place-items-center text-[10px] font-bold shrink-0">
-                    {initiales(m.nom)}
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block text-sm truncate">
-                      {m.nom}
-                      {m.studentId === moiId && <span className="text-muted-foreground"> · vous</span>}
-                    </span>
-                    {m.email && <span className="block text-[11px] text-muted-foreground truncate">{m.email}</span>}
-                  </span>
-                </div>
-              </td>
-              <td className="px-3.5 py-2.5 w-10 text-right">
-                {m.email && m.studentId !== moiId && (
-                  <a href={`mailto:${m.email}`} aria-label={`Écrire à ${m.nom}`}
-                    className="inline-grid w-7 h-7 rounded-lg hover:bg-muted place-items-center text-muted-foreground hover:text-primary">
-                    <Mail className="w-3.5 h-3.5" />
-                  </a>
-                )}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="grid sm:grid-cols-2 gap-2.5 p-3">
+        {groupe.membres.map(m => {
+          const cestVous = m.studentId === moiId;
+          const aDepose = !!rendu && (cestVous ? rendu.parMoi : m.nom === rendu.par);
+          return (
+            <div key={m.studentId} className="flex items-center gap-2.5 rounded-xl border border-border/50 p-2.5">
+              <span className="w-9 h-9 rounded-full bg-primary/15 text-primary grid place-items-center text-xs font-bold shrink-0">
+                {initiales(m.nom)}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium truncate">
+                  {m.nom}{cestVous && <span className="text-muted-foreground font-normal"> · vous</span>}
+                </p>
+                <p className="text-[11px] text-muted-foreground truncate">{m.email || "—"}</p>
+                {aDepose && <p className="text-[10px] font-semibold text-primary mt-0.5">A déposé le rendu</p>}
+              </div>
+              {m.email && !cestVous && (
+                <a href={`mailto:${m.email}`} aria-label={`Écrire à ${m.nom}`}
+                  className="w-8 h-8 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-primary shrink-0">
+                  <Mail className="w-4 h-4" />
+                </a>
+              )}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
 
+/** Une carte de document téléchargeable : icône, nom, extension, action — plutôt qu'un
+ *  simple lien texte perdu dans une ligne de pastilles. */
 function Document({ url, libelle, sombre }: { url: string; libelle: string; sombre?: boolean }) {
+  const ext = libelle.match(/\(([A-Z]+)\)\s*$/)?.[1] ?? null;
+  const nom = ext ? libelle.replace(/\s*\([A-Z]+\)\s*$/, "") : libelle;
   return (
     <a href={url} download target="_blank" rel="noopener noreferrer"
-      className={`inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-medium transition-colors ${
+      className={`group flex items-center gap-3 rounded-xl px-3.5 py-3 text-sm transition-colors ${
         sombre
           ? "bg-slate-800 text-white hover:bg-slate-700"
-          : "border border-border/60 bg-muted/40 hover:bg-muted"}`}>
-      {sombre ? <FileText className="w-3.5 h-3.5 shrink-0" /> : <Download className="w-3.5 h-3.5 text-primary shrink-0" />}
-      <span className="truncate max-w-[260px]">{libelle}</span>
+          : "border border-border/60 bg-card hover:border-primary/40"}`}>
+      <span className={`w-9 h-9 rounded-lg grid place-items-center shrink-0 ${sombre ? "bg-white/10" : "bg-primary/10 text-primary"}`}>
+        <FileText className="w-4 h-4" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block font-medium truncate">{nom}</span>
+        {ext && <span className={`block text-[11px] ${sombre ? "text-white/60" : "text-muted-foreground"}`}>{ext}</span>}
+      </span>
+      <Download className={`w-4 h-4 shrink-0 ${sombre ? "text-white/70" : "text-muted-foreground group-hover:text-primary"}`} />
     </a>
   );
 }
@@ -697,13 +875,20 @@ function Formulaire({ travail, onFini, onAnnuler }:
   }
 
   return (
-    <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 space-y-3">
-      <div className="grid sm:grid-cols-2 gap-2.5">
-        <ChampFichier travailId={travail.id} libelle="Rapport du groupe (PDF)" accept=".pdf" obligatoire
-          fichier={rapport} onFichier={setRapport} />
-        <ChampFichier travailId={travail.id} libelle="Fichiers annexes (ZIP)" accept=".zip,.xlsx,.csv,.docx"
-          fichier={archive} onFichier={setArchive} />
+    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 sm:p-5 space-y-4">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <p className="text-sm font-semibold flex items-center gap-2"><Upload className="w-4 h-4 text-primary" /> Soumission du projet</p>
+        {travail.echeanceLe && (
+          <span className="text-[11px] font-semibold px-2.5 py-1 rounded-full bg-destructive/10 text-destructive whitespace-nowrap">
+            Date limite : {jour(travail.echeanceLe)} à {heureUTC(travail.echeanceLe)}
+          </span>
+        )}
       </div>
+
+      <ChampFichier travailId={travail.id} libelle="Rapport du groupe" accept=".pdf" obligatoire dropzone
+        fichier={rapport} onFichier={setRapport} />
+      <ChampFichier travailId={travail.id} libelle="Fichiers annexes (ZIP, facultatif)" accept=".zip,.xlsx,.csv,.docx"
+        fichier={archive} onFichier={setArchive} />
 
       <div>
         <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
@@ -776,16 +961,22 @@ function Formulaire({ travail, onFini, onAnnuler }:
 
 /** Le fichier part vers le stockage dès sa sélection : le dépôt n'est plus alors qu'un
  *  enregistrement, ce qui évite qu'un envoi de 30 Mo échoue en emportant la soumission. */
-function ChampFichier({ travailId, libelle, accept, fichier, onFichier, obligatoire }: {
+/**
+ * Le champ de dépôt d'un fichier — en compact (archive annexe) ou en grande dropzone
+ * glisser-déposer (rapport principal, la « zone de soumission » qui doit sauter aux yeux).
+ * Les deux formes partagent le même envoi : le fichier part vers le stockage dès sa
+ * sélection, glissée ou choisie — le dépôt final n'est plus alors qu'un enregistrement, ce
+ * qui évite qu'un envoi de 30 Mo échoue en emportant la soumission.
+ */
+function ChampFichier({ travailId, libelle, accept, fichier, onFichier, obligatoire, dropzone }: {
   travailId: number; libelle: string; accept: string; fichier: Fichier;
-  onFichier: (f: Fichier) => void; obligatoire?: boolean;
+  onFichier: (f: Fichier) => void; obligatoire?: boolean; dropzone?: boolean;
 }) {
   const [envoi, setEnvoi] = useState(false);
   const [erreur, setErreur] = useState("");
+  const [survole, setSurvole] = useState(false);
 
-  async function choisir(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
+  async function envoyerFichier(f: File) {
     setErreur(""); setEnvoi(true);
     try {
       const fd = new FormData();
@@ -797,31 +988,99 @@ function ChampFichier({ travailId, libelle, accept, fichier, onFichier, obligato
     } finally { setEnvoi(false); }
   }
 
+  function choisir(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (f) envoyerFichier(f);
+  }
+
+  function deposer(e: React.DragEvent<HTMLLabelElement>) {
+    e.preventDefault(); setSurvole(false);
+    const f = e.dataTransfer.files?.[0];
+    if (f) envoyerFichier(f);
+  }
+
+  if (!dropzone) {
+    return (
+      <div>
+        <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
+          {libelle}{obligatoire && <span className="text-destructive"> *</span>}
+        </label>
+        {fichier ? (
+          <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background px-3 py-2">
+            <Paperclip className="w-3.5 h-3.5 text-primary shrink-0" />
+            <span className="text-xs truncate flex-1">{fichier.nom}</span>
+            <button onClick={() => onFichier(null)} aria-label="Retirer le fichier"
+              className="w-6 h-6 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-destructive shrink-0">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ) : (
+          <label className="flex items-center gap-2 rounded-xl border border-dashed border-border/60 bg-background px-3 py-2 cursor-pointer hover:border-primary/40 transition-colors">
+            {envoi ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
+                   : <Upload className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
+            <span className="text-xs text-muted-foreground truncate">
+              {envoi ? "Envoi en cours…" : "Choisir un fichier"}
+            </span>
+            <input type="file" accept={accept} className="hidden" onChange={choisir} disabled={envoi} />
+          </label>
+        )}
+        {erreur && <p className="text-[11px] text-destructive mt-1">{erreur}</p>}
+      </div>
+    );
+  }
+
   return (
     <div>
       <label className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground mb-1.5">
         {libelle}{obligatoire && <span className="text-destructive"> *</span>}
       </label>
       {fichier ? (
-        <div className="flex items-center gap-2 rounded-xl border border-border/60 bg-background px-3 py-2">
-          <Paperclip className="w-3.5 h-3.5 text-primary shrink-0" />
-          <span className="text-xs truncate flex-1">{fichier.nom}</span>
+        <div className="flex items-center gap-3 rounded-2xl border border-primary/30 bg-background px-4 py-4">
+          <span className="w-10 h-10 rounded-xl bg-primary/15 text-primary grid place-items-center shrink-0">
+            <FileText className="w-5 h-5" />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-medium truncate">{fichier.nom}</span>
+            <span className="block text-xs text-primary">Projet soumis avec succès</span>
+          </span>
           <button onClick={() => onFichier(null)} aria-label="Retirer le fichier"
-            className="w-6 h-6 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-destructive shrink-0">
-            <X className="w-3.5 h-3.5" />
+            className="w-8 h-8 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-destructive shrink-0">
+            <X className="w-4 h-4" />
           </button>
         </div>
       ) : (
-        <label className="flex items-center gap-2 rounded-xl border border-dashed border-border/60 bg-background px-3 py-2 cursor-pointer hover:border-primary/40 transition-colors">
-          {envoi ? <Loader2 className="w-3.5 h-3.5 animate-spin text-primary shrink-0" />
-                 : <Upload className="w-3.5 h-3.5 text-muted-foreground shrink-0" />}
-          <span className="text-xs text-muted-foreground truncate">
-            {envoi ? "Envoi en cours…" : "Choisir un fichier"}
-          </span>
+        <label
+          onDragOver={e => { e.preventDefault(); setSurvole(true); }}
+          onDragLeave={() => setSurvole(false)}
+          onDrop={deposer}
+          className={`flex flex-col items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-10 text-center cursor-pointer transition-colors ${
+            survole ? "border-primary bg-primary/5" : "border-border/60 bg-background hover:border-primary/40"}`}>
+          {envoi ? (
+            <>
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              <span className="text-sm text-muted-foreground">Téléversement en cours…</span>
+              <div className="w-40 h-1.5 rounded-full bg-muted overflow-hidden mt-1">
+                <div className="h-full w-2/3 bg-primary rounded-full animate-pulse" />
+              </div>
+            </>
+          ) : (
+            <>
+              <Upload className="w-6 h-6 text-muted-foreground" />
+              <span className="text-sm">Déposez votre rapport final au format PDF</span>
+              <span className="pointer-events-none inline-flex items-center gap-1.5 h-8 px-3 mt-1 rounded-lg border border-border/60 bg-card text-xs font-medium">
+                Choisir un fichier
+              </span>
+              <span className="text-[11px] text-muted-foreground mt-1">Format accepté : PDF uniquement · Taille max. : 50 Mo</span>
+            </>
+          )}
           <input type="file" accept={accept} className="hidden" onChange={choisir} disabled={envoi} />
         </label>
       )}
-      {erreur && <p className="text-[11px] text-destructive mt-1">{erreur}</p>}
+      {erreur && (
+        <p className="text-xs text-destructive mt-1.5 flex items-center gap-1.5">
+          <AlertCircle className="w-3.5 h-3.5 shrink-0" />{erreur}
+        </p>
+      )}
     </div>
   );
 }
