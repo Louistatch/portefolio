@@ -1,0 +1,85 @@
+# ══════════════════════════════════════════════════════════════
+# Balayage des quiz de leçon chronométrés
+#
+# ── Pourquoi un second workflow, séparé des tâches quotidiennes ──
+#
+# Un quiz « à vous de jouer » se joue une seule fois dans la vie de l'étudiant, sous un
+# compte à rebours : au-delà du temps imparti, la note enregistrée est 0, et un rappel part
+# par email dix minutes avant l'échéance. Ni l'un ni l'autre ne peut attendre le passage
+# quotidien de taches-quotidiennes.yml (09h40 UTC) — un étudiant qui démarre son quiz à
+# 14h doit être relancé à 14h50 et clos à 15h00, pas le lendemain matin.
+#
+# Cinq minutes est le plus petit intervalle que GitHub Actions garantisse pour un workflow
+# planifié ; le serveur lui-même refait le calcul de l'échéance à chaque appel, donc un
+# retard occasionnel de l'ordonnanceur ne fait perdre ni gagner de temps à personne — il
+# retarde seulement le moment où la clôture ou le rappel est constaté.
+#
+# ── Idempotent par construction, donc sans verrou de journée ──
+#
+# Contrairement aux tâches quotidiennes, celui-ci n'a pas besoin de la table
+# academy_cron_verrou : une ligne déjà close (status = completed) ou déjà relancée
+# (quiz_reminder_sent_at posée) sort d'elle-même du prochain balayage. Deux exécutions qui
+# se chevaucheraient ne feraient au pire qu'un travail redondant sur la même ligne, jamais
+# un double envoi — sendAcademyEmail déduplique par dedupeKey.
+#
+# ── Ce qu'il faut pour qu'il fonctionne ──
+#
+#   Le même secret de dépôt CRON_SECRET que taches-quotidiennes.yml (Settings → Secrets
+#   and variables → Actions), avec exactement la même valeur que la variable
+#   d'environnement CRON_SECRET côté hébergeur.
+#
+# ── L'adresse doit porter le www ──
+#
+# louisfarm.com répond 307 vers www.louisfarm.com ; curl ne suit pas les redirections sans
+# -L, et -L supprimerait l'en-tête Authorization en changeant d'hôte. D'où l'adresse par
+# défaut avec www, et la vérification explicite du code HTTP — un 307 ne fait pas échouer
+# --fail, il ferait passer l'étape au vert sans avoir rien déclenché.
+# ══════════════════════════════════════════════════════════════
+name: Balayage des quiz chronométrés
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: quiz-timeouts
+  cancel-in-progress: false
+
+jobs:
+  balayer:
+    name: Clore les quiz expirés, relancer ceux qui approchent de l'échéance
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+
+    steps:
+      - name: Vérifier que le secret est en place
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Le secret de dépôt CRON_SECRET est absent."
+            echo "Settings → Secrets and variables → Actions → New repository secret,"
+            echo "nom CRON_SECRET, avec la même valeur que la variable d'environnement"
+            echo "CRON_SECRET côté hébergeur."
+            exit 1
+          fi
+          echo "Secret présent."
+
+      - name: Balayer les quiz en cours
+        env:
+          BASE: ${{ vars.SITE_URL || 'https://www.louisfarm.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -sS --max-time 60 -o reponse.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/cron/quiz-timeouts")
+          cat reponse.json; echo
+          if [ "$code" -ge 300 ]; then
+            echo "::error::HTTP $code sur $BASE/api/cron/quiz-timeouts"
+            if [ "$code" -lt 400 ]; then
+              echo "C'est une redirection : l'adresse n'est pas la bonne (il manque le www),"
+              echo "ou la variable de dépôt SITE_URL ne le porte pas."
+            fi
+            exit 1
+          fi
+          echo "HTTP $code"
