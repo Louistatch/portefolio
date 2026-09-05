@@ -264,18 +264,33 @@ export default function AcademyDashboard() {
           la place. Sur mobile la grille retombe en une colonne, dans cet ordre. */}
       <div className="grid lg:grid-cols-3 gap-6 items-start">
         <div className="lg:col-span-2 space-y-6">
-      {/* ───── Portefeuille de credentials (style Credly) ───── */}
-      {creds.length > 0 && (
+      {/* ───── Portefeuille de credentials (style Credly) ─────
+          Avant, tant qu'aucun credential n'était décroché, la section n'existait tout
+          simplement pas : un étudiant qui vient d'être admis n'avait aucune idée de ce
+          qui l'attendait ni de ce à quoi ressemblerait son premier badge. On garde la
+          section visible dès l'admission, avec un état vide qui montre le médaillon
+          plutôt que de laisser un trou dans la page. */}
+      {(creds.length > 0 || testStatus?.passed) && (
         <section id="credentials" className="scroll-mt-24">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold flex items-center gap-2"><Award className="w-5 h-5 text-primary" /> Mon portefeuille de credentials</h2>
             <span className="text-xs text-muted-foreground">Vérifiables · Téléchargeables</span>
           </div>
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {creds.map((cr) => (
-              <CredentialCard key={cr.id} cred={cr} />
-            ))}
-          </div>
+          {creds.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {creds.map((cr) => (
+                <CredentialCard key={cr.id} cred={cr} />
+              ))}
+            </div>
+          ) : (
+            <div className="bg-card rounded-2xl border border-dashed border-border p-8 text-center">
+              <IllustrationCredentialVide />
+              <p className="font-medium mt-3">Aucun credential pour l'instant</p>
+              <p className="text-sm text-muted-foreground mt-1.5 max-w-sm mx-auto">
+                Terminez votre premier cours pour décrocher un badge vérifiable — il apparaîtra ici, prêt à télécharger et à partager.
+              </p>
+            </div>
+          )}
         </section>
       )}
 
@@ -397,6 +412,36 @@ export default function AcademyDashboard() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * Illustration du portefeuille vide — un médaillon plutôt qu'un trou dans la page.
+ *
+ * Tracé main, aux couleurs exactes de la marque (--primary #085e41, --accent #16a260) :
+ * pas une photo de stock, pas une capture d'une autre app, juste de quoi montrer à quoi
+ * ressemblera le premier badge sans attendre qu'il existe.
+ */
+function IllustrationCredentialVide() {
+  return (
+    <svg viewBox="0 0 200 160" className="w-40 h-32 mx-auto" fill="none" aria-hidden="true">
+      <ellipse cx="100" cy="146" rx="56" ry="7" fill="#0f172908" />
+      <g transform="rotate(-7 100 82)">
+        <rect x="53" y="23" width="94" height="118" rx="10" fill="#f1f5f9" stroke="#e1e7ef" strokeWidth="1.5" />
+      </g>
+      <g transform="rotate(4 100 82)">
+        <rect x="50" y="19" width="100" height="122" rx="10" fill="#fcfcfd" stroke="#e1e7ef" strokeWidth="1.5" />
+        <rect x="66" y="40" width="52" height="6" rx="3" fill="#e1e7ef" />
+        <rect x="66" y="54" width="68" height="6" rx="3" fill="#e1e7ef" />
+        <circle cx="100" cy="102" r="22" fill="#085e41" />
+        <circle cx="100" cy="102" r="22" fill="none" stroke="#16a260" strokeWidth="2.5" strokeDasharray="3.5 3" />
+        <path d="M91 102l6 6 12-13" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        <path d="M90 121l-8 17 10-4 6 8 4-19z" fill="#16a260" />
+        <path d="M110 121l8 17-10-4-6 8-4-19z" fill="#085e41" />
+      </g>
+      <path d="M38 48l2 6 6 2-6 2-2 6-2-6-6-2 6-2z" fill="#16a260" opacity="0.55" />
+      <path d="M162 94l1.5 4.5 4.5 1.5-4.5 1.5-1.5 4.5-1.5-4.5-4.5-1.5 4.5-1.5z" fill="#085e41" opacity="0.45" />
+    </svg>
   );
 }
 
