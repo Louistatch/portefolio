@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import {
   Users, GraduationCap, Award, BookOpen, Loader2, X, Trophy, CheckCircle2, AlertCircle,
   Clock, TrendingUp, Search, ShieldCheck, ShieldAlert, Mail, MoreVertical,
-  UserCheck, RotateCcw, Trash2, Ban, Download, Sparkles, Filter, ChevronRight,
+  UserCheck, RotateCcw, Trash2, Ban, Download, Sparkles, Filter, ChevronRight, Crown,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -168,19 +168,49 @@ export default function AdminStudents() {
         </div>
       )}
 
-      {/* Top 10 — cumul des points, tous cours confondus */}
+      {/* Top 10 — cumul des points, tous cours confondus. Un podium pour les trois premiers,
+          la même idée que le classement par parcours côté étudiant (dashboard/parcours.tsx) —
+          c'est ce qui donne à un chiffre l'air d'un rang. */}
       {leaderboard && leaderboard.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border/50 p-5">
-          <div className="flex items-center gap-2 mb-3"><Trophy className="w-4 h-4 text-primary" /><h3 className="text-sm font-semibold">Top 10 de la promotion (cumul des points)</h3></div>
-          <div className="divide-y divide-border/30">
-            {leaderboard.map((s, i) => (
-              <div key={s.student_id} className="flex items-center gap-3 py-2">
-                <span className={`w-6 text-center text-xs font-bold shrink-0 ${i < 3 ? "text-primary" : "text-muted-foreground"}`}>{i + 1}</span>
-                <span className="flex-1 text-sm truncate">{s.full_name}</span>
-                <span className="text-sm font-semibold chiffres-tabulaires">{s.total} pts</span>
-              </div>
-            ))}
+        <div className="bg-card rounded-2xl border border-border/50 p-6 shadow-sm">
+          <div className="flex items-center gap-2 mb-5"><Trophy className="w-4 h-4 text-primary" /><h3 className="text-sm font-semibold">Top 10 de la promotion (cumul des points)</h3></div>
+
+          {/* Podium — rang 2, rang 1, rang 3 */}
+          <div className="flex items-end justify-center gap-3 pb-5 mb-4 border-b border-border/40">
+            {[leaderboard[1], leaderboard[0], leaderboard[2]].map((s, slot) => {
+              if (!s) return null;
+              const rang = slot === 1 ? 1 : slot === 0 ? 2 : 3;
+              const premier = rang === 1;
+              return (
+                <div key={s.student_id} className="flex flex-col items-center" style={{ width: premier ? 132 : 102 }}>
+                  {premier && <Crown className="w-4 h-4 text-primary mb-1" />}
+                  <div className={`${premier ? "w-16 h-16 text-lg" : "w-11 h-11 text-sm"} rounded-full flex items-center justify-center font-extrabold mb-2 shrink-0 ${
+                    premier ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-md" : "bg-gradient-to-br from-primary/20 to-primary/5 text-primary border-2 border-primary/30"}`}>
+                    {s.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase() || "?"}
+                  </div>
+                  <p className="text-[11px] sm:text-xs font-bold text-center truncate w-full mb-0.5">{s.full_name}</p>
+                  <p className="chiffres-tabulaires text-xs sm:text-sm font-extrabold text-primary mb-2.5">{s.total} pts</p>
+                  <div className={`${premier ? "h-14" : rang === 2 ? "h-10" : "h-7"} w-full rounded-t-lg bg-primary/10 border border-primary/20 border-b-0 flex items-start justify-center pt-1.5`}>
+                    <span className="text-lg font-extrabold text-primary/50">{rang}</span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
+
+          {/* Rangs 4 à 10 */}
+          {leaderboard.length > 3 && (
+            <div className="space-y-0.5">
+              {leaderboard.slice(3).map((s, i) => (
+                <div key={s.student_id} className="relative flex items-center gap-3 px-2 py-1.5 rounded-lg overflow-hidden">
+                  <div className="absolute inset-y-0 left-0 rounded-lg bg-primary/5" style={{ width: `${Math.round((s.total / leaderboard[0].total) * 100)}%` }} />
+                  <span className="relative w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-[10px] font-bold shrink-0">{i + 4}</span>
+                  <span className="relative flex-1 text-sm truncate">{s.full_name}</span>
+                  <span className="relative chiffres-tabulaires text-sm font-bold shrink-0">{s.total} pts</span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
