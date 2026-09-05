@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import {
   Users, Loader2, UserPlus, Trash2, Shuffle, Check, X, Pencil,
   ClipboardCheck, Link2, AlertCircle, Save, Download, Star, ChevronDown,
-  MessageSquare, Send, Megaphone, Clock, RotateCcw,
+  MessageSquare, Send, Megaphone, Clock, RotateCcw, Sparkles, Gauge, ShieldAlert,
 } from "lucide-react";
 import { PEER_REVIEW_CRITERIA, PEER_REVIEW_MAX_TOTAL } from "@shared/groupwork";
 
@@ -33,16 +33,23 @@ const jour = (d?: string | null) =>
 type Travail = { id: number; index: number; titre: string; semaine: number; maxScore: number; grille?: any };
 type BlocTravail = { travail: Travail; constitue: boolean; groupes: Groupe[]; sansGroupe: any[] };
 
+type StatutIA = { configuree: boolean; quotaUtilisee: number; quotaMax: number; corrigesAujourdhui: number };
+
 export default function AdminGroupWork() {
   const [data, setData] = useState<{ parTravail: BlocTravail[]; travaux: any[] } | null>(null);
+  const [statutIA, setStatutIA] = useState<StatutIA | null>(null);
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState("");
   const [msg, setMsg] = useState("");
   const [onglet, setOnglet] = useState<"groupes" | "enonces" | "promotions" | "retards">("groupes");
 
   const charger = async () => {
-    const d = await adminFetch("/api/admin/academy/groups").then(r => r.json()).catch(() => null);
+    const [d, s] = await Promise.all([
+      adminFetch("/api/admin/academy/groups").then(r => r.json()).catch(() => null),
+      adminFetch("/api/admin/academy/group-work-ia-status").then(r => r.json()).catch(() => null),
+    ]);
     setData(d);
+    setStatutIA(s);
   };
   useEffect(() => { (async () => { await charger(); setLoading(false); })(); }, []);
 
@@ -104,7 +111,12 @@ export default function AdminGroupWork() {
     );
   }
 
-  const aCorriger = data.parTravail.flatMap(b => b.groupes.flatMap(g => g.rendus.filter(r => r.statut !== "graded"))).length;
+  const rendusEnAttente = data.parTravail.flatMap(b => b.groupes.flatMap(g => g.rendus.filter(r => r.statut !== "graded")));
+  const aCorriger = rendusEnAttente.length;
+  // Un rendu que l'IA a déjà tenté et manqué n'attend plus son tour dans la file du jour —
+  // il attend un formateur. Le distinguer évite de croire que « ça va se corriger tout seul »
+  // pour un rendu qui, en réalité, ne repassera plus tout seul.
+  const aValiderManuellement = rendusEnAttente.filter(r => !!r.erreurIA).length;
 
   return (
     <div className="space-y-6">
@@ -114,6 +126,34 @@ export default function AdminGroupWork() {
           Une équipe différente est tirée au sort pour chaque travail, une semaine avant son
           ouverture. {aCorriger} rendu{aCorriger > 1 ? "s" : ""} à corriger.
         </p>
+      </div>
+
+      {/* ── File de correction IA, en un coup d'œil ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-card rounded-2xl border border-border/50 p-4">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center mb-3"><ClipboardCheck className="w-[18px] h-[18px]" /></div>
+          <p className="text-2xl font-bold chiffres-tabulaires">{aCorriger}</p>
+          <p className="text-xs text-muted-foreground mt-1.5">Rendus en attente</p>
+        </div>
+        <div className="bg-card rounded-2xl border border-border/50 p-4">
+          <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center mb-3"><Sparkles className="w-[18px] h-[18px]" /></div>
+          <p className="text-2xl font-bold chiffres-tabulaires">{statutIA?.corrigesAujourdhui ?? "—"}</p>
+          <p className="text-xs text-muted-foreground mt-1.5">Corrigés par l'IA aujourd'hui</p>
+        </div>
+        <div className="bg-card rounded-2xl border border-border/50 p-4">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3"><Gauge className="w-[18px] h-[18px]" /></div>
+          <p className="text-2xl font-bold chiffres-tabulaires">
+            {statutIA ? `${Math.max(0, statutIA.quotaMax - statutIA.quotaUtilisee)}/${statutIA.quotaMax}` : "—"}
+          </p>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            {statutIA && !statutIA.configuree ? "Quota IA — GEMINI_API_KEY absente" : "Quota IA restant aujourd'hui"}
+          </p>
+        </div>
+        <div className="bg-card rounded-2xl border border-border/50 p-4">
+          <div className="w-9 h-9 rounded-xl bg-red-500/10 text-red-600 flex items-center justify-center mb-3"><ShieldAlert className="w-[18px] h-[18px]" /></div>
+          <p className="text-2xl font-bold chiffres-tabulaires">{aValiderManuellement}</p>
+          <p className="text-xs text-muted-foreground mt-1.5">À corriger manuellement (échec IA)</p>
+        </div>
       </div>
 
       {msg && <p className="text-sm text-primary bg-primary/5 border border-primary/20 rounded-xl px-3 py-2">{msg}</p>}
