@@ -3027,6 +3027,62 @@ app.get("/api/cron/late-warnings", alertesDeRetard);
 app.post("/api/cron/late-warnings", alertesDeRetard);
 
 /**
+ * Classement hebdomadaire par parcours, envoyé à tous les inscrits.
+ *
+ * Hebdomadaire, mais SANS verrou dédié : le verrou du jour d'`executerTache` suffit, car
+ * cette tâche n'est déclenchée qu'une fois par semaine (voir le workflow GitHub Actions
+ * classement-hebdo.yml) — la date du jour de ce seul appel hebdomadaire est déjà une clé
+ * unique d'une semaine à l'autre, sans qu'il faille calculer un numéro de semaine ISO.
+ *
+ * Un parcours sans aucune note n'envoie rien : un classement vide serait du bruit, pas une
+ * information.
+ */
+async function corpsClassementHebdomadaire(): Promise<Record<string, unknown>> {
+  const jour = new Date().toISOString().slice(0, 10);
+  let parcoursAnnonces = 0, envoyes = 0, ignores = 0;
+  const parParcours: Record<string, number> = {};
+
+  for (const programme of PROGRAMS) {
+    const idsCours = await coursDuParcours(programme.id);
+    if (!idsCours.length) continue;
+
+    const classement = await classementPoints(idsCours);
+    if (!classement.length) continue;
+
+    const { data: inscriptions } = await supabase.from("enrollments")
+      .select("student_id").in("course_id", idsCours);
+    const idsInscrits = [...new Set((inscriptions || []).map((i: any) => i.student_id))];
+    if (!idsInscrits.length) continue;
+
+    const { data: eleves } = await supabase.from("students")
+      .select("id, full_name, email, course_emails, email_verified").in("id", idsInscrits);
+
+    parcoursAnnonces++;
+    let envoyesParcours = 0;
+    for (const e of eleves || []) {
+      if (!e.email || e.course_emails === false || !e.email_verified) { ignores++; continue; }
+      const r = await sendAcademyEmail({
+        studentId: e.id, to: e.email, type: "classement_hebdo",
+        subject: `🏆 Classement de la semaine — ${programme.title}`,
+        html: classementHebdoEmailHtml(e.full_name, programme, classement),
+        dedupeKey: `classement_hebdo:${programme.id}:${jour}:${e.id}`,
+      });
+      if (r.sent) { envoyes++; envoyesParcours++; } else ignores++;
+    }
+    parParcours[programme.id] = envoyesParcours;
+  }
+
+  console.log(`classement-hebdo: ${envoyes} e-mail(s) envoyé(s) sur ${parcoursAnnonces} parcours actif(s).`, parParcours);
+  return { parcoursAnnonces, envoyes, ignores, parParcours };
+}
+
+const classementHebdomadaire = (req: Request, res: Response) =>
+  executerTache("classement-hebdo", req, res, corpsClassementHebdomadaire);
+
+app.get("/api/cron/classement-hebdo", classementHebdomadaire);
+app.post("/api/cron/classement-hebdo", classementHebdomadaire);
+
+/**
  * Registre des tâches quotidiennes.
  *
  * Il existe pour une seule raison : permettre de lancer une tâche depuis
@@ -3039,6 +3095,7 @@ app.post("/api/cron/late-warnings", alertesDeRetard);
 const TACHES_PLANIFIEES: Record<string, () => Promise<Record<string, unknown>>> = {
   "verify-reminders": corpsRelancesDeVerification,
   "late-warnings": corpsAlertesDeRetard,
+  "classement-hebdo": corpsClassementHebdomadaire,
 };
 
 /**
@@ -3570,6 +3627,14 @@ function quizExpireEmailHtml(name: string, course: { code: string; title: string
 
 function quizRappelEmailHtml(name: string, course: { code: string; title: string }, lessonTitle: string, lienQuiz: string) {
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Il reste 10 minutes ⏳</h1><p class="sub">${course.title}</p></div><div class="bd"><p>Bonjour ${name},</p><p>Le quiz de la leçon <strong>${lessonTitle}</strong> est en cours, et il reste environ dix minutes avant la fin du temps imparti. Passé ce délai, la note enregistrée sera 0, même si le quiz n'est pas commencé.</p><p style="text-align:center;margin-top:20px"><a href="${lienQuiz}" class="btn">Reprendre le quiz</a></p></div>`);
+}
+
+/** Le classement d'un parcours, envoyé chaque semaine à tous les inscrits — voir corpsClassementHebdomadaire. */
+function classementHebdoEmailHtml(
+  name: string, programme: { title: string }, classement: { student_id: number; full_name: string; total: number }[],
+): string {
+  const lignes = classement.map((c, i) => `<li><span class="n">${i + 1}</span> ${c.full_name} — <strong>${c.total} pts</strong></li>`).join("");
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>🏆 Classement de la semaine</h1><p class="sub">${programme.title}</p></div><div class="bd"><p>Bonjour ${name},</p><p>Voici le top 10 de votre parcours, au cumul des points obtenus depuis le début :</p><ul class="steps">${lignes}</ul><p style="text-align:center;margin-top:20px"><a href="${SITE_URL}/academy/login" class="btn">Voir mon classement</a></p></div>`);
 }
 
 app.get("/api/academy/lesson-quiz/:lessonId", requireStudent, async (req, res) => {
@@ -6227,28 +6292,59 @@ app.get("/api/admin/academy/stats", requireAuth, async (_req, res) => {
   });
 });
 
-// ── Classement de la promotion : cumul des points, tous cours confondus ──
+// ── Classement : cumul des points, tous cours confondus ou restreints à un parcours ──
 //
 // « Cumul » et non « moyenne » : un étudiant sur cinq cours pèse plus qu'un étudiant sur un
 // seul, et c'est voulu — c'est un tableau d'assiduité et de volume, pas une moyenne pondérée
 // qui favoriserait quelqu'un n'ayant tenté qu'une leçon facile. Agrégé ici en JS plutôt qu'en
 // SQL : la table `grades` reste modeste (quelques centaines de lignes au plus), et supabase-js
 // n'exprime pas un GROUP BY sans fonction Postgres dédiée à écrire et maintenir pour ça seul.
-app.get("/api/admin/academy/leaderboard", requireAuth, async (_req, res) => {
-  const { data: grades } = await supabase.from("grades").select("student_id, score");
+//
+// `idsCours` restreint le cumul aux cours d'UN parcours (classement par parcours, envoyé
+// chaque semaine — voir corpsClassementHebdomadaire) ; omis, il porte sur tous les cours
+// (classement global de l'administration).
+async function classementPoints(idsCours?: number[]): Promise<{ student_id: number; full_name: string; total: number }[]> {
+  let requete = supabase.from("grades").select("student_id, score");
+  if (idsCours) requete = requete.in("course_id", idsCours);
+  const { data: grades } = await requete;
   const totaux = new Map<number, number>();
   for (const g of grades || []) {
     totaux.set(g.student_id, (totaux.get(g.student_id) || 0) + Number(g.score || 0));
   }
   const ids = [...totaux.keys()];
-  if (!ids.length) return res.json([]);
+  if (!ids.length) return [];
   const { data: eleves } = await supabase.from("students").select("id, full_name").in("id", ids);
   const noms = new Map((eleves || []).map((e: any) => [e.id, e.full_name]));
-  const classement = [...totaux.entries()]
+  return [...totaux.entries()]
     .map(([student_id, total]) => ({ student_id, full_name: noms.get(student_id) || "—", total }))
     .sort((a, b) => b.total - a.total)
     .slice(0, 10);
-  res.json(classement);
+}
+
+/** Identifiants des cours publiés d'un parcours donné. */
+async function coursDuParcours(programId: string): Promise<number[]> {
+  const { data: courses } = await supabase.from("sms_courses").select("id, code").eq("is_published", true);
+  return (courses || []).filter((c: any) => programOf(c.code)?.id === programId).map((c: any) => c.id);
+}
+
+app.get("/api/admin/academy/leaderboard", requireAuth, async (_req, res) => {
+  res.json(await classementPoints());
+});
+
+// ── Classement d'un parcours, consultable par tout étudiant qui y est inscrit ──
+app.get("/api/academy/leaderboard/:programId", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const programId = String(req.params.programId);
+  if (!PROGRAMS.some(p => p.id === programId)) return res.status(404).json({ message: "Parcours introuvable." });
+
+  const idsCours = await coursDuParcours(programId);
+  if (!idsCours.length) return res.json({ classement: [] });
+
+  const { data: monInscription } = await supabase.from("enrollments")
+    .select("id").eq("student_id", sid).in("course_id", idsCours).limit(1).maybeSingle();
+  if (!monInscription) return res.status(403).json({ message: "Vous n'êtes pas inscrit(e) à ce parcours." });
+
+  res.json({ classement: await classementPoints(idsCours) });
 });
 
 
