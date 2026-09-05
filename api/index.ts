@@ -1973,6 +1973,184 @@ async function applyGroupWorkGrade(submissionId: number) {
   return { notified };
 }
 
+// ══════════════════════════════════════════════════════════════════
+// Correction automatique des travaux de groupe par Gemini
+//
+// Les étudiants rédigent leur rapport à plusieurs dans un Google Doc (voir les consignes
+// affichées dans /academy/group-work), puis l'exportent en PDF et le déposent exactement
+// comme avant — /api/academy/group-work/:id/submit ne change pas. Ce qui change, c'est
+// qu'une tâche quotidienne (corpsCorrectionIAGroupWork, tout en bas de cette section) lit
+// chaque rapport en attente et le fait noter par Gemini selon la grille du travail, avant
+// d'appliquer la note exactement comme le ferait applyGroupWorkGrade pour une correction
+// manuelle — l'étudiant ne voit aucune différence entre les deux.
+// ══════════════════════════════════════════════════════════════════
+
+/**
+ * Demande à Gemini de lire un rapport PDF et de le noter selon une grille.
+ *
+ * Le score de chaque critère est demandé par sa CLÉ (pas son libellé) et reborné ici même
+ * (0 au minimum, le maximum du critère au plus) — exactement la même garde que la saisie
+ * manuelle de l'administration (voir PUT /api/admin/academy/group-submissions/:id), pour
+ * qu'une correction IA ne puisse jamais produire une note hors barème par une réponse
+ * imprévue du modèle. `responseSchema` force une sortie JSON structurée : pas de texte à
+ * parser à l'aveugle autour de la note.
+ */
+async function graderAvecGemini(
+  pdf: Buffer,
+  enonce: string,
+  grille: { cle: string; libelle: string; points: number }[],
+  maxScore: number,
+): Promise<{ scores: Record<string, number>; feedback: string } | null> {
+  const modele = process.env.GEMINI_MODEL || "gemini-2.0-flash";
+  const prompt = [
+    "Tu es un correcteur pédagogique pour un cursus MEAL (Suivi, Évaluation, Apprentissage) en français.",
+    "Voici l'énoncé du travail de groupe à corriger :",
+    "---", enonce || "(énoncé non renseigné)", "---",
+    "Voici la grille de notation, un critère par ligne (clé technique : intitulé — points maximum) :",
+    ...grille.map(c => `- ${c.cle} : ${c.libelle} — ${c.points} points maximum`),
+    `Le total maximum du travail est de ${maxScore} points.`,
+    "Le rapport du groupe est joint en pièce jointe PDF. Lis-le entièrement, évalue-le honnêtement",
+    "selon CHAQUE critère de la grille (ni complaisant, ni sévère au-delà de ce que justifie le texte),",
+    "et attribue un nombre de points ENTIER pour CHAQUE critère (0 au minimum, son maximum indiqué au",
+    "plus). Rédige aussi un retour constructif en français (8 à 12 lignes), qui cite des éléments",
+    "précis du rapport, salue ce qui est réussi et signale ce qui manque ou pourrait être amélioré —",
+    "ce retour est envoyé directement aux étudiants, garde un ton bienveillant.",
+  ].join("\n");
+
+  const schema = {
+    type: "OBJECT",
+    properties: {
+      scores: {
+        type: "ARRAY",
+        items: {
+          type: "OBJECT",
+          properties: { cle: { type: "STRING" }, points: { type: "NUMBER" } },
+          required: ["cle", "points"],
+        },
+      },
+      feedback: { type: "STRING" },
+    },
+    required: ["scores", "feedback"],
+  };
+
+  const resp = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${modele}:generateContent?key=${process.env.GEMINI_API_KEY}`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        contents: [{ parts: [
+          { text: prompt },
+          { inline_data: { mime_type: "application/pdf", data: pdf.toString("base64") } },
+        ] }],
+        generationConfig: { responseMimeType: "application/json", responseSchema: schema, temperature: 0.2 },
+      }),
+    },
+  );
+  if (!resp.ok) throw new Error(`Gemini a répondu ${resp.status} : ${(await resp.text()).slice(0, 300)}`);
+
+  const json: any = await resp.json();
+  const texte = json?.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!texte) {
+    const raison = json?.promptFeedback?.blockReason || json?.candidates?.[0]?.finishReason || "raison inconnue";
+    throw new Error(`Gemini n'a renvoyé aucun résultat exploitable (${raison}).`);
+  }
+
+  let brut: any;
+  try { brut = JSON.parse(texte); }
+  catch { throw new Error("Réponse Gemini illisible (JSON invalide)."); }
+
+  const scoresRecus: { cle: string; points: number }[] = Array.isArray(brut?.scores) ? brut.scores : [];
+  const scores: Record<string, number> = {};
+  for (const c of grille) {
+    const trouve = scoresRecus.find(s => s?.cle === c.cle);
+    const valeur = Number(trouve?.points);
+    scores[c.cle] = Number.isFinite(valeur) ? Math.min(c.points, Math.max(0, Math.round(valeur))) : 0;
+  }
+  const feedback = String(brut?.feedback || "").slice(0, 3000).trim()
+    || "Correction automatique — aucun commentaire fourni par le correcteur.";
+  return { scores, feedback };
+}
+
+/**
+ * Tâche quotidienne : corrige les rendus de groupe en attente, dans la limite du quota
+ * Gemini du jour (GEMINI_DAILY_QUOTA, quota gratuit de l'API — 45 par défaut si absent).
+ *
+ * Le compteur `academy_gemini_quota` n'est incrémenté qu'après un appel RÉELLEMENT
+ * effectué (succès ou échec côté Gemini) : un rendu ignoré faute de grille, ou dont le PDF
+ * est injoignable avant même l'appel, ne consomme rien. Un rendu qui échoue reste au
+ * statut « submitted » — il repasse dans le prochain lot, ou attend une correction
+ * manuelle si l'échec se répète (voir ai_attempts/ai_error, visibles dans le panneau
+ * d'administration). Rien n'est jamais noté deux fois : dès qu'un rendu passe à
+ * « graded », il sort de la file de cette tâche.
+ */
+async function corpsCorrectionIAGroupWork(): Promise<Record<string, unknown>> {
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn("correction-ia-group-work : GEMINI_API_KEY absente, tâche ignorée.");
+    return { ignoree: true, raison: "GEMINI_API_KEY absente" };
+  }
+
+  const jour = new Date().toISOString().slice(0, 10);
+  const quotaMax = Math.max(1, Number(process.env.GEMINI_DAILY_QUOTA) || 45);
+  const { data: quotaLigne } = await supabase.from("academy_gemini_quota")
+    .select("utilisees").eq("jour", jour).maybeSingle();
+  let utilisees = quotaLigne?.utilisees ?? 0;
+  if (!quotaLigne) await supabase.from("academy_gemini_quota").insert({ jour, utilisees: 0 }).then(() => {}, () => {});
+
+  const gws = await getGroupWorks();
+  const { data: rendus } = await supabase.from("academy_group_submissions")
+    .select("id, group_work_id, report_url, ai_attempts")
+    .eq("status", "submitted").order("submitted_at", { ascending: true });
+
+  let corriges = 0, enFileAttente = 0, echecs = 0, ignores = 0;
+  for (const r of rendus || []) {
+    if (utilisees >= quotaMax) { enFileAttente++; continue; }
+    // Cinq échecs sur le même rendu (PDF corrompu, format inattendu…) : on cesse de
+    // réessayer chaque jour pour rien — il attend une correction manuelle.
+    if ((r.ai_attempts ?? 0) >= 5) { ignores++; continue; }
+
+    const gw = gws.find(g => g.id === r.group_work_id);
+    const grille: { cle: string; libelle: string; points: number }[] = Array.isArray(gw?.rubric) ? gw!.rubric : [];
+    if (!gw || !grille.length) { ignores++; continue; }
+
+    try {
+      const pdfResp = await fetch(r.report_url);
+      if (!pdfResp.ok) throw new Error(`Rapport PDF injoignable (HTTP ${pdfResp.status}).`);
+      const pdfBuf = Buffer.from(await pdfResp.arrayBuffer());
+      if (pdfBuf.byteLength > 18 * 1024 * 1024) throw new Error("Rapport PDF trop volumineux pour Gemini (18 Mo max).");
+
+      const resultat = await graderAvecGemini(pdfBuf, gw.brief, grille, gw.max_score ?? 100);
+      utilisees++;
+      await supabase.from("academy_gemini_quota").update({ utilisees }).eq("jour", jour).then(() => {}, () => {});
+      if (!resultat) throw new Error("Réponse Gemini vide.");
+
+      const note = grille.reduce((s, c) => s + (resultat.scores[c.cle] ?? 0), 0);
+      await supabase.from("academy_group_submissions").update({
+        score: note, feedback: resultat.feedback, rubric_scores: resultat.scores,
+        status: "graded", graded_at: new Date().toISOString(), graded_by: "ia", ai_error: null,
+      }).eq("id", r.id);
+      await applyGroupWorkGrade(r.id);
+      corriges++;
+    } catch (e: any) {
+      echecs++;
+      const message = String(e?.message || e).slice(0, 500);
+      await supabase.from("academy_group_submissions")
+        .update({ ai_attempts: (r.ai_attempts ?? 0) + 1, ai_error: message })
+        .eq("id", r.id).then(() => {}, () => {});
+      console.error(`correction-ia-group-work : échec sur le rendu ${r.id} —`, message);
+    }
+  }
+
+  console.log(`correction-ia-group-work : ${corriges} corrigé(s), ${enFileAttente} en file (quota), ${echecs} échec(s), ${ignores} ignoré(s). Quota du jour : ${utilisees}/${quotaMax}.`);
+  return { corriges, enFileAttente, echecs, ignores, quotaUtilise: utilisees, quotaMax };
+}
+
+const correctionIAGroupWork = (req: Request, res: Response) =>
+  executerTache("correction-ia-group-work", req, res, corpsCorrectionIAGroupWork);
+
+app.get("/api/cron/correction-ia-group-work", correctionIAGroupWork);
+app.post("/api/cron/correction-ia-group-work", correctionIAGroupWork);
+
 // Recalcule la progression d'un cours à partir des notes de type "lesson" actuellement en base,
 // met à jour l'inscription, et déclenche les emails/certificats de fin de cours si nécessaire.
 // Appelé après tout changement de note (complétion de leçon, ajout/suppression admin) pour que
@@ -3109,6 +3287,7 @@ const TACHES_PLANIFIEES: Record<string, () => Promise<Record<string, unknown>>> 
   "verify-reminders": corpsRelancesDeVerification,
   "late-warnings": corpsAlertesDeRetard,
   "classement-hebdo": corpsClassementHebdomadaire,
+  "correction-ia-group-work": corpsCorrectionIAGroupWork,
 };
 
 /**
@@ -6420,7 +6599,7 @@ app.get("/api/admin/academy/groups", requireAuth, async (_req, res) => {
   if (error) return res.status(500).json({ message: error.message });
 
   const { data: rendus } = await supabase.from("academy_group_submissions")
-    .select("id, group_id, group_work_id, status, score, feedback, content, submitted_at, graded_at, students:submitted_by(full_name)");
+    .select("id, group_id, group_work_id, status, score, feedback, content, submitted_at, graded_at, students:submitted_by(full_name), report_url, report_name, archive_url, archive_name, rubric_scores, graded_by, ai_attempts, ai_error");
 
   const { data: admis } = await supabase.from("students")
     .select("id, full_name, email, admitted_at").not("admitted_at", "is", null).order("admitted_at");
@@ -6443,6 +6622,10 @@ app.get("/api/admin/academy/groups", requireAuth, async (_req, res) => {
         rendus: (rendus || []).filter((r: any) => r.group_id === g.id).map((r: any) => ({
           id: r.id, groupWorkId: r.group_work_id, statut: r.status, note: r.score, feedback: r.feedback,
           contenu: r.content, le: r.submitted_at, corrigeLe: r.graded_at, par: r.students?.full_name ?? null,
+          rapport: r.report_url ? { url: r.report_url, nom: r.report_name } : null,
+          archive: r.archive_url ? { url: r.archive_url, nom: r.archive_name } : null,
+          notesParCritere: r.rubric_scores ?? null,
+          corrigePar: r.graded_by, tentativesIA: r.ai_attempts ?? 0, erreurIA: r.ai_error ?? null,
         })),
       })),
       sansGroupe: (admis || []).filter((s: any) => !places.has(s.id))
@@ -6610,7 +6793,10 @@ app.put("/api/admin/academy/group-submissions/:id", requireAuth, async (req, res
 
   const { data, error } = await supabase.from("academy_group_submissions")
     .update({ score: Math.round(note), feedback: feedback ? String(feedback).slice(0, 3000) : null,
-              status: "graded", graded_at: new Date().toISOString(), rubric_scores: detail })
+              status: "graded", graded_at: new Date().toISOString(), rubric_scores: detail,
+              // Une correction manuelle fait toujours foi, y compris pour remplacer une note
+              // posée par l'IA : elle efface l'erreur éventuelle qui l'accompagnait.
+              graded_by: "admin", ai_error: null })
     .eq("id", id).select().maybeSingle();
   if (error) return res.status(400).json({ message: error.message });
 

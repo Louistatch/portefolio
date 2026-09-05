@@ -21,6 +21,9 @@ type Membre = { studentId: number; nom: string; email: string; role: string };
 type Rendu = {
   id: number; groupWorkId: number; statut: string; note: number | null; feedback: string | null;
   contenu: any; le: string; corrigeLe: string | null; par: string | null;
+  rapport?: { url: string; nom: string } | null; archive?: { url: string; nom: string } | null;
+  notesParCritere?: Record<string, number> | null;
+  corrigePar?: string | null; tentativesIA?: number; erreurIA?: string | null;
 };
 type Groupe = { id: number; nom: string; cohorte: string; actif?: boolean; membres: Membre[]; rendus: Rendu[] };
 
@@ -352,6 +355,11 @@ function LigneRendu({ travail, rendu, pairs, onCorrige }:
         <span className="text-xs text-muted-foreground">
           rendu le {jour(rendu.le)}{rendu.par ? ` par ${rendu.par}` : ""}
         </span>
+        {corrige && rendu.corrigePar === "ia" && (
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600">
+            Corrigé par l'IA
+          </span>
+        )}
         <span className={`ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full ${
           corrige ? "bg-primary text-white" : "bg-amber-500/15 text-amber-600"}`}>
           {corrige ? `${rendu.note}/${travail.maxScore}` : "à corriger"}
@@ -362,6 +370,16 @@ function LigneRendu({ travail, rendu, pairs, onCorrige }:
           {ouvert ? "Fermer" : corrige ? "Modifier" : "Corriger"}
         </button>
       </div>
+
+      {/* La correction IA repasse chaque jour tant qu'elle échoue (PDF illisible, quota
+          Gemini…) : ce bandeau est ce qui évite qu'un rendu reste bloqué en silence — il dit
+          pourquoi, et invite à corriger à la main plutôt que d'attendre indéfiniment. */}
+      {!corrige && !!rendu.erreurIA && (
+        <p className="flex items-start gap-1.5 text-[11px] text-amber-700 dark:text-amber-400 mt-2">
+          <AlertCircle className="w-3 h-3 mt-0.5 shrink-0" />
+          Correction IA en échec ({rendu.tentativesIA ?? 1} tentative{(rendu.tentativesIA ?? 1) > 1 ? "s" : ""}) — {rendu.erreurIA}
+        </p>
+      )}
 
       {/* Les fichiers restent visibles fermé : c'est ce qu'on va chercher le plus souvent. */}
       {(rendu.rapport || rendu.archive) && (

@@ -316,6 +316,43 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
           </div>
         )}
 
+        {/* ── Rédiger à plusieurs, avant le dépôt ──
+            Le dépôt reste un PDF, inchangé : ce qui change, c'est la manière de RÉDIGER ce
+            PDF. Un Google Doc partagé permet au groupe d'écrire ensemble, en même temps,
+            au lieu de s'échanger des versions par email. La structure recommandée reprend
+            les intitulés de LA GRILLE DE CE TRAVAIL — pas un plan générique — pour que le
+            document réponde exactement à ce qui sera noté, correction humaine ou automatique. */}
+        {t.grille?.length > 0 && t.statut !== "completed" && (
+          <div className="rounded-xl border border-border/60 bg-primary/[0.03] p-4 space-y-2.5">
+            <p className="text-sm font-semibold flex items-center gap-2">
+              <Users className="w-4 h-4 text-primary" /> Rédiger le rapport à plusieurs, dans Google Docs
+            </p>
+            <ol className="space-y-2 text-sm text-muted-foreground list-decimal list-inside">
+              <li>
+                Un membre du groupe crée un Google Doc et le partage avec les autres en mode{" "}
+                <strong className="text-foreground">Éditeur</strong> (bouton Partager, en collant les
+                adresses email de l'équipe) : vous rédigez alors ensemble, en même temps.
+              </li>
+              <li>
+                Structurez le document avec un titre par critère de la grille de notation, dans cet ordre :
+                <ul className="mt-1.5 space-y-1 ml-1">
+                  {t.grille.map((c: any) => (
+                    <li key={c.cle} className="flex items-start gap-2">
+                      <span className="w-1 h-1 rounded-full bg-primary mt-[7px] shrink-0" />
+                      <span>{c.libelle} <span className="text-xs">({c.points} pts)</span></span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+              <li>
+                Une fois le rapport terminé : dans Google Docs, <strong className="text-foreground">
+                Fichier → Télécharger → Document PDF</strong>, puis déposez ce PDF ci-dessous comme
+                rapport du groupe — c'est ce fichier, et lui seul, qui est ensuite corrigé.
+              </li>
+            </ol>
+          </div>
+        )}
+
         {verrouille ? (
           <p className="text-sm text-muted-foreground">
             Le dépôt s'ouvrira le {jour(t.ouvertureLe)}.
