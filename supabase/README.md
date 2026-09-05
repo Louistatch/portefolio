@@ -42,6 +42,7 @@ base. Lisez cette page avant d'en lancer un.
 | 31 | `academy_ambassadeurs.sql` | Programme ambassadeur : code de parrainage, filleul (`referred_by_student_id`), commissions (20 % du prix payé) |
 | 32 | `academy_exclusion_classement.sql` | `students.exclude_from_leaderboard` — retire un compte (ex. celui de l'administrateur) des classements sans toucher à ses notes |
 | 33 | `academy_grades_programme.sql` | `grades.program_id` — rattache une note de test d'admission ou de travail de groupe à son parcours (les notes de leçon le déduisent déjà du cours) |
+| 34 | `academy_group_work_ia.sql` | Correction automatique des travaux de groupe par Gemini : `graded_by`/`ai_attempts`/`ai_error` sur les rendus, `academy_gemini_quota` pour le quota journalier |
 
 Les trois derniers sont des **artefacts générés**, pas des sources : le contenu vit dans
 `shared/fca-01.ts`, `shared/fcq-01.ts` et `shared/coop-01.ts`, et le SQL en est la projection

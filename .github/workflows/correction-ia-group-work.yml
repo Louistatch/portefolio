@@ -1,0 +1,93 @@
+# ══════════════════════════════════════════════════════════════
+# Correction automatique des travaux de groupe par Gemini
+#
+# ── Pourquoi un quatrième workflow ──
+#
+# Vercel (offre gratuite) n'accepte que deux tâches planifiées dans vercel.json — déjà
+# prises par verify-reminders et late-warnings. classement-hebdo.yml a montré la voie pour
+# une troisième tâche hebdomadaire sans y toucher ; celle-ci en est une quatrième,
+# quotidienne, sur le même principe : GitHub Actions comme SEUL ordonnanceur, avec ses
+# propres journaux (onglet Actions du dépôt).
+#
+# ── Ce que fait la tâche appelée ──
+#
+# Elle lit chaque rapport de travail de groupe déposé et pas encore corrigé, le fait noter
+# par Gemini selon la grille du travail, puis applique la note — exactement comme le ferait
+# un formateur depuis /pagesecure/travaux-de-groupe. Le quota gratuit de l'API Gemini se
+# renouvelle chaque jour : tout ce qui dépasse GEMINI_DAILY_QUOTA (variable d'environnement
+# côté hébergeur, 45 par défaut) reste au statut « submitted » et repasse dans le lot du
+# lendemain — sans aucune action de votre part.
+#
+# ── Ce qu'il faut pour qu'elle fonctionne ──
+#
+#   1. Le même secret de dépôt CRON_SECRET que les trois autres workflows.
+#   2. Côté hébergeur : la variable d'environnement GEMINI_API_KEY (clé Google AI Studio).
+#      Sans elle, la tâche répond « ignorée » sans erreur — c'est volontaire, tant que la
+#      clé n'est pas posée, la fonctionnalité reste simplement éteinte.
+#
+# ── L'adresse doit porter le www ──
+#
+# louisfarm.com répond 307 vers www.louisfarm.com ; curl ne suit pas les redirections sans
+# -L, et -L supprimerait l'en-tête Authorization en changeant d'hôte. D'où l'adresse par
+# défaut avec www, et la vérification explicite du code HTTP.
+# ══════════════════════════════════════════════════════════════
+name: Correction IA des travaux de groupe
+
+on:
+  schedule:
+    # 10h00 UTC, après les tâches quotidiennes (09h40) — le temps que la journée de dépôt
+    # se termine avant de lancer la correction.
+    - cron: "0 10 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: correction-ia-group-work
+  cancel-in-progress: false
+
+jobs:
+  corriger:
+    name: Corriger les rendus en attente
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Vérifier que le secret est en place
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Le secret de dépôt CRON_SECRET est absent."
+            echo "Settings → Secrets and variables → Actions → New repository secret,"
+            echo "nom CRON_SECRET, avec la même valeur que la variable d'environnement"
+            echo "CRON_SECRET côté hébergeur."
+            exit 1
+          fi
+          echo "Secret présent."
+
+      - name: Lancer la correction
+        env:
+          BASE: ${{ vars.SITE_URL || 'https://www.louisfarm.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -sS --max-time 300 -o reponse.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/cron/correction-ia-group-work")
+          cat reponse.json; echo
+          if [ "$code" -ge 300 ]; then
+            echo "::error::HTTP $code sur $BASE/api/cron/correction-ia-group-work"
+            if [ "$code" -lt 400 ]; then
+              echo "C'est une redirection : l'adresse n'est pas la bonne (il manque le www),"
+              echo "ou la variable de dépôt SITE_URL ne le porte pas."
+            fi
+            exit 1
+          fi
+          echo "HTTP $code"
+
+      - name: Lire le verdict
+        if: always()
+        run: |
+          echo "\"ignoree\": true signifie que GEMINI_API_KEY n'est pas encore configurée côté"
+          echo "hébergeur — ce n'est pas un échec, la fonctionnalité est simplement éteinte."
+          echo "Sinon, le corps de la réponse donne : corriges, enFileAttente (quota atteint,"
+          echo "réessayé demain), echecs (PDF illisible ou réponse Gemini invalide — voir"
+          echo "ai_error sur le rendu concerné dans /pagesecure/travaux-de-groupe), et le"
+          echo "quota du jour (quotaUtilise/quotaMax)."
