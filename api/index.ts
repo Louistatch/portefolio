@@ -12,7 +12,7 @@ import fs from "fs";
 // production (ERR_MODULE_NOT_FOUND) alors que le build, lui, passe sans broncher.
 import {
   gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT,
-  plafondDeNote, resultatsSansCorrection,
+  plafondDeNote, resultatsSansCorrection, materialiserExercicesParametres, graineExercice,
 } from "../shared/exercises.js";
 import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
 import { leconOuverte, semainesNecessaires, FENETRE_ADMISSION_SEMAINES } from "../shared/rythme.js";
@@ -1062,6 +1062,25 @@ function requireStudent(req: Request, res: Response, next: NextFunction) {
     next();
   } catch {
     return res.status(401).json({ message: "Session expirée" });
+  }
+}
+
+/**
+ * L'identifiant de l'étudiant s'il est connecté, sans jamais refuser la requête.
+ *
+ * Sert au tirage des exercices paramétrés : une page de cours reste consultable sans
+ * connexion (aperçu public), mais le tirage doit dépendre de QUI regarde dès qu'on le sait,
+ * pour que deux étudiants ne voient jamais la correction l'un de l'autre.
+ */
+function identifiantEtudiantOptionnel(req: Request): number | null {
+  const header = req.headers.authorization;
+  const token = header?.startsWith("Bearer ") ? header.slice(7) : (req.query.token as string | undefined);
+  if (!token) return null;
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as any;
+    return decoded.role === "student" ? Number(decoded.sid) : null;
+  } catch {
+    return null;
   }
 }
 
@@ -3280,11 +3299,29 @@ app.get("/api/academy/courses/:id", async (req, res) => {
   const { data: course, error } = await supabase.from("sms_courses").select("*").eq("id", Number(req.params.id)).eq("is_published", true).single();
   if (error) return res.status(404).json({ message: "Cours introuvable" });
   const { data: lessons } = await supabase.from("sms_lessons").select("*").eq("course_id", course.id).order("order_index");
-  // Le contenu part vers le navigateur : les corrigés d'exercices en sont retirés.
+
+  // Tentatives déjà faites, par leçon — c'est ce compteur qui fait changer le tirage d'un
+  // exercice paramétré à chaque nouvel essai, sans qu'il soit besoin de stocker le tirage
+  // lui-même nulle part : /api/academy/complete-lesson lit le même compteur pour retrouver
+  // exactement les mêmes valeurs à la correction. Route publique (aperçu avant connexion) :
+  // sans étudiant identifié, le tirage reste fixe, faute d'avoir quelqu'un à qui le dédier.
+  const sid = identifiantEtudiantOptionnel(req);
+  const tentativesParLecon = new Map<number, number>();
+  if (sid && lessons?.length) {
+    const { data: progressions } = await supabase.from("lesson_progress")
+      .select("lesson_id, tentatives").eq("student_id", sid).in("lesson_id", lessons.map((l: any) => l.id));
+    for (const p of progressions || []) tentativesParLecon.set(p.lesson_id, Number(p.tentatives) || 0);
+  }
+
+  // Le contenu part vers le navigateur : les corrigés d'exercices en sont retirés. Un
+  // exercice paramétré est d'abord matérialisé pour CE tirage — sinon stripExerciseAnswers
+  // retirerait sa formule sans jamais lui avoir substitué de valeurs concrètes dans l'énoncé.
   const safeLessons = (lessons || []).map((l: any) => {
     let content = l.content;
     if (typeof content === "string") { try { content = JSON.parse(content); } catch { content = null; } }
-    return { ...l, content: content ? stripExerciseAnswers(content) : l.content };
+    if (!content) return { ...l, content };
+    const grainesBase = graineExercice(sid ?? 0, `${l.id}:${tentativesParLecon.get(l.id) ?? 0}`);
+    return { ...l, content: stripExerciseAnswers(materialiserExercicesParametres(content, grainesBase)) };
   });
   res.json({ ...course, lessons: safeLessons });
 });
@@ -3403,6 +3440,17 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   // cliquant : la note reflète les réponses produites par l'étudiant.
   let lessonContent = lesson.content;
   if (typeof lessonContent === "string") { try { lessonContent = JSON.parse(lessonContent); } catch { lessonContent = null; } }
+
+  // Lu AVANT de l'incrémenter plus bas : c'est le compteur qui était en vigueur quand
+  // GET /api/academy/courses/:id a servi l'énoncé à l'étudiant. Un exercice paramétré s'y
+  // matérialise donc avec le MÊME tirage qu'à l'affichage — sans lui, une réponse juste au
+  // regard de l'énoncé vu serait corrigée contre des valeurs différentes et rejetée à tort.
+  const { data: avantTirage } = await supabase.from("lesson_progress")
+    .select("tentatives").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
+  if (lessonContent) {
+    const grainesBase = graineExercice(sid, `${lesson_id}:${Number(avantTirage?.tentatives) || 0}`);
+    lessonContent = materialiserExercicesParametres(lessonContent, grainesBase);
+  }
   const graded = gradeLessonExercises(lessonContent, answers);
 
   const maxScore = lesson.points ?? 10;
@@ -3412,9 +3460,7 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   // ne distinguait pas la maîtrise de l'obstination.
   let tentative = 1;
   if (graded) {
-    const { data: avant } = await supabase.from("lesson_progress")
-      .select("tentatives").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
-    tentative = (Number(avant?.tentatives) || 0) + 1;
+    tentative = (Number(avantTirage?.tentatives) || 0) + 1;
     await supabase.from("lesson_progress")
       .update({ tentatives: tentative })
       .eq("student_id", sid).eq("lesson_id", lesson_id).then(() => {}, () => {});

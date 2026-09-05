@@ -12,7 +12,13 @@
 // donc cette fonction — appelée par le script ET par la route qui accepte une leçon soumise
 // depuis le panneau d'administration.
 
-import { lessonExercises, gradeLessonExercises, exerciseId, type ExerciseCell } from "./exercises.js";
+import {
+  lessonExercises, gradeLessonExercises, exerciseId, evaluerFormule, identifiantsDeFormule,
+  materialiserExercicesParametres, type ExerciseCell,
+} from "./exercises.js";
+
+/** Graine fixe pour la validation : peu importe laquelle, seule compte sa constance d'un appel à l'autre. */
+const GRAINE_DE_TEST = 1;
 
 export type CelluleBrute = Record<string, any>;
 
@@ -47,13 +53,83 @@ export function validerLecon(lecon: LeconAValider, idsDejaUtilises: Set<string> 
       erreurs.push(`Cellule ${i + 1} (callout) : titre vide.`);
   });
 
-  const exercices: ExerciseCell[] = lessonExercises({ cells: lecon.cellules });
-  if (exercices.length) {
+  const exercicesBruts: ExerciseCell[] = lessonExercises({ cells: lecon.cellules });
+  if (exercicesBruts.length) {
+    const idsBruts = exercicesBruts.map((e, i) => exerciseId(e, i));
+
+    // ── Ce qui ne se vérifie que sur la formule BRUTE, avant tout tirage ──
+    //
+    // Un exercice paramétré n'a pas de `answer` fixe : ce sont ses paramètres et sa
+    // formule qui en tiennent lieu, et c'est ici qu'ils se valident — une formule qui
+    // référence un paramètre non déclaré, ou qui ne s'évalue pas, doit être refusée avant
+    // même de songer à en tirer une valeur.
+    exercicesBruts.forEach((e, i) => {
+      const id = idsBruts[i];
+      if (!Array.isArray(e.parametres) || !e.parametres.length) return;
+
+      if (e.kind !== "number")
+        erreurs.push(`Exercice « ${id} » : un exercice paramétré doit être de type « réponse numérique ».`);
+
+      const noms = new Set<string>();
+      for (const p of e.parametres) {
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(p.nom))
+          erreurs.push(`Exercice « ${id} » : nom de paramètre invalide « ${p.nom} ».`);
+        if (noms.has(p.nom)) erreurs.push(`Exercice « ${id} » : paramètre « ${p.nom} » déclaré plusieurs fois.`);
+        noms.add(p.nom);
+        if (!(Number.isFinite(p.min) && Number.isFinite(p.max) && p.min < p.max))
+          erreurs.push(`Exercice « ${id} » : bornes invalides pour « ${p.nom} » (min doit être strictement inférieur à max).`);
+      }
+
+      if (!e.formule?.trim()) {
+        erreurs.push(`Exercice « ${id} » : un exercice paramétré doit porter une formule.`);
+      } else {
+        try {
+          const utilises = identifiantsDeFormule(e.formule);
+          const inconnus = utilises.filter(n => !noms.has(n));
+          if (inconnus.length) {
+            erreurs.push(`Exercice « ${id} » : la formule utilise ${inconnus.map(n => `« ${n} »`).join(", ")}, `
+              + "non déclaré(s) en paramètre.");
+          } else {
+            const essai: Record<string, number> = {};
+            for (const p of e.parametres) essai[p.nom] = (p.min + p.max) / 2;
+            if (!Number.isFinite(evaluerFormule(e.formule, essai)))
+              erreurs.push(`Exercice « ${id} » : la formule ne produit pas un nombre fini.`);
+          }
+        } catch (err: any) {
+          erreurs.push(`Exercice « ${id} » : formule invalide — ${err.message}`);
+        }
+      }
+
+      // Sans elle, `isExerciseCorrect` compare le chiffre saisi à une réponse calculée qui
+      // a toutes les chances d'avoir des décimales — aucun étudiant ne peut la deviner au
+      // chiffre près, la question serait injouable.
+      if (!(Number(e.tolerance) > 0)) {
+        erreurs.push(`Exercice « ${id} » : une tolérance strictement positive est obligatoire pour un exercice `
+          + "paramétré — la réponse calculée a des décimales que l'étudiant ne peut pas deviner au chiffre près.");
+      }
+
+      for (const p of e.parametres) {
+        if (!e.prompt?.includes(`{{${p.nom}}}`))
+          erreurs.push(`Exercice « ${id} » : le paramètre « ${p.nom} » n'apparaît nulle part dans l'énoncé `
+            + `(« {{${p.nom}}} » attendu).`);
+      }
+    });
+
+    // ── Au-delà d'ici, tout se vérifie sur une version MATÉRIALISÉE ──
+    //
+    // Un tirage fixe donne à un exercice paramétré une réponse concrète, exactement comme
+    // celle qu'un étudiant recevra — les contrôles usuels (réponse renseignée, bornes d'un
+    // choix, correction à 100 % avec sa propre clé) s'appliquent donc sans distinguer les
+    // deux catégories d'exercice.
+    const materialise = materialiserExercicesParametres({ cells: lecon.cellules }, GRAINE_DE_TEST);
+    const exercices: ExerciseCell[] = lessonExercises(materialise);
     const ids = exercices.map((e, i) => exerciseId(e, i));
 
     exercices.forEach((e, i) => {
       const id = ids[i];
-      if (e.answer === undefined || e.answer === null || e.answer === "")
+      const reponseUtilisable = !(e.answer === undefined || e.answer === null || e.answer === ""
+        || (typeof e.answer === "number" && !Number.isFinite(e.answer)));
+      if (!reponseUtilisable)
         erreurs.push(`Exercice « ${id} » : aucune réponse attendue renseignée.`);
       if (!e.explain?.trim())
         erreurs.push(`Exercice « ${id} » : aucune explication — l'étudiant qui échoue ne saurait pas pourquoi.`);
@@ -87,7 +163,7 @@ export function validerLecon(lecon: LeconAValider, idsDejaUtilises: Set<string> 
     if (!erreurs.length) {
       const bonnes: Record<string, any> = {};
       exercices.forEach((e, i) => { bonnes[ids[i]] = e.answer; });
-      const note = gradeLessonExercises({ cells: lecon.cellules }, bonnes);
+      const note = gradeLessonExercises(materialise, bonnes);
       if (!note || note.scorePct !== 100) {
         erreurs.push(`La correction ne rend pas 100 % avec sa propre clé (${note ? note.scorePct : 0} %) : `
           + "une réponse attendue est inatteignable.");

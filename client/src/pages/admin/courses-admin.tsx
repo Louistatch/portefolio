@@ -43,6 +43,10 @@ type CelluleExercise = {
   type: "exercise"; id: string; kind: "choice" | "number" | "text";
   title: string; prompt: string; opts?: string[]; answer: any; accept?: string; tolerance?: number;
   unit?: string; hint?: string; explain: string;
+  // Exercice paramétré (kind "number" uniquement) : `answer` est alors ignoré, la réponse
+  // se calcule côté serveur par `formule` à partir d'un tirage de ces paramètres.
+  parametres?: { nom: string; min: number; max: number; decimales?: number }[];
+  formule?: string;
 };
 type Cellule = CelluleMd | CelluleCallout | CelluleExercise;
 
@@ -388,6 +392,9 @@ function EditeurLecon({ coursId, initial, onClose }: { coursId: number; initial:
       // tableau. `answer` d'un exercice numérique doit être un nombre, pas le texte du champ.
       const cellulesEnvoyees = cellules.map(c => {
         if (c.type !== "exercise") return c;
+        // Paramétré : pas de réponse statique à envoyer, le serveur la calcule à chaque
+        // tirage. L'envoyer quand même enverrait `NaN` (le champ answer est vide côté UI).
+        if (c.parametres?.length) { const { answer, accept, ...reste } = c; return reste; }
         const accept = (c.accept || "").split(",").map(s => s.trim()).filter(Boolean);
         const answer = c.kind === "number" ? Number(c.answer) : c.kind === "choice" ? Number(c.answer) : c.answer;
         return { ...c, answer, accept: accept.length ? accept : undefined };
@@ -544,13 +551,34 @@ function EditeurCellule({ cellule, onChange }: { cellule: Cellule; onChange: (c:
       )}
 
       {cellule.kind === "number" && (
-        <div className="grid grid-cols-3 gap-2">
-          <Input type="number" placeholder="Réponse attendue" value={cellule.answer}
-            onChange={e => onChange({ ...cellule, answer: e.target.value })} />
-          <Input type="number" placeholder="Tolérance (optionnel)" value={cellule.tolerance ?? ""}
-            onChange={e => onChange({ ...cellule, tolerance: e.target.value ? Number(e.target.value) : undefined })} />
-          <Input placeholder="Unité (optionnel)" value={cellule.unit ?? ""}
-            onChange={e => onChange({ ...cellule, unit: e.target.value })} />
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 py-0.5">
+            <Switch checked={!!cellule.parametres?.length} onCheckedChange={v => onChange({
+              ...cellule,
+              parametres: v ? [{ nom: "X", min: 0, max: 100 }] : undefined,
+              formule: v ? (cellule.formule || "") : undefined,
+              answer: v ? "" : cellule.answer,
+            })} />
+            <Label className="text-xs text-muted-foreground m-0">
+              Paramétré — valeurs tirées au hasard à chaque tentative
+            </Label>
+          </div>
+
+          {cellule.parametres?.length ? (
+            <EditeurParametres cellule={cellule} onChange={onChange} />
+          ) : (
+            <Input type="number" placeholder="Réponse attendue" value={cellule.answer}
+              onChange={e => onChange({ ...cellule, answer: e.target.value })} />
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <Input type="number"
+              placeholder={cellule.parametres?.length ? "Tolérance (obligatoire)" : "Tolérance (optionnel)"}
+              value={cellule.tolerance ?? ""}
+              onChange={e => onChange({ ...cellule, tolerance: e.target.value ? Number(e.target.value) : undefined })} />
+            <Input placeholder="Unité (optionnel)" value={cellule.unit ?? ""}
+              onChange={e => onChange({ ...cellule, unit: e.target.value })} />
+          </div>
         </div>
       )}
 
@@ -567,6 +595,48 @@ function EditeurCellule({ cellule, onChange }: { cellule: Cellule; onChange: (c:
         onChange={e => onChange({ ...cellule, hint: e.target.value })} />
       <Textarea rows={2} placeholder="Explication de la correction (obligatoire)" value={cellule.explain}
         onChange={e => onChange({ ...cellule, explain: e.target.value })} />
+    </div>
+  );
+}
+
+/**
+ * Paramètres et formule d'un exercice paramétré.
+ *
+ * `{{nom}}` dans l'énoncé, l'indice ou l'explication sera remplacé par la valeur tirée —
+ * chaque étudiant (et chaque nouvelle tentative) reçoit un tirage différent, la réponse
+ * n'est donc jamais mémorisable, seule la méthode l'est.
+ */
+function EditeurParametres({ cellule, onChange }: { cellule: CelluleExercise; onChange: (c: Cellule) => void }) {
+  const parametres = cellule.parametres || [];
+  const majParametre = (i: number, patch: Partial<{ nom: string; min: number; max: number; decimales: number }>) =>
+    onChange({ ...cellule, parametres: parametres.map((p, j) => j === i ? { ...p, ...patch } : p) });
+
+  return (
+    <div className="space-y-2 border border-dashed border-border rounded-md p-2.5">
+      <Label className="text-xs text-muted-foreground">
+        Paramètres — référencez-les dans l'énoncé par <code className="font-mono">{"{{nom}}"}</code>
+      </Label>
+      {parametres.map((p, i) => (
+        <div key={i} className="grid grid-cols-[1fr_1fr_1fr_90px_auto] gap-1.5 items-center">
+          <Input placeholder="nom" value={p.nom} onChange={e => majParametre(i, { nom: e.target.value.trim() })} />
+          <Input type="number" placeholder="min" value={p.min}
+            onChange={e => majParametre(i, { min: Number(e.target.value) })} />
+          <Input type="number" placeholder="max" value={p.max}
+            onChange={e => majParametre(i, { max: Number(e.target.value) })} />
+          <Input type="number" placeholder="décimales" value={p.decimales ?? 0}
+            onChange={e => majParametre(i, { decimales: Number(e.target.value) })} />
+          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0"
+            onClick={() => onChange({ ...cellule, parametres: parametres.filter((_, j) => j !== i) })}>
+            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+          </Button>
+        </div>
+      ))}
+      <Button size="sm" variant="outline"
+        onClick={() => onChange({ ...cellule, parametres: [...parametres, { nom: "", min: 0, max: 100 }] })}>
+        <Plus className="w-3.5 h-3.5 mr-1" />Paramètre
+      </Button>
+      <Textarea rows={2} placeholder="Formule, par exemple : EAD * PD * LGD" value={cellule.formule || ""}
+        onChange={e => onChange({ ...cellule, formule: e.target.value })} />
     </div>
   );
 }
