@@ -62,21 +62,103 @@ function QuizCell({ cell }: { cell: any }) {
   );
 }
 
+/**
+ * Gras, italique et code en ligne, communs à tous les types de rangée du rendu markdown
+ * maison. Le gras s'applique en premier : une fois consommé, aucun `**` ne subsiste dans le
+ * résultat, et un `*text*` isolé restant est alors sans ambiguïté de l'italique — plusieurs
+ * cours en contiennent (« *Exposure at Default* », « *chaque* ») et l'astérisque y restait
+ * affiché tel quel, faute d'une règle pour le reconnaître.
+ */
+function formaterEnLigne(texte: string): string {
+  return texte
+    .replace(/\*\*(.+?)\*\*/g, "<strong class='text-foreground'>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/`(.+?)`/g, "<code class='font-mono text-xs bg-muted px-1.5 py-0.5 rounded'>$1</code>");
+}
+
+/** Une rangée "| a | b |" en cellules nettoyées de leurs espaces et de leurs bords. */
+function celluleDeRangee(ligne: string): string[] {
+  return ligne.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map(c => c.trim());
+}
+
+/** La ligne de séparation d'un tableau markdown : "|---|---|", "| :-- | --: |", etc. */
+function estSeparateurDeTableau(ligne: string): boolean {
+  return /^\|?\s*:?-{1,}:?\s*(\|\s*:?-{1,}:?\s*)+\|?$/.test(ligne.trim());
+}
+
+/**
+ * Rendu markdown maison, ligne par ligne — jusqu'ici sans tableau : chaque rangée
+ * "| a | b |" s'affichait comme un bloc monospace en défilement horizontal, et la ligne de
+ * séparation d'un tableau ("|---|---|") n'était reconnue nulle part : elle s'affichait telle
+ * quelle, en toutes lettres, entre l'en-tête et les données — c'est ce bazar qui remontait
+ * des écrans d'étudiants.
+ */
 const MarkdownCell = memo(function MarkdownCell({ content }: { content: string }) {
-  return (
-    <div className="px-1 py-1 text-sm leading-relaxed">
-      {(content || "").split("\n").map((line, li) => {
-        if (line.startsWith("### ")) return <h4 key={li} className="font-semibold text-[15px] mt-4 mb-1.5">{line.slice(4)}</h4>;
-        if (line.startsWith("## ")) return <h3 key={li} className="font-bold text-lg mt-3 mb-2">{line.slice(3)}</h3>;
-        if (line.startsWith("| ")) return <div key={li} className="font-mono text-xs bg-muted/60 px-3 py-1 my-0.5 rounded overflow-x-auto whitespace-nowrap">{line.replace(/\|/g, " | ").replace(/---/g, "—")}</div>;
-        if (line.match(/^\d+\. /)) return <div key={li} className="ml-3 text-muted-foreground my-1">{line.replace(/\*\*(.+?)\*\*/g, "$1")}</div>;
-        if (line.startsWith("- ")) return <div key={li} className="ml-3 text-muted-foreground my-0.5">• {line.slice(2).replace(/\*\*(.+?)\*\*/g, "$1")}</div>;
-        if (line.startsWith("```")) return null;
-        if (line.trim() === "") return <div key={li} className="h-1" />;
-        return <p key={li} className="text-muted-foreground my-1" dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(line.replace(/\*\*(.+?)\*\*/g, "<strong class='text-foreground'>$1</strong>").replace(/`(.+?)`/g, "<code class='font-mono text-xs bg-muted px-1.5 py-0.5 rounded'>$1</code>")) }} />;
-      })}
-    </div>
-  );
+  const lignes = (content || "").split("\n");
+  const elements: React.ReactNode[] = [];
+  let i = 0;
+  while (i < lignes.length) {
+    const ligne = lignes[i];
+
+    if (ligne.trim().startsWith("|") && i + 1 < lignes.length && estSeparateurDeTableau(lignes[i + 1])) {
+      const entetes = celluleDeRangee(ligne);
+      const rangees: string[][] = [];
+      let j = i + 2;
+      while (j < lignes.length && lignes[j].trim().startsWith("|")) { rangees.push(celluleDeRangee(lignes[j])); j++; }
+      elements.push(
+        <div key={i} className="my-3 overflow-x-auto rounded-lg border border-border/60">
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="bg-muted/60">
+                {entetes.map((h, hi) => (
+                  <th key={hi} className="px-3 py-2 text-left font-semibold border-b border-border/60"
+                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formaterEnLigne(h)) }} />
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rangees.map((r, ri) => (
+                <tr key={ri} className={ri % 2 ? "bg-muted/20" : ""}>
+                  {r.map((c, ci) => (
+                    <td key={ci} className="px-3 py-2 align-top border-b border-border/30 last:border-b-0"
+                      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formaterEnLigne(c)) }} />
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      i = j;
+      continue;
+    }
+
+    if (ligne.startsWith("### ")) { elements.push(<h4 key={i} className="font-semibold text-[15px] mt-4 mb-1.5">{ligne.slice(4)}</h4>); i++; continue; }
+    if (ligne.startsWith("## ")) { elements.push(<h3 key={i} className="font-bold text-lg mt-3 mb-2">{ligne.slice(3)}</h3>); i++; continue; }
+    // Citation ("> texte") : le même défaut que le tableau, en plus discret — le "> " restait
+    // affiché tel quel, en tête de ligne, plutôt que d'être lu comme une mise en retrait.
+    if (ligne.startsWith("> ")) {
+      elements.push(<blockquote key={i} className="my-2 pl-3 border-l-2 border-primary/40 text-muted-foreground italic"
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formaterEnLigne(ligne.slice(2))) }} />);
+      i++; continue;
+    }
+    if (ligne.match(/^\d+\. /)) {
+      elements.push(<div key={i} className="ml-3 text-muted-foreground my-1"
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formaterEnLigne(ligne)) }} />);
+      i++; continue;
+    }
+    if (ligne.startsWith("- ")) {
+      elements.push(<div key={i} className="ml-3 text-muted-foreground my-0.5"
+        dangerouslySetInnerHTML={{ __html: "• " + DOMPurify.sanitize(formaterEnLigne(ligne.slice(2))) }} />);
+      i++; continue;
+    }
+    if (ligne.startsWith("```")) { i++; continue; }
+    if (ligne.trim() === "") { elements.push(<div key={i} className="h-1" />); i++; continue; }
+    elements.push(<p key={i} className="text-muted-foreground my-1"
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(formaterEnLigne(ligne)) }} />);
+    i++;
+  }
+  return <div className="px-1 py-1 text-sm leading-relaxed">{elements}</div>;
 });
 
 const FigureCell = memo(function FigureCell({ title, svg, caption }: { title?: string; svg?: string; caption?: string }) {
