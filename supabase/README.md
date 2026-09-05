@@ -39,6 +39,7 @@ base. Lisez cette page avant d'en lancer un.
 | 28 | `academy_paiements.sql` | Paiement de l'attestation + liste d'antériorité des inscrits sous la promesse de gratuité |
 | 29 | `academy_engagement_tarif.sql` | Date et montant du tarif reconnu à l'admission — copie datée, pour qu'une hausse ne réécrive pas ce qui a été accepté |
 | 30 | `academy_cours_coop_02.sql` | Cours **COOP-02** — organiser les acteurs et structurer la filière (5 leçons, 25 exercices notés) |
+| 31 | `academy_ambassadeurs.sql` | Programme ambassadeur : code de parrainage, filleul (`referred_by_student_id`), commissions (20 % du prix payé) |
 
 Les trois derniers sont des **artefacts générés**, pas des sources : le contenu vit dans
 `shared/fca-01.ts`, `shared/fcq-01.ts` et `shared/coop-01.ts`, et le SQL en est la projection

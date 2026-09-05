@@ -1173,6 +1173,17 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
   const { data: existing } = await supabase.from("students").select("id").eq("email", email).maybeSingle();
   if (existing) return res.status(409).json({ message: "Un compte existe déjà avec cet email" });
 
+  // Parrainage : un code invalide ou périmé ne doit jamais bloquer une inscription — on
+  // l'ignore silencieusement plutôt que de renvoyer une erreur pour une faute de frappe dans
+  // un lien copié-collé.
+  let referredBy: number | null = null;
+  const codeParrain = trim(req.body.referral_code);
+  if (codeParrain) {
+    const { data: parrain } = await supabase.from("students")
+      .select("id").eq("ambassador_code", String(codeParrain).toUpperCase()).maybeSingle();
+    if (parrain) referredBy = parrain.id;
+  }
+
   const hash = await bcrypt.hash(password, 12);
   const verifyToken = crypto.randomBytes(32).toString("hex");
   const verifyCode = String(crypto.randomInt(100000, 999999)); // code 6 chiffres
@@ -1184,6 +1195,7 @@ app.post("/api/academy/register", rateLimit(8, 10 * 60 * 1000), async (req, res)
       email, password_hash: hash, phone, country, organization,
       entry_score: 0, status: "pending_test",
       email_verified: false, verify_token: verifyToken, verify_code: verifyCode, verify_expires: verifyExpires,
+      referred_by_student_id: referredBy,
     })
     .select("id, full_name, email, status, email_verified").single();
 
@@ -3629,6 +3641,10 @@ function quizRappelEmailHtml(name: string, course: { code: string; title: string
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Il reste 10 minutes ⏳</h1><p class="sub">${course.title}</p></div><div class="bd"><p>Bonjour ${name},</p><p>Le quiz de la leçon <strong>${lessonTitle}</strong> est en cours, et il reste environ dix minutes avant la fin du temps imparti. Passé ce délai, la note enregistrée sera 0, même si le quiz n'est pas commencé.</p><p style="text-align:center;margin-top:20px"><a href="${lienQuiz}" class="btn">Reprendre le quiz</a></p></div>`);
 }
 
+function ambassadorCommissionEmailHtml(name: string, montant: number): string {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>💰 Nouvelle commission</h1><p class="sub">Programme ambassadeur</p></div><div class="bd"><p>Bonjour ${name},</p><p>Une personne que vous avez parrainée vient de payer son attestation. Votre commission de <strong style="color:#0d9488">${montant.toLocaleString("fr-FR")} F CFA</strong> est enregistrée, en attente de versement.</p><p style="text-align:center;margin-top:20px"><a href="${SITE_URL}/academy/ambassador" class="btn">Voir mon espace ambassadeur</a></p></div>`);
+}
+
 /** Le classement d'un parcours, envoyé chaque semaine à tous les inscrits — voir corpsClassementHebdomadaire. */
 function classementHebdoEmailHtml(
   name: string, programme: { title: string }, classement: { student_id: number; full_name: string; total: number }[],
@@ -5047,6 +5063,221 @@ app.get("/api/academy/transcript/pdf", requireStudent, async (req, res) => {
   res.send(pdf);
 });
 
+// ══════════════════════════════════════════════════════════════
+// Programme ambassadeur
+//
+// ── Pourquoi un seuil d'éligibilité, et pas une ouverture à tous ──
+//
+// Un lien de parrainage donné à quelqu'un qui n'a pas encore vu un mois de cours ne dit
+// rien de la formation — il ne peut que répéter un argumentaire commercial. Le seuil (30
+// jours ET 4 leçons réellement terminées, pas seulement écoulées) garantit qu'un ambassadeur
+// parle de ce qu'il connaît.
+//
+// ── Pourquoi le taux est une constante nommée ──
+//
+// 20 % apparaît à deux endroits (le crédit de commission, et le texte qui l'annonce) : une
+// constante unique évite qu'un futur changement de taux n'en oublie un des deux.
+// ══════════════════════════════════════════════════════════════
+const AMBASSADOR_SEUIL_JOURS = 30;
+const AMBASSADOR_SEUIL_LECONS = 4;
+const AMBASSADOR_TAUX_COMMISSION = 0.20;
+
+/**
+ * Éligibilité au programme ambassadeur : 30 jours depuis la PREMIÈRE admission (MEAL ou tout
+ * autre parcours — voir academy_program_admissions) ET au moins 4 leçons terminées, tous
+ * cours confondus. Un étudiant inscrit à plusieurs parcours n'a besoin de remplir la
+ * condition que sur un seul.
+ */
+async function eligibiliteAmbassadeur(sid: number): Promise<{ eligible: boolean; joursDepuisAdmission: number | null; leconsTerminees: number }> {
+  const [stud, autresAdmissions, nbLecons] = await Promise.all([
+    supabase.from("students").select("admitted_at").eq("id", sid).maybeSingle(),
+    supabase.from("academy_program_admissions").select("admitted_at").eq("student_id", sid).not("admitted_at", "is", null),
+    supabase.from("grades").select("id", { count: "exact", head: true }).eq("student_id", sid).eq("type", "lesson"),
+  ]);
+
+  const dates = [stud.data?.admitted_at, ...((autresAdmissions.data || []).map((a: any) => a.admitted_at))]
+    .filter(Boolean).map((d: string) => new Date(d).getTime());
+  const premiereAdmission = dates.length ? Math.min(...dates) : null;
+  const joursDepuisAdmission = premiereAdmission != null ? Math.floor((Date.now() - premiereAdmission) / 86400000) : null;
+  const leconsTerminees = nbLecons.count || 0;
+
+  const eligible = joursDepuisAdmission != null
+    && joursDepuisAdmission >= AMBASSADOR_SEUIL_JOURS
+    && leconsTerminees >= AMBASSADOR_SEUIL_LECONS;
+
+  return { eligible, joursDepuisAdmission, leconsTerminees };
+}
+
+/** Lien de parrainage complet à partir d'un code. */
+function lienParrainage(code: string): string {
+  return `${SITE_URL}/academy/register?ref=${encodeURIComponent(code)}`;
+}
+
+app.get("/api/academy/ambassador/me", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data: stud } = await supabase.from("students")
+    .select("ambassador_code, ambassador_since").eq("id", sid).maybeSingle();
+
+  const eligibilite = await eligibiliteAmbassadeur(sid);
+
+  if (!stud?.ambassador_code) {
+    return res.json({
+      isAmbassador: false, ...eligibilite,
+      seuil: { jours: AMBASSADOR_SEUIL_JOURS, lecons: AMBASSADOR_SEUIL_LECONS },
+    });
+  }
+
+  const { data: filleuls } = await supabase.from("students")
+    .select("id, full_name, created_at").eq("referred_by_student_id", sid).order("created_at", { ascending: false });
+
+  const { data: commissions } = await supabase.from("academy_ambassador_commissions")
+    .select("id, referred_student_id, program_id, amount, devise, status, created_at, paid_at")
+    .eq("ambassador_id", sid).order("created_at", { ascending: false });
+
+  // Une jointure directe serait ambiguë : cette table référence `students` deux fois
+  // (ambassador_id et referred_student_id). Un second aller simple évite de nommer la
+  // contrainte de clé étrangère dans le select — plus lisible, et insensible à un
+  // renommage de contrainte.
+  const idsFilleulsCommission = [...new Set((commissions || []).map((c: any) => c.referred_student_id))];
+  const { data: nomsFilleuls } = idsFilleulsCommission.length
+    ? await supabase.from("students").select("id, full_name").in("id", idsFilleulsCommission)
+    : { data: [] as any[] };
+  const nomParId = new Map((nomsFilleuls || []).map((f: any) => [f.id, f.full_name]));
+
+  const commissionsDetaillees = (commissions || []).map((c: any) => ({ ...c, filleul: nomParId.get(c.referred_student_id) || "—" }));
+  const totalGagne = commissionsDetaillees.reduce((a, c) => a + c.amount, 0);
+  const totalPaye = commissionsDetaillees.filter(c => c.status === "payee").reduce((a, c) => a + c.amount, 0);
+
+  res.json({
+    isAmbassador: true, ...eligibilite,
+    code: stud.ambassador_code, since: stud.ambassador_since, lien: lienParrainage(stud.ambassador_code),
+    filleuls: filleuls || [], commissions: commissionsDetaillees,
+    totalGagne, totalPaye, enAttente: totalGagne - totalPaye,
+    taux: AMBASSADOR_TAUX_COMMISSION * 100,
+  });
+});
+
+app.post("/api/academy/ambassador/join", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data: stud } = await supabase.from("students").select("ambassador_code").eq("id", sid).maybeSingle();
+  if (stud?.ambassador_code) {
+    return res.status(409).json({ message: "Vous êtes déjà ambassadeur.", code: stud.ambassador_code, lien: lienParrainage(stud.ambassador_code) });
+  }
+
+  const eligibilite = await eligibiliteAmbassadeur(sid);
+  if (!eligibilite.eligible) {
+    return res.status(403).json({
+      message: "Pas encore éligible au programme ambassadeur.", ...eligibilite,
+      seuil: { jours: AMBASSADOR_SEUIL_JOURS, lecons: AMBASSADOR_SEUIL_LECONS },
+    });
+  }
+
+  // Cinq essais suffisent très largement : huit caractères hexadécimaux tirent parmi 4
+  // milliards de combinaisons pour une poignée d'ambassadeurs.
+  let code = "";
+  for (let tentative = 0; tentative < 5; tentative++) {
+    code = crypto.randomBytes(4).toString("hex").toUpperCase();
+    const { data: conflit } = await supabase.from("students").select("id").eq("ambassador_code", code).maybeSingle();
+    if (!conflit) break;
+  }
+
+  const since = new Date().toISOString();
+  const { error } = await supabase.from("students")
+    .update({ ambassador_code: code, ambassador_since: since }).eq("id", sid);
+  if (error) return res.status(500).json({ message: "Inscription impossible, réessayez." });
+
+  res.status(201).json({ code, since, lien: lienParrainage(code) });
+});
+
+/**
+ * Certificat d'ambassadeur — texte pur, même choix que le relevé de notes (Helvetica
+ * standard, sans fontkit ni sharp). Ce n'est délibérément PAS une variante du certificat
+ * MEAL (certificateSvg/certificatePdf) : celui-ci énumère en dur les trois cours du cursus
+ * KoboCollect/QGIS/Pipeline, sans rapport avec un rôle d'ambassadeur.
+ */
+async function ambassadorCertificatePdf(t: {
+  name: string; code: string; since: string; nbFilleulsConvertis: number; totalGagne: number;
+}): Promise<Buffer> {
+  const { PDFDocument, StandardFonts, rgb } = await import("pdf-lib");
+  const pdf = await PDFDocument.create();
+  const gras = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const normal = await pdf.embedFont(StandardFonts.Helvetica);
+  const italique = await pdf.embedFont(StandardFonts.HelveticaOblique);
+
+  const LARGEUR = 841.89, HAUTEUR = 595.28; // A4 paysage, en points
+  const page = pdf.addPage([LARGEUR, HAUTEUR]);
+  const accent = rgb(0.05, 0.58, 0.53);
+  const noir = rgb(0.06, 0.09, 0.16);
+  const gris = rgb(0.42, 0.46, 0.53);
+
+  page.drawRectangle({ x: 24, y: 24, width: LARGEUR - 48, height: HAUTEUR - 48, borderColor: accent, borderWidth: 2 });
+  page.drawRectangle({ x: 34, y: 34, width: LARGEUR - 68, height: HAUTEUR - 68, borderColor: accent, borderWidth: 0.5 });
+
+  const centre = (texte: string, taille: number, police = normal) =>
+    LARGEUR / 2 - police.widthOfTextAtSize(texte, taille) / 2;
+
+  let y = HAUTEUR - 110;
+  const kicker = "PROGRAMME AMBASSADEUR";
+  page.drawText(kicker, { x: centre(kicker, 13, gras), y, size: 13, font: gras, color: accent });
+  y -= 46;
+  const titre = "Certificat d'Ambassadeur";
+  page.drawText(titre, { x: centre(titre, 34, gras), y, size: 34, font: gras, color: noir });
+  y -= 56;
+  page.drawText(t.name, { x: centre(t.name, 26, gras), y, size: 26, font: gras, color: accent });
+  y -= 34;
+  const ligne1 = "a représenté LouisFarm Learning au titre du programme ambassadeur,";
+  page.drawText(ligne1, { x: centre(ligne1, 13), y, size: 13, font: normal, color: gris });
+  y -= 20;
+  const depuis = new Date(t.since).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
+  const ligne2 = `en recommandant la formation depuis le ${depuis}.`;
+  page.drawText(ligne2, { x: centre(ligne2, 13), y, size: 13, font: normal, color: gris });
+
+  y -= 60;
+  const stat1 = `${t.nbFilleulsConvertis}`, stat1Lbl = t.nbFilleulsConvertis > 1 ? "filleuls ayant validé une attestation" : "filleul ayant validé une attestation";
+  // toLocaleString("fr-FR") sépare les milliers par une espace fine insécable (U+202F), un
+  // caractère que l'encodage WinAnsi des polices standard de pdf-lib ne sait pas représenter
+  // — page.drawText lève alors une exception. Une espace normale rend le même résultat visuel.
+  const stat2 = `${t.totalGagne.toLocaleString("fr-FR").replace(/\u202f/g, " ")} F CFA`, stat2Lbl = "de commissions générées";
+  const xGauche = LARGEUR / 2 - 160, xDroite = LARGEUR / 2 + 20;
+  page.drawText(stat1, { x: xGauche, y, size: 24, font: gras, color: accent });
+  page.drawText(stat1Lbl, { x: xGauche, y: y - 18, size: 10, font: normal, color: gris });
+  page.drawText(stat2, { x: xDroite, y, size: 24, font: gras, color: accent });
+  page.drawText(stat2Lbl, { x: xDroite, y: y - 18, size: 10, font: normal, color: gris });
+
+  const bas = 70;
+  page.drawText("LouisFarm Learning", { x: 70, y: bas, size: 12, font: gras, color: noir });
+  page.drawText("Formation gratuite par projets — Afrique de l'Ouest", { x: 70, y: bas - 15, size: 9, font: italique, color: gris });
+  const codeTxt = `Code ambassadeur : ${t.code}`;
+  page.drawText(codeTxt, { x: LARGEUR - 70 - normal.widthOfTextAtSize(codeTxt, 9), y: bas - 15, size: 9, font: normal, color: gris });
+  const emisTxt = `Émis le ${new Date().toLocaleDateString("fr-FR")}`;
+  page.drawText(emisTxt, { x: LARGEUR - 70 - normal.widthOfTextAtSize(emisTxt, 9), y: bas, size: 9, font: normal, color: gris });
+
+  return Buffer.from(await pdf.save());
+}
+
+app.get("/api/academy/certificate/ambassador", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data: stud } = await supabase.from("students")
+    .select("full_name, ambassador_code, ambassador_since").eq("id", sid).maybeSingle();
+  if (!stud?.ambassador_code) return res.status(403).json({ message: "Vous n'êtes pas encore ambassadeur." });
+
+  const { data: commissions } = await supabase.from("academy_ambassador_commissions")
+    .select("referred_student_id, amount").eq("ambassador_id", sid);
+  const nbFilleulsConvertis = new Set((commissions || []).map((c: any) => c.referred_student_id)).size;
+  const totalGagne = (commissions || []).reduce((a: number, c: any) => a + c.amount, 0);
+
+  const pdf = await ambassadorCertificatePdf({
+    name: stud.full_name, code: stud.ambassador_code, since: stud.ambassador_since || new Date().toISOString(),
+    nbFilleulsConvertis, totalGagne,
+  });
+  const nomFichier = String(stud.full_name || "ambassadeur")
+    .normalize("NFD").replace(new RegExp("[\\u0300-\\u036f]", "g"), "")
+    .replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  res.setHeader("Content-Type", "application/pdf");
+  res.setHeader("Content-Disposition", `attachment; filename="Certificat_Ambassadeur_${nomFichier}.pdf"`);
+  res.send(pdf);
+});
+
 // ── Demander une attestation ──
 // ══════════════════════════════════════════════════════════════
 // Paiement de l'attestation
@@ -5297,8 +5528,52 @@ app.post("/api/paiements/fedapay", async (req, res) => {
   if (error) return res.status(500).json({ message: "Écriture impossible" });
 
   console.log(`paiement encaissé : ${ligne.montant} ${ligne.devise}, étudiant ${ligne.student_id}, parcours ${ligne.program_id}`);
+  // Ne doit jamais faire échouer la confirmation du paiement lui-même : une commission
+  // ratée se corrige après coup, un paiement non confirmé auprès de l'opérateur ne se
+  // rattrape pas.
+  crediterCommissionAmbassadeur(ligne).catch(e => console.error("commission ambassadeur:", e?.message || e));
   res.json({ ok: true });
 });
+
+/**
+ * Crédite 20 % du prix payé à l'ambassadeur qui a recruté ce payeur, s'il en a un.
+ *
+ * Appelée seulement au moment où `academy_paiements.statut` PASSE à "paye" (jamais sur un
+ * rejeu, déjà écarté plus haut par `if (ligne.statut === "paye") return ...`) — c'est ce qui
+ * évite de créditer deux fois la même commission, en plus de la contrainte unique(payment_id)
+ * qui la ferme définitivement même si cette fonction était rappelée par erreur.
+ */
+async function crediterCommissionAmbassadeur(paiement: { id: number; student_id: number; program_id: string; montant: number; devise: string }) {
+  const { data: payeur } = await supabase.from("students")
+    .select("referred_by_student_id").eq("id", paiement.student_id).maybeSingle();
+  if (!payeur?.referred_by_student_id) return;
+
+  const { data: parrain } = await supabase.from("students")
+    .select("id, ambassador_code, full_name, email").eq("id", payeur.referred_by_student_id).maybeSingle();
+  // Le parrain a pu perdre son statut, ou ne l'avoir jamais eu au moment de l'inscription du
+  // filleul : pas de commission sans code ambassadeur actif.
+  if (!parrain?.ambassador_code) return;
+
+  const montant = Math.round(paiement.montant * AMBASSADOR_TAUX_COMMISSION);
+  const { error } = await supabase.from("academy_ambassador_commissions").insert({
+    ambassador_id: parrain.id, referred_student_id: paiement.student_id,
+    payment_id: paiement.id, program_id: paiement.program_id,
+    amount: montant, devise: paiement.devise,
+  });
+  if (error) {
+    if ((error as any).code !== "23505") console.error("commission ambassadeur : écriture refusée —", error.message);
+    return; // 23505 = déjà créditée pour ce paiement, silence attendu
+  }
+
+  if (parrain.email) {
+    sendAcademyEmail({
+      studentId: parrain.id, to: parrain.email, type: "ambassador_commission",
+      subject: `💰 Nouvelle commission — ${montant.toLocaleString("fr-FR")} F CFA`,
+      html: ambassadorCommissionEmailHtml(parrain.full_name, montant),
+      dedupeKey: `ambassador_commission:${paiement.id}`,
+    }).catch(() => {});
+  }
+}
 
 app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
@@ -6329,6 +6604,67 @@ async function coursDuParcours(programId: string): Promise<number[]> {
 
 app.get("/api/admin/academy/leaderboard", requireAuth, async (_req, res) => {
   res.json(await classementPoints());
+});
+
+// ── Programme ambassadeur, côté administration ──
+app.get("/api/admin/academy/ambassadors", requireAuth, async (_req, res) => {
+  const { data: ambassadeurs } = await supabase.from("students")
+    .select("id, full_name, email, ambassador_code, ambassador_since")
+    .not("ambassador_code", "is", null).order("ambassador_since", { ascending: false });
+  if (!ambassadeurs?.length) return res.json([]);
+
+  const ids = ambassadeurs.map(a => a.id);
+  const [{ data: filleuls }, { data: commissions }] = await Promise.all([
+    supabase.from("students").select("id, referred_by_student_id").in("referred_by_student_id", ids),
+    supabase.from("academy_ambassador_commissions").select("ambassador_id, amount, status").in("ambassador_id", ids),
+  ]);
+
+  const nbFilleuls = new Map<number, number>();
+  for (const f of filleuls || []) nbFilleuls.set(f.referred_by_student_id, (nbFilleuls.get(f.referred_by_student_id) || 0) + 1);
+  const gagnePar = new Map<number, number>(), payePar = new Map<number, number>();
+  for (const c of commissions || []) {
+    gagnePar.set(c.ambassador_id, (gagnePar.get(c.ambassador_id) || 0) + c.amount);
+    if (c.status === "payee") payePar.set(c.ambassador_id, (payePar.get(c.ambassador_id) || 0) + c.amount);
+  }
+
+  res.json(ambassadeurs.map(a => ({
+    ...a, nbFilleuls: nbFilleuls.get(a.id) || 0,
+    totalGagne: gagnePar.get(a.id) || 0, totalPaye: payePar.get(a.id) || 0,
+    enAttente: (gagnePar.get(a.id) || 0) - (payePar.get(a.id) || 0),
+  })));
+});
+
+app.get("/api/admin/academy/ambassador-commissions", requireAuth, async (req, res) => {
+  let requete = supabase.from("academy_ambassador_commissions").select("*").order("created_at", { ascending: false });
+  if (req.query.status) requete = requete.eq("status", String(req.query.status));
+  const { data: commissions, error } = await requete;
+  if (error) return res.status(500).json({ message: error.message });
+
+  // Deux allers simples plutôt qu'un embed nommé : cette table référence `students` deux
+  // fois (ambassador_id et referred_student_id), un embed direct serait ambigu sans nommer
+  // la contrainte de clé étrangère — plus fragile qu'un second select.
+  const ids = [...new Set((commissions || []).flatMap((c: any) => [c.ambassador_id, c.referred_student_id]))];
+  const { data: eleves } = ids.length
+    ? await supabase.from("students").select("id, full_name").in("id", ids)
+    : { data: [] as any[] };
+  const nomParId = new Map((eleves || []).map((e: any) => [e.id, e.full_name]));
+
+  res.json((commissions || []).map((c: any) => ({
+    ...c, ambassadeur: nomParId.get(c.ambassador_id) || "—", filleul: nomParId.get(c.referred_student_id) || "—",
+  })));
+});
+
+app.post("/api/admin/academy/ambassador-commissions/:id/pay", requireAuth, async (req, res) => {
+  const id = Number(req.params.id);
+  const { data: commission } = await supabase.from("academy_ambassador_commissions")
+    .select("status").eq("id", id).maybeSingle();
+  if (!commission) return res.status(404).json({ message: "Commission introuvable." });
+  if (commission.status === "payee") return res.status(400).json({ message: "Cette commission est déjà marquée payée." });
+
+  const { data, error } = await supabase.from("academy_ambassador_commissions")
+    .update({ status: "payee", paid_at: new Date().toISOString() }).eq("id", id).select().single();
+  if (error) return res.status(500).json({ message: error.message });
+  res.json(data);
 });
 
 // ── Classement d'un parcours, consultable par tout étudiant qui y est inscrit ──

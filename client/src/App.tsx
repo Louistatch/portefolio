@@ -32,6 +32,7 @@ const AcademyForgotPassword = lazy(() => import("@/pages/academy/forgot-password
 const AcademyResetPassword = lazy(() => import("@/pages/academy/reset-password"));
 const AcademyProfile = lazy(() => import("@/pages/academy/profile"));
 const AcademyGrades = lazy(() => import("@/pages/academy/grades"));
+const AcademyAmbassador = lazy(() => import("@/pages/academy/ambassador"));
 const VerifyCertificate = lazy(() => import("@/pages/academy/verify-certificate"));
 const AcademyLive = lazy(() => import("@/pages/academy/live"));
 const AcademyParcours = lazy(() => import("@/pages/academy/parcours"));
@@ -55,6 +56,7 @@ const AdminTestimonials = lazy(() => import("@/pages/admin/testimonials-admin"))
 const AdminStudents = lazy(() => import("@/pages/admin/students-admin"));
 const AdminMeetings = lazy(() => import("@/pages/admin/meetings-admin"));
 const AdminStudentMessages = lazy(() => import("@/pages/admin/student-messages-admin"));
+const AdminAmbassadors = lazy(() => import("@/pages/admin/ambassadors-admin"));
 const AdminGroupWork = lazy(() => import("@/pages/admin/group-work-admin"));
 const AdminSupport = lazy(() => import("@/pages/admin/support-admin"));
 const AdminCourses = lazy(() => import("@/pages/admin/courses-admin"));
@@ -130,6 +132,7 @@ function App() {
             <Route path={`${ADMIN_BASE}/students`}>{() => <RequireAuth><AdminStudents /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/meetings`}>{() => <RequireAuth><AdminMeetings /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/student-messages`}>{() => <RequireAuth><AdminStudentMessages /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/ambassadors`}>{() => <RequireAuth><AdminAmbassadors /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/group-work`}>{() => <RequireAuth><AdminGroupWork /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/support`}>{() => <RequireAuth><AdminSupport /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/courses`}>{() => <RequireAuth><AdminCourses /></RequireAuth>}</Route>
@@ -152,6 +155,7 @@ function App() {
             <Route path="/academy/reset-password">{() => <Layout><AcademyResetPassword /></Layout>}</Route>
             <Route path="/academy/profile">{() => <RequireStudentAuth><AcademyLayout><AcademyProfile /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/grades">{() => <RequireStudentAuth><AcademyLayout><AcademyGrades /></AcademyLayout></RequireStudentAuth>}</Route>
+            <Route path="/academy/ambassador">{() => <RequireStudentAuth><AcademyLayout><AcademyAmbassador /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/verify-certificate/:certNo">{() => <Layout><VerifyCertificate /></Layout>}</Route>
             <Route path="/academy/verify-certificate">{() => <Layout><VerifyCertificate /></Layout>}</Route>
             {/* La salle de rencontre sort de Layout : c'est une surface plein écran, pas une
