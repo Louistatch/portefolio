@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useRoute, Link } from "wouter";
 import {
   Loader2, BookOpen, Calendar, CheckCircle2, Trophy, ChevronRight,
-  Lock, Clock, ArrowLeft, TrendingUp, Medal,
+  Lock, Clock, ArrowLeft, TrendingUp, Medal, Crown,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
@@ -23,6 +23,10 @@ import { PROGRAMS, programOf, programById, type Program } from "@shared/programs
  */
 
 type Ligne = any;
+
+function initiales(nom: string) {
+  return nom.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase();
+}
 
 export default function AcademyParcours() {
   const [, navigate] = useLocation();
@@ -250,25 +254,62 @@ export default function AcademyParcours() {
         </section>
       )}
 
-      {/* ── Top 10 du parcours ── */}
+      {/* ── Top 10 du parcours ──
+           Un podium pour les trois premiers plutôt qu'une ligne de plus dans une liste : ce
+           sont eux qui donnent envie de progresser, ils méritent une lecture immédiate plutôt
+           qu'un rang à repérer parmi dix. Rangs 4 à 10 en dessous, avec une barre de fond
+           proportionnelle au score du premier — la distance à parcourir se voit d'un regard. */}
       {inscrit && classement.length > 0 && (
         <section>
           <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
             <Medal className="w-5 h-5" style={{ color: parcours.accent }} /> Top 10 du parcours
           </h2>
-          <div className="bg-card rounded-2xl border border-border/50 p-5">
-            <p className="text-xs text-muted-foreground mb-3">Cumul des points depuis le début — le même classement vous est envoyé par e-mail chaque semaine.</p>
-            <div className="divide-y divide-border/30">
-              {classement.map((c, i) => (
-                <div key={c.student_id} className="flex items-center gap-3 py-2">
-                  <span className="w-6 text-center text-xs font-bold shrink-0" style={{ color: i < 3 ? parcours.accent : undefined }}>
-                    {i < 3 ? <Trophy className="w-3.5 h-3.5 inline" /> : i + 1}
-                  </span>
-                  <span className="flex-1 text-sm truncate">{c.full_name}</span>
-                  <span className="text-sm font-semibold">{c.total} pts</span>
-                </div>
-              ))}
+          <div className="bg-card rounded-2xl border border-border/50 p-6" style={{ boxShadow: "var(--shadow-2)" }}>
+            <p className="text-xs text-muted-foreground mb-5">Cumul des points depuis le début — le même classement vous est envoyé par e-mail chaque semaine.</p>
+
+            {/* Podium — rang 2, rang 1, rang 3 */}
+            <div className="flex items-end justify-center gap-3 sm:gap-4 pb-6 mb-5 border-b border-border/40">
+              {[classement[1], classement[0], classement[2]].map((c, slot) => {
+                if (!c) return null;
+                const rang = slot === 1 ? 1 : slot === 0 ? 2 : 3;
+                const premier = rang === 1;
+                const avatar = premier ? "w-20 h-20 text-2xl" : "w-14 h-14 text-base";
+                const pedestal = premier ? "h-20" : rang === 2 ? "h-14" : "h-10";
+                return (
+                  <div key={c.student_id} className="flex flex-col items-center" style={{ width: premier ? 152 : 116 }}>
+                    {premier && <Crown className="w-5 h-5 mb-1" style={{ color: parcours.accent }} />}
+                    <div
+                      className={`${avatar} rounded-full flex items-center justify-center font-extrabold mb-2.5 shrink-0`}
+                      style={premier
+                        ? { background: `linear-gradient(135deg, ${parcours.accent}, ${parcours.accent}cc)`, color: "#fff", boxShadow: `0 8px 18px -10px ${parcours.accent}8c` }
+                        : { background: `linear-gradient(135deg, ${parcours.accent}2e, ${parcours.accent}0f)`, color: parcours.accent, border: `2px solid ${parcours.accent}4d` }}>
+                      {initiales(c.full_name)}
+                    </div>
+                    <p className="text-xs sm:text-sm font-bold text-center truncate w-full mb-0.5">{c.full_name}</p>
+                    <p className="chiffres-tabulaires text-sm sm:text-base font-extrabold mb-3" style={{ color: parcours.accent }}>{c.total} pts</p>
+                    <div
+                      className={`${pedestal} w-full rounded-t-xl flex items-start justify-center pt-2`}
+                      style={{ background: `${parcours.accent}14`, border: `1px solid ${parcours.accent}30`, borderBottom: "none" }}>
+                      <span className="text-2xl font-extrabold" style={{ color: `${parcours.accent}80` }}>{rang}</span>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
+
+            {/* Rangs 4 à 10 */}
+            {classement.length > 3 && (
+              <div className="space-y-0.5">
+                {classement.slice(3).map((c, i) => (
+                  <div key={c.student_id} className="relative flex items-center gap-3 px-2.5 py-2 rounded-xl overflow-hidden">
+                    <div className="absolute inset-y-0 left-0 rounded-xl" style={{ background: `${parcours.accent}0f`, width: `${Math.round((c.total / classement[0].total) * 100)}%` }} />
+                    <span className="relative w-6 h-6 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-[11px] font-bold shrink-0">{i + 4}</span>
+                    <span className="relative flex-1 text-sm truncate">{c.full_name}</span>
+                    <span className="relative chiffres-tabulaires text-sm font-bold shrink-0">{c.total} pts</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
       )}
