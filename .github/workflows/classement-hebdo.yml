@@ -1,0 +1,79 @@
+# ══════════════════════════════════════════════════════════════
+# Classement hebdomadaire par parcours
+#
+# ── Pourquoi un troisième workflow ──
+#
+# Les tâches quotidiennes (taches-quotidiennes.yml) tournent tous les jours ; celle-ci ne
+# doit tourner qu'une fois par semaine, sinon le même classement partirait sept fois. Un
+# calendrier séparé est plus simple à lire et à corriger qu'une tâche quotidienne qui se
+# demanderait elle-même « suis-je lundi ? » avant de faire quoi que ce soit.
+#
+# ── Pas de verrou dédié à la semaine ──
+#
+# Le verrou du jour (supabase/academy_cron_verrou.sql), déjà utilisé par les autres tâches,
+# suffit ici : ce workflow n'appelle son endpoint qu'une fois par semaine, donc la date du
+# jour de cet unique appel est déjà une clé unique d'une semaine à l'autre. Pas besoin de
+# calculer un numéro de semaine ISO pour une tâche qui ne se déclenche qu'une fois dans la
+# période qu'elle couvre.
+#
+# ── Ce qu'il faut pour qu'il fonctionne ──
+#
+#   Le même secret de dépôt CRON_SECRET que les deux autres workflows (Settings → Secrets
+#   and variables → Actions), avec exactement la même valeur que la variable d'environnement
+#   CRON_SECRET côté hébergeur.
+#
+# ── L'adresse doit porter le www ──
+#
+# louisfarm.com répond 307 vers www.louisfarm.com ; curl ne suit pas les redirections sans
+# -L, et -L supprimerait l'en-tête Authorization en changeant d'hôte. D'où l'adresse par
+# défaut avec www, et la vérification explicite du code HTTP.
+# ══════════════════════════════════════════════════════════════
+name: Classement hebdomadaire
+
+on:
+  schedule:
+    # Lundi 09h00 UTC.
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: classement-hebdo
+  cancel-in-progress: false
+
+jobs:
+  annoncer:
+    name: Envoyer le classement de la semaine à chaque parcours
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Vérifier que le secret est en place
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Le secret de dépôt CRON_SECRET est absent."
+            echo "Settings → Secrets and variables → Actions → New repository secret,"
+            echo "nom CRON_SECRET, avec la même valeur que la variable d'environnement"
+            echo "CRON_SECRET côté hébergeur."
+            exit 1
+          fi
+          echo "Secret présent."
+
+      - name: Envoyer le classement
+        env:
+          BASE: ${{ vars.SITE_URL || 'https://www.louisfarm.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -sS --max-time 60 -o reponse.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/cron/classement-hebdo")
+          cat reponse.json; echo
+          if [ "$code" -ge 300 ]; then
+            echo "::error::HTTP $code sur $BASE/api/cron/classement-hebdo"
+            if [ "$code" -lt 400 ]; then
+              echo "C'est une redirection : l'adresse n'est pas la bonne (il manque le www),"
+              echo "ou la variable de dépôt SITE_URL ne le porte pas."
+            fi
+            exit 1
+          fi
+          echo "HTTP $code"

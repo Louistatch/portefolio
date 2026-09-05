@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation, useRoute, Link } from "wouter";
 import {
   Loader2, BookOpen, Calendar, CheckCircle2, Trophy, ChevronRight,
-  Lock, Clock, ArrowLeft, TrendingUp,
+  Lock, Clock, ArrowLeft, TrendingUp, Medal,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
@@ -33,6 +33,7 @@ export default function AcademyParcours() {
   const [cours, setCours] = useState<any[]>([]);
   const [inscriptions, setInscriptions] = useState<any[]>([]);
   const [planning, setPlanning] = useState<Ligne[]>([]);
+  const [classement, setClassement] = useState<{ student_id: number; full_name: string; total: number }[]>([]);
   const [voirTermines, setVoirTermines] = useState(false);
   const [toutesSemaines, setToutesSemaines] = useState(false);
 
@@ -40,14 +41,18 @@ export default function AcademyParcours() {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
     (async () => {
       try {
-        const [c, e, s] = await Promise.all([
+        const [c, e, s, l] = await Promise.all([
           fetch("/api/academy/courses").then(r => r.json()).catch(() => []),
           studentFetch("/api/academy/my-enrollments").then(r => r.json()).catch(() => []),
           studentFetch("/api/academy/lesson-schedule").then(r => r.json()).catch(() => []),
+          // 403 pour un étudiant pas encore inscrit à ce parcours : silencieux, la section
+          // ne s'affiche simplement pas — ce n'est pas une erreur à faire remonter.
+          studentFetch(`/api/academy/leaderboard/${programId}`).then(r => r.ok ? r.json() : null).catch(() => null),
         ]);
         setCours(Array.isArray(c) ? c : []);
         setInscriptions(Array.isArray(e) ? e : []);
         setPlanning(Array.isArray(s) ? s : []);
+        setClassement(Array.isArray(l?.classement) ? l.classement : []);
       } finally { setChargement(false); }
     })();
   }, [programId]);
@@ -242,6 +247,29 @@ export default function AcademyParcours() {
               {voirTermines ? "Masquer les cours terminés" : `Voir les ${termines} cours terminé${termines > 1 ? "s" : ""}`}
             </button>
           )}
+        </section>
+      )}
+
+      {/* ── Top 10 du parcours ── */}
+      {inscrit && classement.length > 0 && (
+        <section>
+          <h2 className="text-lg font-bold flex items-center gap-2 mb-4">
+            <Medal className="w-5 h-5" style={{ color: parcours.accent }} /> Top 10 du parcours
+          </h2>
+          <div className="bg-card rounded-2xl border border-border/50 p-5">
+            <p className="text-xs text-muted-foreground mb-3">Cumul des points depuis le début — le même classement vous est envoyé par e-mail chaque semaine.</p>
+            <div className="divide-y divide-border/30">
+              {classement.map((c, i) => (
+                <div key={c.student_id} className="flex items-center gap-3 py-2">
+                  <span className="w-6 text-center text-xs font-bold shrink-0" style={{ color: i < 3 ? parcours.accent : undefined }}>
+                    {i < 3 ? <Trophy className="w-3.5 h-3.5 inline" /> : i + 1}
+                  </span>
+                  <span className="flex-1 text-sm truncate">{c.full_name}</span>
+                  <span className="text-sm font-semibold">{c.total} pts</span>
+                </div>
+              ))}
+            </div>
+          </div>
         </section>
       )}
 
