@@ -5662,6 +5662,43 @@ app.post("/api/admin/academy/messages/:id/send", requireAuth, async (req, res) =
   res.json({ sent: true, message: data });
 });
 
+// Envoyer tous les brouillons en attente d'un même geste — une annonce à toute la promotion
+// s'écrit une fois, mais se déclenche autant de fois qu'il y a d'étudiants si on s'en tient au
+// bouton un-par-un. dedupeKey (message_admin:<id>) protège déjà d'un double envoi ; ce
+// balayage ne fait donc que ce que ferait l'administrateur en cliquant 38 fois de suite.
+app.post("/api/admin/academy/messages/send-drafts", requireAuth, async (_req, res) => {
+  const { data: brouillons } = await supabase.from("academy_student_messages")
+    .select("*, students(id, full_name, email)").eq("status", "draft");
+  const resultats = { envoyes: 0, echecs: 0, details: [] as { id: number; ok: boolean; motif?: string }[] };
+  for (const msg of brouillons || []) {
+    const dest = (msg as any).students;
+    if (!dest?.email) {
+      await supabase.from("academy_student_messages")
+        .update({ status: "failed", error: "no_recipient", updated_at: new Date().toISOString() }).eq("id", msg.id);
+      resultats.echecs++; resultats.details.push({ id: msg.id, ok: false, motif: "no_recipient" });
+      continue;
+    }
+    const envoi = await sendAcademyEmail({
+      studentId: dest.id, to: dest.email, type: "message_admin",
+      subject: msg.subject,
+      html: studentMessageEmailHtml(dest.full_name, msg.subject, msg.body),
+      dedupeKey: `message_admin:${msg.id}`,
+    });
+    if (envoi.sent) {
+      await supabase.from("academy_student_messages")
+        .update({ status: "sent", error: null, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", msg.id);
+      resultats.envoyes++; resultats.details.push({ id: msg.id, ok: true });
+    } else {
+      await supabase.from("academy_student_messages")
+        .update({ status: "failed", error: envoi.reason ?? "inconnu", updated_at: new Date().toISOString() })
+        .eq("id", msg.id);
+      resultats.echecs++; resultats.details.push({ id: msg.id, ok: false, motif: envoi.reason });
+    }
+  }
+  res.json(resultats);
+});
+
 app.delete("/api/admin/academy/messages/:id", requireAuth, async (req, res) => {
   const { data: msg } = await supabase.from("academy_student_messages")
     .select("status").eq("id", Number(req.params.id)).maybeSingle();
