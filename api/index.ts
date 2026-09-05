@@ -4773,39 +4773,66 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   const finalScore = arr.length ? Math.round(arr.reduce((a, g) => a + (Number(g.score) / Number(g.max_score)) * 100, 0) / arr.length * 10) / 10 : 0;
   const certNo = `DMA-${course_id}-${sid}-${Date.now().toString(36).toUpperCase()}`;
 
+  // ── Payé ne veut pas dire « en attente » ──
+  //
+  // `du.motif === "déjà payée"` ne repose sur aucune déclaration du navigateur : c'est
+  // notre propre table `academy_paiements`, mise à `paye` par le webhook signé de
+  // l'opérateur — la seule source de vérité sur un paiement, comme le rappelle le
+  // commentaire au-dessus d'`attestationEstDue`. Une revue humaine de 24 à 48 h a un sens
+  // pour la gratuité d'antériorité, où c'est notre propre promesse qui justifie de ne pas
+  // faire payer ; elle n'en a aucun ici, l'argent ayant déjà tranché. La preuve que
+  // personne ne fait cette revue à temps : l'attestation n°25 (étudiant 7, cours 3),
+  // posée le 26 août, toujours `pending` dix jours plus tard.
+  const payee = du.motif === "déjà payée";
+  const now = new Date().toISOString();
+
   const { data, error } = await supabase.from("attestations")
-    .insert({ student_id: sid, course_id, cert_type: "course", certificate_no: certNo, final_score: finalScore, status: "pending" })
+    .insert({
+      student_id: sid, course_id, cert_type: "course", certificate_no: certNo, final_score: finalScore,
+      status: payee ? "issued" : "pending", issued_at: payee ? now : null,
+    })
     .select().single();
   if (error) return res.status(400).json({ message: error.message });
 
-  // Accusé de réception de la demande d'attestation
   const { data: stud } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
   const { data: course } = await supabase.from("sms_courses").select("code, title").eq("id", course_id).single();
 
-  // ── Et l'avis à l'exploitation ──
-  //
-  // Une demande d'attestation attend une décision humaine : elle reste en `pending`
-  // jusqu'à ce que quelqu'un l'approuve. Or personne n'était prévenu. Trois demandes
-  // ont dormi cinq jours — l'étudiante avait terminé trois cours et n'a rien reçu,
-  // pendant qu'un compteur discret l'annonçait sur un écran que personne n'avait de
-  // raison d'ouvrir.
-  //
-  // Une file d'attente qui dépend d'un humain doit aller le chercher, pas l'attendre.
-  if (course) {
-    sendAcademyEmail({
-      studentId: null, to: EMAIL_ALERTE, type: "attestation_a_valider",
-      subject: `📋 Attestation à valider — ${stud?.full_name || "étudiant"} · ${course.code}`,
-      html: attestationAValiderEmailHtml(stud?.full_name || "—", course, certNo, finalScore),
-      dedupeKey: `attest_admin:${data?.id ?? certNo}`,
-    }).catch(() => {});
-  }
-  if (stud?.email && course) {
-    sendAcademyEmail({
-      studentId: sid, to: stud.email, type: "attestation_requested",
-      subject: `📋 Demande d'attestation reçue — ${course.title}`,
-      html: attestationRequestedEmailHtml(stud.full_name, course, certNo, finalScore),
-      dedupeKey: `attest_req:${sid}:${course_id}`,
-    });
+  if (payee) {
+    // Le certificat lui-même, pas un accusé de réception : rien ne reste à valider.
+    if (stud?.email && course) {
+      sendAcademyEmail({
+        studentId: sid, to: stud.email, type: "attestation_issued",
+        subject: `🎓 Votre attestation est prête — ${course.title}`,
+        html: attestationIssuedEmailHtml(stud.full_name, course, certNo, finalScore),
+        dedupeKey: `attestation:${data.id}:issued`,
+      });
+    }
+  } else {
+    // ── Et l'avis à l'exploitation ──
+    //
+    // Une demande d'attestation attend une décision humaine : elle reste en `pending`
+    // jusqu'à ce que quelqu'un l'approuve. Or personne n'était prévenu. Trois demandes
+    // ont dormi cinq jours — l'étudiante avait terminé trois cours et n'a rien reçu,
+    // pendant qu'un compteur discret l'annonçait sur un écran que personne n'avait de
+    // raison d'ouvrir.
+    //
+    // Une file d'attente qui dépend d'un humain doit aller le chercher, pas l'attendre.
+    if (course) {
+      sendAcademyEmail({
+        studentId: null, to: EMAIL_ALERTE, type: "attestation_a_valider",
+        subject: `📋 Attestation à valider — ${stud?.full_name || "étudiant"} · ${course.code}`,
+        html: attestationAValiderEmailHtml(stud?.full_name || "—", course, certNo, finalScore),
+        dedupeKey: `attest_admin:${data?.id ?? certNo}`,
+      }).catch(() => {});
+    }
+    if (stud?.email && course) {
+      sendAcademyEmail({
+        studentId: sid, to: stud.email, type: "attestation_requested",
+        subject: `📋 Demande d'attestation reçue — ${course.title}`,
+        html: attestationRequestedEmailHtml(stud.full_name, course, certNo, finalScore),
+        dedupeKey: `attest_req:${sid}:${course_id}`,
+      });
+    }
   }
 
   res.status(201).json(data);
