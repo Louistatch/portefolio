@@ -32,6 +32,7 @@ const AcademyForgotPassword = lazy(() => import("@/pages/academy/forgot-password
 const AcademyResetPassword = lazy(() => import("@/pages/academy/reset-password"));
 const AcademyProfile = lazy(() => import("@/pages/academy/profile"));
 const AcademyGrades = lazy(() => import("@/pages/academy/grades"));
+const AcademyCertifications = lazy(() => import("@/pages/academy/certifications"));
 const AcademyAmbassador = lazy(() => import("@/pages/academy/ambassador"));
 const VerifyCertificate = lazy(() => import("@/pages/academy/verify-certificate"));
 const AcademyLive = lazy(() => import("@/pages/academy/live"));
@@ -155,6 +156,7 @@ function App() {
             <Route path="/academy/reset-password">{() => <Layout><AcademyResetPassword /></Layout>}</Route>
             <Route path="/academy/profile">{() => <RequireStudentAuth><AcademyLayout><AcademyProfile /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/grades">{() => <RequireStudentAuth><AcademyLayout><AcademyGrades /></AcademyLayout></RequireStudentAuth>}</Route>
+            <Route path="/academy/certifications">{() => <RequireStudentAuth><AcademyLayout><AcademyCertifications /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/ambassador">{() => <RequireStudentAuth><AcademyLayout><AcademyAmbassador /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/verify-certificate/:certNo">{() => <Layout><VerifyCertificate /></Layout>}</Route>
             <Route path="/academy/verify-certificate">{() => <Layout><VerifyCertificate /></Layout>}</Route>

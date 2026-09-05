@@ -69,7 +69,7 @@ function SquelettePage() {
 }
 import { AlerteRetard, constatDepuisPlanning } from "@/components/academy/alerte-retard";
 
-interface Cred { id: string; type: string; title: string; subtitle: string; issued_at: string; expires_at: string | null; status: string; certificate_no: string | null; score: number | null; download_url: string | null; skills: string[]; color: string; }
+export interface Cred { id: string; type: string; title: string; subtitle: string; issued_at: string; expires_at: string | null; status: string; certificate_no: string | null; score: number | null; download_url: string | null; skills: string[]; color: string; }
 
 export default function AcademyDashboard() {
   const [, navigate] = useLocation();
@@ -274,7 +274,7 @@ export default function AcademyDashboard() {
         <section id="credentials" className="scroll-mt-24">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold flex items-center gap-2"><Award className="w-5 h-5 text-primary" /> Mon portefeuille de credentials</h2>
-            <span className="text-xs text-muted-foreground">Vérifiables · Téléchargeables</span>
+            <button onClick={() => navigate("/academy/certifications")} className="text-xs text-primary hover:underline flex items-center gap-1">Détail complet <ChevronRight className="w-3 h-3" /></button>
           </div>
           {creds.length > 0 ? (
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -446,7 +446,7 @@ function IllustrationCredentialVide() {
 }
 
 // ───── Carte de credential (style Credly) ─────
-function CredentialCard({ cred }: { cred: Cred }) {
+export function CredentialCard({ cred }: { cred: Cred }) {
   const expired = cred.status === "expired";
   const issued = cred.issued_at ? new Date(cred.issued_at).toLocaleDateString("fr-FR", { day: "numeric", month: "short", year: "numeric" }) : "";
   const isFinal = cred.type === "final";

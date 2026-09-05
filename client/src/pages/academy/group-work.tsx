@@ -64,6 +64,10 @@ export default function AcademyGroupWork() {
   const [data, setData] = useState<any>(null);
   const [cohorte, setCohorte] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  // Le travail affiché en détail sous la grille — vue « maître-détail » plutôt que trois
+  // fiches complètes empilées : on scanne la grille d'un coup d'œil, puis on ouvre celle
+  // qui compte. Sans sélection explicite, on ouvre celle qui attend une action.
+  const [selectedId, setSelectedId] = useState<number | null>(null);
 
   const charger = async () => {
     const [d, promo] = await Promise.all([
@@ -94,36 +98,122 @@ export default function AcademyGroupWork() {
   const travaux: Travail[] = data.travaux || [];
   const corriges = travaux.filter(t => t.statut === "completed").length;
 
-  return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <SEO title="Travaux de groupe — LouisFarm Learning" description="Les évaluations collectives du cursus MEAL." />
+  const actionnable = travaux.find(t => t.statut === "available" || t.statut === "missed");
+  const dernierTraite = [...travaux].reverse().find(t => t.statut === "submitted" || t.statut === "completed");
+  const selected = travaux.find(t => t.id === selectedId) || actionnable || dernierTraite || travaux[0];
+  const joursRestants = actionnable?.echeanceLe
+    ? Math.max(0, Math.ceil((new Date(actionnable.echeanceLe).getTime() - Date.now()) / 86400000))
+    : null;
 
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-teal-700 p-6 sm:p-8 text-white">
-        <div className="absolute -right-8 -top-8 w-44 h-44 rounded-full bg-white/10" />
-        <div className="relative">
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium bg-white/15 px-2.5 py-1 rounded-full">
-            <Users className="w-3.5 h-3.5" /> Évaluation collective
-          </span>
-          <h1 className="text-2xl sm:text-3xl font-bold mt-3">Travaux de groupe</h1>
-          <p className="text-white/85 text-sm mt-2 max-w-2xl">
-            Trois projets collectifs jalonnent votre parcours. <strong>Une équipe différente
-            est tirée au sort pour chacun</strong>, une semaine avant son ouverture — vous ne
-            travaillerez pas trois fois avec les mêmes personnes.
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <SEO title="Travaux de groupe — LouisFarm Learning" description="Les évaluations collectives du cursus." />
+
+      {/* ───── En-tête minimal : un dashboard s'ouvre sur des chiffres, pas une bannière ───── */}
+      <div className="flex items-start justify-between flex-wrap gap-4">
+        <div>
+          <h1 className="titre-affichage text-2xl sm:text-[28px] font-semibold">Travaux de groupe</h1>
+          <p className="text-sm text-muted-foreground mt-1 max-w-xl">
+            Trois projets collectifs jalonnent votre parcours. Une équipe différente est tirée
+            au sort pour chacun, une semaine avant son ouverture.
           </p>
-          <div className="flex items-center gap-2 mt-4 text-sm">
-            <Trophy className="w-4 h-4" />
-            <span className="font-semibold">{corriges}/{travaux.length}</span>
-            <span className="text-white/80">corrigé{corriges > 1 ? "s" : ""}</span>
-          </div>
+        </div>
+        <span className="inline-flex items-center gap-1.5 text-sm font-bold bg-primary/10 text-primary px-3.5 py-2 rounded-full shrink-0">
+          <Trophy className="w-4 h-4" /> {corriges}/{travaux.length} corrigé{corriges > 1 ? "s" : ""}
+        </span>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="bg-card rounded-2xl border border-border/50 p-4">
+          <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center mb-3"><CheckCircle2 className="w-[18px] h-[18px]" /></div>
+          <p className="text-2xl font-bold chiffres-tabulaires">{corriges} / {travaux.length}</p>
+          <p className="text-xs text-muted-foreground mt-1.5">Travaux corrigés</p>
+        </div>
+        <div className="bg-card rounded-2xl border border-border/50 p-4">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 flex items-center justify-center mb-3"><Clock className="w-[18px] h-[18px]" /></div>
+          <p className="text-2xl font-bold chiffres-tabulaires">{joursRestants != null ? joursRestants : "—"}</p>
+          <p className="text-xs text-muted-foreground mt-1.5">
+            {actionnable ? `jour${(joursRestants ?? 0) > 1 ? "s" : ""} avant l'échéance de « ${actionnable.titre} »` : "Aucune échéance en attente"}
+          </p>
+        </div>
+        <div className="bg-card rounded-2xl border border-border/50 p-4">
+          <div className="w-9 h-9 rounded-xl bg-blue-500/10 text-blue-600 flex items-center justify-center mb-3"><Users className="w-[18px] h-[18px]" /></div>
+          <p className="text-2xl font-bold chiffres-tabulaires">{selected?.groupe?.membres.length ?? 0}</p>
+          <p className="text-xs text-muted-foreground mt-1.5 truncate">Coéquipiers sur « {selected?.titre} »</p>
         </div>
       </div>
 
-      {travaux.map(t => (
-        <CarteTravail key={t.id} travail={t} moiId={moi?.id} consignes={data.consignes} onChange={charger} />
-      ))}
+      {/* ───── Grille des travaux : vue d'ensemble, cliquable ───── */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {travaux.map(t => (
+          <CarteResume key={t.id} travail={t} actif={t.id === selected?.id} onSelect={() => setSelectedId(t.id)} />
+        ))}
+      </div>
+
+      {/* ───── Détail du travail sélectionné ───── */}
+      {selected && (
+        <CarteTravail key={selected.id} travail={selected} moiId={moi?.id} consignes={data.consignes} onChange={charger} />
+      )}
 
       {cohorte && <ForumPromotion promo={cohorte} onPoste={charger} />}
     </div>
+  );
+}
+
+/**
+ * Carte de résumé d'un travail, dans la grille du haut.
+ *
+ * Elle ne porte aucune action propre : cliquer ouvre le détail complet plus bas (équipe,
+ * consignes, dépôt, évaluations), qui reste la seule fiche interactive. Dupliquer le
+ * formulaire de dépôt ici aurait forcé à choisir laquelle des deux copies fait foi.
+ */
+function CarteResume({ travail: t, actif, onSelect }: { travail: Travail; actif: boolean; onSelect: () => void }) {
+  const ton = TON[t.statut] ?? TON.locked;
+  const Icone = ton.icone;
+  const pct = t.statut === "completed" && t.note != null ? Math.round((t.note / t.maxScore) * 100)
+    : t.statut === "submitted" ? 100 : 0;
+  const couleurBarre = t.statut === "completed" ? "bg-primary" : t.statut === "submitted" ? "bg-blue-500" : "bg-transparent";
+
+  return (
+    <button onClick={onSelect}
+      className={`text-left bg-card rounded-2xl border overflow-hidden transition-colors pressable ${
+        actif ? "border-primary/50 ring-1 ring-primary/20" : "border-border/50 hover:border-primary/30"}`}>
+      <div className="flex items-center gap-3 px-4 py-3.5 border-b border-border/40">
+        <span className={`w-9 h-9 rounded-xl grid place-items-center shrink-0 ${ton.badge}`}>
+          <Icone className="w-[18px] h-[18px]" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-sm truncate">{t.titre}</p>
+          <p className="text-[11px] text-muted-foreground truncate">
+            Semaine {t.semaine} · {t.statut === "locked" ? `s'ouvre le ${jourCourt(t.ouvertureLe)}` : `avant le ${jourCourt(t.echeanceLe)}`}
+          </p>
+        </div>
+        <span className={`text-[10px] font-semibold px-2 py-1 rounded-full shrink-0 ${ton.badge}`}>
+          {t.statut === "completed" && t.note != null ? `${t.note}/${t.maxScore}` : GROUP_WORK_STATUS_LABEL[t.statut]}
+        </span>
+      </div>
+      <div className="px-4 py-3.5 space-y-2.5">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground min-w-0">
+          {t.groupe ? (
+            <>
+              <span className="flex items-center -space-x-2 shrink-0">
+                {t.groupe.membres.slice(0, 4).map(m => (
+                  <span key={m.studentId} className="w-6 h-6 rounded-full bg-emerald-100 text-primary grid place-items-center text-[9px] font-bold border-2 border-card">
+                    {initiales(m.nom)}
+                  </span>
+                ))}
+              </span>
+              <span className="truncate">{t.groupe.nom}</span>
+            </>
+          ) : (
+            <><Shuffle className="w-3.5 h-3.5 shrink-0" /> équipe pas encore tirée au sort</>
+          )}
+        </div>
+        <div className="h-1.5 rounded-full bg-muted overflow-hidden">
+          <div className={`h-full rounded-full ${couleurBarre}`} style={{ width: `${pct}%` }} />
+        </div>
+      </div>
+    </button>
   );
 }
 

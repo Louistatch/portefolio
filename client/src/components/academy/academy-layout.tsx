@@ -36,7 +36,7 @@ const NAV: Item[] = [
   { href: "/academy/group-work", label: "Travaux de groupe", icon: Users, exact: true },
   { href: "/academy/grades", label: "Mes notes", icon: TrendingUp, exact: true },
   { href: "/academy/ambassador", label: "Programme ambassadeur", icon: Megaphone, exact: true },
-  { href: "/academy/dashboard#credentials", label: "Certifications", icon: Award },
+  { href: "/academy/certifications", label: "Certifications", icon: Award, exact: true },
   { href: "/academy/dashboard#ressources", label: "Ressources", icon: FolderOpen },
 ];
 
@@ -317,6 +317,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
                 {location.startsWith("/academy/classroom") ? "Salle de cours"
                   : location === "/academy/group-work" ? "Travaux de groupe"
                   : location === "/academy/profile" ? "Mon profil"
+                  : location === "/academy/certifications" ? "Certifications"
                   : location.startsWith("/academy/live") ? "Rencontre en ligne" : "Page"}
               </span>
             </div>
