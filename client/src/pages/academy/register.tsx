@@ -38,12 +38,17 @@ export default function AcademyRegister() {
     if (form.password !== form.confirm) { setError("Les mots de passe ne correspondent pas."); return; }
     setLoading(true);
     try {
+      // Code de parrainage porté par le lien d'un ambassadeur (?ref=CODE) : lu directement
+      // dans l'URL plutôt que stocké dans le formulaire — invisible, et il survit à un
+      // rechargement de la page pendant que l'étudiant remplit ses champs.
+      const referral_code = new URLSearchParams(window.location.search).get("ref") || undefined;
       const res = await fetch("/api/academy/register", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           first_name: form.first_name, middle_name: form.middle_name, last_name: form.last_name,
           email: form.email, password: form.password,
           phone: form.phone, country: form.country, organization: form.organization,
+          referral_code,
         }),
       });
       const data = await res.json();

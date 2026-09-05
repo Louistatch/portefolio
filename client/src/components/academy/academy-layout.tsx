@@ -5,7 +5,7 @@ import { PROGRAMS } from "@shared/programs";
 import { studentFetch, getStudent, clearStudentSession } from "@/lib/student";
 import {
   Home, Route as RouteIcon, BookOpen, Award, FolderOpen, Users,
-  Menu, X, Search, Bell, LogOut, LifeBuoy, GraduationCap, UserCircle, ChevronRight, TrendingUp,
+  Menu, X, Search, Bell, LogOut, LifeBuoy, GraduationCap, UserCircle, ChevronRight, TrendingUp, Megaphone,
 } from "lucide-react";
 import {
   Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList,
@@ -35,6 +35,7 @@ const NAV: Item[] = [
   })),
   { href: "/academy/group-work", label: "Travaux de groupe", icon: Users, exact: true },
   { href: "/academy/grades", label: "Mes notes", icon: TrendingUp, exact: true },
+  { href: "/academy/ambassador", label: "Programme ambassadeur", icon: Megaphone, exact: true },
   { href: "/academy/dashboard#credentials", label: "Certifications", icon: Award },
   { href: "/academy/dashboard#ressources", label: "Ressources", icon: FolderOpen },
 ];
