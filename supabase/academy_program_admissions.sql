@@ -82,3 +82,13 @@ on conflict (student_id, program_id) do nothing;
 
 comment on table academy_program_admissions is
   'Admission et titre final propres à un parcours autre que le cursus MEAL (qui reste porté par les colonnes de students).';
+
+-- ── Chronométrage de l'épreuve d'admission ──
+--
+-- Avant l'ajout de cette colonne, le test n'avait aucune limite de temps : rien
+-- n'empêchait de le laisser ouvert des jours en cherchant chaque réponse. `test_started_at`
+-- est posée par POST /api/academy/programs/:id/start-test, jamais par le navigateur — c'est
+-- elle qui fixe l'heure d'expiration côté serveur, pour que recharger la page ne remette pas
+-- le compteur à zéro. La même colonne existe sur `students` pour le cursus MEAL, par la
+-- même asymétrie documentée plus haut.
+alter table academy_program_admissions add column if not exists test_started_at timestamptz;

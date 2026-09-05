@@ -22,6 +22,8 @@ import { QUESTIONS_FCA } from "@shared/fca-test";
 import { QUESTIONS_FCQ } from "@shared/fcq-test";
 import { QUESTIONS_COOP } from "@shared/coop-test";
 import { programById } from "@shared/programs";
+import { dureeEpreuveSecondes } from "@shared/chronometrage";
+import { useChronoEpreuve, type FenetreChrono } from "@/lib/chrono-epreuve";
 
 /**
  * Banques de questions des parcours ayant leur porte propre.
@@ -47,7 +49,7 @@ const BANQUES_PARCOURS: Record<string, { domain: string; q: string; opts: string
 // ─── TYPES ────────────────────────────────────────────────────────────────────
 // Le parcours réel (cours, progression, attestations) vit dans /academy/* : cette page
 // couvre la présentation du programme et le test d'admission.
-type View = "landing" | "test" | "test-result";
+type View = "landing" | "test-intro" | "test" | "test-result";
 
 // ─── QUIZ DATA (30 questions) ─────────────────────────────────────────────────
 const QUESTIONS = [
@@ -102,6 +104,10 @@ export default function ELearning() {
   const [pageEtat, setPageEtat] = useState<"chargement" | "ok" | "erreur">("chargement");
   const [compact, setCompact] = useState(false);
   const [moduleDetail, setModuleDetail] = useState<any>(null);
+  // Fenêtre de temps fixée par le serveur — jamais recalculée depuis une horloge locale,
+  // pour qu'un rechargement de la page ne remette pas le compteur à zéro.
+  const [fenetreParcours, setFenetreParcours] = useState<FenetreChrono | null>(null);
+  const [demarrageEnCours, setDemarrageEnCours] = useState(false);
   // Trois parcours, trois tests, un seul moteur. Dupliquer l'écran de QCM aurait fait
   // autant de corrections d'affichage à porter à chaque fois — et l'une d'elles aurait fini
   // par être oubliée. Le parcours en cours d'examen commande la banque de questions et
@@ -179,6 +185,7 @@ export default function ELearning() {
       });
       const data = await res.json();
       setSubmitResult(data);
+      setFenetreParcours(null); // l'épreuve est remise : plus rien à décompter.
       if (typeof data.score === "number") setScore(data.score);
       else {
         // Le serveur explique pourquoi il refuse (email non vérifié, déjà admis, délai d'une
@@ -233,10 +240,44 @@ export default function ELearning() {
       setView("test-result"); // affiche le message de verrou
       return;
     }
-    setView("test");
+
+    // Une épreuve déjà démarrée (onglet refermé, page rechargée) reprend directement sur la
+    // question, sans repasser par l'écran « Commencer » — le chronomètre continue de courir
+    // pendant l'absence, il ne se remet jamais à zéro.
+    if (statut?.testStartedAt && statut?.expiresAt) {
+      setFenetreParcours({ testStartedAt: statut.testStartedAt, expiresAt: statut.expiresAt, durationSeconds: statut.durationSeconds });
+      setView("test");
+      return;
+    }
+    setFenetreParcours(null);
+    setView("test-intro");
   }
 
   function startTest() { demarrerTest("meal"); }
+
+  // ── Démarrer le chronomètre — au clic sur « Commencer l'épreuve », jamais avant ──
+  async function demarrerChronometre() {
+    setDemarrageEnCours(true);
+    setSubmitError(false);
+    setSubmitErrorMsg(null);
+    try {
+      const r = await studentFetch(surMeal
+        ? "/api/academy/start-test"
+        : `/api/academy/programs/${parcoursTest}/start-test`, { method: "POST" });
+      const d = await r.json();
+      // L'échec reste sur l'écran de départ, pas sur celui du résultat : son bouton
+      // « Réessayer » relance une SOUMISSION, pas un démarrage, ce serait le mauvais geste.
+      if (!r.ok) { setSubmitError(true); setSubmitErrorMsg(d?.message || "Impossible de démarrer l'épreuve."); return; }
+      setFenetreParcours({ testStartedAt: d.testStartedAt, expiresAt: d.expiresAt, durationSeconds: d.durationSeconds });
+      setView("test");
+    } catch {
+      setSubmitError(true); setSubmitErrorMsg("Impossible de démarrer l'épreuve. Vérifiez votre connexion.");
+    } finally { setDemarrageEnCours(false); }
+  }
+
+  // Appelé une seule fois, exactement quand le temps s'épuise : ce qui a déjà été répondu
+  // part, les questions vides comptent comme fausses — la même règle qu'un envoi volontaire.
+  const chrono = useChronoEpreuve(fenetreParcours, () => { if (!submitting) submitTest(); });
 
   // ─────────────────── RENDER HELPERS ──────────────────────────────────────
 
@@ -1060,16 +1101,76 @@ export default function ELearning() {
     );
   }
 
+  // ── Avant de commencer ──
+  // Le chronomètre démarre au clic sur le bouton, pas à l'arrivée sur cette page : sans cet
+  // écran, le temps de lire les consignes aurait été décompté comme du temps de réponse.
+  function renderTestIntro() {
+    const titre = programById(parcoursTest).title;
+    const duree = Math.round(dureeEpreuveSecondes(BANQUE.length) / 60);
+    return (
+      <div className="max-w-xl mx-auto px-6 py-16 text-center">
+        <span className="text-xs font-medium text-primary bg-primary/10 px-3 py-1 rounded-full">
+          Épreuve d'admission
+        </span>
+        <h1 className="text-2xl sm:text-3xl font-bold mt-5">{titre}</h1>
+
+        <div className="grid grid-cols-3 gap-3 mt-8 text-left">
+          <div className="rounded-2xl border border-border/50 bg-card p-4">
+            <p className="text-2xl font-bold tabular-nums">{BANQUE.length}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">questions</p>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-card p-4">
+            <p className="text-2xl font-bold tabular-nums">{duree} min</p>
+            <p className="text-xs text-muted-foreground mt-0.5">temps alloué</p>
+          </div>
+          <div className="rounded-2xl border border-border/50 bg-card p-4">
+            <p className="text-2xl font-bold tabular-nums">{SEUIL}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">bonnes réponses requises</p>
+          </div>
+        </div>
+
+        <p className="mt-8 text-sm text-muted-foreground leading-relaxed">
+          Aucune pénalité en cas d'erreur : mieux vaut répondre au jugé que laisser une
+          question vide. Le chronomètre démarre au clic ci-dessous et continue même si vous
+          quittez la page ; en cas de coupure, l'épreuve reprend là où vous l'aviez laissée,
+          tant que le temps n'est pas écoulé.
+        </p>
+
+        {submitError && (
+          <p className="mt-4 text-sm text-destructive">{submitErrorMsg || "Impossible de démarrer l'épreuve."}</p>
+        )}
+
+        <Button size="lg" className="gap-2 mt-8" disabled={demarrageEnCours} onClick={demarrerChronometre}>
+          {demarrageEnCours ? "Démarrage…" : "Commencer l'épreuve"} <ArrowRight className="w-4 h-4" />
+        </Button>
+      </div>
+    );
+  }
+
   function renderTest() {
     const q = BANQUE[qIdx];
     const chosen = answers[qIdx];
+    const verrouille = !!chrono?.expire || submitting;
     return (
       <div className="max-w-2xl mx-auto px-6 py-12">
         {/* Progress */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium">Question {qIdx + 1} / {BANQUE.length}</span>
-            <span className="text-sm text-muted-foreground">{answeredCount} réponses</span>
+            <div className="flex items-center gap-3">
+              <span className="text-sm text-muted-foreground">{answeredCount} réponses</span>
+              {/* Discret tant qu'il reste plus de 20 % du temps, puis change de ton — jamais
+                  de sonnerie ni d'animation brusque : c'est un cadre de travail, pas une
+                  alarme. */}
+              {chrono && (
+                <span className={`flex items-center gap-1.5 text-sm font-medium tabular-nums px-2.5 py-1 rounded-full transition-colors ${
+                  chrono.alerte ? "bg-destructive/10 text-destructive" : "bg-muted text-muted-foreground"
+                }`}>
+                  <Clock className={`w-3.5 h-3.5 ${chrono.alerte && !chrono.expire ? "animate-pulse" : ""}`} />
+                  {chrono.affichage}
+                </span>
+              )}
+            </div>
           </div>
           <div className="h-1.5 bg-muted rounded-full overflow-hidden">
             <div className="h-full bg-primary rounded-full transition-all duration-500" style={{ width: `${((qIdx + 1) / BANQUE.length) * 100}%` }} />
@@ -1081,6 +1182,12 @@ export default function ELearning() {
             ))}
           </div>
         </div>
+
+        {chrono?.expire && (
+          <p className="mb-4 text-sm font-medium text-primary">
+            Temps écoulé — votre épreuve a été transmise automatiquement.
+          </p>
+        )}
 
         {/* Card
             translate="no" : le QCM ne doit jamais passer par un traducteur automatique.
@@ -1095,8 +1202,8 @@ export default function ELearning() {
           <p className="text-lg font-medium mt-5 mb-6 leading-relaxed">{q.q}</p>
           <div className="space-y-3">
             {q.opts.map((opt, i) => (
-              <button key={`${qIdx}-${i}`} onClick={() => setAnswers(prev => ({ ...prev, [qIdx]: i }))}
-                className={`w-full text-left px-5 py-3.5 rounded-2xl border text-sm transition-all duration-150 ${
+              <button key={`${qIdx}-${i}`} disabled={verrouille} onClick={() => setAnswers(prev => ({ ...prev, [qIdx]: i }))}
+                className={`w-full text-left px-5 py-3.5 rounded-2xl border text-sm transition-all duration-150 disabled:opacity-50 disabled:pointer-events-none ${
                   chosen === i
                     ? "border-primary bg-primary/10 text-primary font-medium"
                     : "border-border hover:border-primary/40 hover:bg-muted/50 text-foreground"
@@ -1110,15 +1217,19 @@ export default function ELearning() {
 
         {/* Nav */}
         <div className="flex items-center justify-between">
-          <Button variant="outline" disabled={qIdx === 0} onClick={() => setQIdx(q => q - 1)} className="gap-2">
+          <Button variant="outline" disabled={qIdx === 0 || verrouille} onClick={() => setQIdx(q => q - 1)} className="gap-2">
             <ChevronLeft className="w-4 h-4" /> Précédent
           </Button>
-          {qIdx < BANQUE.length - 1 ? (
+          {/* Le temps écoulé force ce bouton à apparaître quelle que soit la question
+              affichée : sans lui, quelqu'un qui n'était pas sur la dernière question au
+              moment de l'expiration n'aurait aucun moyen de relancer l'envoi si la
+              transmission automatique avait échoué (coupure réseau). */}
+          {qIdx < BANQUE.length - 1 && !chrono?.expire ? (
             <Button onClick={() => setQIdx(q => q + 1)} className="gap-2">
               Suivant <ChevronRight className="w-4 h-4" />
             </Button>
           ) : (
-            <Button onClick={submitTest} className="gap-2 bg-primary">
+            <Button onClick={submitTest} disabled={submitting} className="gap-2 bg-primary">
               <CheckCircle2 className="w-4 h-4" /> Soumettre le test
             </Button>
           )}
@@ -1276,7 +1387,7 @@ export default function ELearning() {
               <button
                 onClick={startTest}
                 className={`shrink-0 px-4 py-3 text-sm border-b-2 transition-colors whitespace-nowrap ${
-                  view === "test" || view === "test-result" ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
+                  view === "test-intro" || view === "test" || view === "test-result" ? "border-primary text-primary font-medium" : "border-transparent text-muted-foreground hover:text-foreground"
                 }`}>
                 Test de sélection
               </button>
@@ -1297,6 +1408,7 @@ export default function ELearning() {
       )}
 
       {view === "landing" && renderLanding()}
+      {view === "test-intro" && renderTestIntro()}
       {view === "test" && renderTest()}
       {view === "test-result" && renderTestResult()}
     </div>

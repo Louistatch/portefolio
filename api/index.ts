@@ -17,6 +17,7 @@ import {
 import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
 import { leconOuverte, semainesNecessaires, FENETRE_ADMISSION_SEMAINES } from "../shared/rythme.js";
 import { validerLecon, idsExercices } from "../shared/valider-cours.js";
+import { dureeEpreuveSecondes, fenetreChronoActive, fenetreDepuisDemarrage } from "../shared/chronometrage.js";
 import { raisonDeNePasNotifier, FENETRE_NOTIF_FORUM_MS } from "../shared/notifications.js";
 import { RETARD_EXCLUSION_JOURS, RETARD_PALIERS, alerteDeRetard } from "../shared/retard.js";
 import {
@@ -2152,7 +2153,7 @@ async function grantAdmission(sid: number, score: number, now: Date, previousAdm
 /** Admission de l'étudiant à un parcours porté par academy_program_admissions. */
 async function admissionParcours(sid: number, programId: string) {
   const { data } = await supabase.from("academy_program_admissions")
-    .select("admitted_at, admission_expires, entry_score, test_attempts, next_test_allowed")
+    .select("admitted_at, admission_expires, entry_score, test_attempts, next_test_allowed, test_started_at")
     .eq("student_id", sid).eq("program_id", programId).maybeSingle();
   return data ?? null;
 }
@@ -2238,6 +2239,16 @@ app.get("/api/academy/programs/:id/test-status", requireStudent, async (req, res
   const a = await admissionParcours(sid, programId);
   const expiree = !!a?.admission_expires && new Date(a.admission_expires) < new Date();
   const attente = a?.next_test_allowed ? new Date(a.next_test_allowed) : null;
+
+  // Une fenêtre de chronomètre entamée mais jamais soumise, et désormais expirée, s'efface
+  // d'elle-même : ce n'est pas une faute d'avoir été interrompu, l'étudiant retrouve
+  // l'écran de départ plutôt qu'une porte fermée pour une semaine.
+  const fenetre = fenetreChronoActive(a?.test_started_at ?? null, r.parcours!.admission.nbQuestions);
+  if (a?.test_started_at && !fenetre) {
+    await supabase.from("academy_program_admissions").update({ test_started_at: null })
+      .eq("student_id", sid).eq("program_id", programId).then(() => {}, () => {});
+  }
+
   res.json({
     programId: r.parcours!.id,
     passed: !!a?.admitted_at && !expiree,
@@ -2251,7 +2262,50 @@ app.get("/api/academy/programs/:id/test-status", requireStudent, async (req, res
     seuil: r.parcours!.admission.seuil,
     credential: r.parcours!.credential,
     title: r.parcours!.title,
+    testStartedAt: fenetre?.testStartedAt ?? null,
+    expiresAt: fenetre?.expiresAt ?? null,
+    durationSeconds: fenetre?.durationSeconds ?? dureeEpreuveSecondes(r.parcours!.admission.nbQuestions),
   });
+});
+
+// ── Démarrer le chronomètre de l'épreuve ──
+//
+// Séparée de test-status (une consultation ne doit jamais déclencher le compte à rebours à
+// l'insu de l'étudiant) et de submit-test (démarrer et remettre sont deux gestes, pas un
+// seul). Idempotente : rappelée sur une fenêtre déjà active — un double clic, un
+// rechargement — elle renvoie la MÊME fenêtre plutôt que d'offrir du temps en plus.
+app.post("/api/academy/programs/:id/start-test", rateLimit(20, 10 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const programId = String(req.params.id);
+  const r = parcoursAvecTest(programId);
+  if (!r.ok) return res.status(r.statut!).json({ message: r.message });
+  const parcours = r.parcours!;
+
+  const a = await admissionParcours(sid, programId);
+  const now = new Date();
+  const expiree = !!a?.admission_expires && new Date(a.admission_expires) < now;
+  if (a?.admitted_at && !expiree) {
+    return res.status(403).json({
+      message: `Vous êtes déjà admis(e) au parcours « ${parcours.title} ».`,
+      alreadyAdmitted: true,
+    });
+  }
+  if (a?.next_test_allowed && new Date(a.next_test_allowed) > now) {
+    return res.status(403).json({
+      message: `Vous pourrez repasser ce test à partir du ${new Date(a.next_test_allowed).toLocaleDateString("fr-FR")}.`,
+      nextTestAllowed: a.next_test_allowed,
+    });
+  }
+
+  const existante = fenetreChronoActive(a?.test_started_at ?? null, parcours.admission.nbQuestions);
+  if (existante) return res.json(existante);
+
+  const debut = now.toISOString();
+  const { error } = await supabase.from("academy_program_admissions")
+    .upsert({ student_id: sid, program_id: programId, test_started_at: debut }, { onConflict: "student_id,program_id" });
+  if (error) return res.status(500).json({ message: "Impossible de démarrer l'épreuve. Réessayez." });
+
+  res.json(fenetreDepuisDemarrage(debut, parcours.admission.nbQuestions));
 });
 
 app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
@@ -2286,6 +2340,11 @@ app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000),
       nextTestAllowed: a.next_test_allowed,
     });
   }
+  // Ferme l'accès direct à cette route : sans être passé par start-test, aucune fenêtre de
+  // temps n'a jamais été fixée, et le chronomètre n'aurait alors protégé personne.
+  if (!a?.test_started_at) {
+    return res.status(400).json({ message: "Démarrez l'épreuve avant de la remettre." });
+  }
 
   const correct: boolean[] = [];
   let score = 0;
@@ -2302,6 +2361,9 @@ app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000),
     student_id: sid, program_id: programId,
     entry_score: score, test_attempts: tentatives, last_test_at: now.toISOString(),
     next_test_allowed: passed ? null : prochainEssai,
+    // La fenêtre de temps a servi : l'effacer permet à une reprise (échec) de repartir sur
+    // un chronomètre neuf plutôt que de retrouver une fenêtre déjà expirée.
+    test_started_at: null,
   }, { onConflict: "student_id,program_id" }).then(() => {}, () => {});
 
   await supabase.from("grades").insert({
@@ -2390,7 +2452,7 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
 
   // Vérifier le délai de re-tentative (1 semaine après échec)
   const { data: stud } = await supabase.from("students")
-    .select("admitted_at, admission_expires, next_test_allowed, test_attempts, status, email_verified").eq("id", sid).single();
+    .select("admitted_at, admission_expires, next_test_allowed, test_attempts, status, email_verified, test_started_at").eq("id", sid).single();
   // L'email non vérifié ne bloque plus le test : quand l'envoi d'email échoue (domaine
   // d'expédition non validé, quota, boîte inexistante), l'étudiant était enfermé dans une
   // impasse dont aucune action de sa part ne pouvait le sortir. La vérification reste exigée
@@ -2403,6 +2465,11 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
   }
   if (stud?.next_test_allowed && new Date(stud.next_test_allowed) > new Date()) {
     return res.status(403).json({ message: "Vous devez attendre avant de repasser le test.", nextAllowed: stud.next_test_allowed });
+  }
+  // Ferme l'accès direct à cette route : sans être passé par start-test, aucune fenêtre de
+  // temps n'a jamais été fixée.
+  if (!stud?.test_started_at) {
+    return res.status(400).json({ message: "Démarrez l'épreuve avant de la remettre." });
   }
 
   // Calcul du score CÔTÉ SERVEUR à partir des réponses
@@ -2426,6 +2493,9 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
   const update: any = {
     entry_score: score, test_attempts: attempts, last_test_at: now.toISOString(),
     status: passed ? "active" : "pending_test",
+    // La fenêtre de temps a servi : l'effacer permet à une reprise (échec) de repartir sur
+    // un chronomètre neuf plutôt que de retrouver une fenêtre déjà expirée.
+    test_started_at: null,
   };
   if (!passed) {
     update.next_test_allowed = new Date(now.getTime() + RETRY_DAYS * 24 * 60 * 60 * 1000).toISOString();
@@ -2467,7 +2537,7 @@ app.post("/api/academy/submit-test", rateLimit(10, 10 * 60 * 1000), requireStude
 app.get("/api/academy/test-status", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   let { data } = await supabase.from("students")
-    .select("entry_score, status, admitted_at, admission_expires, next_test_allowed, test_attempts, email_verified").eq("id", sid).single();
+    .select("entry_score, status, admitted_at, admission_expires, next_test_allowed, test_attempts, email_verified, test_started_at").eq("id", sid).single();
 
   // Rattrapage : un étudiant ayant atteint le score requis mais dépourvu d'admission est
   // dans un état incohérent — il voit ses cours verrouillés alors qu'il a réussi, sans
@@ -2478,7 +2548,7 @@ app.get("/api/academy/test-status", requireStudent, async (req, res) => {
     const repaired = await grantAdmission(sid, data.entry_score, new Date(), null);
     if (repaired.ok) {
       const { data: fresh } = await supabase.from("students")
-        .select("entry_score, status, admitted_at, admission_expires, next_test_allowed, test_attempts, email_verified").eq("id", sid).single();
+        .select("entry_score, status, admitted_at, admission_expires, next_test_allowed, test_attempts, email_verified, test_started_at").eq("id", sid).single();
       if (fresh) data = fresh;
     }
   }
@@ -2486,6 +2556,14 @@ app.get("/api/academy/test-status", requireStudent, async (req, res) => {
   const { data: test } = await supabase.from("grades")
     .select("score, graded_at").eq("student_id", sid).eq("type", "entry_test").maybeSingle();
   const canRetry = !data?.next_test_allowed || new Date(data.next_test_allowed) <= new Date();
+
+  // Même auto-nettoyage que pour les autres parcours : une fenêtre expirée sans soumission
+  // redevient un écran de départ, pas une porte fermée.
+  const fenetre = fenetreChronoActive(data?.test_started_at ?? null, ADMISSION_ANSWER_KEY.length);
+  if (data?.test_started_at && !fenetre) {
+    await supabase.from("students").update({ test_started_at: null }).eq("id", sid).then(() => {}, () => {});
+  }
+
   res.json({
     hasTaken: !!test,
     score: data?.entry_score ?? 0,
@@ -2497,7 +2575,37 @@ app.get("/api/academy/test-status", requireStudent, async (req, res) => {
     canRetry,
     attempts: data?.test_attempts ?? 0,
     emailVerified: data?.email_verified !== false,
+    testStartedAt: fenetre?.testStartedAt ?? null,
+    expiresAt: fenetre?.expiresAt ?? null,
+    durationSeconds: fenetre?.durationSeconds ?? dureeEpreuveSecondes(ADMISSION_ANSWER_KEY.length),
   });
+});
+
+// ── Démarrer le chronomètre — cursus MEAL ──
+// Même contrat que /api/academy/programs/:id/start-test : idempotente, jamais déclenchée
+// par une simple consultation.
+app.post("/api/academy/start-test", rateLimit(20, 10 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const { data: stud } = await supabase.from("students")
+    .select("admitted_at, admission_expires, next_test_allowed, test_started_at").eq("id", sid).single();
+
+  const now = new Date();
+  const expiree = !!stud?.admission_expires && new Date(stud.admission_expires) < now;
+  if (stud?.admitted_at && !expiree) {
+    return res.status(403).json({ message: "Vous êtes déjà admis(e). Le test ne peut pas être repassé.", alreadyAdmitted: true });
+  }
+  if (stud?.next_test_allowed && new Date(stud.next_test_allowed) > now) {
+    return res.status(403).json({ message: "Vous devez attendre avant de repasser le test.", nextAllowed: stud.next_test_allowed });
+  }
+
+  const existante = fenetreChronoActive(stud?.test_started_at ?? null, ADMISSION_ANSWER_KEY.length);
+  if (existante) return res.json(existante);
+
+  const debut = now.toISOString();
+  const { error } = await supabase.from("students").update({ test_started_at: debut }).eq("id", sid);
+  if (error) return res.status(500).json({ message: "Impossible de démarrer l'épreuve. Réessayez." });
+
+  res.json(fenetreDepuisDemarrage(debut, ADMISSION_ANSWER_KEY.length));
 });
 
 // ── Vérifier l'email via le token ──

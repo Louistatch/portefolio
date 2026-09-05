@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
 import { useLocation, useRoute } from "wouter";
-import { Loader2, ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { Loader2, ChevronLeft, ChevronRight, ArrowRight, ArrowLeft, Check, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
 import { isStudentLoggedIn, studentFetch } from "@/lib/student";
 import { programById, type Program } from "@shared/programs";
 import { BANQUES_ADMISSION } from "@shared/tests-parcours";
+import { dureeEpreuveSecondes } from "@shared/chronometrage";
+import { useChronoEpreuve, type FenetreChrono } from "@/lib/chrono-epreuve";
 
 /**
  * Test d'admission d'un parcours.
@@ -63,6 +65,11 @@ export default function ProgramTest() {
   const [resultat, setResultat] = useState<any>(null);
   const [engage, setEngage] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  // Fenêtre de temps fixée par le serveur (POST start-test ou reprise via GET test-status) —
+  // jamais recalculée depuis une horloge locale, pour qu'un rechargement ne remette pas le
+  // compteur à zéro et n'en offre pas davantage.
+  const [fenetre, setFenetre] = useState<FenetreChrono | null>(null);
+  const [demarrage, setDemarrage] = useState(false);
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
@@ -74,10 +81,32 @@ export default function ProgramTest() {
         // encore disponible répond 503, et l'afficher comme « 0 bonne réponse » serait faux.
         if (!r.ok) { setErreur(d?.message || "Ce test n'est pas accessible."); return; }
         setStatut(d);
+        // Une épreuve déjà démarrée (page rechargée en cours de route) reprend directement
+        // sur la question, sans repasser par l'écran « Commencer ».
+        if (d?.testStartedAt && d?.expiresAt) {
+          setFenetre({ testStartedAt: d.testStartedAt, expiresAt: d.expiresAt, durationSeconds: d.durationSeconds });
+        }
       } catch { setErreur("Impossible de charger le test. Vérifiez votre connexion."); }
       finally { setChargement(false); }
     })();
   }, [programId]);
+
+  async function demarrerEpreuve() {
+    setDemarrage(true);
+    setErreur(null);
+    try {
+      const r = await studentFetch(`/api/academy/programs/${programId}/start-test`, { method: "POST" });
+      const d = await r.json();
+      if (!r.ok) { setErreur(d?.message || "Impossible de démarrer l'épreuve."); return; }
+      setFenetre({ testStartedAt: d.testStartedAt, expiresAt: d.expiresAt, durationSeconds: d.durationSeconds });
+    } catch { setErreur("Impossible de démarrer l'épreuve. Vérifiez votre connexion."); }
+    finally { setDemarrage(false); }
+  }
+
+  // Appelé une seule fois, exactement quand le temps s'épuise : ce qui a déjà été répondu
+  // part, les questions vides comptent comme fausses — la même règle que pour un envoi
+  // volontaire, aucune pénalité de plus pour être arrivé au bout du chronomètre.
+  const chrono = useChronoEpreuve(fenetre, () => { if (!envoi) envoyer(); });
 
   let parcours: Program | null = null;
   try { parcours = programById(programId); } catch { parcours = null; }
@@ -265,7 +294,48 @@ export default function ProgramTest() {
     );
   }
 
+  // ── Avant de commencer ──
+  //
+  // Le chronomètre démarre au clic, pas à l'ouverture de la page : sans cet écran, le
+  // temps de lire les consignes aurait été décompté comme du temps de réponse.
+  if (!fenetre) {
+    const duree = statut?.durationSeconds ?? dureeEpreuveSecondes(questions.length);
+    const minutes = Math.round(duree / 60);
+    return (
+      <EcranAdministratif accent={accent} label="Épreuve d'admission">
+        <h1 className="mt-3 text-3xl sm:text-4xl font-semibold tracking-tight">{parcours.title}</h1>
+        <dl className="mt-6 max-w-md border-t border-border pt-4 text-sm">
+          <div className="flex justify-between gap-4 py-1">
+            <dt className="text-muted-foreground">Questions</dt>
+            <dd className="font-mono tabular-nums">{statut?.nbQuestions ?? questions.length}</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-1">
+            <dt className="text-muted-foreground">Temps alloué</dt>
+            <dd className="font-mono tabular-nums">{minutes} minutes</dd>
+          </div>
+          <div className="flex justify-between gap-4 py-1">
+            <dt className="text-muted-foreground">Bonnes réponses requises</dt>
+            <dd className="font-mono tabular-nums">{statut?.seuil ?? "—"}</dd>
+          </div>
+        </dl>
+        <p className="mt-6 max-w-2xl leading-7 text-muted-foreground">
+          Aucune pénalité en cas d'erreur : mieux vaut répondre au jugé que laisser une question
+          vide. Le chronomètre démarre au clic ci-dessous et continue même si vous quittez la
+          page ; en cas de coupure, l'épreuve reprend là où vous l'aviez laissée, tant que le
+          temps n'est pas écoulé.
+        </p>
+        {erreur && <p className="mt-4 text-sm text-destructive">{erreur}</p>}
+        <Button className="mt-8 gap-2 min-h-11 rounded-none border-0 text-white disabled:opacity-50"
+          style={{ background: accent }} disabled={demarrage} onClick={demarrerEpreuve}>
+          {demarrage ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          Commencer l'épreuve <ArrowRight className="w-4 h-4" />
+        </Button>
+      </EcranAdministratif>
+    );
+  }
+
   // ── L'épreuve ──
+  const verrouille = !!chrono?.expire || envoi;
   const q = questions[idx];
   const choisie = reponses[idx];
   const repondues = Object.keys(reponses).length;
@@ -284,6 +354,7 @@ export default function ProgramTest() {
       // indisponible. Afficher ce message vaut mieux qu'une erreur générique.
       if (!r.ok && typeof d?.score !== "number") { setErreur(d?.message || "Envoi impossible."); return; }
       setResultat(d);
+      setFenetre(null); // l'épreuve est remise : plus rien à décompter.
     } catch { setErreur("Envoi impossible. Vérifiez votre connexion et réessayez."); }
     finally { setEnvoi(false); }
   }
@@ -292,17 +363,35 @@ export default function ProgramTest() {
     <div className="mx-auto max-w-5xl px-4 sm:px-8 py-8 sm:py-12" translate="no">
       <SEO title={`Test d'admission — ${parcours.title}`} description={parcours.subtitle} />
 
-      <header className="border-t-2 pt-6" style={{ borderColor: accent }}>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
-          Épreuve d'admission
-        </p>
-        <h1 className="mt-2 text-xl font-semibold leading-tight">{parcours.title}</h1>
-        <p className="mt-2 text-xs leading-5 text-muted-foreground">
-          <span className="font-mono tabular-nums">{statut?.nbQuestions ?? questions.length}</span> questions ·{" "}
-          <span className="font-mono tabular-nums">{statut?.seuil ?? "—"}</span> bonnes réponses requises ·
-          aucune pénalité en cas d'erreur
-        </p>
+      <header className="border-t-2 pt-6 flex items-start justify-between gap-4" style={{ borderColor: accent }}>
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>
+            Épreuve d'admission
+          </p>
+          <h1 className="mt-2 text-xl font-semibold leading-tight">{parcours.title}</h1>
+          <p className="mt-2 text-xs leading-5 text-muted-foreground">
+            <span className="font-mono tabular-nums">{statut?.nbQuestions ?? questions.length}</span> questions ·{" "}
+            <span className="font-mono tabular-nums">{statut?.seuil ?? "—"}</span> bonnes réponses requises ·
+            aucune pénalité en cas d'erreur
+          </p>
+        </div>
+        {/* Discret tant qu'il reste plus de 20 % du temps, puis change de ton — jamais de
+            sonnerie ni d'animation brusque : c'est un cadre de travail, pas une alarme. */}
+        {chrono && (
+          <div className={`shrink-0 flex items-center gap-1.5 border px-3 py-1.5 font-mono text-sm tabular-nums transition-colors ${
+            chrono.alerte ? "border-destructive text-destructive" : "border-border text-muted-foreground"
+          }`}>
+            <Clock className={`w-3.5 h-3.5 ${chrono.alerte && !chrono.expire ? "animate-pulse" : ""}`} />
+            {chrono.affichage}
+          </div>
+        )}
       </header>
+
+      {chrono?.expire && (
+        <p className="mt-4 text-sm font-medium" style={{ color: accent }}>
+          Temps écoulé — votre épreuve a été transmise automatiquement.
+        </p>
+      )}
 
       {/* Deux colonnes à partir de lg : la progression tient dans une colonne étroite, la
           question occupe la principale. En dessous, tout s'empile — c'est l'écran de 390 px
@@ -361,10 +450,10 @@ export default function ProgramTest() {
               return (
                 // La clé inclut l'index de question : sans elle, React réutilise les nœuds
                 // d'une question à l'autre et les options restent figées sur la première.
-                <button key={`${idx}-${i}`}
+                <button key={`${idx}-${i}`} disabled={verrouille}
                   onClick={() => setReponses({ ...reponses, [idx]: i })}
                   aria-pressed={prise}
-                  className={`flex min-h-14 items-start gap-4 border px-4 py-3 text-left text-sm leading-6 transition-colors ${
+                  className={`flex min-h-14 items-start gap-4 border px-4 py-3 text-left text-sm leading-6 transition-colors disabled:opacity-50 disabled:pointer-events-none ${
                     prise ? "border-foreground bg-muted font-medium" : "border-border hover:bg-muted/50"
                   }`}>
                   <span className="flex w-6 h-6 shrink-0 items-center justify-center border font-mono text-xs"
@@ -381,12 +470,16 @@ export default function ProgramTest() {
           {erreur && <p className="mt-4 text-sm text-destructive">{erreur}</p>}
 
           <div className="mt-10 border-t border-border pt-5 flex items-center justify-between gap-3">
-            <Button variant="outline" className="gap-1.5 min-h-11 rounded-none" disabled={idx === 0}
+            <Button variant="outline" className="gap-1.5 min-h-11 rounded-none" disabled={idx === 0 || verrouille}
               onClick={() => setIdx(i => Math.max(0, i - 1))}>
               <ChevronLeft className="w-4 h-4" /> Précédente
             </Button>
 
-            {idx < questions.length - 1 ? (
+            {/* Le temps écoulé force ce bouton à apparaître quelle que soit la question
+                affichée : sans lui, quelqu'un qui n'était pas sur la dernière question au
+                moment de l'expiration n'aurait aucun moyen de relancer l'envoi si la
+                transmission automatique avait échoué (coupure réseau). */}
+            {idx < questions.length - 1 && !chrono?.expire ? (
               <Button className="gap-1.5 min-h-11 rounded-none border-0 text-white" style={{ background: accent }}
                 onClick={() => setIdx(i => Math.min(questions.length - 1, i + 1))}>
                 Suivante <ChevronRight className="w-4 h-4" />
