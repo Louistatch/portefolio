@@ -13,11 +13,15 @@ import fs from "fs";
 import {
   gradeLessonExercises, stripExerciseAnswers, EXERCISE_PASS_PCT,
   plafondDeNote, resultatsSansCorrection, materialiserExercicesParametres, graineExercice,
+  lessonExercises,
 } from "../shared/exercises.js";
 import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
 import { leconOuverte, semainesNecessaires, FENETRE_ADMISSION_SEMAINES } from "../shared/rythme.js";
 import { validerLecon, idsExercices } from "../shared/valider-cours.js";
-import { dureeEpreuveSecondes, fenetreChronoActive, fenetreDepuisDemarrage } from "../shared/chronometrage.js";
+import {
+  dureeEpreuveSecondes, fenetreChronoActive, fenetreDepuisDemarrage,
+  dureeQuizSecondes, SEUIL_RAPPEL_SECONDES,
+} from "../shared/chronometrage.js";
 import { raisonDeNePasNotifier, FENETRE_NOTIF_FORUM_MS } from "../shared/notifications.js";
 import { RETARD_EXCLUSION_JOURS, RETARD_PALIERS, alerteDeRetard } from "../shared/retard.js";
 import {
@@ -2243,7 +2247,7 @@ app.get("/api/academy/programs/:id/test-status", requireStudent, async (req, res
   // Une fenêtre de chronomètre entamée mais jamais soumise, et désormais expirée, s'efface
   // d'elle-même : ce n'est pas une faute d'avoir été interrompu, l'étudiant retrouve
   // l'écran de départ plutôt qu'une porte fermée pour une semaine.
-  const fenetre = fenetreChronoActive(a?.test_started_at ?? null, r.parcours!.admission.nbQuestions);
+  const fenetre = fenetreChronoActive(a?.test_started_at ?? null, dureeEpreuveSecondes(r.parcours!.admission.nbQuestions));
   if (a?.test_started_at && !fenetre) {
     await supabase.from("academy_program_admissions").update({ test_started_at: null })
       .eq("student_id", sid).eq("program_id", programId).then(() => {}, () => {});
@@ -2297,7 +2301,7 @@ app.post("/api/academy/programs/:id/start-test", rateLimit(20, 10 * 60 * 1000), 
     });
   }
 
-  const existante = fenetreChronoActive(a?.test_started_at ?? null, parcours.admission.nbQuestions);
+  const existante = fenetreChronoActive(a?.test_started_at ?? null, dureeEpreuveSecondes(parcours.admission.nbQuestions));
   if (existante) return res.json(existante);
 
   const debut = now.toISOString();
@@ -2305,7 +2309,7 @@ app.post("/api/academy/programs/:id/start-test", rateLimit(20, 10 * 60 * 1000), 
     .upsert({ student_id: sid, program_id: programId, test_started_at: debut }, { onConflict: "student_id,program_id" });
   if (error) return res.status(500).json({ message: "Impossible de démarrer l'épreuve. Réessayez." });
 
-  res.json(fenetreDepuisDemarrage(debut, parcours.admission.nbQuestions));
+  res.json(fenetreDepuisDemarrage(debut, dureeEpreuveSecondes(parcours.admission.nbQuestions)));
 });
 
 app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000), requireStudent, async (req, res) => {
@@ -2559,7 +2563,7 @@ app.get("/api/academy/test-status", requireStudent, async (req, res) => {
 
   // Même auto-nettoyage que pour les autres parcours : une fenêtre expirée sans soumission
   // redevient un écran de départ, pas une porte fermée.
-  const fenetre = fenetreChronoActive(data?.test_started_at ?? null, ADMISSION_ANSWER_KEY.length);
+  const fenetre = fenetreChronoActive(data?.test_started_at ?? null, dureeEpreuveSecondes(ADMISSION_ANSWER_KEY.length));
   if (data?.test_started_at && !fenetre) {
     await supabase.from("students").update({ test_started_at: null }).eq("id", sid).then(() => {}, () => {});
   }
@@ -2598,14 +2602,14 @@ app.post("/api/academy/start-test", rateLimit(20, 10 * 60 * 1000), requireStuden
     return res.status(403).json({ message: "Vous devez attendre avant de repasser le test.", nextAllowed: stud.next_test_allowed });
   }
 
-  const existante = fenetreChronoActive(stud?.test_started_at ?? null, ADMISSION_ANSWER_KEY.length);
+  const existante = fenetreChronoActive(stud?.test_started_at ?? null, dureeEpreuveSecondes(ADMISSION_ANSWER_KEY.length));
   if (existante) return res.json(existante);
 
   const debut = now.toISOString();
   const { error } = await supabase.from("students").update({ test_started_at: debut }).eq("id", sid);
   if (error) return res.status(500).json({ message: "Impossible de démarrer l'épreuve. Réessayez." });
 
-  res.json(fenetreDepuisDemarrage(debut, ADMISSION_ANSWER_KEY.length));
+  res.json(fenetreDepuisDemarrage(debut, dureeEpreuveSecondes(ADMISSION_ANSWER_KEY.length)));
 });
 
 // ── Vérifier l'email via le token ──
@@ -3487,6 +3491,216 @@ app.get("/api/academy/my-grades", requireStudent, async (req, res) => {
   res.json({ grades: arr, average: Math.round(avg * 10) / 10, count: arr.length });
 });
 
+// ══════════════ Le quiz d'une leçon (« à vous de jouer ») ══════════════
+//
+// Contrairement au test d'admission — retentable après une semaine — un quiz de leçon ne se
+// passe qu'une fois dans la vie de l'étudiant : démarré, l'essai est consommé, qu'il soit
+// remis à temps, en retard, ou jamais remis. `lesson_progress.quiz_started_at`, une fois
+// posée, n'est donc JAMAIS effacée (contrairement à `test_started_at` sur l'épreuve
+// d'admission, remise à zéro après chaque tentative) — c'est elle qui porte la marque « déjà
+// utilisé », pour toujours.
+
+/** Résout l'accès à une leçon pour le portail du quiz : mêmes vérifications que complete-lesson. */
+async function accesLeconQuiz(sid: number, lessonId: number): Promise<
+  | { ok: true; course_id: number; lesson: { id: number; course_id: number; title: string; points: number; content: any }; lp: any }
+  | { ok: false; statut: number; body: any }
+> {
+  const { data: lesson } = await supabase.from("sms_lessons")
+    .select("id, course_id, title, points, content").eq("id", lessonId).maybeSingle();
+  if (!lesson) return { ok: false, statut: 404, body: { message: "Leçon introuvable." } };
+
+  const { data: stud } = await supabase.from("students")
+    .select("admitted_at, admission_expires").eq("id", sid).single();
+  if (!stud?.admitted_at) return { ok: false, statut: 403, body: { message: "Vous devez réussir le test d'admission pour accéder aux cours." } };
+  if (stud.admission_expires && new Date(stud.admission_expires) < new Date())
+    return { ok: false, statut: 403, body: { message: "Votre période d'admission (3 mois) a expiré. Repassez le test d'admission." } };
+
+  const { data: coursVise } = await supabase.from("sms_courses").select("code").eq("id", lesson.course_id).maybeSingle();
+  const progDuCours = coursVise?.code ? programOf(coursVise.code)?.id : null;
+  if (progDuCours) {
+    const admission = (await parcoursAdmis(sid)).find(p => p.programId === progDuCours);
+    if (!admission)
+      return { ok: false, statut: 403, body: { message: "Vous devez réussir le test d'admission de ce parcours pour accéder à ses cours." } };
+    if (admission.expires && new Date(admission.expires) < new Date())
+      return { ok: false, statut: 403, body: { message: "Votre période d'admission (3 mois) à ce parcours a expiré. Repassez le test d'admission." } };
+  }
+
+  await regenererPlannings(sid);
+  await refreshLessonStates(sid);
+  const { data: lp } = await supabase.from("lesson_progress")
+    .select("id, status, unlock_at, quiz_started_at").eq("student_id", sid).eq("lesson_id", lessonId).maybeSingle();
+  if (!lp || lp.status === "locked")
+    return { ok: false, statut: 403, body: { message: "Cette leçon n'est pas encore débloquée.", unlockAt: lp?.unlock_at, locked: true } };
+
+  return { ok: true, course_id: lesson.course_id, lesson, lp };
+}
+
+/**
+ * Clôt de force un quiz dont le temps est écoulé sans jamais avoir été remis : note 0,
+ * leçon marquée complétée, planning recalculé, email d'avis. Appelée depuis trois endroits
+ * — la consultation du statut, une tentative de redémarrage, et le balayage périodique —
+ * parce qu'aucun des trois ne doit laisser une leçon bloquée en attendant les deux autres.
+ */
+async function finaliserQuizExpire(sid: number, courseId: number, lessonId: number, lesson: { title?: string; points?: number }) {
+  const maxScore = lesson.points ?? 10;
+  await supabase.from("grades").upsert({
+    student_id: sid, course_id: courseId, lesson_id: lessonId,
+    title: lesson.title || "Leçon", score: 0, max_score: maxScore, type: "lesson",
+  }, { onConflict: "student_id,lesson_id", ignoreDuplicates: true });
+  await supabase.from("lesson_progress")
+    .update({ status: "completed", completed_at: new Date().toISOString(), score: 0 })
+    .eq("student_id", sid).eq("lesson_id", lessonId);
+  await recalcCourseProgress(sid, courseId);
+  await refreshLessonStates(sid);
+
+  const { data: stud } = await supabase.from("students").select("full_name, email, course_emails").eq("id", sid).maybeSingle();
+  const { data: course } = await supabase.from("sms_courses").select("code, title").eq("id", courseId).maybeSingle();
+  if (stud?.email && stud.course_emails !== false && course) {
+    sendAcademyEmail({
+      studentId: sid, to: stud.email, type: "quiz_expire",
+      subject: `⏱️ Temps écoulé — ${lesson.title || "quiz"}`,
+      html: quizExpireEmailHtml(stud.full_name, course, lesson.title || "Leçon"),
+      dedupeKey: `quiz_expire:${sid}:${lessonId}`,
+    }).catch(() => {});
+  }
+}
+
+function quizExpireEmailHtml(name: string, course: { code: string; title: string }, lessonTitle: string) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Temps écoulé ⏱️</h1><p class="sub">${course.title}</p></div><div class="bd"><p>Bonjour ${name},</p><p>Le temps imparti au quiz de la leçon <strong>${lessonTitle}</strong> est écoulé sans qu'il ait été remis. La note enregistrée est <strong style="color:#b45309">0</strong>, conformément à la règle annoncée avant le départ du chronomètre.</p><p>Le reste du cours reste accessible normalement : cette leçon compte pour votre progression, elle ne bloque rien d'autre.</p></div>`);
+}
+
+function quizRappelEmailHtml(name: string, course: { code: string; title: string }, lessonTitle: string, lienQuiz: string) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Il reste 10 minutes ⏳</h1><p class="sub">${course.title}</p></div><div class="bd"><p>Bonjour ${name},</p><p>Le quiz de la leçon <strong>${lessonTitle}</strong> est en cours, et il reste environ dix minutes avant la fin du temps imparti. Passé ce délai, la note enregistrée sera 0, même si le quiz n'est pas commencé.</p><p style="text-align:center;margin-top:20px"><a href="${lienQuiz}" class="btn">Reprendre le quiz</a></p></div>`);
+}
+
+app.get("/api/academy/lesson-quiz/:lessonId", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const lessonId = Number(req.params.lessonId);
+  const acces = await accesLeconQuiz(sid, lessonId);
+  if (!acces.ok) return res.status(acces.statut).json(acces.body);
+  const { lesson, lp, course_id } = acces;
+
+  let content = lesson.content;
+  if (typeof content === "string") { try { content = JSON.parse(content); } catch { content = null; } }
+  const nb = content ? lessonExercises(content).length : 0;
+  if (!nb) return res.json({ hasQuiz: false });
+
+  if (lp.status === "completed") {
+    const { data: note } = await supabase.from("grades")
+      .select("score, max_score").eq("student_id", sid).eq("lesson_id", lessonId).maybeSingle();
+    return res.json({ hasQuiz: true, status: "finished", score: note?.score ?? null, maxScore: note?.max_score ?? lesson.points ?? 10 });
+  }
+
+  if (lp.quiz_started_at) {
+    const duree = dureeQuizSecondes(nb);
+    const fenetre = fenetreChronoActive(lp.quiz_started_at, duree);
+    if (fenetre) return res.json({ hasQuiz: true, status: "in_progress", ...fenetre, nbExercices: nb });
+    // Expiré sans jamais avoir été remis : finalisé ici même, pour ne pas laisser la leçon
+    // bloquée indéfiniment en attendant le prochain passage du balayage périodique.
+    await finaliserQuizExpire(sid, course_id, lessonId, lesson);
+    return res.json({ hasQuiz: true, status: "finished", score: 0, maxScore: lesson.points ?? 10, horsDelai: true });
+  }
+
+  res.json({ hasQuiz: true, status: "not_started", nbExercices: nb, durationSeconds: dureeQuizSecondes(nb) });
+});
+
+app.post("/api/academy/lesson-quiz/:lessonId/start", rateLimit(20, 10 * 60 * 1000), requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const lessonId = Number(req.params.lessonId);
+  const acces = await accesLeconQuiz(sid, lessonId);
+  if (!acces.ok) return res.status(acces.statut).json(acces.body);
+  const { lesson, lp, course_id } = acces;
+
+  if (lp.status === "completed")
+    return res.status(409).json({ message: "Ce quiz a déjà été remis.", alreadySubmitted: true });
+
+  let content = lesson.content;
+  if (typeof content === "string") { try { content = JSON.parse(content); } catch { content = null; } }
+  const nb = content ? lessonExercises(content).length : 0;
+  if (!nb) return res.status(400).json({ message: "Cette leçon ne contient aucun exercice noté." });
+
+  const duree = dureeQuizSecondes(nb);
+  const existante = fenetreChronoActive(lp.quiz_started_at, duree);
+  if (existante) return res.json(existante); // reprise idempotente : ne redémarre jamais le chrono
+
+  if (lp.quiz_started_at) {
+    // Démarré une première fois, et désormais expiré sans avoir été remis : l'essai est
+    // consommé, il n'y en a pas de second.
+    await finaliserQuizExpire(sid, course_id, lessonId, lesson);
+    return res.status(409).json({ message: "Le temps imparti à ce quiz est déjà écoulé.", alreadySubmitted: true });
+  }
+
+  const debut = new Date().toISOString();
+  const { error } = await supabase.from("lesson_progress")
+    .update({ quiz_started_at: debut }).eq("student_id", sid).eq("lesson_id", lessonId);
+  if (error) return res.status(500).json({ message: "Impossible de démarrer le quiz. Réessayez." });
+
+  res.json(fenetreDepuisDemarrage(debut, duree));
+});
+
+/**
+ * Balayage périodique des quiz en cours — rappel à 10 minutes, clôture à 0 si le temps est
+ * écoulé sans avoir été remis. Séparé des tâches quotidiennes à dessein : celles-là
+ * tournent une fois par jour derrière un verrou conçu pour ça, un compte à rebours a besoin
+ * d'être revérifié toutes les quelques minutes. Le filet GitHub Actions
+ * (.github/workflows/quiz-timeouts.yml) l'appelle toutes les cinq minutes ; aucun verrou
+ * de journée n'est nécessaire ici, chaque ligne traitée devient immédiatement invisible au
+ * passage suivant (status passe à completed, ou quiz_reminder_sent_at se pose).
+ */
+async function corpsBalayageQuiz(req: Request, res: Response) {
+  if (!declencheurDeLAppel(req)) return res.status(401).json({ message: "Non autorisé." });
+
+  const { data: enCours } = await supabase.from("lesson_progress")
+    .select("id, student_id, course_id, lesson_id, quiz_started_at, quiz_reminder_sent_at")
+    .not("quiz_started_at", "is", null)
+    .neq("status", "completed");
+  const lignes = enCours || [];
+  if (!lignes.length) return res.json({ traitees: 0, expirees: 0, rappels: 0 });
+
+  const lessonIds = Array.from(new Set(lignes.map(l => l.lesson_id)));
+  const { data: lecons } = await supabase.from("sms_lessons").select("id, title, points, content").in("id", lessonIds);
+  const leconParId = new Map((lecons || []).map((l: any) => [l.id, l]));
+
+  let expirees = 0, rappels = 0;
+  const now = Date.now();
+
+  for (const ligne of lignes) {
+    const lesson = leconParId.get(ligne.lesson_id);
+    if (!lesson) continue; // leçon supprimée depuis : rien à faire, la ligne restera visible pour investigation
+    let content = lesson.content;
+    if (typeof content === "string") { try { content = JSON.parse(content); } catch { content = null; } }
+    const nb = content ? lessonExercises(content).length : 0;
+    if (!nb) continue;
+
+    const echeance = new Date(ligne.quiz_started_at).getTime() + dureeQuizSecondes(nb) * 1000;
+
+    if (now > echeance) {
+      await finaliserQuizExpire(ligne.student_id, ligne.course_id, ligne.lesson_id, lesson);
+      expirees++;
+      continue;
+    }
+
+    if (echeance - now <= SEUIL_RAPPEL_SECONDES * 1000 && !ligne.quiz_reminder_sent_at) {
+      const { data: stud } = await supabase.from("students").select("full_name, email, course_emails").eq("id", ligne.student_id).maybeSingle();
+      const { data: course } = await supabase.from("sms_courses").select("code, title").eq("id", ligne.course_id).maybeSingle();
+      if (stud?.email && stud.course_emails !== false && course) {
+        await sendAcademyEmail({
+          studentId: ligne.student_id, to: stud.email, type: "quiz_rappel",
+          subject: `⏳ 10 minutes restantes — ${lesson.title || "quiz"}`,
+          html: quizRappelEmailHtml(stud.full_name, course, lesson.title || "Leçon", `${SITE_URL}/academy/quiz/${ligne.lesson_id}`),
+          dedupeKey: `quiz_rappel:${ligne.student_id}:${ligne.lesson_id}`,
+        }).catch(() => {});
+      }
+      await supabase.from("lesson_progress").update({ quiz_reminder_sent_at: new Date().toISOString() }).eq("id", ligne.id);
+      rappels++;
+    }
+  }
+
+  res.json({ traitees: lignes.length, expirees, rappels });
+}
+app.get("/api/cron/quiz-timeouts", corpsBalayageQuiz);
+app.post("/api/cron/quiz-timeouts", corpsBalayageQuiz);
+
 // ── Compléter une leçon (auto-note + progression) ──
 app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
@@ -3540,7 +3754,7 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   await regenererPlannings(sid);
   await refreshLessonStates(sid);
   const { data: lp } = await supabase.from("lesson_progress")
-    .select("status, unlock_at, due_at").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
+    .select("status, unlock_at, due_at, quiz_started_at").eq("student_id", sid).eq("lesson_id", lesson_id).maybeSingle();
   if (!lp || lp.status === "locked")
     return res.status(403).json({ message: "Cette leçon n'est pas encore débloquée.", unlockAt: lp?.unlock_at, locked: true });
 
@@ -3548,6 +3762,25 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   // cliquant : la note reflète les réponses produites par l'étudiant.
   let lessonContent = lesson.content;
   if (typeof lessonContent === "string") { try { lessonContent = JSON.parse(lessonContent); } catch { lessonContent = null; } }
+  const nbExercicesLecon = lessonContent ? lessonExercises(lessonContent).length : 0;
+
+  // ── Une leçon à exercices est un quiz : un seul essai dans une vie ──
+  //
+  // Contrairement à l'ancien mécanisme (une note plafonnée un peu plus à chaque reprise),
+  // « à vous de jouer » ne se rejoue pas : une fois le quiz démarré depuis
+  // /academy/quiz/:lessonId, l'essai est consommé — remis dans les temps, remis en retard,
+  // ou jamais remis, peu importe, il n'y en aura pas de second. C'est pourquoi cette route
+  // refuse toute soumission qui n'est jamais passée par ce démarrage, et toute seconde
+  // soumission une fois la leçon déjà complétée.
+  const estUnQuiz = nbExercicesLecon > 0;
+  if (estUnQuiz) {
+    if (lp.status === "completed") {
+      return res.status(409).json({ message: "Ce quiz a déjà été remis.", alreadySubmitted: true });
+    }
+    if (!lp.quiz_started_at) {
+      return res.status(400).json({ message: "Démarrez le quiz avant de le remettre.", quizNotStarted: true });
+    }
+  }
 
   // Lu AVANT de l'incrémenter plus bas : c'est le compteur qui était en vigueur quand
   // GET /api/academy/courses/:id a servi l'énoncé à l'étudiant. Un exercice paramétré s'y
@@ -3563,18 +3796,30 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
 
   const maxScore = lesson.points ?? 10;
 
+  // ── Retard sur le quiz : 0, pas une note calculée sur ce qui a été fait à temps ──
+  //
+  // « Il doit finir » : le risque n'est pas de mal répondre, c'est de ne pas boucler. Un
+  // quiz remis après l'heure limite vaut 0 même si toutes les réponses sont justes — la
+  // correction reste calculée et renvoyée (l'étudiant a le droit de savoir ce qu'il aurait
+  // obtenu), mais ne compte pas.
+  const horsDelai = estUnQuiz && !!lp.quiz_started_at
+    && Date.now() > new Date(lp.quiz_started_at).getTime() + dureeQuizSecondes(nbExercicesLecon) * 1000;
+
   // Toute soumission d'une leçon à exercices compte, réussie ou non. C'est le
   // compteur qui manquait : sans lui un échec ne coûtait rien, et la note finale
   // ne distinguait pas la maîtrise de l'obstination.
+  //
+  // Réservé aux exercices SANS portail de quiz : ceux-là gardent l'ancien mécanisme de
+  // reprises, puisqu'ils ne sont jamais passés par un démarrage chronométré.
   let tentative = 1;
-  if (graded) {
+  if (graded && !estUnQuiz) {
     tentative = (Number(avantTirage?.tentatives) || 0) + 1;
     await supabase.from("lesson_progress")
       .update({ tentatives: tentative })
       .eq("student_id", sid).eq("lesson_id", lesson_id).then(() => {}, () => {});
   }
 
-  if (graded && !graded.passed) {
+  if (graded && !estUnQuiz && !graded.passed) {
     // Échec : on dit QUELS exercices sont faux, jamais POURQUOI.
     //
     // La correction rédigée énonce la bonne réponse ; la renvoyer ici faisait de
@@ -3591,9 +3836,10 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
 
   // Réussite : la note est plafonnée par le rang de la tentative. Le plancher est
   // le seuil de validation — la persévérance valide toujours, elle cesse seulement
-  // de valoir autant que la maîtrise du premier coup.
-  const plafond = graded ? plafondDeNote(tentative) : 100;
-  const pctRetenu = graded ? Math.min(graded.scorePct, plafond) : 100;
+  // de valoir autant que la maîtrise du premier coup. Un quiz à essai unique n'a pas de
+  // rang de tentative à plafonner ; en retard, sa note est 0, quoi que valent les réponses.
+  const plafond = graded && !estUnQuiz ? plafondDeNote(tentative) : 100;
+  const pctRetenu = !graded ? 100 : horsDelai ? 0 : estUnQuiz ? graded.scorePct : Math.min(graded.scorePct, plafond);
   const finalScore = Math.round(maxScore * pctRetenu / 100);
 
   // Insertion idempotente (une seule note par élève/leçon, protégée par la contrainte UNIQUE(student_id, lesson_id))
@@ -3613,8 +3859,10 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
   await refreshLessonStates(sid);
 
   // Email de réussite. Pas d'envoi quand la leçon termine le cours : recalcCourseProgress a
-  // déjà envoyé « projet terminé », qui dit mieux la même chose au même moment.
-  if (!result?.completed) {
+  // déjà envoyé « projet terminé », qui dit mieux la même chose au même moment. Pas d'envoi
+  // non plus pour un quiz remis hors délai : un email de félicitations sur une note de 0
+  // serait faux, quelle que soit la qualité des réponses données.
+  if (!result?.completed && !horsDelai) {
     notifyLessonPassed(sid, course_id, lesson_id, lesson.title || "Leçon", finalScore, maxScore, result)
       .catch((e: any) => console.error("lesson_passed email error:", e?.message || e));
   }
@@ -3628,6 +3876,8 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
     plafondApplique: graded && plafond < 100 ? plafond : null,
     correctCount: graded?.correctCount ?? null,
     total: graded?.total ?? null,
+    horsDelai,
+    message: horsDelai ? "Temps écoulé : ce quiz a été remis hors délai, la note enregistrée est 0." : undefined,
   });
 });
 
@@ -5410,6 +5660,43 @@ app.post("/api/admin/academy/messages/:id/send", requireAuth, async (req, res) =
     .update({ status: "sent", error: null, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
     .eq("id", id).select().single();
   res.json({ sent: true, message: data });
+});
+
+// Envoyer tous les brouillons en attente d'un même geste — une annonce à toute la promotion
+// s'écrit une fois, mais se déclenche autant de fois qu'il y a d'étudiants si on s'en tient au
+// bouton un-par-un. dedupeKey (message_admin:<id>) protège déjà d'un double envoi ; ce
+// balayage ne fait donc que ce que ferait l'administrateur en cliquant 38 fois de suite.
+app.post("/api/admin/academy/messages/send-drafts", requireAuth, async (_req, res) => {
+  const { data: brouillons } = await supabase.from("academy_student_messages")
+    .select("*, students(id, full_name, email)").eq("status", "draft");
+  const resultats = { envoyes: 0, echecs: 0, details: [] as { id: number; ok: boolean; motif?: string }[] };
+  for (const msg of brouillons || []) {
+    const dest = (msg as any).students;
+    if (!dest?.email) {
+      await supabase.from("academy_student_messages")
+        .update({ status: "failed", error: "no_recipient", updated_at: new Date().toISOString() }).eq("id", msg.id);
+      resultats.echecs++; resultats.details.push({ id: msg.id, ok: false, motif: "no_recipient" });
+      continue;
+    }
+    const envoi = await sendAcademyEmail({
+      studentId: dest.id, to: dest.email, type: "message_admin",
+      subject: msg.subject,
+      html: studentMessageEmailHtml(dest.full_name, msg.subject, msg.body),
+      dedupeKey: `message_admin:${msg.id}`,
+    });
+    if (envoi.sent) {
+      await supabase.from("academy_student_messages")
+        .update({ status: "sent", error: null, sent_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .eq("id", msg.id);
+      resultats.envoyes++; resultats.details.push({ id: msg.id, ok: true });
+    } else {
+      await supabase.from("academy_student_messages")
+        .update({ status: "failed", error: envoi.reason ?? "inconnu", updated_at: new Date().toISOString() })
+        .eq("id", msg.id);
+      resultats.echecs++; resultats.details.push({ id: msg.id, ok: false, motif: envoi.reason });
+    }
+  }
+  res.json(resultats);
 });
 
 app.delete("/api/admin/academy/messages/:id", requireAuth, async (req, res) => {

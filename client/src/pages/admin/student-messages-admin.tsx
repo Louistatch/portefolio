@@ -36,6 +36,7 @@ export default function StudentMessagesAdmin() {
   const [edition, setEdition] = useState<Partial<Message> | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [envoiDe, setEnvoiDe] = useState<number | null>(null);
+  const [envoiTous, setEnvoiTous] = useState(false);
 
   async function recharger() {
     const [m, e] = await Promise.all([
@@ -84,6 +85,24 @@ export default function StudentMessagesAdmin() {
     } finally { setEnvoiDe(null); }
   }
 
+  async function envoyerBrouillons() {
+    const brouillons = messages.filter(m => m.status === "draft");
+    if (!brouillons.length) return;
+    if (!confirm(`Envoyer les ${brouillons.length} brouillon(s) en attente ?\n\nUn message envoyé ne peut pas être repris.`)) return;
+    setEnvoiTous(true);
+    try {
+      const res = await adminFetch("/api/admin/academy/messages/send-drafts", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) { toast({ title: "Envoi impossible", description: data?.message, variant: "destructive" }); return; }
+      toast({
+        title: `${data.envoyes} message(s) envoyé(s)`,
+        description: data.echecs ? `${data.echecs} échec(s) — voir le détail ci-dessous.` : undefined,
+        variant: data.echecs ? "destructive" : undefined,
+      });
+      await recharger();
+    } finally { setEnvoiTous(false); }
+  }
+
   async function supprimer(m: Message) {
     if (!confirm("Supprimer ce brouillon ?")) return;
     const res = await adminFetch(`/api/admin/academy/messages/${m.id}`, { method: "DELETE" });
@@ -112,9 +131,17 @@ export default function StudentMessagesAdmin() {
             Un message individuel s'écrit, se relit, puis s'envoie. Il part de contact@louisfarm.com.
           </p>
         </div>
-        <Button className="gap-2" onClick={() => setEdition({ subject: "", body: "" })}>
-          <Plus className="w-4 h-4" /> Nouveau message
-        </Button>
+        <div className="flex gap-2">
+          {messages.some(m => m.status === "draft") && (
+            <Button variant="outline" className="gap-2" disabled={envoiTous} onClick={envoyerBrouillons}>
+              {envoiTous ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+              Envoyer les brouillons ({messages.filter(m => m.status === "draft").length})
+            </Button>
+          )}
+          <Button className="gap-2" onClick={() => setEdition({ subject: "", body: "" })}>
+            <Plus className="w-4 h-4" /> Nouveau message
+          </Button>
+        </div>
       </div>
 
       {edition && (
