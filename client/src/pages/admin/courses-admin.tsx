@@ -359,7 +359,16 @@ function EditeurLecon({ coursId, initial, onClose }: { coursId: number; initial:
   const { toast } = useToast();
   const [titre, setTitre] = useState(initial?.title || "");
   const [points, setPoints] = useState(initial?.points ?? 100);
-  const [cellules, setCellules] = useState<Cellule[]>(initial?.content?.cells || []);
+  // `accept` vit en base comme un tableau ; le champ de saisie manipule une chaîne. Sans
+  // cette conversion à l'ouverture, une leçon déjà publiée avec des variantes acceptées
+  // (COOP-01 en a) réapparaissait recollée sans espaces après les virgules.
+  const [cellules, setCellules] = useState<Cellule[]>(
+    (initial?.content?.cells || []).map(c =>
+      c.type === "exercise" && Array.isArray((c as any).accept)
+        ? { ...c, accept: (c as any).accept.join(", ") }
+        : c
+    )
+  );
   const [erreurs, setErreurs] = useState<string[]>([]);
 
   const majCellule = (i: number, c: Cellule) => setCellules(cs => cs.map((x, j) => j === i ? c : x));
