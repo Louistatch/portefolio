@@ -33,6 +33,7 @@ type Travail = {
   livrables: string[]; maxScore: number; semaine: number;
   enonceUrl: string | null; modeleUrl: string | null;
   grille: { cle: string; libelle: string; points: number }[];
+  plan: { titre: string; consigne: string }[];
   ouvertureLe: string | null; echeanceLe: string | null;
   groupe: Groupe | null; groupeLe: string | null;
   statut: GroupWorkStatus; note: number | null; feedback: string | null;
@@ -496,10 +497,12 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
         {/* ── Rédiger à plusieurs, avant le dépôt ──
             Le dépôt reste un PDF, inchangé : ce qui change, c'est la manière de RÉDIGER ce
             PDF. Un Google Doc partagé permet au groupe d'écrire ensemble, en même temps,
-            au lieu de s'échanger des versions par email. La structure recommandée reprend
-            les intitulés de LA GRILLE DE CE TRAVAIL — pas un plan générique — pour que le
-            document réponde exactement à ce qui sera noté, correction humaine ou automatique. */}
-        {t.grille?.length > 0 && t.statut !== "completed" && (
+            au lieu de s'échanger des versions par email. La structure recommandée est celle
+            du PLAN DE CE TRAVAIL (le même que le modèle DOCX téléchargeable) — plus précis
+            qu'un simple intitulé de critère — et chaque section est ensuite reliée au critère
+            de la grille qu'elle nourrit, pour que le document réponde exactement à ce qui sera
+            noté, correction humaine ou automatique. Un travail sans plan retombe sur la grille. */}
+        {(t.plan?.length > 0 || t.grille?.length > 0) && t.statut !== "completed" && (
           <div className="rounded-xl border border-border/60 bg-primary/[0.03] p-4 space-y-2.5">
             <p className="text-sm font-semibold flex items-center gap-2">
               <Users className="w-4 h-4 text-primary" /> Rédiger le rapport à plusieurs, dans Google Docs
@@ -510,17 +513,39 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
                 <strong className="text-foreground">Éditeur</strong> (bouton Partager, en collant les
                 adresses email de l'équipe) : vous rédigez alors ensemble, en même temps.
               </li>
-              <li>
-                Structurez le document avec un titre par critère de la grille de notation, dans cet ordre :
-                <ul className="mt-1.5 space-y-1 ml-1">
-                  {t.grille.map((c: any) => (
-                    <li key={c.cle} className="flex items-start gap-2">
-                      <span className="w-1 h-1 rounded-full bg-primary mt-[7px] shrink-0" />
-                      <span>{c.libelle} <span className="text-xs">({c.points} pts)</span></span>
-                    </li>
-                  ))}
-                </ul>
-              </li>
+              {t.plan?.length > 0 ? (
+                <li>
+                  Structurez le document selon le plan de ce travail — une section par titre, dans cet ordre :
+                  <ul className="mt-1.5 space-y-1.5 ml-1">
+                    {t.plan.map((s) => (
+                      <li key={s.titre} className="flex items-start gap-2">
+                        <span className="w-1 h-1 rounded-full bg-primary mt-[7px] shrink-0" />
+                        <span>
+                          <span className="text-foreground font-medium">{s.titre}</span>
+                          {" — "}{s.consigne}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  {t.grille?.length > 0 && (
+                    <p className="mt-2 text-xs">
+                      C'est ce même document qui est noté sur : {t.grille.map((c) => `${c.libelle} (${c.points} pts)`).join(", ")}.
+                    </p>
+                  )}
+                </li>
+              ) : (
+                <li>
+                  Structurez le document avec un titre par critère de la grille de notation, dans cet ordre :
+                  <ul className="mt-1.5 space-y-1 ml-1">
+                    {t.grille.map((c) => (
+                      <li key={c.cle} className="flex items-start gap-2">
+                        <span className="w-1 h-1 rounded-full bg-primary mt-[7px] shrink-0" />
+                        <span>{c.libelle} <span className="text-xs">({c.points} pts)</span></span>
+                      </li>
+                    ))}
+                  </ul>
+                </li>
+              )}
               <li>
                 Une fois le rapport terminé : dans Google Docs, <strong className="text-foreground">
                 Fichier → Télécharger → Document PDF</strong>, puis déposez ce PDF ci-dessous comme
