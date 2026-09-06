@@ -3250,7 +3250,11 @@ async function corpsClassementHebdomadaire(): Promise<Record<string, unknown>> {
 
     const { data: inscriptions } = await supabase.from("enrollments")
       .select("student_id").in("course_id", idsCours);
-    const idsInscrits = [...new Set((inscriptions || []).map((i: any) => i.student_id))];
+    // Restreint aux étudiants RÉELLEMENT admis à CE parcours : une ligne d'inscription
+    // fantôme héritée d'un autre parcours ne doit jamais valoir invitation à son classement.
+    const admis = await elevesAdmisAuParcours(programme.id);
+    const idsInscrits = [...new Set((inscriptions || []).map((i: any) => i.student_id))]
+      .filter(id => admis.has(id));
     if (!idsInscrits.length) continue;
 
     const { data: eleves } = await supabase.from("students")
@@ -6485,20 +6489,29 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
       await supabase.from("students").update({ email_verified: true, verify_token: null, verify_code: null }).eq("id", id);
     } else if (action === "admit") {
       // Admission manuelle : génère admission + planning hebdo + inscription
+      //
+      // Cette action n'admet qu'au cursus MEAL (elle appelle generateLessonSchedule(id, now,
+      // "meal") plus bas, jamais un autre parcours) : l'inscription doit donc se limiter aux
+      // cours MEAL, exactement comme grantMealAdmission et grantProgramAdmission le font pour
+      // les admissions automatiques. Faute de ce filtre, elle inscrivait l'étudiant à TOUS les
+      // cours publiés, tous parcours confondus — un étudiant admis ici au seul MEAL se
+      // retrouvait « inscrit » à TOF-FIN-01 (ou pire, au jour où COOP/FCA/FCQ existent tous),
+      // sans avoir jamais passé leur test. Dix-sept étudiants réels en portaient la trace.
       const expires = new Date(now.getFullYear(), now.getMonth() + 3, now.getDate()).toISOString();
       await supabase.from("students").update({ admitted_at: now.toISOString(), admission_expires: expires, status: "active", email_verified: true, next_test_allowed: null }).eq("id", id);
-      const { data: courses } = await supabase.from("sms_courses").select("id").eq("is_published", true);
-      if (courses?.length) {
+      const { data: courses } = await supabase.from("sms_courses").select("id, code").eq("is_published", true);
+      const coursMeal = (courses || []).filter((co: any) => programOf(co.code)?.id === "meal");
+      if (coursMeal.length) {
         const { data: existing } = await supabase.from("enrollments").select("course_id").eq("student_id", id);
         const already = new Set((existing || []).map((e: any) => e.course_id));
-        const toAdd = courses.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: id, course_id: co.id, started_at: now.toISOString() }));
+        const toAdd = coursMeal.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: id, course_id: co.id, started_at: now.toISOString() }));
         if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
       }
       // Remplace toute attestation d'admission existante (évite les doublons si "admit" est cliqué
       // plusieurs fois ou après un revoke_admission — verify-certificate suppose une seule ligne par étudiant).
       await supabase.from("attestations").delete().eq("student_id", id).eq("cert_type", "admission").then(() => {}, () => {});
       const certNo = `DMA-ADM-${id}-${Date.now().toString(36).toUpperCase()}`;
-      await supabase.from("attestations").insert({ student_id: id, course_id: courses?.[0]?.id ?? null, cert_type: "admission", certificate_no: certNo, status: "issued", issued_at: now.toISOString(), expires_at: expires }).then(() => {}, () => {});
+      await supabase.from("attestations").insert({ student_id: id, course_id: coursMeal[0]?.id ?? null, cert_type: "admission", certificate_no: certNo, status: "issued", issued_at: now.toISOString(), expires_at: expires }).then(() => {}, () => {});
       // Planning reparti de zéro à la date d'admission : c'est aussi le moyen pour l'admin de
       // débloquer un étudiant dont le calendrier avait été généré sur un ancien rythme.
       await supabase.from("lesson_progress").delete().eq("student_id", id).then(() => {}, () => {});
@@ -6981,6 +6994,26 @@ async function classementPoints(idsCours?: number[]): Promise<{ student_id: numb
 async function coursDuParcours(programId: string): Promise<number[]> {
   const { data: courses } = await supabase.from("sms_courses").select("id, code").eq("is_published", true);
   return (courses || []).filter((c: any) => programOf(c.code)?.id === programId).map((c: any) => c.id);
+}
+
+/**
+ * Identifiants des étudiants RÉELLEMENT admis à un parcours — pas seulement « inscrits ».
+ *
+ * `enrollments` a porté des lignes fantômes (une admission manuelle a longtemps inscrit
+ * l'étudiant à tous les cours publiés, tous parcours confondus, voir l'action « admit » de
+ * /api/admin/academy/students/:id/action) : y lire directement la liste des destinataires
+ * d'un parcours revient à croire ces lignes. La source de vérité est l'admission elle-même —
+ * `students.admitted_at` pour le MEAL, `academy_program_admissions` pour les autres — jamais
+ * `enrollments`, qu'on ne fait ici que RESTREINDRE, pas remplacer.
+ */
+async function elevesAdmisAuParcours(programId: string): Promise<Set<number>> {
+  if (programId === "meal") {
+    const { data } = await supabase.from("students").select("id").not("admitted_at", "is", null);
+    return new Set((data || []).map((s: any) => s.id));
+  }
+  const { data } = await supabase.from("academy_program_admissions")
+    .select("student_id").eq("program_id", programId).not("admitted_at", "is", null);
+  return new Set((data || []).map((r: any) => r.student_id));
 }
 
 app.get("/api/admin/academy/leaderboard", requireAuth, async (_req, res) => {
