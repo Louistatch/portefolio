@@ -1515,7 +1515,7 @@ async function notifyCoursesUnlocked(sid: number, opened: { courseId: number; le
  * c'est elle qui fait foi : l'administration peut réécrire un énoncé sans redéploiement.
  */
 async function getGroupWorks(): Promise<any[]> {
-  const champs = "id, gw_index, week_index, title, brief, deliverables, max_score, is_published, brief_url, template_url, rubric";
+  const champs = "id, gw_index, week_index, title, brief, deliverables, max_score, is_published, brief_url, template_url, rubric, plan";
   const { data, error } = await supabase.from("academy_group_works").select(champs).order("gw_index");
   if (error) return [];             // table absente — la fonctionnalité n'est pas installée
   if (data?.length) return data;
@@ -1524,6 +1524,7 @@ async function getGroupWorks(): Promise<any[]> {
     gw_index: g.index, week_index: g.weekIndex, title: g.title,
     brief: g.brief, deliverables: g.deliverables, max_score: g.maxScore,
     brief_url: g.briefUrl, template_url: g.templateUrl, rubric: INSTRUCTOR_RUBRIC,
+    plan: g.plan,
   }));
   await supabase.from("academy_group_works")
     .upsert(semences, { onConflict: "gw_index", ignoreDuplicates: true }).then(() => {}, () => {});
@@ -1824,9 +1825,12 @@ async function generateGroupWorkSchedule(sid: number, admittedAt: Date, dejaDans
 /**
  * Recalcule l'état des GW d'un étudiant et renvoie de quoi les afficher.
  *
- * L'état ne se stocke pas à la main : il DÉRIVE du rendu du groupe et de la fenêtre —
- * corrigé s'il est noté, rendu s'il est déposé, sinon verrouillé / à rendre / en retard.
- * Une ligne « rendu » ne peut donc pas rester coincée si un coéquipier dépose à minuit.
+ * L'état ne se stocke pas à la main : il DÉRIVE du rendu et de l'équipe — corrigé s'il est
+ * noté, rendu s'il est déposé, sinon verrouillé tant que le groupe n'existe pas, à rendre
+ * dès qu'il existe, en retard après l'échéance. Le dépôt s'ouvre donc à la constitution de
+ * l'équipe, pas à l'ancienne date `unlock_at` : une équipe tirée au sort peut déposer
+ * immédiatement, sans attendre le passage d'une horloge sur une date déjà dépassée par les
+ * faits. Une ligne « rendu » ne peut donc pas rester coincée si un coéquipier dépose à minuit.
  *
  * C'est aussi ici que le groupe se constitue : à l'ouverture du premier GW (semaine 4),
  * pas à l'admission. Un étudiant qui abandonne en semaine 2 n'encombre pas les équipes.
@@ -1862,9 +1866,13 @@ async function refreshGroupWorkStates(sid: number): Promise<{ lignes: any[]; gro
   const ouverts: { groupWorkId: number; dueAt: string }[] = [];
   for (const l of lignes as any[]) {
     const rendu = rendus.find(r => r.group_work_id === l.group_work_id);
+    // Le dépôt s'ouvre dès que l'équipe existe — pas à la date de constitution
+    // initialement prévue. Un groupe qui se forme (tirage au sort, ou l'admin qui
+    // l'assigne à la main) rend le travail « available » immédiatement, sans attendre
+    // le passage de l'horloge sur `unlock_at`.
     const etat = rendu?.status === "graded" ? "completed"
       : rendu ? "submitted"
-      : now < new Date(l.unlock_at).getTime() ? "locked"
+      : !groupes[l.group_work_id] ? "locked"
       : now > new Date(l.due_at).getTime() ? "missed" : "available";
 
     const maj: any = {};
@@ -4531,13 +4539,15 @@ app.get("/api/academy/group-work", requireStudent, async (req, res) => {
       const rendu = rendus.find((r: any) => r.group_work_id === gw.id);
       const g = groupes[gw.id] ?? null;
       const membres = membresPar[gw.id] ?? [];
+      // Date à laquelle l'équipe de CE travail est (ou sera) tirée au sort — c'est elle,
+      // désormais, qui ouvre le dépôt : le groupe une fois formé peut déposer tout de
+      // suite, sans attendre l'ancienne date `unlock_at`.
+      const groupeLe = l?.unlock_at
+        ? new Date(new Date(l.unlock_at).getTime() - GROUP_FORMATION_LEAD_WEEKS * 7 * 24 * 3600 * 1000).toISOString()
+        : null;
       return {
         groupe: g ? { id: g.id, nom: g.name, cohorte: g.cohort, membres } : null,
-        // Date à laquelle l'équipe de CE travail sera tirée au sort, quand elle ne l'est pas
-        // encore : sans elle, l'étudiant ne sait pas s'il doit s'inquiéter ou patienter.
-        groupeLe: l?.unlock_at
-          ? new Date(new Date(l.unlock_at).getTime() - GROUP_FORMATION_LEAD_WEEKS * 7 * 24 * 3600 * 1000).toISOString()
-          : null,
+        groupeLe,
         id: gw.id,
         index: gw.gw_index,
         titre: gw.title,
@@ -4548,7 +4558,8 @@ app.get("/api/academy/group-work", requireStudent, async (req, res) => {
         enonceUrl: gw.brief_url ?? null,
         modeleUrl: gw.template_url ?? null,
         grille: Array.isArray(gw.rubric) ? gw.rubric : [],
-        ouvertureLe: l?.unlock_at ?? null,
+        plan: Array.isArray(gw.plan) ? gw.plan : [],
+        ouvertureLe: groupeLe,
         echeanceLe: l?.due_at ?? null,
         statut: l?.status ?? "locked",
         note: rendu?.status === "graded" ? rendu.score : null,
@@ -4867,13 +4878,16 @@ app.get("/api/academy/cohort-forum", requireStudent, async (req, res) => {
   if (error) return res.json({ actif: false, cohorte, annonces: [], messages: [] });
 
   const posts = (data || []).map((p: any) => formaterPost(p, sid));
-  const { count } = await supabase.from("students")
-    .select("id", { count: "exact", head: true }).not("admitted_at", "is", null);
+  // L'effectif affiché est celui de CETTE promotion, pas de tous les admis depuis l'origine —
+  // même calcul que le fan-out des notifications ci-dessous, à partir de la date d'admission.
+  const { data: admis } = await supabase.from("students")
+    .select("id, admitted_at").not("admitted_at", "is", null);
+  const effectif = (admis || []).filter((s: any) => cohortOf(new Date(s.admitted_at)) === cohorte).length;
 
   res.json({
     actif: true,
     cohorte,
-    effectif: count ?? null,
+    effectif,
     annonces: posts.filter(p => p.kind === "annonce"),
     messages: posts.filter(p => p.kind !== "annonce"),
   });
