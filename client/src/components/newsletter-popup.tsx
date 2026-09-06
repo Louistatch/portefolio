@@ -6,6 +6,7 @@ import { X, Mail, CheckCircle2, Loader2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useLocation } from "wouter";
 import { isStudentLoggedIn } from "@/lib/student";
+import { useApresResolution, EVT_CONDITIONS_RESOLUES, EVT_COOKIES_RESOLUS } from "@/hooks/use-consent-gate";
 
 export function NewsletterPopup() {
   const [show, setShow] = useState(false);
@@ -15,6 +16,11 @@ export function NewsletterPopup() {
   const [dismissed, setDismissed] = useState(false);
   const subscribe = useSubscribe();
   const [location] = useLocation();
+  // Attend son tour derrière les conditions et les cookies : sans ça, son délai de 45
+  // secondes (ou le seuil de défilement) pouvait la faire apparaître par-dessus un bandeau
+  // cookies encore ouvert, dans le même coin de l'écran — deux fenêtres superposées.
+  const conditionsResolues = useApresResolution("terms_accepted", EVT_CONDITIONS_RESOLUES);
+  const cookiesResolus = useApresResolution("cookie_consent", EVT_COOKIES_RESOLUS);
 
   useEffect(() => {
     // Cette fenêtre s'adresse à un VISITEUR. Elle n'a rien à faire chez un membre.
@@ -30,6 +36,9 @@ export function NewsletterPopup() {
     // cible de cette fenêtre, sur quelque page qu'il se trouve.
     if (/^\/(academy|pagesecure)/.test(location)) return;
     if (isStudentLoggedIn()) return;
+    // Attend que les conditions et les cookies soient résolus avant de s'armer — voir la
+    // note plus haut sur pourquoi ces trois fenêtres ne doivent jamais se chevaucher.
+    if (!conditionsResolues || !cookiesResolus) return;
 
     // Le stockage local n'est pas toujours joignable — navigation privée stricte, données de
     // site bloquées. L'accès ne renvoie pas null, il LÈVE. Même durcissement que partout
@@ -48,7 +57,7 @@ export function NewsletterPopup() {
 
     window.addEventListener("scroll", handleScroll, { passive: true });
     return () => { clearTimeout(timer); window.removeEventListener("scroll", handleScroll); };
-  }, [location]);
+  }, [location, conditionsResolues, cookiesResolus]);
 
   const dismiss = () => {
     setDismissed(true);

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { X, Shield, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { signalerResolution, EVT_CONDITIONS_RESOLUES } from "@/hooks/use-consent-gate";
 
 export function TermsPopup() {
   const [show, setShow] = useState(false);
@@ -25,11 +26,16 @@ export function TermsPopup() {
     if (accepted) {
       try { localStorage.setItem("terms_accepted", "1"); } catch { /* stockage indisponible */ }
       setShow(false);
+      signalerResolution(EVT_CONDITIONS_RESOLUES);
     }
   };
 
   const handleDecline = () => {
     setShow(false);
+    // Un refus ne se mémorise pas (on repose la question au prochain passage), mais il
+    // libère quand même les fenêtres suivantes (cookies, newsletter) pour CETTE visite —
+    // sans quoi elles attendraient indéfiniment une résolution qui ne viendra jamais.
+    signalerResolution(EVT_CONDITIONS_RESOLUES);
   };
 
   if (!show) return null;
