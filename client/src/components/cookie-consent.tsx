@@ -2,24 +2,37 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Cookie } from "lucide-react";
+import { useLocation } from "wouter";
+import { useApresResolution, signalerResolution, EVT_CONDITIONS_RESOLUES, EVT_COOKIES_RESOLUS } from "@/hooks/use-consent-gate";
 
 export function CookieConsent() {
   const [show, setShow] = useState(false);
+  const [location] = useLocation();
+  // N'apparaît qu'une fois la modale des conditions résolue : sinon les deux se
+  // superposaient à l'instant même de la première visite, l'une plein écran, l'autre en
+  // bandeau — le classique fouillis de fenêtres qui s'ouvrent toutes à la fois.
+  const conditionsResolues = useApresResolution("terms_accepted", EVT_CONDITIONS_RESOLUES);
 
   useEffect(() => {
-    if (!localStorage.getItem("cookie_consent")) {
-      setShow(true);
-    }
-  }, []);
+    // Monté à la racine de l'app, ce bandeau apparaissait aussi dans l'espace étudiant et
+    // l'administration — jusque sur la salle de réunion en direct. Même exclusion que la
+    // fenêtre newsletter, pour la même raison : ces espaces ne sont pas sa cible.
+    if (/^\/(academy|pagesecure)/.test(location)) return;
+    if (!conditionsResolues) return;
+    try { if (localStorage.getItem("cookie_consent")) return; } catch { /* stockage indisponible : on montre le bandeau */ }
+    setShow(true);
+  }, [location, conditionsResolues]);
 
   const accept = () => {
-    localStorage.setItem("cookie_consent", "accepted");
+    try { localStorage.setItem("cookie_consent", "accepted"); } catch { /* stockage indisponible */ }
     setShow(false);
+    signalerResolution(EVT_COOKIES_RESOLUS);
   };
 
   const decline = () => {
-    localStorage.setItem("cookie_consent", "declined");
+    try { localStorage.setItem("cookie_consent", "declined"); } catch { /* stockage indisponible */ }
     setShow(false);
+    signalerResolution(EVT_COOKIES_RESOLUS);
   };
 
   return (
