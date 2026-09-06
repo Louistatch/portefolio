@@ -23,11 +23,9 @@ export function TermsPopup() {
   }, []);
 
   const handleAccept = () => {
-    if (accepted) {
-      try { localStorage.setItem("terms_accepted", "1"); } catch { /* stockage indisponible */ }
-      setShow(false);
-      signalerResolution(EVT_CONDITIONS_RESOLUES);
-    }
+    try { localStorage.setItem("terms_accepted", "1"); } catch { /* stockage indisponible */ }
+    setShow(false);
+    signalerResolution(EVT_CONDITIONS_RESOLUES);
   };
 
   const handleDecline = () => {
@@ -43,195 +41,157 @@ export function TermsPopup() {
   return (
     <AnimatePresence>
       {show && (
-        <>
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50"
-          />
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.9, y: 20 }}
-            transition={{ type: "spring", damping: 25 }}
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-0"
-          >
-            <div className="relative w-full max-w-2xl max-h-[90vh] bg-card rounded-3xl border border-border/50 shadow-2xl overflow-hidden flex flex-col">
-              {/* Header */}
-              <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-border/50 p-6 flex items-center gap-3">
-                <Shield className="w-6 h-6 text-primary shrink-0" />
-                <div className="flex-1">
-                  <h2 className="text-xl lg:text-2xl font-bold">Conditions d'utilisation</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {showFull ? "Détails complets des conditions" : "Veuillez accepter nos conditions avant de continuer"}
-                  </p>
-                </div>
-                <button onClick={handleDecline} className="w-8 h-8 rounded-full bg-white/20 hover:bg-white/30 flex items-center justify-center transition-colors">
-                  <X className="w-4 h-4" />
+        // Une carte de coin, jamais plein écran : elle ne doit pas empêcher de lire la page
+        // en dessous. Elle grandit sur place quand on demande le détail (bouton « En savoir
+        // plus »), au lieu d'ouvrir une seconde fenêtre — d'où le `layout` de framer-motion,
+        // qui anime le changement de taille automatiquement.
+        <motion.div
+          layout
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ type: "spring", damping: 25 }}
+          className={`fixed z-50 bottom-4 left-4 right-4 sm:right-auto ${showFull ? "sm:w-[26rem]" : "sm:w-96"} bg-card border border-border/50 rounded-3xl shadow-2xl overflow-hidden`}
+        >
+          {/* Header */}
+          <div className="bg-gradient-to-r from-primary/10 to-primary/5 border-b border-border/50 p-4 flex items-center gap-3">
+            <Shield className="w-5 h-5 text-primary shrink-0" />
+            <div className="flex-1 min-w-0">
+              <h2 className="text-sm font-bold">Conditions d'utilisation</h2>
+              {showFull && <p className="text-xs text-muted-foreground mt-0.5">Détails complets des conditions</p>}
+            </div>
+            <button onClick={handleDecline} className="w-7 h-7 rounded-full hover:bg-foreground/10 flex items-center justify-center transition-colors shrink-0">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+
+          {/* Content */}
+          <AnimatePresence mode="wait">
+            {!showFull ? (
+              <motion.div
+                key="short"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="p-4 space-y-3"
+              >
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  En continuant votre navigation, vous acceptez notre politique de confidentialité et nos conditions d'utilisation.
+                </p>
+                <button
+                  onClick={() => setShowFull(true)}
+                  className="text-xs font-medium text-primary hover:text-primary/80 inline-flex items-center gap-1"
+                >
+                  En savoir plus
+                  <ChevronDown className="w-3.5 h-3.5" />
                 </button>
-              </div>
-
-              {/* Content */}
-              <AnimatePresence mode="wait">
-                {!showFull ? (
-                  <motion.div
-                    key="short"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="p-6 space-y-6"
+              </motion.div>
+            ) : (
+              <motion.div
+                key="full"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex flex-col"
+              >
+                {/* Back button */}
+                <div className="px-4 py-2 border-b border-border/50">
+                  <button
+                    onClick={() => setShowFull(false)}
+                    className="text-xs font-medium text-primary hover:text-primary/80 inline-flex items-center gap-1"
                   >
-                    {/* Short description */}
-                    <div className="text-center space-y-4">
-                      <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center mx-auto">
-                        <Shield className="w-8 h-8 text-primary" />
-                      </div>
-                      <div className="space-y-2">
-                        <h3 className="text-lg font-semibold">Bienvenue sur notre site</h3>
-                        <p className="text-muted-foreground leading-relaxed max-w-md mx-auto">
-                          En continuant votre navigation, vous acceptez notre politique de confidentialité et nos conditions d'utilisation qui régissent l'utilisation de ce site web.
-                        </p>
-                      </div>
-                    </div>
+                    <ChevronUp className="w-3.5 h-3.5" />
+                    Retour au résumé
+                  </button>
+                </div>
 
-                    {/* Key points summary */}
-                    <div className="bg-muted/30 rounded-2xl p-4 space-y-3">
-                      <h4 className="font-medium text-sm">Ce que vous acceptez :</h4>
-                      <ul className="text-sm text-muted-foreground space-y-1">
-                        <li>• Utilisation responsable du contenu</li>
-                        <li>• Respect de la propriété intellectuelle</li>
-                        <li>• Protection de vos données personnelles</li>
-                        <li>• Modération des commentaires</li>
-                      </ul>
-                      <p className="text-xs text-muted-foreground mt-3 italic">
-                        Vous pouvez accepter immédiatement ou lire les conditions complètes ci-dessous.
+                {/* Full terms */}
+                <ScrollArea className="max-h-[50vh] p-4">
+                  <div className="space-y-5 pr-3">
+                    <section className="space-y-1.5">
+                      <h3 className="text-sm font-semibold text-foreground">1. Services proposés</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Ce site web fournit des informations, réflexions et analyses sur l'agriculture durable, la finance agricole, la résilience climatique et la digitalisation rurale en Afrique de l'Ouest. Les contenus sont à titre informatif uniquement.
                       </p>
-                    </div>
+                    </section>
 
-                    {/* Learn more button */}
-                    <Button
-                      variant="ghost"
-                      onClick={() => setShowFull(true)}
-                      className="w-full text-primary hover:text-primary/80 hover:bg-primary/5"
-                    >
-                      En savoir plus sur nos conditions
-                      <ChevronDown className="w-4 h-4 ml-2" />
-                    </Button>
-                  </motion.div>
-                ) : (
-                  <motion.div
-                    key="full"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="flex flex-col max-h-[60vh]"
-                  >
-                    {/* Back button */}
-                    <div className="px-6 py-3 border-b border-border/50">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowFull(false)}
-                        className="text-primary hover:text-primary/80 hover:bg-primary/5"
-                      >
-                        <ChevronUp className="w-4 h-4 mr-2" />
-                        Retour au résumé
-                      </Button>
-                    </div>
+                    <section className="space-y-1.5">
+                      <h3 className="text-sm font-semibold text-foreground">2. Propriété intellectuelle</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Tous les contenus (textes, images, graphiques) sont protégés par la loi sur la propriété intellectuelle. Toute reproduction ou utilisation sans autorisation préalable est interdite.
+                      </p>
+                    </section>
 
-                    {/* Full terms */}
-                    <ScrollArea className="flex-1 p-6">
-                      <div className="space-y-6 pr-4">
-                        <section className="space-y-2">
-                          <h3 className="font-semibold text-foreground">1. Services proposés</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Ce site web fournit des informations, réflexions et analyses sur l'agriculture durable, la finance agricole, la résilience climatique et la digitalisation rurale en Afrique de l'Ouest. Les contenus sont à titre informatif uniquement.
-                          </p>
-                        </section>
+                    <section className="space-y-1.5">
+                      <h3 className="text-sm font-semibold text-foreground">3. Responsabilité</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Les informations fournies sont à titre informatif. Nous déclinons toute responsabilité quant aux dommages directs ou indirects résultant de l'utilisation de ce site.
+                      </p>
+                    </section>
 
-                        <section className="space-y-2">
-                          <h3 className="font-semibold text-foreground">2. Propriété intellectuelle</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Tous les contenus (textes, images, graphiques) sont protégés par la loi sur la propriété intellectuelle. Toute reproduction ou utilisation sans autorisation préalable est interdite.
-                          </p>
-                        </section>
+                    <section className="space-y-1.5">
+                      <h3 className="text-sm font-semibold text-foreground">4. Données personnelles</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Vos données personnelles sont collectées conformément à la politique de confidentialité. Nous respectons les réglementations en vigueur concernant la protection des données.
+                      </p>
+                    </section>
 
-                        <section className="space-y-2">
-                          <h3 className="font-semibold text-foreground">3. Responsabilité</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Les informations fournies sont à titre informatif. Nous déclinons toute responsabilité quant aux dommages directs ou indirects résultant de l'utilisation de ce site.
-                          </p>
-                        </section>
+                    <section className="space-y-1.5">
+                      <h3 className="text-sm font-semibold text-foreground">5. Commentaires</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Les commentaires doivent être respectueux. Nous nous réservons le droit de modérer ou supprimer les commentaires jugés inappropriés, offensants ou hors de propos.
+                      </p>
+                    </section>
 
-                        <section className="space-y-2">
-                          <h3 className="font-semibold text-foreground">4. Données personnelles</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Vos données personnelles sont collectées conformément à la politique de confidentialité. Nous respectons les réglementations en vigueur concernant la protection des données.
-                          </p>
-                        </section>
+                    <section className="space-y-1.5">
+                      <h3 className="text-sm font-semibold text-foreground">6. Liens externes</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Ce site peut contenir des liens vers des sites externes. Nous ne sommes pas responsables du contenu ou de la politique de confidentialité de ces sites.
+                      </p>
+                    </section>
 
-                        <section className="space-y-2">
-                          <h3 className="font-semibold text-foreground">5. Commentaires</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Les commentaires doivent être respectueux. Nous nous réservons le droit de modérer ou supprimer les commentaires jugés inappropriés, offensants ou hors de propos.
-                          </p>
-                        </section>
+                    <section className="space-y-1.5">
+                      <h3 className="text-sm font-semibold text-foreground">7. Modifications</h3>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Nous nous réservons le droit de modifier ces conditions à tout moment. Les modifications seront notifiées aux utilisateurs via ce site.
+                      </p>
+                    </section>
 
-                        <section className="space-y-2">
-                          <h3 className="font-semibold text-foreground">6. Liens externes</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Ce site peut contenir des liens vers des sites externes. Nous ne sommes pas responsables du contenu ou de la politique de confidentialité de ces sites.
-                          </p>
-                        </section>
-
-                        <section className="space-y-2">
-                          <h3 className="font-semibold text-foreground">7. Modifications</h3>
-                          <p className="text-sm text-muted-foreground leading-relaxed">
-                            Nous nous réservons le droit de modifier ces conditions à tout moment. Les modifications seront notifiées aux utilisateurs via ce site.
-                          </p>
-                        </section>
-
-                        <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30 rounded-2xl p-4 flex gap-3">
-                          <AlertCircle className="w-5 h-5 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
-                          <div className="text-sm text-amber-800 dark:text-amber-200">
-                            <p className="font-semibold mb-1">Important</p>
-                            <p>En acceptant ces conditions, vous reconnaissez avoir lu et accepté l'ensemble de ces termes.</p>
-                          </div>
-                        </div>
+                    <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30 rounded-xl p-3 flex gap-2.5">
+                      <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />
+                      <div className="text-xs text-amber-800 dark:text-amber-200">
+                        <p className="font-semibold mb-0.5">Important</p>
+                        <p>En acceptant ces conditions, vous reconnaissez avoir lu et accepté l'ensemble de ces termes.</p>
                       </div>
-                    </ScrollArea>
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                    </div>
+                  </div>
+                </ScrollArea>
 
-              {/* Footer */}
-              <div className="border-t border-border/50 bg-muted/30 p-6 space-y-4">
-                <div className="flex items-center gap-3 p-4 bg-background rounded-xl border border-border/50 hover:border-primary/50 transition-colors cursor-pointer" onClick={() => setAccepted(!accepted)}>
-                  <Checkbox checked={accepted} onCheckedChange={(v) => setAccepted(v === true)} className="w-5 h-5" />
-                  <label className="text-sm font-medium cursor-pointer flex-1">
+                <div className="flex items-center gap-2.5 px-4 py-3 border-t border-border/50 cursor-pointer" onClick={() => setAccepted(!accepted)}>
+                  <Checkbox checked={accepted} onCheckedChange={(v) => setAccepted(v === true)} className="w-4 h-4 shrink-0" />
+                  <label className="text-xs font-medium cursor-pointer flex-1">
                     J'accepte les conditions d'utilisation
                   </label>
                 </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={handleDecline} className="flex-1">
-                    Refuser
-                  </Button>
-                  <Button disabled={!accepted} onClick={handleAccept} className="flex-1">
-                    {showFull ? "Accepter et continuer" : "Continuer"}
-                  </Button>
-                </div>
-
-                {!showFull && (
-                  <p className="text-xs text-center text-muted-foreground">
-                    En cliquant sur "Continuer", vous acceptez nos conditions d'utilisation.
-                  </p>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        </>
+          {/* Footer */}
+          <div className="border-t border-border/50 bg-muted/30 p-3 flex gap-2">
+            <Button variant="outline" size="sm" onClick={handleDecline} className="flex-1 rounded-xl">
+              Refuser
+            </Button>
+            <Button
+              size="sm"
+              disabled={showFull && !accepted}
+              onClick={handleAccept}
+              className="flex-1 rounded-xl"
+            >
+              {showFull ? "Accepter et continuer" : "J'accepte"}
+            </Button>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
