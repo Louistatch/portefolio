@@ -3835,7 +3835,7 @@ async function accesLeconQuiz(sid: number, lessonId: number): Promise<
   await regenererPlannings(sid);
   await refreshLessonStates(sid);
   const { data: lp } = await supabase.from("lesson_progress")
-    .select("id, status, unlock_at, quiz_started_at").eq("student_id", sid).eq("lesson_id", lessonId).maybeSingle();
+    .select("id, status, unlock_at, quiz_started_at, exercise_results").eq("student_id", sid).eq("lesson_id", lessonId).maybeSingle();
   if (!lp || lp.status === "locked")
     return { ok: false, statut: 403, body: { message: "Cette leçon n'est pas encore débloquée.", unlockAt: lp?.unlock_at, locked: true } };
 
@@ -3907,7 +3907,13 @@ app.get("/api/academy/lesson-quiz/:lessonId", requireStudent, async (req, res) =
   if (lp.status === "completed") {
     const { data: note } = await supabase.from("grades")
       .select("score, max_score").eq("student_id", sid).eq("lesson_id", lessonId).maybeSingle();
-    return res.json({ hasQuiz: true, status: "finished", score: note?.score ?? null, maxScore: note?.max_score ?? lesson.points ?? 10 });
+    // La correction détaillée revient telle qu'enregistrée à la remise (voir complete-lesson) :
+    // un étudiant qui revient sur ce quiz plus tard retrouve exactement ce qu'il a vu au
+    // moment de la remise, pas seulement le score.
+    return res.json({
+      hasQuiz: true, status: "finished", score: note?.score ?? null, maxScore: note?.max_score ?? lesson.points ?? 10,
+      exerciseResults: lp.exercise_results ?? null,
+    });
   }
 
   if (lp.quiz_started_at) {
@@ -4166,9 +4172,15 @@ app.post("/api/academy/complete-lesson", requireStudent, async (req, res) => {
     student_id: sid, course_id, lesson_id,
     title: lesson.title || "Leçon", score: finalScore, max_score: maxScore, type: "lesson",
   }, { onConflict: "student_id,lesson_id", ignoreDuplicates: true });
-  // Marquer la leçon comme complétée dans le planning hebdo
+  // Marquer la leçon comme complétée dans le planning hebdo — avec la correction détaillée
+  // qui part au navigateur ci-dessous (jamais plus), pour qu'un retour ultérieur sur ce quiz
+  // (page rechargée, revenu plus tard) la retrouve telle quelle au lieu de n'avoir plus que
+  // le score. Voir GET /api/academy/lesson-quiz/:lessonId, statut « finished ».
   await supabase.from("lesson_progress")
-    .update({ status: "completed", completed_at: new Date().toISOString(), score: finalScore })
+    .update({
+      status: "completed", completed_at: new Date().toISOString(), score: finalScore,
+      exercise_results: graded?.results ?? null,
+    })
     .eq("student_id", sid).eq("lesson_id", lesson_id).then(() => {}, () => {});
 
   const result = await recalcCourseProgress(sid, course_id);

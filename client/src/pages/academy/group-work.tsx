@@ -619,7 +619,7 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
         )}
 
         {/* ── 7. Le fil du groupe ── */}
-        {t.groupe && <ForumGroupe travailId={t.id} forum={forum} onPoste={chargerForum} />}
+        {t.groupe && <ForumGroupe travailId={t.id} forum={forum} nbMembres={t.groupe.membres.length} onPoste={chargerForum} />}
       </div>
     </section>
   );
@@ -1110,10 +1110,16 @@ function ChampFichier({ travailId, libelle, accept, fichier, onFichier, obligato
   );
 }
 
-/** Le fil du groupe de CE travail. Il naît et meurt avec l'équipe : les coéquipiers du
- *  travail suivant ne sont pas les mêmes, et n'ont pas à lire cette conversation. */
-function ForumGroupe({ travailId, forum, onPoste }:
-  { travailId: number; forum: any; onPoste: () => Promise<void> }) {
+/**
+ * Le fil du groupe de CE travail. Il naît et meurt avec l'équipe : les coéquipiers du
+ * travail suivant ne sont pas les mêmes, et n'ont pas à lire cette conversation.
+ *
+ * L'en-tête dit explicitement à qui ce fil s'adresse — « Privé · 3 membres » — pour qu'on
+ * ne le confonde jamais avec le forum de la promotion plus bas sur la même page : l'un se
+ * lit par toute la cohorte, l'autre par trois personnes tout au plus.
+ */
+function ForumGroupe({ travailId, forum, nbMembres, onPoste }:
+  { travailId: number; forum: any; nbMembres: number; onPoste: () => Promise<void> }) {
   const [corps, setCorps] = useState("");
   const [envoi, setEnvoi] = useState(false);
 
@@ -1134,11 +1140,17 @@ function ForumGroupe({ travailId, forum, onPoste }:
 
   return (
     <div className="rounded-xl border border-border/60 overflow-hidden">
-      <div className="px-3.5 py-2 bg-muted/40 border-b border-border/40">
+      <div className="px-3.5 py-2 bg-muted/40 border-b border-border/40 flex items-center justify-between gap-2">
         <p className="text-sm font-semibold flex items-center gap-2">
           <MessageSquare className="w-3.5 h-3.5 text-primary" /> Échanges du groupe
         </p>
+        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-muted-foreground shrink-0">
+          <Lock className="w-3 h-3" /> Privé · {nbMembres} membre{nbMembres > 1 ? "s" : ""}
+        </span>
       </div>
+      <p className="px-3.5 py-2 text-[11px] text-muted-foreground border-b border-border/40">
+        Visible uniquement par vous et vos coéquipiers de ce travail — jamais par le reste de la promotion.
+      </p>
 
       {ressources.length > 0 && (
         <div className="px-3.5 py-2.5 border-b border-border/40 bg-primary/[0.03]">
@@ -1219,6 +1231,9 @@ function ForumPromotion({ promo, onPoste }: { promo: any; onPoste: () => Promise
           Promotion {promo.cohorte}{promo.effectif ? ` · ${promo.effectif} étudiants` : ""}
         </span>
       </div>
+      <p className="px-4 sm:px-5 py-2 text-[11px] text-muted-foreground border-b border-border/40">
+        Visible par toute la promotion — à distinguer des échanges de votre groupe, propres à chaque travail.
+      </p>
 
       {annonces.length > 0 && (
         <div className="px-4 sm:px-5 py-3 border-b border-border/40 bg-primary/[0.03] space-y-2.5">
