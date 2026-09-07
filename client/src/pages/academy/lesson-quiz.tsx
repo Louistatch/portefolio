@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useLocation, useRoute } from "wouter";
-import { Loader2, ArrowRight, ArrowLeft, Check, Clock, Lightbulb } from "lucide-react";
+import { Loader2, ArrowRight, ArrowLeft, Check, Clock, Lightbulb, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
 import { isStudentLoggedIn, studentFetch } from "@/lib/student";
 import { programOf } from "@shared/programs";
 import { dureeQuizSecondes } from "@shared/chronometrage";
 import { useChronoEpreuve, type FenetreChrono } from "@/lib/chrono-epreuve";
+import type { ExerciseResult } from "@shared/exercises";
 
 /**
  * Le quiz d'une leçon (« à vous de jouer »), à part de la lecture.
@@ -31,6 +32,60 @@ function EcranAdministratif({ accent, label, children }: { accent: string; label
         <p className="text-[11px] font-semibold uppercase tracking-[0.16em]" style={{ color: accent }}>{label}</p>
         {children}
       </div>
+    </div>
+  );
+}
+
+/**
+ * Met en forme une réponse (donnée ou correcte) pour l'affichage — un exercice à choix ne
+ * renvoie qu'un index côté serveur, c'est ici qu'il redevient le texte de l'option choisie.
+ */
+function libelleReponse(ex: Exercice | undefined, valeur: any): string {
+  if (valeur === null || valeur === undefined || valeur === "") return "Aucune réponse donnée";
+  if (ex?.kind === "choice") {
+    const i = Number(valeur);
+    const lettre = ["A", "B", "C", "D"][i];
+    const texte = ex.opts?.[i];
+    return texte ? `${lettre} — ${texte}` : String(valeur);
+  }
+  if (ex?.kind === "number") return `${valeur}${ex.unit ? ` ${ex.unit}` : ""}`;
+  return String(valeur);
+}
+
+/** Un exercice corrigé, dans le même registre visuel que le reste du portail de quiz. */
+function BlocCorrection({ index, exercice, resultat }: { index: number; exercice?: Exercice; resultat: ExerciseResult }) {
+  const correct = resultat.correct;
+  return (
+    <div className="border-t-2 pt-5" style={{ borderColor: correct ? "#059669" : "#b91c1c" }}>
+      <p className="font-mono text-xs tabular-nums text-muted-foreground">Question {index + 1}</p>
+      {exercice?.title && <p className="mt-1.5 text-[11px] font-semibold uppercase tracking-widest text-muted-foreground">{exercice.title}</p>}
+      <p className="mt-1.5 text-base sm:text-lg font-semibold leading-snug">{exercice?.prompt}</p>
+
+      <div className="mt-4 space-y-2.5 text-sm">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Votre réponse</p>
+          <p className={`mt-0.5 ${correct ? "" : "text-destructive"}`}>{libelleReponse(exercice, resultat.given)}</p>
+        </div>
+        {!correct && resultat.answer !== null && resultat.answer !== undefined && (
+          <div>
+            <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Bonne réponse</p>
+            <p className="mt-0.5" style={{ color: "#059669" }}>{libelleReponse(exercice, resultat.answer)}</p>
+          </div>
+        )}
+      </div>
+
+      <p className={`mt-3 inline-flex items-center gap-1.5 text-sm font-medium ${correct ? "" : "text-destructive"}`}
+        style={correct ? { color: "#059669" } : undefined}>
+        {correct ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+        {correct ? "Bonne réponse" : "Réponse incorrecte"}
+      </p>
+
+      {resultat.explain && (
+        <p className="mt-2.5 text-sm leading-6 text-muted-foreground bg-muted/50 p-3 flex gap-2">
+          <Lightbulb className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+          {resultat.explain}
+        </p>
+      )}
     </div>
   );
 }
@@ -143,6 +198,8 @@ export default function LessonQuiz() {
   if (fini) {
     const d = resultat || statut;
     const horsDelai = !!d.horsDelai;
+    const exerciseResults: ExerciseResult[] = Array.isArray(d.exerciseResults) ? d.exerciseResults : [];
+    const nbCorrects = exerciseResults.filter(r => r.correct).length;
     return (
       <EcranAdministratif accent={horsDelai ? "#b45309" : accent} label="Résultat du quiz">
         <h1 className="mt-3 text-3xl font-semibold tracking-tight">{titreLecon}</h1>
@@ -153,8 +210,19 @@ export default function LessonQuiz() {
           {horsDelai
             ? "Le temps imparti était écoulé au moment de la remise : la note enregistrée est 0, quelles qu'aient été les réponses données."
             : "Ce quiz ne peut être repassé : votre note est définitive."}
+          {!horsDelai && exerciseResults.length > 0 && ` ${nbCorrects}/${exerciseResults.length} exercices corrects — le détail de chacun est ci-dessous.`}
         </p>
-        <Button className="mt-8 gap-2 min-h-11 rounded-none border-0 text-white"
+
+        {exerciseResults.length > 0 && (
+          <div className="mt-10 space-y-8">
+            {exerciseResults.map((r, i) => (
+              <BlocCorrection key={r.id} index={i} resultat={r}
+                exercice={exercices.find(e => e.id === r.id)} />
+            ))}
+          </div>
+        )}
+
+        <Button className="mt-10 gap-2 min-h-11 rounded-none border-0 text-white"
           style={{ background: accent }} onClick={() => navigate(`/academy/classroom/${courseId}`)}>
           Retour à la leçon <ArrowRight className="w-4 h-4" />
         </Button>

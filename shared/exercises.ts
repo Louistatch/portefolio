@@ -33,7 +33,17 @@ export type ExerciseCell = {
   formule?: string;
 };
 
-export type ExerciseResult = { id: string; correct: boolean; explain: string | null };
+export type ExerciseResult = {
+  id: string; correct: boolean; explain: string | null;
+  /** Ce que l'étudiant a répondu — un simple écho de sa propre saisie, jamais une fuite. */
+  given: any;
+  /**
+   * La bonne réponse, redacted (null) par resultatsSansCorrection tant qu'elle n'est pas
+   * méritée — voir son commentaire. Un index pour un exercice à choix, une valeur brute pour
+   * les autres ; c'est au client de la mettre en forme (ex.opts[answer] pour un choix).
+   */
+  answer: any;
+};
 
 /**
  * Tentatives tolérées avant que la note ne soit plafonnée.
@@ -79,7 +89,7 @@ export function plafondDeNote(tentative: number): number {
  * était écrit pour être lu avant de répondre.
  */
 export function resultatsSansCorrection(results: ExerciseResult[]): ExerciseResult[] {
-  return results.map(r => ({ id: r.id, correct: r.correct, explain: null }));
+  return results.map(r => ({ id: r.id, correct: r.correct, explain: null, given: r.given, answer: null }));
 }
 
 
@@ -169,7 +179,10 @@ export function gradeLessonExercises(content: any, answers: any): LessonGrade | 
   const given = answers && typeof answers === "object" ? answers : {};
   const results: ExerciseResult[] = exercises.map((ex, i) => {
     const id = exerciseId(ex, i);
-    return { id, correct: isExerciseCorrect(ex, given[id]), explain: ex.explain || null };
+    return {
+      id, correct: isExerciseCorrect(ex, given[id]), explain: ex.explain || null,
+      given: given[id] ?? null, answer: ex.answer ?? null,
+    };
   });
   const correctCount = results.filter(r => r.correct).length;
   const scorePct = Math.round((correctCount / exercises.length) * 100);
