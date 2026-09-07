@@ -68,6 +68,24 @@ export default function AdminStudents() {
     onError: () => toast({ title: "Erreur", variant: "destructive" }),
   });
 
+  // Décision sur une demande d'attestation DE COURS en attente (voir le tableau de bord,
+  // « X attestations attendent votre validation ») : la liste ne montrait jusqu'ici que le
+  // numéro de certificat, sans aucun bouton pour trancher — la file s'accumulait sans que
+  // personne ne puisse l'y vider.
+  const decisionAttestation = useMutation({
+    mutationFn: async ({ id, status }: { id: number; status: "issued" | "rejected" }) =>
+      adminFetch(`/api/admin/academy/attestations/${id}`, { method: "PUT", body: JSON.stringify({ status }) }),
+    onSuccess: (_d, v) => {
+      qc.invalidateQueries({ queryKey: ["academy-student", selectedId] });
+      // Le compteur « attestations en attente » du tableau de bord lit la même donnée sous
+      // une autre clé (queryKey ["admin-dashboard", ...]) : sans cette invalidation, il
+      // resterait à 4 après validation tant que l'admin ne recharge pas la page.
+      qc.invalidateQueries({ queryKey: ["admin-dashboard"] });
+      toast({ title: v.status === "issued" ? "Attestation validée — l'étudiant vient d'être notifié" : "Attestation rejetée — l'étudiant a été prévenu" });
+    },
+    onError: () => toast({ title: "Erreur", variant: "destructive" }),
+  });
+
   const filtered = useMemo(() => {
     let list = students || [];
     if (search.trim()) {
@@ -428,9 +446,35 @@ export default function AdminStudents() {
                     <h3 className="text-sm font-semibold mb-2 flex items-center gap-1.5"><Award className="w-4 h-4 text-primary" /> Attestations</h3>
                     <div className="space-y-1.5">
                       {detail.attestations.map((a: any) => (
-                        <div key={a.id} className="flex items-center justify-between text-xs bg-muted/40 rounded-lg px-3 py-2">
-                          <span className="font-mono">{a.certificate_no}</span>
-                          <span className="capitalize px-2 py-0.5 rounded-full bg-primary/10 text-primary">{a.cert_type}</span>
+                        <div key={a.id} className="text-xs bg-muted/40 rounded-lg px-3 py-2 space-y-1.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono truncate">{a.certificate_no}</span>
+                            <span className={`shrink-0 capitalize px-2 py-0.5 rounded-full ${
+                              a.status === "pending" ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              : a.status === "rejected" ? "bg-destructive/10 text-destructive"
+                              : "bg-primary/10 text-primary"}`}>
+                              {a.status === "pending" ? "En attente" : a.status === "rejected" ? "Rejetée" : a.cert_type}
+                            </span>
+                          </div>
+                          {a.status === "pending" && (
+                            <div className="flex items-center justify-between gap-2 pt-0.5">
+                              <span className="text-[11px] text-muted-foreground">
+                                {a.sms_courses?.title || a.cert_type}{a.final_score != null ? ` — moyenne ${a.final_score} %` : ""}
+                              </span>
+                              <div className="flex gap-1.5 shrink-0">
+                                <Button size="sm" variant="outline" className="h-7 px-2 text-[11px] text-destructive hover:text-destructive"
+                                  disabled={decisionAttestation.isPending}
+                                  onClick={() => decisionAttestation.mutate({ id: a.id, status: "rejected" })}>
+                                  Rejeter
+                                </Button>
+                                <Button size="sm" className="h-7 px-2 text-[11px]"
+                                  disabled={decisionAttestation.isPending}
+                                  onClick={() => decisionAttestation.mutate({ id: a.id, status: "issued" })}>
+                                  Valider
+                                </Button>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
