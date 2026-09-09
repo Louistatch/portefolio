@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import {
-  Loader2, Megaphone, Users, Wallet, Clock, CheckCircle2, AlertCircle,
+  Loader2, Megaphone, Users, Wallet, Clock, CheckCircle2, AlertCircle, Send,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -42,6 +42,28 @@ export default function AmbassadorsAdmin() {
     },
   });
 
+  /**
+   * Diffusion du programme à la promotion vérifiée.
+   *
+   * Déclenchée à la main, jamais automatiquement : c'est une annonce. La clé de
+   * déduplication côté serveur fait qu'une relance n'écrit qu'aux comptes créés depuis la
+   * dernière — d'où le libellé du retour, qui distingue les deux nombres.
+   */
+  const diffuser = useMutation({
+    mutationFn: async () => {
+      const res = await adminFetch("/api/admin/academy/ambassador/notify", { method: "POST" });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({})))?.message || "Diffusion impossible");
+      return res.json() as Promise<{ envoyes: number; ignores: number }>;
+    },
+    onSuccess: r => toast({
+      title: r.envoyes === 0 ? "Personne de nouveau à informer" : `${r.envoyes} e-mail${r.envoyes > 1 ? "s" : ""} envoyé${r.envoyes > 1 ? "s" : ""}`,
+      description: r.ignores > 0
+        ? `${r.ignores} apprenant${r.ignores > 1 ? "s" : ""} avai${r.ignores > 1 ? "ent" : "t"} déjà reçu le message.`
+        : undefined,
+    }),
+    onError: (e: any) => toast({ title: e.message || "Erreur", variant: "destructive" }),
+  });
+
   const payer = useMutation({
     mutationFn: async (id: number) => {
       const res = await adminFetch(`/api/admin/academy/ambassador-commissions/${id}/pay`, { method: "POST" });
@@ -62,13 +84,29 @@ export default function AmbassadorsAdmin() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <Megaphone className="w-6 h-6 text-primary" /> Programme ambassadeur
-        </h1>
-        <p className="text-sm text-muted-foreground mt-1">
-          20 % du prix de l'attestation par filleul, créditée automatiquement au paiement. Le versement, lui, reste manuel — cochez « payée » une fois le virement fait.
-        </p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Megaphone className="w-6 h-6 text-primary" /> Programme ambassadeur
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            20 % du prix de l'attestation par filleul, créditée automatiquement au paiement. Le versement, lui, reste manuel — cochez « payée » une fois le virement fait.
+          </p>
+        </div>
+        <Button className="gap-2 shrink-0" disabled={diffuser.isPending}
+          onClick={() => {
+            if (confirm(
+              "Envoyer l'e-mail de présentation du programme à tous les apprenants vérifiés ?\n\n"
+              + "Chacun reçoit un message personnalisé : ce que le programme rapporte, et ce qu'il lui reste "
+              + "à faire pour y entrer.\n\n"
+              + "Les ambassadeurs en poste, les adresses non confirmées et les désabonnés sont exclus. "
+              + "Personne ne le reçoit deux fois — vous pouvez relancer après une vague d'inscriptions.",
+            )) diffuser.mutate();
+          }}>
+          {diffuser.isPending
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Envoi…</>
+            : <><Send className="w-4 h-4" /> Informer les apprenants</>}
+        </Button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
