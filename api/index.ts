@@ -3947,7 +3947,10 @@ function ambBouton(href: string, libelle: string): string {
  * `apercu` alimente la ligne d'aperçu des boîtes de réception — celle qui suit l'objet et qui,
  * laissée vide, se remplit toute seule avec le premier texte du message (ici « Bonjour X »).
  */
-function ambassadorEmailLayout(o: { apercu: string; surTitre: string; titre: string; encart?: string; corps: string }): string {
+function ambassadorEmailLayout(o: { apercu: string; surTitre: string; titre: string; encart?: string; corps: string;
+  /** Mention du pied. « Vous êtes ambassadeur » est vrai pour l'e-mail de commission et faux
+   *  pour celui qui invite à le devenir : la coque ne peut pas la deviner. */
+  pied?: string }): string {
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
@@ -3991,7 +3994,7 @@ function ambassadorEmailLayout(o: { apercu: string; surTitre: string; titre: str
     <div style="font-family:${EMAIL_AMB.sans};font-size:14px;font-weight:700;color:${EMAIL_AMB.teal};margin-bottom:4px">LouisFarm Learning</div>
     <div style="font-family:${EMAIL_AMB.sans};font-size:12px;color:#6b7280;line-height:1.6">Formation gratuite par projets &middot; KoboCollect &middot; Python &middot; QGIS<br>
       Afrique de l'Ouest &middot; <a href="${SITE_URL}/academy/login" style="color:${EMAIL_AMB.teal};text-decoration:none">Mon espace étudiant</a></div>
-    <div style="font-family:${EMAIL_AMB.sans};font-size:11px;color:#6b7280;line-height:1.6;margin-top:12px">Vous recevez cet email parce que vous êtes ambassadeur de LouisFarm Learning.</div>
+    <div style="font-family:${EMAIL_AMB.sans};font-size:11px;color:#6b7280;line-height:1.6;margin-top:12px">${o.pied || "Vous recevez cet email parce que vous avez un compte sur LouisFarm Learning."}</div>
   </td></tr>
 
 </table>
@@ -4063,7 +4066,262 @@ function ambassadorCommissionEmailHtml(name: string, montant: number): string {
     titre: "Quelqu'un que vous avez amené vient d'aller au bout.",
     encart,
     corps,
+    pied: "Vous recevez cet email parce que vous êtes ambassadeur de LouisFarm Learning.",
   });
+}
+
+/**
+ * Barre de progression, en e-mail.
+ *
+ * Deux cellules d'un tableau dont les largeurs sont des pourcentages : c'est la seule forme
+ * qu'Outlook, Gmail et Apple Mail rendent identiquement. Une div à `width: X%` avec un
+ * `background` serait plus courte à écrire et disparaîtrait sous le moteur Word.
+ * `font-size:0;line-height:0` empêche la cellule vide de se voir imposer une hauteur de
+ * ligne, ce qui épaissirait la barre de façon incontrôlable d'un client à l'autre.
+ */
+function ambBarre(pct: number): string {
+  const p = Math.max(0, Math.min(100, Math.round(pct)));
+  const cell = (largeur: number, couleur: string) => largeur <= 0 ? "" :
+    `<td width="${largeur}%" height="6" bgcolor="${couleur}" style="width:${largeur}%;height:6px;background:${couleur};font-size:0;line-height:0">&nbsp;</td>`;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;border-radius:3px;overflow:hidden"><tr>`
+    + cell(p, EMAIL_AMB.clair) + cell(100 - p, "#1C5642") + `</tr></table>`;
+}
+
+/** Une condition d'accès : son libellé, son compte réel, et la distance qui reste. */
+function ambCondition(label: string, valeur: number, cible: number): string {
+  const S = EMAIL_AMB;
+  const atteint = valeur >= cible;
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom:14px"><tr>`
+    + `<td style="font-family:${S.sans};font-size:13px;color:#C9D6D1;padding-bottom:6px">${label}</td>`
+    + `<td align="right" style="font-family:${S.sans};font-size:13px;font-weight:700;color:${atteint ? S.clair : "#ffffff"};padding-bottom:6px">`
+    + `${Math.min(valeur, cible)} / ${cible}</td>`
+    + `</tr><tr><td colspan="2">${ambBarre(cible > 0 ? (valeur / cible) * 100 : 0)}</td></tr></table>`;
+}
+
+/**
+ * Ce qu'il reste à franchir, en toutes lettres.
+ *
+ * Miroir exact de la fonction `manquant` de la page ambassadeur : les deux doivent dire la
+ * même chose le même jour, sinon l'e-mail annonce un reste que la page dément.
+ */
+function ambResteAFaire(e: { joursDepuisAdmission: number | null; leconsTerminees: number }): string {
+  if (e.joursDepuisAdmission == null) return "";
+  const jours = Math.max(0, AMBASSADOR_SEUIL_JOURS - e.joursDepuisAdmission);
+  const lecons = Math.max(0, AMBASSADOR_SEUIL_LECONS - e.leconsTerminees);
+  const bouts: string[] = [];
+  if (jours > 0) bouts.push(`${jours} jour${jours > 1 ? "s" : ""}`);
+  if (lecons > 0) bouts.push(`${lecons} leçon${lecons > 1 ? "s" : ""}`);
+  return bouts.join(" et ");
+}
+
+/**
+ * E-mail d'information du programme ambassadeur, adressé à toute la promotion vérifiée.
+ *
+ * Un même message ne pouvait pas servir : entre quelqu'un qui remplit déjà les deux
+ * conditions, quelqu'un à deux leçons du seuil et quelqu'un qui n'est pas encore admis, la
+ * seule phrase utile — « voilà ce qu'il vous reste » — est différente à chaque fois. Le
+ * corps du message (ce qu'est le programme, ce qu'il rapporte, comment une commission naît)
+ * est commun ; l'en-tête, l'objet et l'appel à l'action sont calculés pour chacun.
+ *
+ * Les seuils et le taux viennent des constantes du programme, jamais d'un texte recopié :
+ * un changement de règle change l'e-mail au même instant que la page.
+ */
+function ambassadorInvitationEmailHtml(name: string, e: {
+  eligible: boolean; joursDepuisAdmission: number | null; leconsTerminees: number;
+}): string {
+  const esc = (t: string) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const prenom = esc((name || "").split(" ")[0] || "");
+  const taux = Math.round(AMBASSADOR_TAUX_COMMISSION * 100);
+  const S = EMAIL_AMB;
+  const p = `font-family:${S.sans};font-size:15px;line-height:1.7;color:#374151;margin:0 0 16px`;
+  const pasAdmis = e.joursDepuisAdmission == null;
+  const reste = ambResteAFaire(e);
+
+  // Ce qu'une attestation payante rapporte aujourd'hui — lu dans le registre des parcours,
+  // exactement comme la page. Rien n'est écrit en dur.
+  const tarifs = PROGRAMS.filter(x => x.prixAttestation > 0);
+  const tarif = tarifs.length === 1 ? tarifs[0] : null;
+
+  const titre = e.eligible
+    ? "Vous pouvez devenir ambassadeur dès aujourd'hui."
+    : pasAdmis
+      ? "Un programme qui vous attend de l'autre côté de l'admission."
+      : "Il vous reste peu de chose pour devenir ambassadeur.";
+
+  // L'en-tête porte ce qui est propre au destinataire — comme l'e-mail de commission y porte
+  // le montant. Le reste du message est le même pour tout le monde.
+  const encart = e.eligible
+    ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:24px"><tr>`
+      + `<td style="border:1px solid #2F6251;border-radius:14px;padding:18px 20px">`
+      + `<div style="font-family:${S.sans};font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:#A1B6B0">Votre situation</div>`
+      + `<div style="font-family:${S.serif};font-size:26px;font-weight:600;color:${S.clair};line-height:1.15;margin:8px 0 6px">Les deux conditions sont remplies</div>`
+      + `<div style="font-family:${S.sans};font-size:13px;color:#BAC8C4">Votre code de parrainage est créé en un clic, rien d'autre à remplir.</div>`
+      + `</td></tr></table>`
+    : pasAdmis
+      ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:24px"><tr>`
+        + `<td style="border:1px solid #2F6251;border-radius:14px;padding:18px 20px">`
+        + `<div style="font-family:${S.sans};font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:#A1B6B0">Votre situation</div>`
+        + `<div style="font-family:${S.sans};font-size:15px;line-height:1.6;color:#ffffff;margin-top:8px">Le programme s'ouvre après votre admission à un parcours. Le compteur démarre ce jour-là.</div>`
+        + `</td></tr></table>`
+      : `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:24px"><tr>`
+        + `<td style="border:1px solid #2F6251;border-radius:14px;padding:18px 20px">`
+        + `<div style="font-family:${S.sans};font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:#A1B6B0;padding-bottom:14px">Ce qu'il vous reste</div>`
+        + ambCondition(`${AMBASSADOR_SEUIL_JOURS} jours depuis votre admission`, e.joursDepuisAdmission ?? 0, AMBASSADOR_SEUIL_JOURS)
+        + ambCondition(`${AMBASSADOR_SEUIL_LECONS} leçons terminées`, e.leconsTerminees, AMBASSADOR_SEUIL_LECONS)
+        + (reste ? `<div style="font-family:${S.sans};font-size:14px;color:#ffffff;margin-top:4px">Encore <strong style="color:${S.clair}">${reste}</strong>, et la carte est à vous.</div>` : "")
+        + `</td></tr></table>`;
+
+  const corps =
+    `<p style="${p}">Bonjour${prenom ? ` ${prenom}` : ""},</p>`
+    + `<p style="${p}">Vous suivez une formation gratuite. Le programme ambassadeur vous permet d'en parler `
+      + `autour de vous — et d'être payé quand quelqu'un que vous avez amené va jusqu'au bout. `
+      + `Pas de vente, pas de discours : vous racontez ce que vous faites déjà.</p>`
+
+    + `<div style="margin:28px 0 16px">${ambSurTitre("Ce que ça vous rapporte", S.teal)}</div>`
+    + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #e5e7eb;border-radius:14px">`
+    + [
+        [`${taux} % de commission`, tarif
+          ? `Sur chaque attestation payée par un filleul — soit ${Math.round(tarif.prixAttestation * taux / 100).toLocaleString("fr-FR")} F CFA pour une attestation à ${tarif.prixAttestation.toLocaleString("fr-FR")} F CFA. Versée par Mobile Money.`
+          : "Sur chaque attestation payée par une personne que vous avez amenée, versée par Mobile Money."],
+        ["Vos filleuls le restent à vie", "Une inscription ouverte depuis votre lien vous est rattachée définitivement — même si elle paie six mois plus tard."],
+        ["Un certificat d'ambassadeur", "Nominatif, avec vos filleuls et vos résultats. À joindre à une candidature ou publier sur LinkedIn."],
+      ].map(([t, x], i) =>
+        `<tr><td style="padding:14px 18px;${i ? "border-top:1px solid #f0f2f5" : ""}">`
+        + `<div style="font-family:${S.sans};font-size:14px;font-weight:600;color:#111827">${t}</div>`
+        + `<div style="font-family:${S.sans};font-size:13px;color:#6b7280;line-height:1.6;margin-top:2px">${x}</div>`
+        + `</td></tr>`).join("")
+    + `</table>`
+
+    + `<div style="margin:28px 0 16px">${ambSurTitre("Comment une commission naît", S.teal)}</div>`
+    + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">`
+    + ambEtape(1, "Vous partagez votre lien", "WhatsApp, LinkedIn, un groupe de promo. Aucune exclusivité, aucun quota.")
+    + ambEtape(2, "Un filleul va au bout", "Il s'inscrit par votre lien, suit le parcours et demande son attestation.")
+    + ambEtape(3, "Vous êtes payé", `${taux} % du montant, crédités automatiquement dès la confirmation du paiement.`)
+    + `</table>`
+
+    + `<div class="amb-cta" style="margin:30px 0 8px">`
+      + ambBouton(`${SITE_URL}/academy/ambassador`, e.eligible ? "Devenir ambassadeur" : "Voir où j'en suis")
+    + `</div>`
+    + `<p style="font-family:${S.sans};font-size:13px;line-height:1.6;color:#6b7280;text-align:center;margin:0 0 26px">`
+      + (e.eligible
+        ? "Votre code et votre lien sont générés immédiatement."
+        : "La page se met à jour toute seule à mesure que vous avancez.")
+    + `</p>`
+
+    + `<p style="${p};border-top:1px solid #f0f2f5;padding-top:22px;margin-bottom:0">`
+      + `Rien ne vous y oblige, et ne rien faire ne vous coûte rien. Mais si cette formation vous sert, `
+      + `il y a de fortes chances qu'elle serve aussi à quelqu'un que vous connaissez.<br>`
+      + `<strong style="color:#111827">Louis</strong></p>`;
+
+  return ambassadorEmailLayout({
+    apercu: e.eligible
+      ? "Les deux conditions sont remplies — votre code vous attend."
+      : reste
+        ? `Encore ${reste} avant de pouvoir rejoindre le programme.`
+        : "Ce que le programme ambassadeur rapporte, et comment y entrer.",
+    surTitre: "Programme ambassadeur",
+    titre,
+    encart,
+    corps,
+  });
+}
+
+/** L'objet, calculé lui aussi : c'est lui qui décide si le message est ouvert. */
+function ambassadorInvitationSujet(e: { eligible: boolean; joursDepuisAdmission: number | null; leconsTerminees: number }): string {
+  if (e.eligible) return "Vous pouvez devenir ambassadeur dès aujourd'hui";
+  const reste = ambResteAFaire(e);
+  if (reste) return `Il vous reste ${reste} pour devenir ambassadeur`;
+  return "Le programme ambassadeur — et comment y entrer";
+}
+
+/**
+ * Diffusion du programme ambassadeur à toute la promotion vérifiée.
+ *
+ * ── Pourquoi trois requêtes et pas trois par étudiant ──
+ *
+ * `eligibiliteAmbassadeur` interroge la base trois fois pour UN étudiant. L'appeler en
+ * boucle sur la promotion ferait trois fois l'effectif — et la fonction Vercel s'arrête à
+ * trente secondes. Les mêmes règles se calculent ici en trois requêtes pour tout le monde :
+ * les admissions portées par `students`, celles portées par `academy_program_admissions`, et
+ * le compte de leçons validées. Le résultat doit rester identique à celui de la page, sans
+ * quoi l'e-mail annoncerait un reste que la page dément.
+ *
+ * ── Qui ne le reçoit pas ──
+ *
+ * Les ambassadeurs en poste (`ambassador_code` non nul) : leur annoncer « voilà ce qu'il
+ * vous reste pour devenir ambassadeur » n'aurait aucun sens. Les comptes suspendus, les
+ * adresses non confirmées et les désabonnés des e-mails de cours non plus — même règle que
+ * l'annonce d'un nouveau cours.
+ *
+ * ── Pourquoi on peut le relancer sans risque ──
+ *
+ * Une clé de déduplication par étudiant : relancer la diffusion n'écrit qu'aux comptes
+ * créés depuis la dernière fois. C'est ce qui permet de la rejouer après une vague
+ * d'inscriptions sans réécrire à toute la promotion.
+ */
+async function notifyAmbassadorProgramEmails(): Promise<{ envoyes: number; ignores: number }> {
+  if (!resend) return { envoyes: 0, ignores: 0 };
+
+  const [etudiantsQ, admissionsQ, leconsQ] = await Promise.all([
+    supabase.from("students").select("id, full_name, email, admitted_at")
+      .eq("status", "active").eq("email_verified", true).eq("course_emails", true)
+      .is("ambassador_code", null),
+    supabase.from("academy_program_admissions").select("student_id, admitted_at").not("admitted_at", "is", null),
+    supabase.from("grades").select("student_id").eq("type", "lesson"),
+  ]);
+
+  const etudiants = (etudiantsQ.data || []).filter((e: any) => e.email);
+  if (!etudiants.length) return { envoyes: 0, ignores: 0 };
+
+  const admissionsPar = new Map<number, number[]>();
+  for (const a of admissionsQ.data || []) {
+    const t = new Date((a as any).admitted_at).getTime();
+    const liste = admissionsPar.get((a as any).student_id) || [];
+    liste.push(t);
+    admissionsPar.set((a as any).student_id, liste);
+  }
+  const leconsPar = new Map<number, number>();
+  for (const g of leconsQ.data || []) {
+    const sid = (g as any).student_id;
+    leconsPar.set(sid, (leconsPar.get(sid) || 0) + 1);
+  }
+
+  const keyFor = (sid: number) => `ambassador_program:${sid}`;
+  const { data: deja } = await supabase.from("academy_emails")
+    .select("dedupe_key").in("dedupe_key", etudiants.map((e: any) => keyFor(e.id)));
+  const dejaEnvoye = new Set((deja || []).map((r: any) => r.dedupe_key));
+
+  const aEcrire = etudiants.filter((e: any) => !dejaEnvoye.has(keyFor(e.id)));
+  if (!aEcrire.length) return { envoyes: 0, ignores: etudiants.length };
+
+  const messages = aEcrire.map((etu: any) => {
+    // Même calcul que eligibiliteAmbassadeur : la PREMIÈRE admission, tous parcours confondus.
+    const dates = [etu.admitted_at, ...(admissionsPar.get(etu.id) || [])]
+      .filter(Boolean)
+      .map((d: any) => (typeof d === "number" ? d : new Date(d).getTime()));
+    const premiere = dates.length ? Math.min(...dates) : null;
+    const joursDepuisAdmission = premiere != null ? Math.floor((Date.now() - premiere) / 86400000) : null;
+    const leconsTerminees = leconsPar.get(etu.id) || 0;
+    const eligible = joursDepuisAdmission != null
+      && joursDepuisAdmission >= AMBASSADOR_SEUIL_JOURS
+      && leconsTerminees >= AMBASSADOR_SEUIL_LECONS;
+    const etat = { eligible, joursDepuisAdmission, leconsTerminees };
+    return {
+      etu,
+      sujet: ambassadorInvitationSujet(etat),
+      html: ambassadorInvitationEmailHtml(etu.full_name, etat),
+    };
+  });
+
+  for (let i = 0; i < messages.length; i += 100) {
+    const lot = messages.slice(i, i + 100)
+      .map(m => ({ from: FROM_EMAIL, to: m.etu.email, subject: m.sujet, html: m.html }));
+    await resend.batch.send(lot).catch((e: any) => console.error("Diffusion ambassadeur :", e?.message || e));
+  }
+  messages.forEach(m =>
+    logAcademyEmail(m.etu.id, "ambassador_program", m.etu.email, m.sujet, keyFor(m.etu.id)));
+
+  return { envoyes: messages.length, ignores: etudiants.length - messages.length };
 }
 
 /** Le classement d'un parcours, envoyé chaque semaine à tous les inscrits — voir corpsClassementHebdomadaire. */
@@ -7266,6 +7524,22 @@ app.get("/api/admin/academy/ambassador-commissions", requireAuth, async (req, re
   res.json((commissions || []).map((c: any) => ({
     ...c, ambassadeur: nomParId.get(c.ambassador_id) || "—", filleul: nomParId.get(c.referred_student_id) || "—",
   })));
+});
+
+/**
+ * Diffusion du programme à la promotion. Déclenchée à la main depuis l'administration plutôt
+ * que par une tâche planifiée : c'est une annonce, pas un automatisme, et les deux créneaux
+ * de l'ordonnanceur Vercel sont déjà pris. Rejouable sans risque — voir la clé de
+ * déduplication dans notifyAmbassadorProgramEmails.
+ */
+app.post("/api/admin/academy/ambassador/notify", requireAuth, async (_req, res) => {
+  try {
+    const r = await notifyAmbassadorProgramEmails();
+    res.json(r);
+  } catch (e: any) {
+    console.error("Diffusion ambassadeur :", e?.message || e);
+    res.status(500).json({ message: "Diffusion impossible pour le moment." });
+  }
 });
 
 app.post("/api/admin/academy/ambassador-commissions/:id/pay", requireAuth, async (req, res) => {
