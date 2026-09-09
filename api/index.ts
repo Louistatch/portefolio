@@ -7425,8 +7425,41 @@ app.get("/api/admin/academy/stats", requireAuth, async (_req, res) => {
 // `idsCours` restreint le cumul aux cours d'UN parcours (classement par parcours, envoyé
 // chaque semaine — voir corpsClassementHebdomadaire) ; omis, il porte sur tous les cours
 // (classement global de l'administration).
-async function classementPoints(idsCours?: number[]): Promise<{ student_id: number; full_name: string; total: number }[]> {
-  let requete = supabase.from("grades").select("student_id, score");
+/**
+ * Le classement — une seule définition, pour l'e-mail hebdomadaire, la page de l'étudiant et
+ * l'administration.
+ *
+ * ── Le bug que cette fonction portait ──
+ *
+ * Le filtre par parcours s'écrivait `.in("course_id", idsCours)`. Or les notes du test
+ * d'admission (`type = 'entry_test'`) n'ont PAS de `course_id` — elles portent un
+ * `program_id`, précisément pour être rattachées à leur parcours. Un `IN` ne retient jamais
+ * un NULL : ces notes disparaissaient donc du classement par parcours, tandis que le
+ * classement de l'administration, appelé SANS filtre, les comptait toutes.
+ *
+ * Les deux vues ne mesuraient pas la même chose. Sur les données réelles au moment du
+ * correctif : 115 notes de leçon (1 613 points) contre 37 notes d'admission (902 points).
+ * Komlavi Aimé DEDIHA ressortait 9e chez l'administrateur et 16e dans l'e-mail reçu par sa
+ * promotion — pour la même semaine.
+ *
+ * ── La règle retenue ──
+ *
+ * Le classement mesure le TRAVAIL DE COURS. Le test d'admission est une porte d'entrée, pas
+ * une performance continue : il est exclu partout, sans exception. Un étudiant admis à deux
+ * parcours aurait sinon compté deux fois son entrée dans le total de l'administration.
+ *
+ * Et le classement de l'administration devient lui aussi un classement PAR PARCOURS :
+ * additionner les points d'un étudiant du cursus MEAL et d'un étudiant en finance climatique
+ * compare deux barèmes sans rapport.
+ */
+async function classementPoints(
+  idsCours?: number[],
+  options: { limite?: number | null } = {},
+): Promise<{ student_id: number; full_name: string; total: number }[]> {
+  const limite = options.limite === undefined ? 10 : options.limite;
+  // `neq` plutôt qu'une liste blanche de types : une note d'un type ajouté demain (travail de
+  // groupe, projet…) compte comme du travail de cours sans qu'on ait à y repenser.
+  let requete = supabase.from("grades").select("student_id, score").neq("type", "entry_test");
   if (idsCours) requete = requete.in("course_id", idsCours);
   const { data: grades } = await requete;
   const totaux = new Map<number, number>();
@@ -7441,11 +7474,11 @@ async function classementPoints(idsCours?: number[]): Promise<{ student_id: numb
   // pour vérifier que la notation fonctionne — mais ne doit apparaître dans aucun classement :
   // il n'est pas en compétition avec la promotion qu'il sert à tester.
   const exclus = new Set((eleves || []).filter((e: any) => e.exclude_from_leaderboard).map((e: any) => e.id));
-  return [...totaux.entries()]
+  const classe = [...totaux.entries()]
     .filter(([student_id]) => !exclus.has(student_id))
     .map(([student_id, total]) => ({ student_id, full_name: noms.get(student_id) || "—", total }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 10);
+    .sort((a, b) => b.total - a.total || a.full_name.localeCompare(b.full_name, "fr"));
+  return limite == null ? classe : classe.slice(0, limite);
 }
 
 /** Identifiants des cours publiés d'un parcours donné. */
@@ -7474,8 +7507,67 @@ async function elevesAdmisAuParcours(programId: string): Promise<Set<number>> {
   return new Set((data || []).map((r: any) => r.student_id));
 }
 
-app.get("/api/admin/academy/leaderboard", requireAuth, async (_req, res) => {
-  res.json(await classementPoints());
+/**
+ * Classement vu par l'administration.
+ *
+ * Trois différences avec celui de l'étudiant, et trois seulement :
+ *  - il porte sur UN parcours, comme l'e-mail et la page de l'étudiant, pour qu'une place
+ *    annoncée soit la même partout (voir classementPoints) ;
+ *  - il n'est pas coupé au dixième : l'administration doit voir toute la promotion ;
+ *  - il inclut les admis qui n'ont AUCUNE note. Ce sont eux qui comptent le plus pour qui
+ *    encadre : un classement qui les efface cache exactement les étudiants à relancer.
+ */
+app.get("/api/admin/academy/leaderboard", requireAuth, async (req, res) => {
+  const programId = String(req.query.programId || PROGRAMS[0].id);
+  if (!PROGRAMS.some(p => p.id === programId)) return res.status(404).json({ message: "Parcours introuvable." });
+
+  const idsCours = await coursDuParcours(programId);
+  const [classement, admis] = await Promise.all([
+    classementPoints(idsCours.length ? idsCours : [-1], { limite: null }),
+    elevesAdmisAuParcours(programId),
+  ]);
+
+  const points = new Map(classement.map(c => [c.student_id, c.total]));
+  const idsAffiches = [...new Set([...points.keys(), ...admis])];
+  if (!idsAffiches.length) return res.json({ programId, classement: [] });
+
+  const [elevesQ, activiteQ] = await Promise.all([
+    supabase.from("students")
+      .select("id, full_name, email, last_login, exclude_from_leaderboard").in("id", idsAffiches),
+    supabase.from("academy_activite").select("student_id, jour, minutes").in("student_id", idsAffiches),
+  ]);
+
+  const ilYA7Jours = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10);
+  const minutesTotal = new Map<number, number>();
+  const minutes7j = new Map<number, number>();
+  for (const a of activiteQ.data || []) {
+    const sid = (a as any).student_id, m = (a as any).minutes || 0;
+    minutesTotal.set(sid, (minutesTotal.get(sid) || 0) + m);
+    if ((a as any).jour >= ilYA7Jours) minutes7j.set(sid, (minutes7j.get(sid) || 0) + m);
+  }
+
+  const lignes = (elevesQ.data || [])
+    .filter((e: any) => !e.exclude_from_leaderboard)
+    .map((e: any) => ({
+      student_id: e.id,
+      full_name: e.full_name,
+      email: e.email,
+      total: points.get(e.id) ?? 0,
+      lastLogin: e.last_login,
+      minutesTotal: minutesTotal.get(e.id) || 0,
+      minutes7j: minutes7j.get(e.id) || 0,
+    }))
+    .sort((a, b) => b.total - a.total || a.full_name.localeCompare(b.full_name, "fr"));
+
+  // Le rang est calculé ici, une fois : deux ex æquo partagent la même place, et la suivante
+  // saute d'autant. Laisser l'interface numéroter les lignes aurait inventé un départage.
+  let rangCourant = 0, precedent: number | null = null;
+  const avecRang = lignes.map((l, i) => {
+    if (l.total !== precedent) { rangCourant = i + 1; precedent = l.total; }
+    return { ...l, rang: rangCourant };
+  });
+
+  res.json({ programId, classement: avecRang });
 });
 
 // ── Programme ambassadeur, côté administration ──
@@ -7556,6 +7648,56 @@ app.post("/api/admin/academy/ambassador-commissions/:id/pay", requireAuth, async
 });
 
 // ── Classement d'un parcours, consultable par tout étudiant qui y est inscrit ──
+/**
+ * Signal de présence — envoyé toutes les cinq minutes tant que l'onglet est visible.
+ *
+ * ── Pourquoi le serveur ne fait pas confiance au client ──
+ *
+ * Il ne crédite JAMAIS un forfait : il crédite le temps réellement écoulé depuis le signal
+ * précédent, plafonné à l'intervalle. Un client qui appellerait cette route en boucle
+ * n'obtiendrait donc rien de plus qu'un client honnête — le compteur suit l'horloge, pas le
+ * nombre d'appels. C'est aussi ce qui évite qu'un étudiant ayant deux onglets ouverts voie
+ * son temps compté deux fois : le second signal ne trouve presque rien à ajouter.
+ *
+ * ── Pourquoi pas de rateLimit ici ──
+ *
+ * `rateLimit` est indexé par adresse IP. Nos étudiants se connectent souvent depuis un
+ * cybercafé ou derrière le NAT d'un opérateur : plusieurs comptes partagent alors une seule
+ * IP, et le quota du premier ferait taire les suivants. Plafonner l'EFFET, comme ci-dessus,
+ * protège la donnée sans jamais pénaliser une salle informatique.
+ */
+const ACTIVITE_PAS_MINUTES = 5;
+
+app.post("/api/academy/activite", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const maintenant = new Date();
+  const jour = maintenant.toISOString().slice(0, 10);
+
+  const { data: ligne } = await supabase.from("academy_activite")
+    .select("minutes, dernier_ping").eq("student_id", sid).eq("jour", jour).maybeSingle();
+
+  if (!ligne) {
+    // Premier signal du jour : le client n'émet qu'APRÈS un intervalle de présence, jamais à
+    // l'ouverture de la page — ce crédit correspond donc à du temps réellement passé.
+    await supabase.from("academy_activite")
+      .insert({ student_id: sid, jour, minutes: ACTIVITE_PAS_MINUTES, dernier_ping: maintenant.toISOString() })
+      // Deux onglets peuvent émettre le tout premier signal en même temps : l'insertion
+      // perdante viole la clé primaire, et c'est exactement le comportement voulu.
+      .then(() => {}, () => {});
+    return res.json({ ok: true });
+  }
+
+  const ecouleMin = (maintenant.getTime() - new Date(ligne.dernier_ping).getTime()) / 60000;
+  if (ecouleMin < 1) return res.json({ ok: true, ignore: "trop_rapproche" });
+
+  await supabase.from("academy_activite").update({
+    minutes: ligne.minutes + Math.round(Math.min(ACTIVITE_PAS_MINUTES, ecouleMin)),
+    dernier_ping: maintenant.toISOString(),
+  }).eq("student_id", sid).eq("jour", jour);
+
+  res.json({ ok: true });
+});
+
 app.get("/api/academy/leaderboard/:programId", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const programId = String(req.params.programId);

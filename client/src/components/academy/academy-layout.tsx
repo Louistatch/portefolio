@@ -3,6 +3,7 @@ import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { PROGRAMS } from "@shared/programs";
 import { studentFetch, getStudent, clearStudentSession } from "@/lib/student";
+import { usePresence } from "@/hooks/use-presence";
 import {
   Home, Route as RouteIcon, BookOpen, Award, FolderOpen, Users,
   Menu, X, Search, Bell, LogOut, LifeBuoy, GraduationCap, UserCircle, ChevronRight, TrendingUp, Megaphone,
@@ -123,6 +124,9 @@ function Palette({ ouvert, setOuvert, admisMeal }: { ouvert: boolean; setOuvert:
 
 export function AcademyLayout({ children }: { children: React.ReactNode }) {
   const [location, navigate] = useLocation();
+  // Posé sur la coque, pas sur chaque page : le compteur ne repart pas de zéro quand
+  // l'étudiant passe d'une leçon à son relevé de notes.
+  usePresence();
   const [menuOuvert, setMenuOuvert] = useState(false);
   const [paletteOuverte, setPaletteOuverte] = useState(false);
   const etudiant = getStudent();

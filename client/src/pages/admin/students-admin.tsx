@@ -6,12 +6,18 @@ import { Input } from "@/components/ui/input";
 import {
   Users, GraduationCap, Award, BookOpen, Loader2, X, Trophy, CheckCircle2, AlertCircle,
   Clock, TrendingUp, Search, ShieldCheck, ShieldAlert, Mail, MoreVertical,
-  UserCheck, RotateCcw, Trash2, Ban, Download, Sparkles, Filter, ChevronRight, Crown,
+  UserCheck, RotateCcw, Trash2, Ban, Download, Sparkles, Filter, ChevronRight,
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { useToast } from "@/hooks/use-toast";
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from "recharts";
+import { PROGRAMS } from "@shared/programs";
+
+type LigneClassement = {
+  student_id: number; full_name: string; email: string; total: number; rang: number;
+  lastLogin: string | null; minutesTotal: number; minutes7j: number;
+};
 
 type Student = {
   id: number; full_name: string; email: string; phone?: string; country?: string;
@@ -33,10 +39,15 @@ export default function AdminStudents() {
     queryKey: ["academy-stats"],
     queryFn: async () => (await adminFetch("/api/admin/academy/stats")).json(),
   });
-  const { data: leaderboard } = useQuery<{ student_id: number; full_name: string; total: number }[]>({
-    queryKey: ["academy-leaderboard"],
-    queryFn: async () => (await adminFetch("/api/admin/academy/leaderboard")).json(),
+  // Le classement se lit PAR PARCOURS, comme l'e-mail hebdomadaire et la page de l'étudiant.
+  // Additionner les points d'un étudiant du cursus MEAL et d'un étudiant en finance climatique
+  // comparait deux barèmes sans rapport — c'est ce qui faisait diverger les trois vues.
+  const [parcours, setParcours] = useState<string>(PROGRAMS[0].id);
+  const { data: classement, isLoading: classementEnCours } = useQuery<{ classement: LigneClassement[] }>({
+    queryKey: ["academy-leaderboard", parcours],
+    queryFn: async () => (await adminFetch(`/api/admin/academy/leaderboard?programId=${parcours}`)).json(),
   });
+  const lignes = classement?.classement || [];
   const { data: students, isLoading, isError, refetch } = useQuery<Student[]>({
     queryKey: ["academy-students"],
     queryFn: async () => (await adminFetch("/api/admin/academy/students")).json(),
@@ -186,51 +197,89 @@ export default function AdminStudents() {
         </div>
       )}
 
-      {/* Top 10 — cumul des points, tous cours confondus. Un podium pour les trois premiers,
-          la même idée que le classement par parcours côté étudiant (dashboard/parcours.tsx) —
-          c'est ce qui donne à un chiffre l'air d'un rang. */}
-      {leaderboard && leaderboard.length > 0 && (
-        <div className="bg-card rounded-2xl border border-border/50 p-6 shadow-sm">
-          <div className="flex items-center gap-2 mb-5"><Trophy className="w-4 h-4 text-primary" /><h3 className="text-sm font-semibold">Top 10 de la promotion (cumul des points)</h3></div>
+      {/* ── Classement ──
+          Le podium a disparu : trois cercles en dégradé, une couronne et des barres de fond
+          derrière chaque ligne, c'est du décor d'écran étudiant. Une console d'encadrement se
+          parcourt du regard, colonne par colonne — qui décroche se repère à ses minutes et à
+          sa dernière visite, pas à la taille de sa médaille. */}
+      <div className="bg-card rounded-2xl border border-border/50 overflow-hidden">
+        <div className="p-4 sm:p-5 border-b border-border/40">
+          <div className="flex items-baseline justify-between gap-3 flex-wrap mb-3">
+            <h3 className="text-sm font-semibold flex items-center gap-2">
+              <Trophy className="w-4 h-4 text-primary" /> Classement du parcours
+            </h3>
+            <span className="text-xs text-muted-foreground">
+              {lignes.length} étudiant{lignes.length > 1 ? "s" : ""} admis
+            </span>
+          </div>
+          <div className="flex gap-1.5 flex-wrap">
+            {PROGRAMS.map(p => (
+              <button key={p.id} onClick={() => setParcours(p.id)}
+                className={`text-xs px-3 py-1.5 rounded-full transition-colors ${
+                  parcours === p.id ? "bg-primary text-primary-foreground"
+                                    : "bg-muted text-muted-foreground hover:bg-muted/70"}`}>
+                {p.title}
+              </button>
+            ))}
+          </div>
+        </div>
 
-          {/* Podium — rang 2, rang 1, rang 3 */}
-          <div className="flex items-end justify-center gap-3 pb-5 mb-4 border-b border-border/40">
-            {[leaderboard[1], leaderboard[0], leaderboard[2]].map((s, slot) => {
-              if (!s) return null;
-              const rang = slot === 1 ? 1 : slot === 0 ? 2 : 3;
-              const premier = rang === 1;
+        {/* En-tête de colonnes : le libellé se lit une fois, les lignes n'ont plus à se
+            réexpliquer. « 7 j » et « total » comptent le temps réellement passé sur le site. */}
+        <div className="hidden sm:flex items-center gap-3 px-4 sm:px-5 py-2 bg-muted/30 border-b border-border/40
+                        text-[10px] uppercase tracking-[0.08em] text-muted-foreground font-semibold">
+          <span className="w-8 shrink-0">Rang</span>
+          <span className="flex-1 min-w-0">Étudiant</span>
+          <span className="w-16 text-right shrink-0">Points</span>
+          <span className="w-20 text-right shrink-0">Temps 7 j</span>
+          <span className="w-20 text-right shrink-0">Temps total</span>
+          <span className="w-28 text-right shrink-0">Dernière visite</span>
+        </div>
+
+        {classementEnCours ? (
+          <div className="flex justify-center py-12"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
+        ) : lignes.length === 0 ? (
+          <div className="px-4 py-12 text-center text-sm text-muted-foreground">
+            Aucun étudiant admis à ce parcours pour l'instant.
+          </div>
+        ) : (
+          <div className="divide-y divide-border/30 max-h-[520px] overflow-y-auto">
+            {lignes.map(l => {
+              const inactif = l.total === 0;
               return (
-                <div key={s.student_id} className="flex flex-col items-center" style={{ width: premier ? 132 : 102 }}>
-                  {premier && <Crown className="w-4 h-4 text-primary mb-1" />}
-                  <div className={`${premier ? "w-16 h-16 text-lg" : "w-11 h-11 text-sm"} rounded-full flex items-center justify-center font-extrabold mb-2 shrink-0 ${
-                    premier ? "bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-md" : "bg-gradient-to-br from-primary/20 to-primary/5 text-primary border-2 border-primary/30"}`}>
-                    {s.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("").toUpperCase() || "?"}
-                  </div>
-                  <p className="text-[11px] sm:text-xs font-bold text-center truncate w-full mb-0.5">{s.full_name}</p>
-                  <p className="chiffres-tabulaires text-xs sm:text-sm font-extrabold text-primary mb-2.5">{s.total} pts</p>
-                  <div className={`${premier ? "h-14" : rang === 2 ? "h-10" : "h-7"} w-full rounded-t-lg bg-primary/10 border border-primary/20 border-b-0 flex items-start justify-center pt-1.5`}>
-                    <span className="text-lg font-extrabold text-primary/50">{rang}</span>
-                  </div>
-                </div>
+                <button key={l.student_id} onClick={() => setSelectedId(l.student_id)}
+                  className="w-full flex items-center gap-3 px-4 sm:px-5 py-2.5 text-left hover:bg-muted/40 transition-colors">
+                  <span className={`w-8 shrink-0 chiffres-tabulaires text-sm font-semibold ${
+                    l.rang <= 3 && !inactif ? "text-primary" : "text-muted-foreground"}`}>
+                    {inactif ? "—" : l.rang}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className={`block text-sm truncate ${inactif ? "text-muted-foreground" : "font-medium"}`}>
+                      {l.full_name}
+                    </span>
+                    <span className="block sm:hidden text-[11px] text-muted-foreground chiffres-tabulaires">
+                      {l.total} pts · {dureeCourte(l.minutesTotal)} · {depuisQuand(l.lastLogin)}
+                    </span>
+                  </span>
+                  <span className="hidden sm:block w-16 text-right shrink-0 chiffres-tabulaires text-sm font-semibold">
+                    {l.total}
+                  </span>
+                  <span className="hidden sm:block w-20 text-right shrink-0 chiffres-tabulaires text-sm text-muted-foreground">
+                    {dureeCourte(l.minutes7j)}
+                  </span>
+                  <span className="hidden sm:block w-20 text-right shrink-0 chiffres-tabulaires text-sm text-muted-foreground">
+                    {dureeCourte(l.minutesTotal)}
+                  </span>
+                  <span className={`hidden sm:block w-28 text-right shrink-0 text-xs ${
+                    l.lastLogin ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400"}`}>
+                    {depuisQuand(l.lastLogin)}
+                  </span>
+                </button>
               );
             })}
           </div>
-
-          {/* Rangs 4 à 10 */}
-          {leaderboard.length > 3 && (
-            <div className="space-y-0.5">
-              {leaderboard.slice(3).map((s, i) => (
-                <div key={s.student_id} className="relative flex items-center gap-3 px-2 py-1.5 rounded-lg overflow-hidden">
-                  <div className="absolute inset-y-0 left-0 rounded-lg bg-primary/5" style={{ width: `${Math.round((s.total / leaderboard[0].total) * 100)}%` }} />
-                  <span className="relative w-5 h-5 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-[10px] font-bold shrink-0">{i + 4}</span>
-                  <span className="relative flex-1 text-sm truncate">{s.full_name}</span>
-                  <span className="relative chiffres-tabulaires text-sm font-bold shrink-0">{s.total} pts</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Search + filters */}
       <div className="flex items-center gap-3 flex-wrap">
@@ -513,4 +562,25 @@ function MenuItem({ icon: Icon, label, onClick, danger }: { icon: any; label: st
 
 function Info({ label, value }: { label: string; value: string }) {
   return <div className="bg-muted/40 rounded-lg px-3 py-2"><p className="text-[10px] text-muted-foreground">{label}</p><p className="font-medium truncate">{value}</p></div>;
+}
+
+/** Minutes en durée lisible. « 0 » ne se dit pas « 0 min » mais « — » : l'absence de temps
+ *  passé n'est pas une durée nulle, c'est une donnée qui manque. */
+function dureeCourte(minutes: number): string {
+  if (!minutes) return "—";
+  if (minutes < 60) return `${minutes} min`;
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  return m ? `${h} h ${String(m).padStart(2, "0")}` : `${h} h`;
+}
+
+/** Dernière visite, en distance plutôt qu'en date : « il y a 12 j » se compare d'un coup
+ *  d'œil d'une ligne à l'autre, « 28/08/2026 » demande un calcul à chaque fois. */
+function depuisQuand(iso: string | null): string {
+  if (!iso) return "jamais";
+  const jours = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
+  if (jours <= 0) return "aujourd'hui";
+  if (jours === 1) return "hier";
+  if (jours < 31) return `il y a ${jours} j`;
+  const mois = Math.floor(jours / 30);
+  return `il y a ${mois} mois`;
 }
