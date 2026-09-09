@@ -1,6 +1,8 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "buildCommand": "npm run build:vercel",
+  "//regions": "dub1 = AWS eu-west-1, la région EXACTE de la base Supabase. Sans cette clé Vercel place les fonctions à iad1 (Washington) : chaque requête base traversait l'Atlantique, et nos routes enchaînent plusieurs allers-retours séquentiels. Dublin est aussi plus proche de l'Afrique de l'Ouest que Washington — le gain porte sur les deux trajets, ce n'est pas un arbitrage.",
+  "regions": ["dub1"],
   "outputDirectory": "dist/public",
   "framework": null,
   "rewrites": [
