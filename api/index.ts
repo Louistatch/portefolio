@@ -3880,8 +3880,190 @@ function quizRappelEmailHtml(name: string, course: { code: string; title: string
   return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Il reste 10 minutes ⏳</h1><p class="sub">${course.title}</p></div><div class="bd"><p>Bonjour ${name},</p><p>Le quiz de la leçon <strong>${lessonTitle}</strong> est en cours, et il reste environ dix minutes avant la fin du temps imparti. Passé ce délai, la note enregistrée sera 0, même si le quiz n'est pas commencé.</p><p style="text-align:center;margin-top:20px"><a href="${lienQuiz}" class="btn">Reprendre le quiz</a></p></div>`);
 }
 
+// ══════════════ Email du programme ambassadeur ══════════════
+//
+// ── Pourquoi une mise en page à part, et pas academyEmailLayout ──
+//
+// Le programme ambassadeur n'est pas une notification de cours : c'est une adhésion, avec sa
+// carte, son code et son taux. La page /academy/ambassador lui donne une identité propre —
+// bloc vert profond, titre en serif, filets, chiffres en colonne — et un email qui repartirait
+// du bandeau turquoise commun casserait le lien entre les deux au moment précis où il compte,
+// celui où l'on clique. Le pied de page, lui, reste celui de l'académie : c'est le même
+// produit, pas une autre marque.
+//
+// ── Les contraintes tenues ──
+//
+// Aucune image (rien à débloquer, rien à charger), aucun JavaScript, tables pour la mise en
+// page (le moteur Word d'Outlook ne compose ni flex ni grid), styles en ligne (Gmail retire
+// la feuille <style> dans certains cas), dégradé posé PAR-DESSUS une couleur unie qui sert de
+// repli, coins arrondis qui dégradent proprement en angles droits, et un `color-scheme` clair
+// déclaré pour qu'Outlook.com et Apple Mail n'inversent pas eux-mêmes les couleurs.
+const EMAIL_AMB = {
+  fonce: "#043424",   // VERT_FONCE de la page (hsl 160 84% 11%)
+  fonce2: "#0C4B36",  // VERT_FONCE_2 (hsl 160 72% 17%)
+  clair: "#5AE2A3",   // VERT_CLAIR (hsl 152 70% 62%)
+  teal: "#0d9488",    // l'encre d'action commune à tous les emails de l'académie
+  serif: "Georgia,'Times New Roman',Times,serif",
+  sans: "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif",
+};
+
+/** Sur-titre à filet — la signature visuelle de la page, transposée en deux cellules. */
+function ambSurTitre(texte: string, couleur: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>`
+    + `<td width="26" style="font-size:0;line-height:0"><div style="width:26px;height:1px;background:${couleur};font-size:0;line-height:0">&nbsp;</div></td>`
+    + `<td style="padding-left:10px;font-family:${EMAIL_AMB.sans};font-size:11px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:${couleur}">${texte}</td>`
+    + `</tr></table>`;
+}
+
+/** Étape numérotée, façon frise de la page — ramenée à une ligne de tableau. */
+function ambEtape(n: number, titre: string, texte: string): string {
+  return `<tr>`
+    + `<td width="30" valign="top" style="padding:0 12px 16px 0">`
+    + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="28"><tr>`
+    + `<td width="28" height="28" align="center" valign="middle" bgcolor="#e8f5f0" style="width:28px;height:28px;border-radius:14px;font-family:${EMAIL_AMB.sans};font-size:13px;font-weight:700;color:${EMAIL_AMB.teal};text-align:center">${n}</td>`
+    + `</tr></table></td>`
+    + `<td valign="top" style="padding:0 0 16px">`
+    + `<div style="font-family:${EMAIL_AMB.sans};font-size:15px;font-weight:600;color:#111827;line-height:1.35">${titre}</div>`
+    + `<div style="font-family:${EMAIL_AMB.sans};font-size:13px;color:#6b7280;line-height:1.6;margin-top:3px">${texte}</div>`
+    + `</td></tr>`;
+}
+
+/**
+ * Bouton « à toute épreuve » : la couleur est portée par l'attribut `bgcolor` de la cellule
+ * (compris partout, y compris par Outlook qui ignore `background`), le rembourrage par le
+ * lien lui-même, et `mso-padding-alt` rattrape le rembourrage qu'Outlook n'applique pas aux
+ * liens. Sans image : une image bloquée rendrait le bouton invisible.
+ */
+function ambBouton(href: string, libelle: string): string {
+  return `<table role="presentation" cellpadding="0" cellspacing="0" border="0" align="center" style="margin:0 auto"><tr>`
+    + `<td align="center" bgcolor="${EMAIL_AMB.teal}" style="border-radius:12px;mso-padding-alt:16px 34px">`
+    + `<a href="${href}" style="display:inline-block;padding:16px 34px;font-family:${EMAIL_AMB.sans};font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;border-radius:12px">${libelle}</a>`
+    + `</td></tr></table>`;
+}
+
+/**
+ * Coque des emails du programme ambassadeur.
+ *
+ * `apercu` alimente la ligne d'aperçu des boîtes de réception — celle qui suit l'objet et qui,
+ * laissée vide, se remplit toute seule avec le premier texte du message (ici « Bonjour X »).
+ */
+function ambassadorEmailLayout(o: { apercu: string; surTitre: string; titre: string; encart?: string; corps: string }): string {
+  return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><meta name="supported-color-schemes" content="light">
+<title>${o.surTitre}</title>
+<style>
+  body{margin:0!important;padding:0!important;width:100%!important;background:#eef2f1}
+  img{border:0;line-height:100%;outline:none;text-decoration:none}
+  table{border-collapse:collapse}
+  a{color:${EMAIL_AMB.teal}}
+  @media only screen and (max-width:600px){
+    .amb-pad{padding-left:22px!important;padding-right:22px!important}
+    .amb-titre{font-size:23px!important;line-height:1.22!important}
+    .amb-montant{font-size:30px!important}
+    .amb-cta table{width:100%!important}
+    .amb-cta a{display:block!important}
+  }
+</style></head>
+<body style="margin:0;padding:0;background:#eef2f1">
+<div style="display:none;font-size:1px;color:#eef2f1;line-height:1px;max-height:0;max-width:0;opacity:0;overflow:hidden">${o.apercu}</div>
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" bgcolor="#eef2f1" style="background:#eef2f1"><tr>
+<td align="center" style="padding:24px 12px">
+
+<!-- width="600" pour le moteur Word d'Outlook, qui ignore max-width ; width:100% pour tous les
+     autres, sans quoi la carte garde 600 px de large sur un écran de 375 et le message part
+     en défilement horizontal. -->
+<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px;background:#ffffff;border:1px solid #dfe7e4;border-radius:20px;overflow:hidden">
+
+  <!-- En-tête : le seul bloc sombre du message, comme la page n'en a qu'un -->
+  <tr><td bgcolor="${EMAIL_AMB.fonce}" class="amb-pad"
+      style="background-color:${EMAIL_AMB.fonce};background-image:linear-gradient(155deg,${EMAIL_AMB.fonce2} 0%,${EMAIL_AMB.fonce} 78%);border-radius:20px 20px 0 0;padding:34px 36px 32px">
+    ${ambSurTitre(o.surTitre, EMAIL_AMB.clair)}
+    <div class="amb-titre" style="font-family:${EMAIL_AMB.serif};font-size:28px;line-height:1.2;font-weight:600;color:#ffffff;margin:18px 0 0;letter-spacing:-0.4px">${o.titre}</div>
+    ${o.encart || ""}
+  </td></tr>
+
+  <!-- Corps -->
+  <tr><td class="amb-pad" style="padding:32px 36px 34px">${o.corps}</td></tr>
+
+  <!-- Pied de page : celui de l'académie, inchangé — même produit -->
+  <tr><td align="center" bgcolor="#f9fafb" style="background:#f9fafb;border-top:1px solid #eef2f1;border-radius:0 0 20px 20px;padding:24px 32px">
+    <div style="font-family:${EMAIL_AMB.sans};font-size:14px;font-weight:700;color:${EMAIL_AMB.teal};margin-bottom:4px">LouisFarm Learning</div>
+    <div style="font-family:${EMAIL_AMB.sans};font-size:12px;color:#6b7280;line-height:1.6">Formation gratuite par projets &middot; KoboCollect &middot; Python &middot; QGIS<br>
+      Afrique de l'Ouest &middot; <a href="${SITE_URL}/academy/login" style="color:${EMAIL_AMB.teal};text-decoration:none">Mon espace étudiant</a></div>
+    <div style="font-family:${EMAIL_AMB.sans};font-size:11px;color:#6b7280;line-height:1.6;margin-top:12px">Vous recevez cet email parce que vous êtes ambassadeur de LouisFarm Learning.</div>
+  </td></tr>
+
+</table>
+</td></tr></table>
+</body></html>`;
+}
+
+/**
+ * Email de commission — le message qui porte le programme ambassadeur.
+ *
+ * Il ne se contente pas d'annoncer un montant : il rappelle la boucle qui l'a produit et ce
+ * qu'elle rapportera la prochaine fois. C'est le seul moment où l'on écrit à un ambassadeur
+ * avec une preuve en main, donc le seul où le rappel du mécanisme se lit vraiment.
+ */
 function ambassadorCommissionEmailHtml(name: string, montant: number): string {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>💰 Nouvelle commission</h1><p class="sub">Programme ambassadeur</p></div><div class="bd"><p>Bonjour ${name},</p><p>Une personne que vous avez parrainée vient de payer son attestation. Votre commission de <strong style="color:#0d9488">${montant.toLocaleString("fr-FR")} F CFA</strong> est enregistrée, en attente de versement.</p><p style="text-align:center;margin-top:20px"><a href="${SITE_URL}/academy/ambassador" class="btn">Voir mon espace ambassadeur</a></p></div>`);
+  const esc = (t: string) => String(t).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const prenom = esc((name || "").split(" ")[0] || "");
+  const taux = Math.round(AMBASSADOR_TAUX_COMMISSION * 100);
+  const somme = montant.toLocaleString("fr-FR");
+  const S = EMAIL_AMB;
+  const p = `font-family:${S.sans};font-size:15px;line-height:1.7;color:#374151;margin:0 0 16px`;
+
+  // Le montant, posé dans l'en-tête sombre : c'est l'information du message, elle n'a pas à
+  // se mériter un défilement.
+  const encart =
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-top:24px"><tr>`
+    + `<td style="border:1px solid #2F6251;border-radius:14px;padding:18px 20px">`
+    + `<div style="font-family:${S.sans};font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:#A1B6B0">Votre commission</div>`
+    + `<div class="amb-montant" style="font-family:${S.serif};font-size:34px;font-weight:600;color:${S.clair};line-height:1.1;margin:8px 0 6px">${somme} F CFA</div>`
+    + `<div style="font-family:${S.sans};font-size:13px;color:#BAC8C4">Enregistrée, en attente de versement</div>`
+    + `</td></tr></table>`;
+
+  const corps =
+    `<p style="${p}">Bonjour${prenom ? ` ${prenom}` : ""},</p>`
+    + `<p style="${p}">Vous n'avez rien vendu : vous avez parlé d'une formation que vous suivez. `
+      + `Quelqu'un vous a écouté, a fait le parcours en entier, et vient de payer son attestation. `
+      + `<strong style="color:#111827">${taux} % lui reviennent — à vous.</strong></p>`
+
+    + `<div style="margin:28px 0 18px">${ambSurTitre("Comment on en est arrivé là", S.teal)}</div>`
+    + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">`
+    + ambEtape(1, "Vous avez partagé votre lien", "Une inscription ouverte depuis ce lien vous est rattachée, définitivement.")
+    + ambEtape(2, "Votre filleul est allé au bout", "Il a suivi le parcours, l'a terminé, puis demandé son attestation.")
+    + ambEtape(3, "La commission est tombée", `${taux} % du montant payé, crédités automatiquement au moment de la confirmation.`)
+    + `</table>`
+
+    + `<div style="margin:26px 0 14px">${ambSurTitre("Ce qui suit", S.teal)}</div>`
+    + `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="border:1px solid #e5e7eb;border-radius:14px">`
+    + [
+        ["Le versement", "Par Mobile Money, à la main — vous verrez la ligne passer en « versée » dans votre espace."],
+        ["Aucun plafond", "Pas de quota, pas de maximum : chaque filleul qui va au bout compte."],
+        ["Votre certificat", "Il se met à jour tout seul — ce filleul et ce montant y figurent désormais."],
+      ].map(([titre, texte], i) =>
+        `<tr><td style="padding:14px 18px;${i ? "border-top:1px solid #f0f2f5" : ""}">`
+        + `<div style="font-family:${S.sans};font-size:14px;font-weight:600;color:#111827">${titre}</div>`
+        + `<div style="font-family:${S.sans};font-size:13px;color:#6b7280;line-height:1.6;margin-top:2px">${texte}</div>`
+        + `</td></tr>`).join("")
+    + `</table>`
+
+    + `<div class="amb-cta" style="margin:30px 0 8px">${ambBouton(`${SITE_URL}/academy/ambassador`, "Voir mon espace ambassadeur")}</div>`
+    + `<p style="font-family:${S.sans};font-size:13px;line-height:1.6;color:#6b7280;text-align:center;margin:0 0 26px">Vos filleuls, vos gains et votre certificat y sont à jour.</p>`
+
+    + `<p style="${p};border-top:1px solid #f0f2f5;padding-top:22px;margin-bottom:0">Merci sincèrement. Parler d'une formation gratuite à quelqu'un qui en a besoin, `
+      + `c'est le genre de chose qui fait grandir cette école plus sûrement que n'importe quelle publicité.<br>`
+      + `<strong style="color:#111827">Louis</strong></p>`;
+
+  return ambassadorEmailLayout({
+    apercu: `${somme} F CFA viennent d'être crédités sur votre compte ambassadeur.`,
+    surTitre: "Programme ambassadeur",
+    titre: "Quelqu'un que vous avez amené vient d'aller au bout.",
+    encart,
+    corps,
+  });
 }
 
 /** Le classement d'un parcours, envoyé chaque semaine à tous les inscrits — voir corpsClassementHebdomadaire. */
@@ -5449,6 +5631,9 @@ app.get("/api/academy/ambassador/me", requireStudent, async (req, res) => {
     return res.json({
       isAmbassador: false, ...eligibilite,
       seuil: { jours: AMBASSADOR_SEUIL_JOURS, lecons: AMBASSADOR_SEUIL_LECONS },
+      // Le taux est l'argument nº 1 de la page d'offre : il doit venir d'ici, pas d'une
+      // constante recopiée côté client qui divergerait au premier changement de taux.
+      taux: AMBASSADOR_TAUX_COMMISSION * 100,
     });
   }
 
@@ -5893,7 +6078,10 @@ async function crediterCommissionAmbassadeur(paiement: { id: number; student_id:
   if (parrain.email) {
     sendAcademyEmail({
       studentId: parrain.id, to: parrain.email, type: "ambassador_commission",
-      subject: `💰 Nouvelle commission — ${montant.toLocaleString("fr-FR")} F CFA`,
+      // Un objet qui dit ce qui s'est passé, à la personne à qui c'est arrivé. L'ancien
+      // (« 💰 Nouvelle commission ») ouvrait sur un pictogramme d'argent, ce que les
+      // filtres anti-spam pèsent lourdement et ce qu'aucun humain n'écrirait.
+      subject: `${(parrain.full_name || "").split(" ")[0] || "Vous"}, vous venez de gagner ${montant.toLocaleString("fr-FR")} F CFA`,
       html: ambassadorCommissionEmailHtml(parrain.full_name, montant),
       dedupeKey: `ambassador_commission:${paiement.id}`,
     }).catch(() => {});
