@@ -21,12 +21,14 @@ import { QUESTIONS_TOF } from "../shared/tof-test.js";
 import { QUESTIONS_FCA } from "../shared/fca-test.js";
 import { QUESTIONS_FCQ } from "../shared/fcq-test.js";
 import { QUESTIONS_COOP } from "../shared/coop-test.js";
+import { QUESTIONS_DATA } from "../shared/data-test.js";
 import { BANQUES_ADMISSION, aUnTestEnLigne } from "../shared/tests-parcours.js";
 import { TESTS_PARCOURS } from "../api/program-tests.js";
 import { TOF_ANSWER_KEY, TOF_CORRECT_TEXTS } from "../api/tof-answers.js";
 import { FCA_ANSWER_KEY, FCA_CORRECT_TEXTS } from "../api/fca-answers.js";
 import { FCQ_ANSWER_KEY, FCQ_CORRECT_TEXTS } from "../api/fcq-answers.js";
 import { COOP_ANSWER_KEY, COOP_CORRECT_TEXTS } from "../api/coop-answers.js";
+import { DATA_ANSWER_KEY, DATA_CORRECT_TEXTS } from "../api/data-answers.js";
 
 const LETTRES = ["A", "B", "C", "D"];
 
@@ -76,6 +78,17 @@ const SUITES: Suite[] = [
     // non son contenu, qui s'apprend pendant les huit semaines.
     themesAttendus: ["Formes juridiques", "Lecture d'un texte", "Vie associative",
       "Calcul et pourcentages", "Gestion et comptes"],
+  },
+  {
+    programId: "data",
+    questions: QUESTIONS_DATA,
+    cle: DATA_ANSWER_KEY,
+    textes: DATA_CORRECT_TEXTS,
+    // Aucun thème ne porte sur Python, Pandas ou une méthode statistique : le parcours
+    // annonce lui-même « aucun prérequis technique » dès sa première semaine, et le test ne
+    // vérifie que ce qu'il faut posséder pour suivre neuf semaines sans décrocher.
+    themesAttendus: ["Raisonnement quantitatif", "Lecture de données", "Logique et rigueur",
+      "Outils numériques", "Résolution de problème"],
   },
 ];
 

@@ -21,6 +21,7 @@ import { QUESTIONS_TOF } from "@shared/tof-test";
 import { QUESTIONS_FCA } from "@shared/fca-test";
 import { QUESTIONS_FCQ } from "@shared/fcq-test";
 import { QUESTIONS_COOP } from "@shared/coop-test";
+import { QUESTIONS_DATA } from "@shared/data-test";
 import { programById } from "@shared/programs";
 import { dureeEpreuveSecondes } from "@shared/chronometrage";
 import { useChronoEpreuve, type FenetreChrono } from "@/lib/chrono-epreuve";
@@ -44,6 +45,7 @@ const BANQUES_PARCOURS: Record<string, { domain: string; q: string; opts: string
   fca: QUESTIONS_FCA.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
   fcq: QUESTIONS_FCQ.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
   coop: QUESTIONS_COOP.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
+  data: QUESTIONS_DATA.map(x => ({ domain: x.domaine, q: x.q, opts: x.opts })),
 };
 
 // ─── TYPES ────────────────────────────────────────────────────────────────────
@@ -610,11 +612,12 @@ export default function ELearning() {
             portes s'ouvrent. FCA-01 est resté un temps sans bouton, sa banque n'étant pas
             écrite — proposer une porte qui ne s'ouvre pas est pire que ne rien proposer.
             La grille passe à trois colonnes avec le cinquième parcours : 3 + 2 se lit mieux
-            que 4 + 1, et laisse aux cartes la largeur qu'exige leur tableau. */}
+            que 4 + 1, et laisse aux cartes la largeur qu'exige leur tableau. Le sixième
+            parcours (Data Analytics) complète la grille à 3 + 3. */}
         <section className="max-w-6xl mx-auto px-5 sm:px-6 pb-14">
           <div className="flex items-baseline gap-4 mb-6">
             <h2 className="font-serif text-2xl sm:text-[28px] font-semibold tracking-tight">
-              Cinq parcours, cinq portes d'entrée
+              Six parcours, six portes d'entrée
             </h2>
             <span className="flex-1 h-px bg-border" />
           </div>
@@ -665,6 +668,15 @@ export default function ELearning() {
                 titreDelivre: "Certificat de Spécialiste en Organisation des Acteurs et Structuration des Filières",
                 fond: "bg-blue-50 dark:bg-blue-950/30", encre: "text-blue-900 dark:text-blue-300",
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("coop") },
+              },
+              {
+                code: "DATA-01 · 02", teinte: "#9f1239", titre: "Data Analytics",
+                texte: "Nettoyer un jeu de données réel, en tirer des statistiques et des visualisations qui tiennent, écrire une requête SQL, construire un modèle de régression ou de classification simple, et présenter une recommandation à un décideur.",
+                lignes: [["Leçons", "9"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"],
+                         ["Formation", "Gratuite"], ["Attestation", "10 000 F CFA"]],
+                titreDelivre: "LouisFarm Data Analytics Professional — 9 Week Applied Track",
+                fond: "bg-rose-50 dark:bg-rose-950/30", encre: "text-rose-800 dark:text-rose-300",
+                action: { libelle: "Passer le test", onClick: () => demarrerTest("data") },
               },
             ].map(p => (
               <Spotlight key={p.code} className="lift border border-border rounded-lg bg-card overflow-hidden flex flex-col">

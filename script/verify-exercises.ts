@@ -23,6 +23,8 @@ import { LECONS_FCA_01 } from "../shared/fca-01";
 import { LECONS_FCQ_01 } from "../shared/fcq-01";
 import { LECONS_COOP_01 } from "../shared/coop-01";
 import { LECONS_COOP_02 } from "../shared/coop-02";
+import { LECONS_DATA_01 } from "../shared/data-01";
+import { LECONS_DATA_02 } from "../shared/data-02";
 
 let pass = 0;
 const failures: string[] = [];
@@ -113,6 +115,8 @@ const coursTs: { nom: string; lecons: { titre: string; cellules: any[] }[] }[] =
   { nom: "shared/fcq-01.ts", lecons: LECONS_FCQ_01 as any },
   { nom: "shared/coop-01.ts", lecons: LECONS_COOP_01 as any },
   { nom: "shared/coop-02.ts", lecons: LECONS_COOP_02 as any },
+  { nom: "shared/data-01.ts", lecons: LECONS_DATA_01 as any },
+  { nom: "shared/data-02.ts", lecons: LECONS_DATA_02 as any },
 ];
 
 for (const cours of coursTs) {

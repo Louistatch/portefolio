@@ -15,6 +15,7 @@ import { TOF_ANSWER_KEY } from "./tof-answers.js";
 import { FCA_ANSWER_KEY } from "./fca-answers.js";
 import { FCQ_ANSWER_KEY } from "./fcq-answers.js";
 import { COOP_ANSWER_KEY } from "./coop-answers.js";
+import { DATA_ANSWER_KEY } from "./data-answers.js";
 
 export interface TestParcours {
   /** Énoncés et options — partent côté client. */
@@ -35,6 +36,7 @@ const CLES: Record<string, number[]> = {
   fca: FCA_ANSWER_KEY,
   fcq: FCQ_ANSWER_KEY,
   coop: COOP_ANSWER_KEY,
+  data: DATA_ANSWER_KEY,
 };
 
 /**

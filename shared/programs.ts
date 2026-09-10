@@ -210,6 +210,44 @@ export const PROGRAMS: Program[] = [
     // juridiques usuelles, compter en pourcentages. Vingt questions, seuil à 70 %.
     admission: { nbQuestions: 20, seuil: 14, surStudents: false },
   },
+  {
+    id: "data",
+    prefix: "DATA-",
+    title: "Data Analytics",
+    subtitle: "Nettoyer, explorer, visualiser et prédire, avec de vraies données ouest-africaines",
+    // Sixième titre délivré par LouisFarm, et second parcours payant après « coop ». Public
+    // distinct de tous les autres : ni agent de terrain MEAL, ni juriste coopératif, ni
+    // spécialiste du crédit — quiconque veut savoir transformer un tableau de chiffres en
+    // décision, quel que soit son secteur de départ.
+    credential: "LouisFarm Data Analytics Professional — 9 Week Applied Track",
+    outcome: "Nettoyer un jeu de données réel, en tirer des statistiques et des visualisations qui tiennent, écrire une requête SQL, construire un modèle de régression ou de classification simple, et présenter une recommandation à un décideur.",
+    // ── Sur cette sixième teinte ──
+    //
+    // Les cinq accents en place couvrent déjà : teal (primaire, MEAL), violet (TOF),
+    // deux ambres proches (FCA/FCQ, un même domaine à deux niveaux), bleu profond (COOP).
+    // Une sixième couleur crédible doit s'écarter d'assez loin de chacune d'elles, y compris
+    // sous daltonisme, pour rester lisible dans les mêmes grilles de cartes.
+    //
+    // Rose foncé / bordeaux (#9f1239, ~346° de teinte) : la famille la plus éloignée des
+    // cinq déjà prises (160°, 262°, 32°/24°, 217°), contraste de 7,9:1 sur blanc, et ne se
+    // confond ni avec l'ambre (trop rouge pour ça) ni avec le violet (trop rouge aussi) en
+    // vision normale comme en deutéranopie/protanopie simulées.
+    accent: "#9f1239",
+    // Neuf leçons, une par semaine : cinq dans DATA-01 (fondations — Python, nettoyage,
+    // statistiques, visualisation, SQL), quatre dans DATA-02 (régression, classification,
+    // séries temporelles, projet final). Neuf semaines sur les treize de la fenêtre
+    // d'admission, comme pour COOP — voir npm run verify:rythme.
+    lessonsPerWeek: 1,
+    // Dix mille francs, le même tarif que le premier parcours payant : la formation reste
+    // gratuite de bout en bout, seul le document final se paie, et un tarif qui varierait
+    // sans raison d'un parcours payant à l'autre se lirait comme arbitraire.
+    prixAttestation: 10000,
+    // Le test ne suppose ni Python ni statistique : la semaine 1 du parcours le dit
+    // explicitement, « aucun prérequis technique ». Il vérifie ce qu'il faut déjà savoir
+    // faire pour suivre neuf semaines sans décrocher — lire un tableau, calculer un
+    // pourcentage, repérer une conclusion hâtive. Vingt questions, seuil à 70 %.
+    admission: { nbQuestions: 20, seuil: 14, surStudents: false },
+  },
 ];
 
 /** Parcours auquel appartient un cours, d'après son code. */

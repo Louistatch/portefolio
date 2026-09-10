@@ -21,6 +21,8 @@ import { LECONS_FCA_01 } from "../shared/fca-01.js";
 import { LECONS_FCQ_01 } from "../shared/fcq-01.js";
 import { LECONS_COOP_01 } from "../shared/coop-01.js";
 import { LECONS_COOP_02 } from "../shared/coop-02.js";
+import { LECONS_DATA_01 } from "../shared/data-01.js";
+import { LECONS_DATA_02 } from "../shared/data-02.js";
 
 const JOUR_MS = 24 * 60 * 60 * 1000;
 
@@ -45,6 +47,7 @@ const DECOUPAGE: Record<string, number[]> = {
   fca: [LECONS_FCA_01.length],
   fcq: [LECONS_FCQ_01.length],
   coop: [LECONS_COOP_01.length, LECONS_COOP_02.length],
+  data: [LECONS_DATA_01.length, LECONS_DATA_02.length],
 };
 const FORFAIT = [12];
 

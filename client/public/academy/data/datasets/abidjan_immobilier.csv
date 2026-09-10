@@ -1,0 +1,2001 @@
+commune,surface_m2,nbr_chambres,etage,type_logement,distance_centre_km,annee_construction,etat,parking,gardiennage,prix_fcfa
+Yopougon,48,3,4,Appartement,31.8,1999,Bon état,0,0,6900000
+Treichville,49,3,1,Appartement,5.8,2022,Bon état,1,0,10800000
+Adjamé,66,2,3,Appartement,21.0,1985,Bon état,1,0,10900000
+Abobo,89,1,1,Appartement,4.2,2015,Bon état,1,0,9900000
+Plateau,116,2,0,Villa,40.0,2000,Bon état,1,1,46700000
+Plateau,49,2,1,Studio,6.9,2014,Bon état,1,1,20900000
+Cocody,155,3,2,Duplex,0.5,2015,Bon état,1,0,53300000
+Port-Bouet,64,1,4,Appartement,7.1,1987,Bon état,0,0,10900000
+Abobo,73,3,3,Villa,2.6,1983,Neuf,1,0,7100000
+Adjamé,51,4,0,Duplex,0.5,2022,À rénover,1,0,9600000
+Cocody,22,2,0,Appartement,13.8,1995,Bon état,1,1,7100000
+Treichville,115,2,0,Villa,2.6,1982,Bon état,1,1,26200000
+Koumassi,107,1,4,Studio,12.7,1986,Bon état,1,1,13400000
+Marcory,64,3,3,Appartement,2.7,1981,À rénover,1,1,13400000
+Plateau,76,3,3,Studio,1.7,1980,Bon état,0,0,28200000
+Plateau,95,2,1,Studio,29.2,1980,Bon état,1,0,38800000
+Marcory,34,3,1,Appartement,3.6,2017,À rénover,0,1,9100000
+Abobo,57,4,1,Appartement,7.4,1986,Bon état,0,1,7300000
+Yopougon,110,2,0,Appartement,7.5,2003,Neuf,0,0,17500000
+Marcory,39,1,1,Appartement,6.6,1984,Neuf,0,0,7900000
+Abobo,85,4,0,Villa,19.7,2000,Bon état,0,1,11400000
+Plateau,37,3,0,Villa,9.0,2007,À rénover,1,0,14500000
+Marcory,93,4,3,Appartement,4.1,1997,Bon état,1,1,25600000
+Yopougon,72,3,3,Duplex,15.9,2003,Bon état,0,1,11400000
+Yopougon,33,4,1,Appartement,1.6,2011,Bon état,1,0,7100000
+Koumassi,132,2,1,Appartement,6.3,2012,Bon état,0,1,17400000
+Plateau,51,3,1,Appartement,24.1,1989,Bon état,0,1,22300000
+Abobo,49,4,2,Villa,7.9,1988,Neuf,1,1,6200000
+Abobo,81,3,3,Appartement,13.6,2012,À rénover,1,0,9000000
+Cocody,131,2,3,Appartement,8.5,2012,Bon état,0,0,39500000
+Abobo,44,2,2,Appartement,14.6,1986,Bon état,0,1,5300000
+Plateau,76,2,0,Studio,23.1,1983,Bon état,1,0,41300000
+Cocody,91,2,1,Duplex,2.5,2007,Neuf,0,0,26800000
+Treichville,104,2,1,Appartement,1.5,2002,Bon état,1,0,17700000
+Treichville,80,3,1,Appartement,5.3,2011,Bon état,1,1,18400000
+Koumassi,61,3,3,Villa,9.7,2023,Bon état,0,0,6800000
+Marcory,49,2,1,Villa,2.1,1995,Bon état,1,0,10400000
+Cocody,77,3,0,Appartement,0.5,1989,Bon état,0,0,25100000
+Adjamé,43,1,1,Duplex,3.4,1993,À rénover,1,1,7200000
+Yopougon,20,1,5,Villa,27.8,2018,Neuf,1,1,5000000
+Plateau,92,2,0,Appartement,9.5,2015,Bon état,1,0,32100000
+Yopougon,116,3,2,Villa,4.1,2013,Bon état,1,1,17100000
+Cocody,23,2,1,Duplex,1.7,2003,Bon état,1,0,6200000
+Port-Bouet,44,2,0,Studio,3.5,1997,Bon état,0,1,6300000
+Marcory,100,2,1,Appartement,1.5,1995,Bon état,1,1,22600000
+Adjamé,206,4,2,Appartement,0.9,2020,À rénover,1,1,31000000
+Marcory,74,1,1,Appartement,19.0,2016,Neuf,1,0,13900000
+Abobo,51,3,3,Appartement,40.0,2020,Bon état,1,1,5500000
+Abobo,67,3,0,Villa,1.4,2004,Neuf,0,1,9300000
+Plateau,147,3,0,Studio,0.5,1987,Neuf,1,1,75800000
+Treichville,53,4,4,Villa,3.2,2003,Bon état,1,0,10000000
+Koumassi,49,1,1,Duplex,5.0,1999,Neuf,1,0,5000000
+Port-Bouet,58,2,2,Appartement,1.8,2009,À rénover,1,1,9800000
+Port-Bouet,46,4,3,Studio,2.9,1999,À rénover,0,0,9100000
+Abobo,78,2,1,Studio,1.8,1997,Bon état,1,1,9600000
+Port-Bouet,166,3,2,Appartement,11.9,1983,Bon état,0,0,28700000
+Cocody,87,3,0,Villa,10.0,2015,Bon état,1,1,27400000
+Plateau,65,3,0,Appartement,8.1,1985,À rénover,1,0,27800000
+Cocody,64,4,0,Studio,3.9,1982,Bon état,1,0,25700000
+Yopougon,34,5,3,Villa,19.2,1997,Neuf,1,0,5000000
+Yopougon,115,3,0,Appartement,27.9,2019,Bon état,1,0,16400000
+Marcory,71,2,2,Villa,1.5,1997,Bon état,0,1,15800000
+Koumassi,67,4,4,Villa,2.0,2002,Bon état,0,1,10000000
+Yopougon,364,1,1,Appartement,6.0,2014,À rénover,0,1,59600000
+Marcory,86,2,1,Appartement,0.8,1985,À rénover,1,1,16800000
+Abobo,51,4,1,Appartement,4.6,2005,Bon état,1,1,6900000
+Plateau,60,2,1,Villa,7.0,2000,Bon état,1,0,24600000
+Koumassi,131,2,1,Studio,5.9,2003,À rénover,1,0,18100000
+Cocody,78,1,2,Duplex,3.2,1994,Bon état,1,0,15800000
+Treichville,36,4,5,Villa,6.3,2006,Bon état,0,1,7900000
+Koumassi,117,3,4,Studio,25.5,2011,Neuf,0,0,21900000
+Plateau,53,3,3,Appartement,1.8,1991,À rénover,0,0,20400000
+Cocody,188,2,3,Villa,8.5,1984,Bon état,1,1,49600000
+Koumassi,126,3,1,Appartement,0.5,1986,Neuf,0,1,23300000
+Adjamé,59,3,2,Appartement,0.5,2001,À rénover,1,1,9800000
+Adjamé,140,2,3,Villa,6.4,2006,Bon état,1,1,20900000
+Koumassi,76,2,1,Appartement,0.9,1994,À rénover,1,1,11700000
+Cocody,113,2,4,Villa,0.5,2018,Neuf,0,0,38100000
+Yopougon,94,5,1,Studio,1.5,2014,Bon état,0,1,21900000
+Cocody,48,3,2,Appartement,6.7,2005,Bon état,0,1,17500000
+Port-Bouet,53,4,2,Appartement,9.7,2002,Bon état,1,0,12300000
+Abobo,123,2,4,Studio,1.8,1992,Bon état,0,0,13500000
+Yopougon,62,3,0,Studio,8.8,2005,À rénover,1,0,7900000
+Cocody,60,3,2,Appartement,1.6,1982,Bon état,1,0,19700000
+Marcory,46,3,1,Appartement,7.6,2008,À rénover,0,1,10800000
+Yopougon,91,5,0,Villa,4.2,1981,Neuf,1,0,13100000
+Adjamé,207,2,3,Villa,8.5,2007,Bon état,1,0,32700000
+Abobo,43,1,2,Appartement,40.0,2002,Neuf,1,1,5000000
+Port-Bouet,75,3,2,Appartement,22.2,2015,Bon état,0,1,14700000
+Yopougon,149,3,1,Studio,0.5,1985,Bon état,0,1,24200000
+Cocody,71,3,1,Villa,17.3,1990,À rénover,0,1,24100000
+Adjamé,92,2,2,Duplex,0.6,2017,Bon état,0,0,13800000
+Koumassi,43,3,1,Studio,24.5,2013,Bon état,1,1,6400000
+Abobo,91,2,0,Duplex,2.6,1996,Bon état,1,0,8900000
+Koumassi,67,2,4,Appartement,3.9,1982,Neuf,1,0,12800000
+Yopougon,121,3,1,Studio,0.8,2023,Neuf,0,0,18300000
+Abobo,133,3,2,Appartement,1.0,2013,Bon état,0,0,16400000
+Yopougon,269,2,1,Villa,10.4,2001,Bon état,1,1,32500000
+Cocody,98,2,1,Appartement,23.1,2008,Bon état,0,1,42700000
+Cocody,87,2,1,Appartement,7.5,2008,Bon état,0,1,22100000
+Cocody,81,2,1,Studio,10.1,1984,Bon état,1,0,22900000
+Abobo,62,3,1,Studio,11.5,1989,Bon état,0,1,8400000
+Marcory,87,4,1,Appartement,2.4,1989,À rénover,1,1,23500000
+Abobo,64,2,1,Villa,0.5,1988,Bon état,0,0,8700000
+Port-Bouet,80,3,0,Appartement,0.5,2000,Bon état,1,1,18900000
+Marcory,142,4,1,Appartement,3.5,1992,Bon état,1,0,37900000
+Yopougon,45,4,0,Studio,2.2,1989,À rénover,0,0,6100000
+Koumassi,130,2,0,Appartement,0.5,2017,Bon état,1,1,18900000
+Marcory,142,5,4,Duplex,1.6,1990,Bon état,1,1,39200000
+Cocody,69,2,2,Appartement,1.1,1983,Bon état,1,0,27300000
+Marcory,26,2,2,Villa,19.7,2010,Bon état,0,1,5000000
+Plateau,54,1,1,Villa,1.2,2013,Bon état,1,1,22300000
+Port-Bouet,141,2,4,Appartement,6.2,2021,Neuf,1,1,25000000
+Koumassi,73,1,2,Appartement,7.2,2014,Bon état,1,0,11500000
+Abobo,45,2,3,Studio,6.3,2018,Bon état,1,0,5300000
+Port-Bouet,57,2,1,Studio,0.8,2018,Neuf,1,0,8600000
+Koumassi,112,4,4,Appartement,3.1,2012,Bon état,1,1,21600000
+Plateau,97,4,3,Villa,0.5,1987,Neuf,0,0,46200000
+Port-Bouet,65,2,3,Appartement,4.0,2011,À rénover,0,0,12900000
+Abobo,61,4,0,Appartement,1.7,2012,Bon état,1,0,8300000
+Koumassi,61,4,0,Appartement,6.6,1987,À rénover,1,1,9600000
+Port-Bouet,46,3,0,Appartement,9.4,1993,Bon état,1,1,6500000
+Marcory,165,1,0,Studio,6.1,2013,À rénover,1,1,37100000
+Cocody,63,3,3,Villa,4.6,1987,Bon état,1,0,21800000
+Marcory,135,4,0,Duplex,3.9,2021,Bon état,1,0,28600000
+Yopougon,158,3,0,Villa,14.7,1986,Bon état,0,1,21900000
+Koumassi,121,2,0,Duplex,2.0,1992,Bon état,0,1,17000000
+Port-Bouet,59,3,0,Villa,10.6,2000,Bon état,1,1,8500000
+Cocody,90,3,0,Villa,11.3,2011,Bon état,1,1,25600000
+Abobo,73,3,3,Duplex,4.3,1990,Neuf,1,1,7700000
+Yopougon,47,1,2,Villa,2.8,1993,Bon état,0,1,5700000
+Marcory,87,2,0,Appartement,5.1,1990,Bon état,1,1,16700000
+Cocody,41,4,1,Villa,0.8,1981,Neuf,1,1,10800000
+Yopougon,133,4,1,Duplex,0.5,2013,Bon état,0,0,27900000
+Treichville,58,1,0,Studio,0.9,2023,Bon état,1,0,13100000
+Yopougon,81,5,2,Villa,1.7,1996,À rénover,1,1,12300000
+Abobo,85,2,2,Villa,5.6,1993,Neuf,1,0,10500000
+Adjamé,65,3,2,Duplex,15.1,2004,Bon état,1,1,12000000
+Yopougon,99,3,2,Appartement,2.1,2006,À rénover,1,0,17600000
+Treichville,58,4,0,Villa,21.9,1987,Bon état,1,0,12000000
+Treichville,114,4,4,Appartement,24.8,1996,Bon état,1,0,31300000
+Marcory,38,2,3,Villa,25.5,1984,À rénover,1,0,7500000
+Yopougon,79,4,4,Villa,14.5,1991,Bon état,0,0,10200000
+Marcory,194,1,0,Appartement,3.6,2017,Bon état,1,0,43000000
+Marcory,45,3,4,Appartement,0.6,1997,À rénover,1,1,12500000
+Cocody,53,3,3,Villa,6.7,2005,À rénover,0,0,23900000
+Abobo,95,3,3,Appartement,6.5,2010,Bon état,1,0,9900000
+Abobo,81,2,0,Appartement,15.2,2016,Neuf,0,0,10600000
+Cocody,88,4,2,Studio,40.0,1985,Bon état,1,1,28700000
+Marcory,94,2,4,Appartement,5.7,2020,Neuf,0,1,22700000
+Port-Bouet,101,1,2,Appartement,3.4,1994,Neuf,0,1,12600000
+Marcory,128,3,2,Duplex,1.6,2021,Bon état,1,0,24100000
+Plateau,90,2,4,Appartement,0.5,2005,À rénover,1,0,30100000
+Yopougon,65,4,1,Appartement,5.7,1991,À rénover,1,1,10600000
+Treichville,103,2,2,Villa,6.5,2020,Bon état,1,1,19100000
+Marcory,191,2,1,Studio,13.9,1993,Bon état,1,0,45300000
+Adjamé,69,4,4,Duplex,5.6,1980,Neuf,1,0,14800000
+Koumassi,45,3,0,Duplex,19.9,1996,Bon état,1,0,8000000
+Marcory,128,2,1,Studio,7.9,2012,Neuf,1,0,34400000
+Adjamé,69,3,2,Appartement,14.7,2008,Bon état,0,1,12800000
+Yopougon,25,3,3,Appartement,1.3,2010,Neuf,1,1,5000000
+Abobo,113,3,2,Appartement,15.5,1987,À rénover,1,0,17400000
+Abobo,56,2,4,Appartement,9.0,2009,Bon état,1,0,6000000
+Abobo,70,4,4,Villa,1.5,1992,Bon état,0,1,10900000
+Cocody,87,4,0,Villa,1.7,1995,Neuf,1,1,37300000
+Koumassi,81,3,1,Appartement,20.9,1981,Bon état,1,1,14100000
+Yopougon,105,1,0,Studio,0.5,1997,À rénover,1,0,10600000
+Plateau,59,4,1,Appartement,5.0,2014,Bon état,1,1,22100000
+Cocody,95,3,1,Appartement,3.0,1998,Bon état,1,0,37000000
+Abobo,65,3,4,Villa,8.8,1992,Bon état,0,0,8100000
+Adjamé,107,2,3,Appartement,14.6,1983,Bon état,1,0,17500000
+Cocody,100,4,0,Appartement,3.6,1998,À rénover,1,1,38700000
+Abobo,46,3,0,Appartement,4.5,2004,Bon état,1,0,6500000
+Marcory,127,1,2,Appartement,32.1,2017,Bon état,0,1,26500000
+Adjamé,56,2,1,Studio,12.3,2010,Bon état,1,0,8800000
+Plateau,110,4,0,Duplex,18.2,2015,Bon état,1,0,45500000
+Adjamé,89,1,3,Appartement,4.6,1983,Bon état,1,0,15100000
+Yopougon,185,5,4,Appartement,2.1,2018,Neuf,1,0,34400000
+Port-Bouet,66,3,1,Villa,4.2,1986,Bon état,1,0,11800000
+Plateau,62,3,3,Duplex,10.1,1995,À rénover,0,0,29300000
+Yopougon,73,2,1,Appartement,0.9,1984,Bon état,1,0,10100000
+Cocody,63,2,2,Appartement,2.5,2002,Neuf,1,0,16600000
+Port-Bouet,110,4,1,Studio,0.5,2015,À rénover,0,1,19300000
+Port-Bouet,33,2,0,Villa,4.5,2011,Bon état,0,0,5000000
+Marcory,44,3,4,Appartement,14.1,2003,Bon état,0,1,9800000
+Adjamé,43,2,1,Villa,0.5,2004,Bon état,1,1,8300000
+Koumassi,119,1,2,Appartement,9.0,2007,Bon état,0,0,14600000
+Abobo,173,1,1,Villa,21.6,1998,Bon état,1,1,19600000
+Abobo,70,3,0,Villa,2.2,1986,Bon état,0,1,8100000
+Marcory,68,5,0,Studio,9.5,2023,Bon état,1,0,17300000
+Cocody,76,2,1,Appartement,29.5,2020,Bon état,1,1,17800000
+Port-Bouet,132,2,2,Appartement,26.2,1996,Bon état,1,1,22100000
+Port-Bouet,46,2,1,Appartement,2.1,1981,Neuf,1,1,7700000
+Abobo,83,3,2,Studio,0.8,1995,Bon état,1,1,11400000
+Yopougon,120,2,2,Appartement,1.3,2018,Bon état,0,0,17400000
+Yopougon,95,4,2,Appartement,9.7,1997,Bon état,1,0,12600000
+Adjamé,81,3,1,Appartement,10.3,2018,Bon état,0,1,16400000
+Port-Bouet,122,3,4,Studio,9.0,1980,Bon état,0,1,23400000
+Port-Bouet,20,1,1,Appartement,3.3,1982,Neuf,1,1,5000000
+Koumassi,103,5,1,Appartement,1.5,2000,À rénover,0,1,19000000
+Adjamé,53,2,0,Appartement,7.0,2009,Neuf,1,0,7900000
+Cocody,30,1,1,Studio,5.3,1990,Neuf,0,0,8700000
+Plateau,95,3,0,Villa,10.4,2001,Bon état,1,1,41300000
+Port-Bouet,146,3,2,Villa,4.7,2004,Bon état,0,1,20000000
+Abobo,69,2,0,Studio,3.3,1982,Neuf,0,1,7500000
+Cocody,119,2,1,Duplex,2.8,2009,À rénover,0,1,34600000
+Cocody,165,3,3,Appartement,1.9,2003,À rénover,1,0,55700000
+Adjamé,142,2,1,Duplex,2.5,2015,Bon état,1,1,27100000
+Cocody,167,4,0,Appartement,0.8,2002,Bon état,1,1,51300000
+Plateau,107,3,0,Appartement,3.4,1987,Bon état,1,1,40200000
+Abobo,77,2,3,Studio,0.5,1983,Bon état,1,0,8400000
+Adjamé,33,2,0,Appartement,1.7,2018,Bon état,1,0,5000000
+Adjamé,65,2,1,Appartement,11.0,2022,À rénover,1,1,10000000
+Marcory,48,3,1,Appartement,3.1,2010,À rénover,0,0,12400000
+Adjamé,218,3,2,Villa,8.8,2008,À rénover,1,1,31900000
+Marcory,67,2,2,Appartement,10.1,2015,Bon état,1,0,15400000
+Yopougon,78,3,3,Villa,7.0,1992,Bon état,0,0,8800000
+Koumassi,97,5,0,Studio,25.5,2020,Bon état,0,1,16400000
+Adjamé,75,2,0,Villa,0.5,1988,Bon état,1,0,11500000
+Port-Bouet,172,4,0,Appartement,10.7,2000,Bon état,1,1,42700000
+Adjamé,54,2,0,Duplex,25.5,1982,Bon état,1,0,8400000
+Abobo,81,1,0,Appartement,15.9,2004,Bon état,1,1,6000000
+Cocody,51,2,1,Appartement,1.5,2004,Bon état,1,0,10800000
+Yopougon,38,2,1,Appartement,3.2,1991,Bon état,0,0,5400000
+Marcory,54,2,2,Villa,1.5,2008,À rénover,0,1,12700000
+Marcory,72,1,1,Appartement,7.4,1990,Neuf,0,1,15200000
+Treichville,59,4,2,Appartement,10.0,1990,Neuf,0,0,14200000
+Yopougon,52,4,1,Appartement,3.1,2005,Bon état,0,1,9800000
+Port-Bouet,36,3,0,Appartement,6.2,1993,Bon état,1,1,6100000
+Abobo,71,2,1,Villa,9.4,1995,Bon état,1,1,9600000
+Koumassi,35,1,0,Studio,4.4,1989,Neuf,1,1,5000000
+Abobo,108,1,0,Studio,15.4,2010,Bon état,1,0,10300000
+Abobo,77,3,1,Appartement,11.8,2010,Bon état,1,0,7200000
+Yopougon,36,4,4,Appartement,0.5,2015,À rénover,1,0,5600000
+Plateau,63,2,2,Duplex,7.8,1989,À rénover,1,1,23600000
+Adjamé,51,1,0,Appartement,2.1,2005,Bon état,1,0,7800000
+Marcory,86,3,3,Studio,6.5,1999,Bon état,0,0,20100000
+Cocody,144,2,2,Appartement,25.2,2023,À rénover,1,0,37500000
+Adjamé,29,2,2,Duplex,16.9,1988,Bon état,0,0,5000000
+Plateau,78,3,3,Appartement,4.1,1994,Bon état,1,1,24600000
+Treichville,68,3,1,Appartement,2.8,1988,À rénover,0,1,18100000
+Treichville,103,1,0,Villa,2.1,1986,Bon état,1,1,18700000
+Port-Bouet,82,1,1,Villa,6.1,2005,À rénover,1,1,12200000
+Yopougon,51,5,1,Appartement,1.0,2003,Bon état,0,1,10800000
+Cocody,63,2,1,Villa,6.4,1991,Bon état,1,1,15500000
+Port-Bouet,50,1,2,Villa,0.5,1999,À rénover,0,0,6600000
+Yopougon,126,2,4,Appartement,3.1,1993,Neuf,0,0,14800000
+Treichville,74,1,4,Appartement,2.0,2001,Bon état,0,0,13900000
+Treichville,191,2,3,Appartement,28.4,1995,Neuf,1,0,41700000
+Port-Bouet,71,4,3,Appartement,10.4,2008,À rénover,0,1,15600000
+Marcory,52,2,4,Villa,3.4,2011,Bon état,1,1,15600000
+Yopougon,35,2,0,Appartement,0.8,1998,Neuf,0,0,5000000
+Port-Bouet,30,3,0,Appartement,5.8,2014,Bon état,0,1,6100000
+Marcory,33,3,1,Appartement,1.9,2022,Bon état,1,1,7000000
+Plateau,84,4,3,Villa,6.2,2011,Bon état,0,0,33200000
+Abobo,95,4,1,Appartement,14.4,1999,Bon état,0,1,11800000
+Port-Bouet,33,1,2,Appartement,7.7,2019,À rénover,0,1,5000000
+Adjamé,115,3,0,Appartement,8.0,1999,Bon état,1,1,25100000
+Abobo,58,2,0,Duplex,6.2,1987,Bon état,1,1,7800000
+Cocody,79,5,2,Appartement,21.0,2014,Neuf,0,0,29300000
+Abobo,165,2,0,Villa,21.5,2021,À rénover,0,0,23600000
+Treichville,115,5,1,Appartement,5.8,1992,Neuf,1,0,22300000
+Plateau,64,3,0,Appartement,2.9,2020,Bon état,0,1,20800000
+Abobo,47,2,1,Villa,4.9,1985,À rénover,1,0,5000000
+Port-Bouet,25,3,2,Appartement,1.7,1995,Bon état,1,0,5000000
+Koumassi,51,5,1,Duplex,8.1,1984,Bon état,1,1,9700000
+Adjamé,66,4,2,Duplex,5.5,2013,Bon état,0,1,12500000
+Adjamé,45,1,0,Studio,0.9,1985,Bon état,1,1,6900000
+Yopougon,69,3,3,Villa,1.8,2012,Bon état,1,0,8200000
+Marcory,77,2,1,Appartement,5.2,1994,À rénover,1,0,18600000
+Koumassi,66,1,2,Appartement,17.5,1994,À rénover,1,0,9600000
+Koumassi,53,2,2,Duplex,6.7,1993,Bon état,1,1,8900000
+Port-Bouet,80,2,0,Villa,9.2,2018,Bon état,1,0,9900000
+Port-Bouet,92,4,3,Villa,3.3,1984,Bon état,0,1,19100000
+Abobo,43,2,2,Appartement,6.8,2005,Bon état,1,1,5000000
+Abobo,149,4,1,Appartement,4.7,1996,Bon état,0,0,19100000
+Koumassi,70,1,0,Duplex,8.6,2022,À rénover,1,0,10600000
+Adjamé,74,2,4,Appartement,0.5,1995,Bon état,1,1,12200000
+Adjamé,105,2,3,Appartement,5.4,2014,Bon état,1,1,14800000
+Koumassi,83,2,0,Appartement,2.8,2017,Bon état,1,1,12600000
+Port-Bouet,119,1,1,Studio,3.2,2002,Bon état,0,0,14700000
+Yopougon,85,2,3,Appartement,25.9,1992,Neuf,0,0,14000000
+Yopougon,54,3,2,Studio,1.6,2012,Bon état,1,1,7900000
+Cocody,88,2,3,Appartement,3.0,2008,Bon état,1,1,31100000
+Abobo,42,2,1,Studio,5.7,2013,Bon état,1,0,5000000
+Cocody,78,2,2,Villa,15.9,2013,Bon état,0,1,21700000
+Yopougon,72,4,1,Appartement,4.3,2006,Bon état,1,1,10300000
+Abobo,66,4,0,Villa,10.9,1994,À rénover,1,0,10200000
+Marcory,69,2,2,Appartement,15.5,1988,À rénover,1,1,13300000
+Abobo,29,2,5,Appartement,3.0,2005,Bon état,1,0,5000000
+Cocody,56,1,1,Studio,4.0,1982,Neuf,1,1,14800000
+Cocody,77,5,1,Appartement,3.5,2015,À rénover,1,1,20000000
+Koumassi,80,1,2,Appartement,14.3,1984,Bon état,1,0,10200000
+Yopougon,44,2,1,Appartement,0.5,1999,Bon état,0,1,5100000
+Plateau,139,2,3,Appartement,3.0,1999,Neuf,1,1,52800000
+Abobo,48,2,3,Studio,9.1,1984,Neuf,1,1,5000000
+Koumassi,120,2,0,Appartement,6.7,1989,Neuf,1,0,20700000
+Marcory,91,3,5,Duplex,4.6,1995,Neuf,1,1,20800000
+Abobo,53,1,3,Duplex,6.2,2004,À rénover,1,1,5700000
+Cocody,179,3,3,Appartement,1.8,2023,Bon état,1,1,63900000
+Cocody,41,1,2,Appartement,4.5,2004,Bon état,1,1,13100000
+Abobo,117,1,3,Studio,5.6,2009,À rénover,1,0,12800000
+Abobo,122,4,0,Appartement,18.5,1993,Bon état,1,0,14700000
+Abobo,53,2,1,Appartement,2.4,2001,À rénover,0,1,5000000
+Adjamé,148,4,3,Appartement,16.2,2022,À rénover,1,0,24700000
+Treichville,65,3,0,Villa,8.3,2007,Bon état,1,1,13000000
+Abobo,85,1,0,Studio,0.5,2009,À rénover,0,1,9500000
+Yopougon,84,5,3,Appartement,10.3,1998,Bon état,0,0,13700000
+Koumassi,69,2,3,Appartement,0.5,2017,Neuf,1,1,11500000
+Marcory,111,4,0,Duplex,40.0,2021,Bon état,1,0,25000000
+Yopougon,110,2,3,Studio,16.5,1999,Bon état,1,1,15300000
+Cocody,31,4,2,Villa,2.8,2014,À rénover,0,0,12700000
+Cocody,141,1,1,Studio,2.4,2001,Bon état,0,0,41500000
+Treichville,32,3,3,Appartement,3.8,1994,Bon état,1,0,7000000
+Koumassi,124,3,1,Studio,3.5,1990,Neuf,0,1,18300000
+Adjamé,129,4,0,Appartement,3.7,2013,Bon état,0,0,21700000
+Yopougon,43,4,0,Appartement,3.1,2003,Neuf,0,0,6000000
+Plateau,60,4,1,Villa,7.8,1985,Bon état,0,0,23900000
+Plateau,42,4,1,Appartement,1.4,1996,À rénover,0,0,20300000
+Marcory,66,2,3,Duplex,15.0,2007,Bon état,1,1,13800000
+Abobo,63,2,3,Appartement,13.4,2010,Bon état,0,0,6000000
+Adjamé,109,2,2,Duplex,5.2,2015,Bon état,1,1,22300000
+Adjamé,142,2,3,Duplex,15.3,1988,Neuf,1,1,24100000
+Marcory,148,2,0,Appartement,2.3,1989,Bon état,1,1,25200000
+Treichville,56,3,0,Studio,0.5,2000,Neuf,1,0,11500000
+Adjamé,66,2,3,Appartement,7.7,2013,Bon état,1,1,10900000
+Abobo,32,3,0,Duplex,4.9,2010,Neuf,1,0,5100000
+Abobo,49,2,0,Appartement,6.7,2008,Neuf,1,1,5000000
+Yopougon,119,2,2,Villa,18.4,2022,Bon état,1,1,19200000
+Marcory,165,3,1,Appartement,28.0,2022,Bon état,1,1,46300000
+Yopougon,40,3,3,Appartement,8.1,1990,Neuf,1,1,5500000
+Koumassi,55,3,0,Appartement,11.6,2012,Bon état,0,1,8600000
+Cocody,73,3,0,Appartement,0.7,1980,À rénover,1,1,20000000
+Cocody,85,2,1,Studio,1.4,2000,Bon état,1,0,24900000
+Cocody,49,3,2,Villa,10.6,2002,Neuf,1,0,15800000
+Cocody,91,1,1,Villa,4.5,1988,Bon état,0,0,28000000
+Port-Bouet,58,2,1,Appartement,4.7,1980,Bon état,0,0,11700000
+Adjamé,73,2,3,Appartement,3.0,2000,Neuf,1,1,10500000
+Yopougon,97,1,4,Appartement,7.5,2001,À rénover,0,1,8900000
+Cocody,74,2,0,Studio,1.6,1983,À rénover,1,0,22300000
+Yopougon,59,5,1,Duplex,7.9,1980,À rénover,1,1,10600000
+Yopougon,70,5,1,Appartement,1.5,1989,À rénover,1,0,12500000
+Plateau,71,2,4,Appartement,0.5,1994,Bon état,1,1,25500000
+Yopougon,61,1,5,Appartement,3.2,2015,Bon état,1,1,8100000
+Yopougon,65,2,0,Villa,2.1,2008,Bon état,1,1,11200000
+Abobo,164,2,2,Villa,17.6,1984,À rénover,1,1,20600000
+Abobo,98,4,1,Studio,0.5,2008,Bon état,1,0,12600000
+Cocody,64,1,0,Appartement,1.6,2006,Bon état,1,1,16600000
+Yopougon,104,3,0,Studio,6.4,2004,Bon état,1,0,15300000
+Abobo,62,1,1,Villa,5.2,1995,À rénover,1,0,8500000
+Abobo,132,5,1,Appartement,0.5,1995,Neuf,0,1,18600000
+Port-Bouet,89,2,0,Villa,0.5,2015,Bon état,0,0,15300000
+Adjamé,70,3,2,Appartement,35.4,2004,À rénover,1,1,11300000
+Plateau,92,2,0,Appartement,8.6,2020,Bon état,0,1,40500000
+Cocody,34,3,2,Studio,3.6,1980,À rénover,1,0,14300000
+Adjamé,42,2,1,Appartement,5.1,1984,Bon état,0,1,7300000
+Cocody,41,1,0,Studio,2.5,2020,Neuf,1,0,11600000
+Abobo,79,4,1,Villa,3.4,1999,À rénover,0,1,10800000
+Treichville,175,4,0,Appartement,8.4,1984,Bon état,1,1,26500000
+Abobo,225,4,1,Villa,17.2,2015,Bon état,0,0,34100000
+Yopougon,101,3,0,Villa,1.6,2008,Bon état,1,0,15500000
+Adjamé,95,4,1,Appartement,14.7,2013,Bon état,0,0,18800000
+Yopougon,30,1,0,Appartement,1.0,1997,Bon état,0,1,5000000
+Abobo,56,2,2,Appartement,1.9,1981,Bon état,1,0,6300000
+Treichville,50,2,3,Appartement,0.5,1995,Bon état,0,0,9600000
+Yopougon,54,3,0,Appartement,1.2,2008,À rénover,0,1,9400000
+Treichville,68,2,1,Appartement,19.9,2012,Bon état,1,1,13200000
+Port-Bouet,58,1,0,Appartement,4.9,1995,Bon état,0,1,12200000
+Plateau,27,3,2,Duplex,0.6,2014,Bon état,1,1,11700000
+Cocody,107,4,0,Appartement,25.7,2022,Bon état,0,1,30000000
+Cocody,43,2,1,Studio,16.9,2021,À rénover,0,1,12800000
+Cocody,83,1,1,Villa,11.2,1996,Neuf,1,0,21000000
+Cocody,208,2,4,Villa,21.7,1983,À rénover,0,1,42200000
+Adjamé,47,2,1,Appartement,2.0,1983,Bon état,1,0,9400000
+Cocody,21,2,2,Duplex,14.5,2004,Bon état,1,0,7000000
+Marcory,64,3,1,Villa,9.4,2012,Neuf,0,1,16000000
+Port-Bouet,128,3,4,Studio,16.3,1993,Bon état,1,0,24300000
+Cocody,196,3,3,Appartement,12.8,2003,Bon état,0,1,50500000
+Koumassi,40,2,0,Appartement,3.4,1990,Bon état,0,0,5600000
+Marcory,94,4,3,Villa,11.9,2004,Bon état,0,0,26300000
+Cocody,58,2,1,Appartement,2.4,2007,À rénover,1,1,14800000
+Adjamé,70,2,3,Appartement,3.2,1986,Bon état,1,1,7000000
+Abobo,276,4,3,Appartement,0.9,2015,Bon état,0,1,36400000
+Port-Bouet,35,2,0,Villa,21.9,1989,Bon état,1,1,5900000
+Adjamé,84,1,2,Duplex,2.8,2015,Bon état,1,0,12900000
+Koumassi,93,4,0,Appartement,5.9,2010,À rénover,0,1,17900000
+Marcory,127,2,0,Studio,4.0,1998,Bon état,1,0,30100000
+Plateau,77,3,0,Villa,25.7,1997,Bon état,1,1,32500000
+Koumassi,86,1,2,Appartement,3.3,1985,Bon état,0,0,14200000
+Koumassi,61,3,0,Duplex,12.1,2007,Bon état,0,1,7600000
+Treichville,84,2,0,Studio,15.5,1986,Bon état,1,1,18500000
+Yopougon,62,1,2,Studio,4.6,2017,Neuf,1,0,8800000
+Yopougon,101,3,0,Appartement,3.8,1991,À rénover,1,1,12400000
+Koumassi,61,2,0,Villa,11.0,2020,Bon état,0,0,7100000
+Yopougon,89,2,0,Appartement,19.5,2013,Bon état,1,0,11100000
+Port-Bouet,73,1,1,Appartement,11.2,2004,Neuf,1,1,10500000
+Port-Bouet,129,1,1,Appartement,2.1,1996,Bon état,1,0,23000000
+Yopougon,72,2,0,Studio,17.5,2012,À rénover,0,0,9200000
+Koumassi,30,1,5,Studio,3.9,2002,À rénover,1,1,5000000
+Koumassi,139,4,2,Appartement,6.9,1988,Bon état,0,1,21900000
+Cocody,47,1,1,Appartement,14.2,1985,Neuf,1,0,15400000
+Port-Bouet,53,2,1,Studio,1.7,1981,Bon état,1,1,9200000
+Abobo,55,1,1,Appartement,12.3,2017,Bon état,1,1,5900000
+Koumassi,147,2,2,Villa,7.3,1988,Bon état,0,1,21900000
+Yopougon,25,4,0,Appartement,17.9,1982,À rénover,1,1,5000000
+Port-Bouet,354,2,0,Appartement,1.5,1995,Bon état,1,1,54300000
+Yopougon,125,5,3,Duplex,4.4,2004,Neuf,1,1,25700000
+Cocody,82,2,0,Appartement,14.3,2003,À rénover,1,0,25600000
+Port-Bouet,72,3,1,Appartement,0.5,2008,Neuf,0,0,13000000
+Cocody,85,3,3,Appartement,1.0,2023,À rénover,1,1,38000000
+Marcory,96,4,2,Duplex,37.3,2019,Bon état,1,1,20000000
+Treichville,102,3,1,Studio,2.6,2005,À rénover,1,1,21300000
+Treichville,97,3,2,Appartement,29.7,2017,Neuf,1,0,17400000
+Abobo,77,2,0,Appartement,1.6,2014,Neuf,1,0,10500000
+Abobo,67,2,2,Villa,3.6,2002,Bon état,1,1,10000000
+Yopougon,68,4,1,Appartement,11.2,1983,Bon état,0,1,13700000
+Marcory,67,2,3,Villa,8.6,2021,Bon état,1,1,17100000
+Yopougon,130,2,4,Appartement,7.0,1993,À rénover,1,1,17700000
+Adjamé,99,3,4,Appartement,6.0,2018,À rénover,1,0,16300000
+Koumassi,20,2,4,Villa,14.8,1986,Bon état,1,1,5000000
+Koumassi,102,5,1,Appartement,2.1,1987,Neuf,0,1,24600000
+Koumassi,81,3,1,Studio,4.7,2021,Bon état,1,0,14100000
+Cocody,73,3,1,Appartement,1.4,1998,Bon état,0,0,22000000
+Yopougon,61,4,2,Appartement,7.2,1981,Bon état,0,1,11800000
+Cocody,129,1,3,Duplex,2.3,1980,À rénover,0,1,30800000
+Abobo,118,2,0,Appartement,3.2,2021,Neuf,1,0,14900000
+Yopougon,50,2,4,Villa,5.1,2017,Bon état,1,0,6800000
+Port-Bouet,90,2,3,Appartement,0.5,1992,Neuf,0,0,17000000
+Yopougon,45,3,5,Villa,0.8,2021,Bon état,1,0,6700000
+Cocody,37,4,3,Villa,9.3,2023,Bon état,1,1,10100000
+Plateau,54,2,0,Appartement,4.5,2003,Bon état,1,1,20600000
+Koumassi,113,2,0,Studio,16.0,2011,Neuf,1,1,19800000
+Abobo,119,5,0,Villa,9.5,2009,Neuf,1,1,17200000
+Cocody,95,2,0,Appartement,0.5,1985,Neuf,0,0,32100000
+Cocody,106,2,2,Villa,7.7,2017,Bon état,1,0,27000000
+Adjamé,95,2,3,Villa,0.8,2012,Bon état,1,0,15300000
+Cocody,53,4,3,Appartement,12.1,2023,Bon état,1,0,16700000
+Koumassi,91,3,2,Appartement,38.1,2002,À rénover,0,0,16400000
+Adjamé,110,3,0,Appartement,6.1,1989,Bon état,1,1,19200000
+Cocody,107,4,0,Appartement,9.2,1994,Bon état,1,1,41000000
+Cocody,134,2,0,Studio,2.2,2002,Neuf,0,1,47100000
+Treichville,105,2,1,Appartement,4.6,2015,Bon état,1,1,23800000
+Yopougon,88,4,1,Duplex,15.5,1980,Bon état,1,1,14800000
+Yopougon,126,2,0,Appartement,1.5,1987,Neuf,1,1,15000000
+Koumassi,73,3,1,Appartement,2.5,1982,Neuf,1,0,11900000
+Treichville,47,4,0,Studio,4.7,1993,À rénover,0,1,10200000
+Treichville,68,3,2,Villa,10.0,1996,À rénover,1,0,14200000
+Koumassi,51,3,1,Villa,3.8,2013,Neuf,1,0,7800000
+Yopougon,53,4,1,Appartement,21.0,1985,Bon état,1,0,7300000
+Cocody,69,4,1,Appartement,0.8,1984,À rénover,1,1,16900000
+Koumassi,50,2,4,Appartement,3.7,2020,Neuf,0,1,6800000
+Abobo,63,1,0,Duplex,9.9,2019,Bon état,1,1,7100000
+Yopougon,29,2,1,Appartement,2.0,2008,À rénover,1,1,5000000
+Port-Bouet,82,3,2,Studio,8.5,2014,À rénover,0,1,15300000
+Cocody,74,2,2,Villa,1.4,1997,Bon état,1,1,28800000
+Yopougon,49,3,4,Appartement,0.5,2019,Neuf,1,1,8500000
+Cocody,102,2,1,Villa,1.0,2009,Bon état,1,1,38400000
+Yopougon,118,3,1,Studio,21.3,1994,À rénover,0,0,18800000
+Cocody,33,2,0,Studio,6.4,1994,À rénover,1,0,11700000
+Cocody,50,3,2,Appartement,12.7,1995,Bon état,1,1,14500000
+Cocody,50,3,0,Appartement,3.2,2012,Bon état,0,0,14700000
+Adjamé,46,2,0,Appartement,7.2,1989,Bon état,1,1,5000000
+Koumassi,112,2,1,Appartement,5.5,1998,Bon état,0,1,19900000
+Abobo,67,3,1,Villa,23.3,2016,À rénover,1,1,10500000
+Treichville,65,2,0,Studio,11.0,1982,Bon état,0,0,12200000
+Yopougon,27,2,2,Appartement,10.5,2015,Bon état,0,1,5000000
+Marcory,101,5,2,Villa,0.5,1983,Bon état,0,0,23600000
+Port-Bouet,40,3,0,Villa,6.4,1990,Bon état,1,1,7900000
+Marcory,76,5,1,Appartement,5.0,2020,Bon état,1,1,23400000
+Treichville,85,2,2,Appartement,21.0,2012,Bon état,1,1,12900000
+Cocody,146,2,1,Villa,2.4,2007,À rénover,0,1,46900000
+Treichville,38,4,1,Studio,2.5,2011,Bon état,1,0,8600000
+Cocody,20,3,1,Villa,4.2,1995,À rénover,1,1,6600000
+Port-Bouet,81,3,2,Appartement,2.2,1988,Neuf,0,0,16100000
+Abobo,181,2,4,Appartement,1.1,1990,Bon état,1,0,20900000
+Treichville,137,2,2,Appartement,15.6,1985,Bon état,1,0,27700000
+Cocody,82,1,0,Villa,6.5,2006,À rénover,1,1,22200000
+Abobo,58,2,1,Studio,15.8,1991,Neuf,0,0,7900000
+Treichville,110,1,3,Appartement,14.2,2001,Bon état,0,0,22200000
+Abobo,45,1,0,Studio,2.7,2019,Bon état,1,1,5100000
+Abobo,94,5,5,Villa,6.3,2016,Bon état,1,1,11000000
+Adjamé,95,2,4,Villa,0.7,2000,À rénover,0,0,14500000
+Yopougon,125,3,0,Duplex,19.7,2012,À rénover,0,1,21400000
+Abobo,293,4,4,Appartement,4.1,1996,Bon état,1,1,40200000
+Abobo,90,3,1,Duplex,4.0,2008,Neuf,1,0,12600000
+Port-Bouet,57,2,3,Appartement,2.9,2019,Bon état,1,1,12500000
+Cocody,73,3,1,Appartement,4.9,1989,Bon état,0,1,27400000
+Marcory,30,3,1,Studio,2.3,1997,À rénover,1,1,7100000
+Treichville,52,3,2,Duplex,3.8,1992,À rénover,0,0,10600000
+Port-Bouet,60,3,3,Villa,12.9,2006,Neuf,0,1,6900000
+Yopougon,57,5,0,Villa,14.4,1989,Bon état,0,0,9500000
+Abobo,80,3,2,Villa,2.9,2011,Bon état,1,1,9700000
+Marcory,49,2,0,Studio,5.1,2020,Neuf,1,0,11200000
+Plateau,129,3,1,Appartement,16.6,1982,Bon état,1,0,51200000
+Yopougon,74,1,1,Studio,0.5,2001,Bon état,0,0,9200000
+Yopougon,73,4,1,Appartement,17.6,2006,Bon état,0,1,8600000
+Abobo,63,1,1,Appartement,2.0,1982,Bon état,0,0,6000000
+Cocody,80,2,0,Appartement,9.1,2012,Bon état,0,0,25900000
+Treichville,111,4,0,Villa,7.0,1981,Neuf,1,0,32900000
+Treichville,48,3,0,Duplex,6.4,1990,À rénover,0,1,10400000
+Adjamé,53,2,1,Villa,15.7,1989,Bon état,0,0,9000000
+Abobo,63,2,4,Duplex,0.9,2018,À rénover,0,1,8600000
+Marcory,38,4,0,Appartement,3.4,2012,Bon état,0,0,8300000
+Koumassi,49,2,4,Villa,6.2,1986,À rénover,1,0,7800000
+Adjamé,58,4,2,Studio,13.3,1994,À rénover,1,1,9600000
+Plateau,114,1,2,Villa,2.0,2005,Bon état,1,1,45100000
+Port-Bouet,84,3,2,Villa,13.0,1990,Bon état,1,0,15900000
+Koumassi,81,4,3,Villa,4.1,2017,À rénover,0,0,14700000
+Treichville,113,2,0,Studio,1.7,2006,Bon état,0,0,20500000
+Adjamé,69,2,1,Studio,11.4,2018,À rénover,1,1,12400000
+Abobo,90,2,2,Appartement,0.8,1986,Bon état,1,0,14000000
+Yopougon,70,3,2,Studio,5.8,1980,Bon état,0,1,9000000
+Port-Bouet,84,3,3,Appartement,0.5,1989,Neuf,0,0,14800000
+Port-Bouet,55,3,0,Appartement,3.5,2000,Bon état,0,0,10600000
+Cocody,22,2,2,Studio,7.4,1994,À rénover,0,0,7400000
+Cocody,69,2,1,Appartement,6.5,2009,Bon état,0,1,19100000
+Yopougon,150,1,1,Studio,4.1,2009,Neuf,0,1,11200000
+Koumassi,117,2,1,Appartement,4.5,1987,Bon état,1,0,21300000
+Treichville,119,3,2,Appartement,2.1,2003,Bon état,0,1,29200000
+Plateau,137,4,3,Appartement,4.9,1998,Bon état,0,0,43900000
+Abobo,77,3,1,Appartement,24.5,1982,Bon état,1,1,8900000
+Yopougon,81,2,3,Studio,15.2,1994,Bon état,1,1,14000000
+Treichville,54,5,1,Appartement,1.3,2015,Neuf,1,0,16500000
+Port-Bouet,63,3,0,Appartement,0.5,1985,Bon état,0,1,13300000
+Koumassi,100,4,0,Appartement,21.7,2021,Bon état,1,1,16900000
+Yopougon,135,3,0,Appartement,6.0,1997,À rénover,0,0,20600000
+Yopougon,69,2,1,Studio,6.2,2017,À rénover,1,1,9500000
+Marcory,59,1,1,Appartement,12.1,1998,Bon état,0,0,13800000
+Cocody,74,3,2,Villa,3.0,2009,Bon état,0,1,20900000
+Port-Bouet,100,1,2,Duplex,5.3,1992,Bon état,1,0,14100000
+Koumassi,36,2,0,Villa,27.7,2018,Bon état,1,1,6300000
+Treichville,23,3,0,Studio,8.9,1991,Bon état,1,0,5000000
+Treichville,56,3,0,Appartement,1.3,2013,À rénover,0,0,14900000
+Abobo,40,3,1,Appartement,1.1,1991,Bon état,0,0,5000000
+Koumassi,57,2,0,Studio,1.8,2023,À rénover,1,0,8500000
+Treichville,68,2,0,Villa,11.6,2003,Neuf,1,1,12000000
+Port-Bouet,59,3,4,Villa,2.8,1983,Neuf,1,0,11000000
+Marcory,152,5,3,Villa,0.5,2015,À rénover,1,1,31200000
+Yopougon,87,3,0,Appartement,23.1,1993,Bon état,0,0,12200000
+Plateau,86,4,1,Appartement,1.5,1996,Bon état,1,1,29300000
+Treichville,101,3,1,Studio,0.5,1982,Bon état,0,1,24600000
+Abobo,42,3,3,Villa,2.2,2017,Bon état,0,1,5900000
+Marcory,124,2,1,Appartement,2.1,2002,Bon état,1,1,19800000
+Adjamé,71,3,0,Studio,4.4,1992,Neuf,1,1,14800000
+Abobo,103,3,2,Appartement,20.2,1988,Bon état,0,1,18100000
+Yopougon,43,3,1,Appartement,16.9,2000,Bon état,0,0,6500000
+Cocody,34,2,0,Studio,4.9,2020,À rénover,1,1,9300000
+Adjamé,111,3,1,Studio,4.2,1987,Bon état,1,1,27500000
+Abobo,89,2,1,Villa,6.5,1996,Neuf,0,0,8500000
+Koumassi,47,3,1,Appartement,2.2,1995,Bon état,0,1,7700000
+Abobo,48,2,0,Appartement,0.5,1995,Neuf,0,0,5900000
+Port-Bouet,129,4,1,Villa,22.4,2007,Bon état,1,1,30800000
+Abobo,41,2,0,Appartement,1.7,1995,Neuf,1,0,5100000
+Abobo,168,1,3,Studio,1.8,1993,Bon état,1,1,17100000
+Port-Bouet,47,2,0,Duplex,5.1,2023,Neuf,1,1,7000000
+Yopougon,101,3,0,Studio,5.4,2017,Bon état,1,1,14400000
+Plateau,63,2,2,Appartement,0.5,1999,À rénover,0,1,20200000
+Cocody,100,2,3,Studio,1.3,2020,Bon état,0,1,30500000
+Koumassi,56,3,3,Appartement,3.8,2013,Neuf,1,0,8300000
+Abobo,68,2,1,Appartement,9.2,2008,Bon état,1,0,6300000
+Adjamé,75,4,0,Appartement,2.1,1982,Bon état,1,0,16600000
+Marcory,45,4,2,Appartement,4.4,1989,À rénover,1,0,10300000
+Plateau,107,3,2,Duplex,6.5,1999,Neuf,1,0,35200000
+Cocody,57,2,0,Appartement,17.6,1981,À rénover,0,1,16800000
+Yopougon,66,3,4,Appartement,3.2,2006,Bon état,0,1,10100000
+Abobo,45,1,0,Duplex,1.1,2011,Bon état,0,1,5000000
+Yopougon,20,2,5,Appartement,5.4,1989,À rénover,0,0,5000000
+Yopougon,67,2,3,Studio,11.0,2019,Bon état,1,0,7900000
+Port-Bouet,246,4,2,Appartement,0.9,1996,À rénover,0,1,61300000
+Yopougon,109,1,4,Appartement,4.4,2012,Bon état,0,0,15300000
+Abobo,73,3,2,Duplex,0.5,1985,Bon état,1,0,8800000
+Koumassi,65,3,0,Appartement,0.5,2018,Bon état,0,0,9400000
+Yopougon,75,2,1,Villa,5.3,1997,Bon état,1,0,10400000
+Abobo,97,1,0,Appartement,2.8,1988,Bon état,1,0,11700000
+Port-Bouet,41,5,1,Appartement,14.9,1987,Bon état,1,0,8600000
+Treichville,129,3,2,Appartement,7.4,2004,Neuf,1,0,27500000
+Plateau,105,3,1,Appartement,4.8,2010,Bon état,0,1,43000000
+Port-Bouet,106,2,1,Appartement,4.2,2021,Bon état,0,0,16700000
+Yopougon,92,2,2,Studio,5.5,1983,À rénover,1,0,12300000
+Marcory,74,2,3,Appartement,0.5,1999,Bon état,1,1,11000000
+Yopougon,103,1,0,Appartement,17.9,2007,Bon état,1,1,15300000
+Treichville,99,1,1,Appartement,40.0,2019,Neuf,0,0,19700000
+Yopougon,62,4,0,Duplex,1.6,1980,À rénover,1,1,8800000
+Yopougon,55,2,2,Duplex,1.0,2019,Bon état,1,0,9900000
+Abobo,78,2,0,Villa,1.2,2023,Bon état,1,0,9400000
+Marcory,160,3,2,Studio,8.7,2002,Bon état,0,1,31400000
+Cocody,40,3,0,Appartement,8.7,1992,Bon état,1,1,14700000
+Plateau,35,1,0,Appartement,15.1,1995,Bon état,1,0,13000000
+Plateau,80,3,4,Villa,11.1,2005,À rénover,1,1,34400000
+Plateau,76,1,0,Villa,4.8,2010,Neuf,0,1,24900000
+Plateau,80,1,1,Appartement,7.6,1980,Bon état,1,0,29900000
+Adjamé,83,1,0,Appartement,9.3,1996,À rénover,0,0,12000000
+Plateau,66,4,1,Duplex,5.8,1995,Bon état,0,0,31000000
+Yopougon,155,1,1,Studio,5.2,2016,À rénover,1,1,14400000
+Port-Bouet,33,1,1,Appartement,8.3,1989,À rénover,0,0,5000000
+Yopougon,49,2,0,Villa,6.5,2017,Bon état,1,1,8700000
+Adjamé,70,4,1,Appartement,8.3,2023,Bon état,1,0,11500000
+Plateau,32,2,2,Appartement,7.6,2010,Bon état,0,0,11000000
+Plateau,67,2,3,Appartement,10.2,1989,Neuf,1,1,23600000
+Cocody,169,1,1,Appartement,8.2,2013,À rénover,1,1,38700000
+Plateau,74,2,2,Appartement,5.9,1985,À rénover,0,0,18700000
+Marcory,83,3,0,Studio,9.2,2007,Bon état,1,0,18600000
+Plateau,39,3,0,Appartement,4.8,2007,Bon état,0,1,16200000
+Cocody,54,2,0,Villa,2.2,1992,Neuf,1,0,16200000
+Plateau,61,2,0,Appartement,0.5,2020,Bon état,0,0,22600000
+Yopougon,63,1,0,Appartement,6.6,1991,Bon état,0,1,8200000
+Marcory,140,2,1,Studio,7.1,2019,À rénover,0,1,34900000
+Yopougon,97,1,2,Villa,28.6,1981,Bon état,1,0,12200000
+Abobo,42,3,4,Duplex,3.6,1987,À rénover,1,1,5000000
+Adjamé,83,5,0,Duplex,4.0,2021,Bon état,1,1,15700000
+Cocody,95,5,2,Appartement,1.8,1988,Bon état,0,0,38200000
+Koumassi,130,4,3,Appartement,0.6,1987,Bon état,1,1,27300000
+Abobo,162,3,2,Studio,11.9,1982,À rénover,0,0,18700000
+Cocody,44,3,0,Duplex,2.3,1988,Bon état,0,0,14500000
+Port-Bouet,49,2,0,Villa,7.5,1992,Bon état,1,0,8900000
+Port-Bouet,39,3,0,Studio,9.3,1988,Neuf,0,0,6200000
+Cocody,66,2,1,Studio,5.1,2010,Bon état,0,1,20000000
+Marcory,93,2,2,Appartement,16.7,2004,Bon état,1,0,15700000
+Koumassi,121,3,0,Villa,4.7,2023,Bon état,1,1,14400000
+Koumassi,71,2,0,Studio,2.7,1987,Bon état,0,0,11300000
+Plateau,63,2,2,Villa,18.1,2010,Bon état,0,0,22400000
+Marcory,80,4,3,Appartement,15.8,2010,Neuf,0,1,20400000
+Yopougon,49,1,1,Appartement,1.4,1996,À rénover,1,1,6400000
+Yopougon,210,2,2,Appartement,0.5,1998,Bon état,1,1,25200000
+Abobo,33,4,1,Appartement,0.8,1982,Bon état,1,1,5000000
+Yopougon,81,3,0,Duplex,2.7,2009,Neuf,1,0,10000000
+Yopougon,203,3,1,Appartement,28.7,1989,Bon état,1,1,37000000
+Koumassi,74,2,2,Appartement,6.5,2008,Bon état,1,0,8900000
+Cocody,67,2,4,Appartement,3.7,2019,À rénover,0,1,19700000
+Marcory,62,4,0,Villa,17.6,1997,Bon état,0,1,13000000
+Adjamé,67,3,1,Villa,4.8,1991,Bon état,1,0,12700000
+Port-Bouet,146,3,1,Appartement,3.0,2002,Bon état,0,0,25800000
+Abobo,24,1,1,Appartement,22.7,1990,Bon état,1,1,5000000
+Abobo,159,1,0,Appartement,15.2,1988,À rénover,0,1,19700000
+Cocody,36,5,1,Villa,14.8,2003,À rénover,1,0,13400000
+Yopougon,65,2,3,Appartement,5.7,2004,Bon état,0,1,9800000
+Abobo,59,3,2,Duplex,12.5,2004,Bon état,0,1,6400000
+Marcory,99,1,1,Appartement,1.6,1988,À rénover,1,0,15600000
+Marcory,33,3,0,Appartement,6.8,1991,Bon état,1,0,7800000
+Yopougon,93,4,0,Villa,33.0,1990,Bon état,1,1,14300000
+Cocody,203,3,1,Appartement,2.8,2017,À rénover,1,0,72100000
+Yopougon,37,1,3,Villa,12.7,2007,Bon état,1,0,5000000
+Marcory,81,3,4,Appartement,5.4,1987,Bon état,1,1,19400000
+Yopougon,53,3,1,Villa,0.5,1989,À rénover,0,1,6000000
+Cocody,91,2,1,Studio,11.5,2004,Bon état,0,1,35300000
+Port-Bouet,74,4,3,Duplex,1.5,2015,Bon état,0,0,14300000
+Abobo,53,3,1,Appartement,8.0,2022,Bon état,1,1,7500000
+Adjamé,94,4,2,Appartement,0.7,1988,Bon état,0,1,15300000
+Koumassi,182,3,0,Appartement,23.5,2020,Neuf,1,0,30900000
+Yopougon,67,1,2,Duplex,2.8,1987,Bon état,1,1,7000000
+Cocody,106,2,1,Duplex,2.1,1982,Bon état,1,1,34200000
+Abobo,39,2,3,Appartement,1.1,1997,À rénover,0,1,5000000
+Abobo,46,4,3,Appartement,23.4,2014,Bon état,0,1,6300000
+Koumassi,93,3,0,Appartement,10.0,1996,Bon état,1,0,16700000
+Yopougon,155,3,2,Appartement,10.8,2015,Bon état,0,1,19100000
+Plateau,88,2,3,Appartement,5.5,2007,À rénover,0,1,29800000
+Marcory,63,2,1,Appartement,5.2,1994,Bon état,0,1,14500000
+Yopougon,74,3,0,Villa,0.9,1998,Bon état,0,1,14700000
+Adjamé,39,2,0,Duplex,6.6,2001,Bon état,0,0,6200000
+Abobo,100,2,1,Duplex,2.3,1985,Bon état,1,0,12900000
+Yopougon,115,3,1,Appartement,30.2,1986,Bon état,1,0,17100000
+Treichville,59,1,2,Villa,12.7,2023,Bon état,1,1,14500000
+Abobo,58,2,0,Studio,4.3,1988,À rénover,0,0,5100000
+Marcory,84,2,3,Appartement,1.3,1999,À rénover,1,1,18400000
+Cocody,59,1,0,Villa,12.3,2016,À rénover,1,0,12500000
+Plateau,71,5,0,Appartement,1.0,1990,Bon état,0,0,20500000
+Marcory,211,2,1,Appartement,1.7,1981,À rénover,0,0,47600000
+Plateau,65,1,1,Appartement,1.9,2001,À rénover,0,1,23200000
+Plateau,62,2,0,Appartement,6.5,2015,Bon état,1,1,22400000
+Marcory,53,3,0,Villa,12.4,1984,Bon état,1,1,12100000
+Plateau,107,2,0,Appartement,3.0,1986,Bon état,1,1,59200000
+Port-Bouet,67,3,2,Appartement,0.7,1985,Neuf,0,0,12000000
+Cocody,53,1,3,Appartement,5.0,2001,Neuf,1,0,16000000
+Abobo,143,1,1,Studio,11.0,1989,Neuf,0,1,14200000
+Yopougon,150,2,2,Appartement,2.0,2019,Bon état,0,1,22000000
+Treichville,55,4,2,Villa,2.0,1999,Bon état,1,0,12500000
+Cocody,29,4,0,Villa,23.5,2007,Bon état,0,1,9400000
+Yopougon,122,1,4,Appartement,24.7,2002,Bon état,1,0,20200000
+Treichville,52,3,3,Appartement,37.2,2014,À rénover,1,0,13500000
+Port-Bouet,109,4,0,Villa,13.2,1980,À rénover,1,0,22100000
+Koumassi,28,2,0,Appartement,1.7,2008,Bon état,0,1,5000000
+Marcory,115,4,0,Appartement,1.9,1988,Bon état,1,0,27000000
+Plateau,40,1,0,Villa,3.3,1988,Bon état,1,0,19700000
+Adjamé,106,4,2,Appartement,3.1,2001,Bon état,1,0,19000000
+Port-Bouet,74,3,1,Appartement,25.1,1981,Bon état,1,0,16000000
+Abobo,46,4,3,Appartement,12.4,1995,Bon état,1,1,7600000
+Abobo,60,3,2,Appartement,10.3,2019,À rénover,1,0,7900000
+Marcory,104,2,2,Villa,1.6,1985,Neuf,0,0,19600000
+Koumassi,78,4,2,Villa,19.2,1992,Neuf,1,1,8600000
+Plateau,99,2,0,Villa,14.1,2012,Neuf,1,0,41300000
+Yopougon,198,2,1,Villa,1.4,1998,Bon état,1,0,24400000
+Yopougon,34,3,2,Appartement,16.4,1994,Bon état,1,0,5300000
+Abobo,165,3,0,Appartement,2.5,2012,Bon état,0,1,17100000
+Marcory,78,4,0,Appartement,0.7,1989,Neuf,1,1,18600000
+Cocody,47,2,3,Appartement,8.6,1980,Bon état,1,0,14300000
+Abobo,38,3,2,Duplex,8.5,1991,Neuf,0,1,5000000
+Marcory,67,3,0,Studio,0.8,2022,Bon état,0,1,12900000
+Abobo,117,1,2,Appartement,3.1,2008,Neuf,1,1,15200000
+Plateau,69,2,3,Appartement,39.5,1996,Bon état,0,0,23700000
+Yopougon,157,2,1,Appartement,9.1,1983,Bon état,0,0,16500000
+Abobo,36,2,0,Appartement,10.5,2008,Bon état,0,1,5000000
+Cocody,73,5,4,Appartement,1.9,1986,Bon état,1,1,27100000
+Yopougon,39,3,1,Villa,0.7,2023,Bon état,0,1,6000000
+Plateau,88,3,0,Studio,2.6,1992,Neuf,1,0,43000000
+Cocody,115,5,1,Villa,2.3,1984,Bon état,1,0,41000000
+Treichville,60,2,3,Appartement,2.1,1985,Bon état,1,1,12100000
+Yopougon,20,4,0,Appartement,1.7,2013,Bon état,1,1,5000000
+Koumassi,81,2,0,Villa,6.8,1986,Bon état,1,0,13800000
+Marcory,92,4,0,Studio,3.2,2007,À rénover,1,0,23400000
+Adjamé,90,2,5,Studio,13.7,1989,Bon état,0,0,13700000
+Koumassi,137,4,0,Duplex,1.6,1983,Neuf,1,1,17000000
+Abobo,43,2,2,Villa,5.0,1982,Bon état,1,1,6200000
+Yopougon,104,2,4,Villa,0.5,2004,Neuf,0,1,11900000
+Yopougon,134,3,0,Appartement,5.3,2002,Bon état,1,1,18400000
+Yopougon,30,2,5,Villa,0.5,2006,Bon état,0,0,5000000
+Port-Bouet,86,3,4,Appartement,30.4,1993,Neuf,1,1,13100000
+Koumassi,57,2,3,Appartement,12.5,2017,À rénover,0,1,6700000
+Treichville,71,3,0,Villa,5.4,2011,Bon état,1,1,10700000
+Plateau,88,2,2,Appartement,0.7,2002,Bon état,0,1,36900000
+Adjamé,58,1,3,Appartement,7.2,2019,Neuf,0,0,8000000
+Port-Bouet,53,2,5,Appartement,11.4,2016,Bon état,1,1,13200000
+Plateau,75,2,0,Appartement,1.7,1982,À rénover,1,1,24100000
+Cocody,43,2,3,Appartement,6.7,2014,Bon état,1,1,11200000
+Koumassi,43,2,1,Appartement,13.5,1992,À rénover,0,0,6000000
+Abobo,104,2,0,Appartement,11.7,2013,Neuf,0,1,12800000
+Port-Bouet,41,1,1,Appartement,13.0,2003,Bon état,1,0,6100000
+Plateau,103,3,3,Duplex,16.9,1980,Bon état,1,0,45700000
+Koumassi,93,4,1,Appartement,22.2,1991,Bon état,0,0,13800000
+Marcory,31,2,1,Appartement,4.2,1987,Neuf,1,1,5300000
+Plateau,53,3,5,Villa,6.7,1998,Bon état,0,0,15700000
+Plateau,134,3,1,Studio,12.5,1988,Bon état,0,0,36300000
+Koumassi,45,2,2,Villa,9.6,2007,Bon état,0,1,6300000
+Adjamé,58,3,1,Appartement,40.0,1993,Bon état,1,1,9600000
+Abobo,93,2,1,Villa,0.5,2006,Bon état,1,1,10000000
+Yopougon,109,3,2,Villa,3.5,1997,Bon état,1,0,19500000
+Port-Bouet,65,1,4,Villa,2.6,2021,Bon état,1,1,12300000
+Yopougon,55,3,1,Villa,2.4,2020,Bon état,0,0,7900000
+Koumassi,150,3,3,Studio,2.0,1985,Bon état,1,0,17800000
+Yopougon,176,1,0,Studio,9.9,2012,À rénover,1,0,20900000
+Yopougon,120,2,0,Villa,0.7,2016,Neuf,1,1,15300000
+Yopougon,77,5,1,Appartement,10.8,2021,Bon état,0,0,11900000
+Marcory,49,2,0,Villa,9.5,2004,Bon état,1,0,9500000
+Koumassi,49,3,0,Studio,2.3,1992,Bon état,1,0,7200000
+Abobo,96,4,1,Appartement,2.3,2002,Bon état,1,0,12300000
+Marcory,91,3,0,Duplex,7.9,2015,Bon état,1,1,19100000
+Port-Bouet,149,3,0,Appartement,11.5,2012,Neuf,1,1,28500000
+Yopougon,102,3,1,Appartement,16.7,2000,Bon état,0,0,16200000
+Abobo,35,4,2,Studio,15.3,2013,À rénover,1,0,5000000
+Port-Bouet,125,2,4,Appartement,26.8,2015,À rénover,1,0,25700000
+Abobo,45,2,2,Appartement,7.0,1996,Neuf,1,1,5000000
+Cocody,61,2,1,Appartement,19.1,1989,Bon état,1,0,14000000
+Port-Bouet,84,5,4,Appartement,13.2,2002,Bon état,0,0,18800000
+Abobo,200,3,3,Appartement,18.0,2023,Bon état,1,1,22400000
+Yopougon,349,1,0,Appartement,0.5,1981,Bon état,0,0,47600000
+Plateau,100,4,0,Appartement,27.0,2014,Bon état,0,0,27800000
+Koumassi,67,2,2,Duplex,5.1,1993,Neuf,1,0,12200000
+Abobo,96,1,2,Duplex,12.8,2020,À rénover,0,0,11600000
+Abobo,115,3,3,Appartement,1.1,1981,À rénover,0,1,11400000
+Port-Bouet,63,2,2,Villa,4.0,1998,Bon état,0,1,8500000
+Koumassi,181,4,2,Appartement,2.5,1995,Bon état,1,0,39300000
+Plateau,83,2,5,Appartement,2.8,2022,Bon état,1,0,27900000
+Marcory,95,4,1,Appartement,1.1,2023,Bon état,0,1,20600000
+Marcory,103,3,0,Duplex,13.1,2004,Bon état,0,1,15800000
+Koumassi,91,1,3,Duplex,0.5,1980,À rénover,1,0,12100000
+Cocody,112,5,0,Appartement,3.0,1981,Neuf,1,1,40000000
+Abobo,54,3,3,Appartement,1.5,2006,Bon état,0,0,7600000
+Koumassi,56,2,4,Appartement,7.1,1981,Bon état,1,1,6700000
+Port-Bouet,43,2,2,Villa,2.3,2009,Bon état,1,1,5700000
+Yopougon,92,4,2,Villa,2.4,1989,Bon état,1,1,15800000
+Koumassi,109,2,1,Appartement,5.4,1998,Bon état,1,0,19000000
+Cocody,93,2,1,Studio,8.5,2021,À rénover,1,0,21500000
+Port-Bouet,170,1,1,Appartement,1.0,1995,Bon état,0,1,31600000
+Plateau,73,2,2,Duplex,1.5,1992,Bon état,0,1,27700000
+Yopougon,103,3,3,Villa,2.3,1987,Bon état,0,1,18100000
+Koumassi,43,2,2,Appartement,29.1,2010,Bon état,1,0,6400000
+Plateau,61,2,0,Studio,4.0,2004,Bon état,1,1,14300000
+Marcory,104,2,1,Studio,7.3,2018,Bon état,1,1,22000000
+Adjamé,113,2,3,Appartement,2.2,2000,Neuf,0,0,21200000
+Adjamé,64,4,1,Appartement,5.4,2017,Bon état,1,0,10300000
+Adjamé,71,2,1,Duplex,0.6,2020,Bon état,1,0,10800000
+Adjamé,35,5,3,Appartement,0.5,2008,Bon état,1,1,6700000
+Abobo,62,2,2,Appartement,5.1,1985,Bon état,1,1,5000000
+Marcory,115,2,1,Appartement,4.1,1997,Bon état,1,1,31100000
+Yopougon,98,4,3,Studio,1.2,2023,Bon état,1,0,13700000
+Plateau,95,2,0,Studio,9.3,2014,Bon état,1,1,38600000
+Port-Bouet,76,3,5,Duplex,39.6,2006,Bon état,1,1,13900000
+Abobo,74,5,0,Villa,4.0,1984,Bon état,0,0,12800000
+Yopougon,53,1,0,Appartement,7.8,1986,Bon état,1,0,7300000
+Yopougon,105,1,3,Villa,26.4,1989,Bon état,1,0,13200000
+Treichville,91,3,0,Studio,14.2,1989,Bon état,1,1,17400000
+Plateau,94,2,2,Appartement,5.0,2007,À rénover,1,0,39800000
+Abobo,57,2,3,Appartement,10.7,2015,Bon état,1,0,5000000
+Abobo,25,1,3,Appartement,1.1,1989,À rénover,1,0,5000000
+Abobo,128,1,5,Villa,5.7,2014,Bon état,1,1,11800000
+Cocody,58,3,0,Studio,2.6,2014,Bon état,0,0,22400000
+Port-Bouet,48,1,2,Villa,1.4,2016,À rénover,1,0,7900000
+Port-Bouet,104,2,0,Duplex,4.4,1999,À rénover,1,0,19700000
+Abobo,61,3,1,Appartement,1.1,1992,Bon état,0,0,7900000
+Adjamé,125,2,3,Duplex,9.6,1990,Bon état,1,0,14900000
+Port-Bouet,100,1,1,Studio,4.9,1998,Bon état,1,1,13900000
+Adjamé,104,3,2,Appartement,6.1,2007,Bon état,1,1,19900000
+Plateau,37,1,1,Duplex,1.3,2017,Neuf,1,1,13300000
+Abobo,135,3,2,Appartement,1.2,1983,Neuf,0,1,20300000
+Abobo,84,4,5,Studio,7.0,2016,À rénover,1,0,12200000
+Yopougon,61,2,0,Studio,33.6,1998,Neuf,1,1,7300000
+Adjamé,79,3,2,Studio,0.8,2016,Neuf,0,0,12100000
+Port-Bouet,30,2,3,Villa,2.7,1993,Bon état,0,0,5300000
+Port-Bouet,90,2,1,Appartement,16.3,2010,Neuf,1,1,10200000
+Yopougon,44,4,0,Villa,0.6,2007,Bon état,1,1,8900000
+Cocody,37,4,2,Appartement,16.7,2015,Bon état,1,1,13700000
+Treichville,34,2,1,Studio,5.9,2023,Bon état,1,1,8300000
+Koumassi,129,3,0,Studio,4.2,2017,Bon état,0,1,16000000
+Plateau,54,4,3,Duplex,3.0,1998,Bon état,0,1,27800000
+Port-Bouet,159,5,1,Appartement,2.8,2021,Bon état,0,1,44800000
+Port-Bouet,56,3,4,Studio,2.9,1980,Bon état,1,1,8300000
+Abobo,31,2,3,Duplex,17.3,2002,Bon état,0,0,5000000
+Abobo,42,2,2,Studio,10.3,2007,Bon état,1,0,5000000
+Yopougon,137,5,0,Appartement,8.9,1983,À rénover,1,1,18100000
+Cocody,68,1,1,Appartement,12.8,2020,Bon état,1,0,20400000
+Yopougon,56,3,0,Appartement,2.4,1997,Bon état,1,0,9500000
+Koumassi,80,2,4,Villa,7.7,2018,Neuf,1,0,11000000
+Cocody,95,2,0,Villa,4.9,2004,Bon état,0,0,33800000
+Yopougon,129,2,0,Duplex,12.2,1997,Neuf,0,1,13600000
+Yopougon,152,5,1,Appartement,3.0,1985,Bon état,0,1,20200000
+Abobo,62,1,0,Appartement,8.2,1998,À rénover,1,1,7000000
+Port-Bouet,38,3,0,Villa,17.1,1991,Bon état,0,1,7100000
+Yopougon,60,1,2,Studio,4.1,2004,Bon état,1,1,7000000
+Yopougon,84,2,0,Duplex,0.6,2014,Bon état,0,1,13200000
+Adjamé,46,2,0,Studio,5.8,1980,Bon état,0,1,8000000
+Yopougon,46,3,1,Appartement,3.4,1984,Bon état,0,0,7800000
+Marcory,88,2,2,Villa,8.9,1980,Bon état,1,0,18700000
+Yopougon,72,2,2,Studio,24.1,1987,Neuf,1,0,11000000
+Plateau,75,1,1,Appartement,5.3,2018,À rénover,1,1,24500000
+Plateau,50,2,2,Appartement,5.0,2022,Bon état,1,1,24700000
+Yopougon,66,5,1,Appartement,8.5,1997,À rénover,1,1,9900000
+Yopougon,46,4,4,Appartement,0.9,1988,Neuf,1,1,9800000
+Port-Bouet,115,2,0,Villa,2.3,1984,Bon état,1,0,20000000
+Yopougon,124,3,2,Appartement,20.1,1983,Neuf,1,0,14800000
+Abobo,29,4,3,Appartement,8.9,2023,Neuf,1,1,5000000
+Abobo,46,1,3,Appartement,0.5,2008,Bon état,1,0,5200000
+Cocody,35,4,0,Villa,1.8,1980,Bon état,1,1,13700000
+Adjamé,53,4,0,Appartement,9.2,2009,Bon état,1,1,11700000
+Plateau,71,1,2,Villa,11.6,1980,Bon état,1,1,26100000
+Treichville,36,2,0,Appartement,14.7,1982,Bon état,0,0,6700000
+Plateau,46,5,3,Appartement,2.8,2001,Bon état,1,1,24400000
+Yopougon,45,3,2,Appartement,21.4,1987,Bon état,0,1,6800000
+Cocody,82,1,2,Appartement,6.4,1997,Bon état,1,1,25300000
+Treichville,76,2,0,Appartement,9.5,2004,Bon état,1,1,10600000
+Abobo,51,2,2,Appartement,7.3,1999,Neuf,1,1,6500000
+Abobo,81,3,2,Studio,1.0,2010,Bon état,0,0,9300000
+Cocody,56,3,3,Villa,26.4,2009,Bon état,0,1,22700000
+Koumassi,64,5,0,Appartement,1.0,1995,Bon état,0,1,12900000
+Marcory,170,2,0,Appartement,2.4,1981,Neuf,0,0,38000000
+Port-Bouet,144,3,1,Duplex,13.4,1996,Bon état,1,0,28700000
+Marcory,38,3,0,Villa,7.7,1989,Bon état,1,0,7500000
+Plateau,112,2,2,Appartement,14.6,1986,Bon état,1,1,52600000
+Cocody,111,2,4,Villa,5.8,2021,Bon état,1,0,43600000
+Yopougon,42,5,1,Studio,3.8,1988,À rénover,0,0,7600000
+Abobo,111,4,3,Studio,20.4,1996,Bon état,0,1,18800000
+Cocody,159,2,0,Appartement,0.5,1988,Bon état,0,1,44000000
+Koumassi,42,3,0,Appartement,15.5,1988,Bon état,1,0,6000000
+Yopougon,47,2,0,Appartement,2.1,2016,À rénover,1,0,6600000
+Abobo,123,3,1,Duplex,15.1,2003,Neuf,1,0,16700000
+Yopougon,84,3,4,Villa,1.2,2018,Bon état,0,0,11900000
+Yopougon,97,3,0,Appartement,6.9,1990,À rénover,0,0,15800000
+Abobo,87,5,2,Duplex,17.5,1987,Bon état,1,1,13200000
+Plateau,90,3,1,Duplex,5.1,2004,À rénover,0,1,31100000
+Plateau,38,2,4,Duplex,11.0,1981,Bon état,1,1,15500000
+Port-Bouet,124,3,0,Studio,13.1,1989,Bon état,0,0,26000000
+Treichville,132,2,0,Duplex,10.7,2003,Bon état,0,1,27800000
+Yopougon,66,2,0,Appartement,20.8,1995,Bon état,1,1,10900000
+Marcory,72,2,1,Studio,4.7,1998,Neuf,0,0,12700000
+Adjamé,34,2,0,Studio,1.5,2010,Bon état,1,0,5900000
+Yopougon,95,3,3,Appartement,0.5,1990,Bon état,1,1,11800000
+Cocody,98,2,2,Appartement,2.3,1985,À rénover,1,1,24700000
+Plateau,71,3,2,Duplex,1.2,1985,Bon état,1,0,26100000
+Adjamé,129,3,1,Appartement,6.5,2011,Bon état,1,1,19300000
+Adjamé,62,2,0,Studio,1.6,2018,À rénover,0,1,9200000
+Cocody,98,4,1,Appartement,0.5,1992,Bon état,1,1,32900000
+Marcory,44,2,5,Appartement,0.5,1982,Bon état,1,0,10700000
+Marcory,73,2,3,Appartement,14.2,2020,Bon état,0,1,15000000
+Adjamé,68,3,3,Appartement,7.2,2014,Bon état,1,0,9000000
+Cocody,82,2,3,Villa,3.5,2017,Bon état,1,1,29000000
+Cocody,61,1,0,Villa,18.0,1996,Bon état,1,1,14900000
+Koumassi,69,3,0,Appartement,0.6,1982,Bon état,1,0,11100000
+Plateau,111,3,0,Appartement,31.4,2013,Bon état,1,1,48100000
+Adjamé,59,2,1,Appartement,7.7,1991,Bon état,1,0,9800000
+Marcory,33,5,0,Appartement,1.6,2003,Bon état,1,1,10100000
+Cocody,177,3,1,Studio,9.1,1985,Bon état,1,0,61600000
+Marcory,147,4,2,Appartement,11.5,2021,Bon état,1,1,31700000
+Adjamé,39,1,3,Appartement,4.5,1990,À rénover,1,0,7800000
+Port-Bouet,104,3,2,Appartement,15.8,2006,À rénover,0,1,19900000
+Koumassi,57,4,4,Appartement,1.3,2003,Bon état,1,1,9700000
+Yopougon,84,3,0,Appartement,2.6,1997,Bon état,1,1,14500000
+Adjamé,85,3,0,Appartement,0.8,2006,À rénover,1,0,15300000
+Marcory,66,2,2,Studio,1.9,2020,Bon état,1,1,15100000
+Marcory,50,1,0,Duplex,2.2,2000,Bon état,1,0,13700000
+Port-Bouet,52,2,0,Studio,20.0,2013,Neuf,0,1,8600000
+Cocody,47,2,1,Appartement,0.7,2012,À rénover,0,1,13500000
+Cocody,49,4,0,Appartement,4.5,1997,Bon état,1,1,17300000
+Marcory,71,2,1,Villa,6.1,1982,Bon état,1,1,17800000
+Cocody,52,5,1,Villa,18.3,2003,Neuf,1,0,14900000
+Plateau,104,5,1,Duplex,40.0,1980,Bon état,1,1,33900000
+Abobo,155,2,2,Appartement,11.2,1985,Bon état,1,0,16800000
+Yopougon,55,2,1,Appartement,28.3,1998,Bon état,0,1,5800000
+Port-Bouet,83,4,0,Villa,12.4,2001,Bon état,0,1,15400000
+Koumassi,95,5,0,Studio,26.4,2022,Bon état,0,1,18900000
+Yopougon,93,2,1,Studio,9.8,1987,Neuf,1,1,11300000
+Marcory,77,2,2,Villa,0.7,1984,Bon état,0,0,13100000
+Yopougon,107,3,3,Duplex,4.1,1988,Bon état,1,1,16300000
+Abobo,94,3,2,Villa,8.3,2000,Bon état,0,0,13500000
+Marcory,40,2,0,Duplex,3.5,2007,Neuf,1,1,6400000
+Abobo,114,3,2,Duplex,2.6,1983,Bon état,0,1,16300000
+Yopougon,115,1,2,Studio,6.9,2003,Neuf,1,0,16800000
+Abobo,50,1,1,Appartement,21.7,1987,À rénover,1,0,6300000
+Yopougon,75,2,1,Appartement,0.5,1996,Bon état,0,0,12500000
+Marcory,104,2,1,Villa,11.7,2013,Bon état,1,1,29900000
+Treichville,66,2,2,Appartement,10.3,1999,Bon état,0,0,12800000
+Koumassi,126,2,2,Studio,26.6,1995,Bon état,1,1,19400000
+Plateau,240,2,0,Appartement,21.4,1989,À rénover,1,1,85100000
+Port-Bouet,50,2,2,Appartement,11.5,2013,Neuf,1,0,8600000
+Yopougon,37,2,0,Studio,5.9,2022,Bon état,1,0,6400000
+Port-Bouet,86,5,0,Appartement,1.8,1989,À rénover,0,1,14500000
+Koumassi,106,2,5,Appartement,6.3,2009,Bon état,1,0,14000000
+Yopougon,66,2,4,Appartement,11.6,2009,Neuf,1,1,11200000
+Cocody,152,3,0,Villa,18.1,2004,Neuf,0,0,56900000
+Marcory,38,5,1,Appartement,12.5,2022,Neuf,1,0,9500000
+Abobo,104,2,0,Studio,1.7,2020,À rénover,0,1,13900000
+Abobo,54,3,1,Appartement,7.3,1986,Bon état,1,0,7200000
+Marcory,174,3,3,Duplex,3.2,1999,À rénover,1,1,49500000
+Plateau,200,3,4,Appartement,0.5,1996,À rénover,0,1,82100000
+Koumassi,50,1,2,Appartement,1.8,1982,Bon état,0,0,8100000
+Treichville,56,3,1,Appartement,1.0,2019,Neuf,1,0,17200000
+Abobo,113,1,2,Appartement,14.8,2015,Neuf,1,0,13500000
+Plateau,61,3,1,Villa,2.4,2005,Bon état,1,0,24900000
+Marcory,72,3,4,Appartement,2.7,1989,Bon état,1,1,18500000
+Cocody,75,2,3,Appartement,25.7,2013,Bon état,0,1,21400000
+Port-Bouet,28,4,2,Villa,3.8,1993,Bon état,1,0,7500000
+Cocody,73,1,1,Appartement,0.5,1987,À rénover,1,0,21000000
+Abobo,52,4,0,Appartement,2.7,2006,Bon état,1,0,6800000
+Marcory,58,2,0,Studio,1.0,1989,Bon état,1,0,11000000
+Abobo,152,2,3,Duplex,0.9,1994,À rénover,0,1,21000000
+Adjamé,39,1,1,Appartement,0.6,2016,Neuf,0,1,6600000
+Koumassi,111,5,1,Appartement,7.2,2001,Bon état,0,0,19000000
+Marcory,64,1,1,Duplex,1.7,2010,Neuf,1,0,13900000
+Cocody,64,2,3,Appartement,3.6,1981,Neuf,1,1,15000000
+Plateau,109,2,0,Duplex,15.8,2010,Bon état,1,0,42300000
+Port-Bouet,87,3,3,Appartement,4.4,1993,Bon état,0,1,17200000
+Port-Bouet,98,3,3,Studio,19.8,1989,Bon état,0,0,22800000
+Abobo,120,1,4,Appartement,5.5,2009,À rénover,0,1,11700000
+Abobo,62,2,1,Duplex,4.1,2015,Neuf,1,1,6000000
+Adjamé,54,2,0,Appartement,11.1,2019,Bon état,1,0,7600000
+Plateau,43,2,1,Villa,0.6,1994,Neuf,0,1,13000000
+Port-Bouet,49,2,1,Appartement,0.7,1993,Bon état,1,1,10200000
+Yopougon,322,3,0,Appartement,8.4,2010,Bon état,0,0,59800000
+Yopougon,137,2,2,Studio,5.3,2008,À rénover,0,0,20200000
+Abobo,38,2,1,Villa,12.5,2006,Bon état,0,1,5300000
+Cocody,38,2,3,Duplex,19.8,2000,Neuf,0,1,11700000
+Plateau,94,5,0,Appartement,3.9,1988,Bon état,0,1,42800000
+Adjamé,97,5,2,Studio,7.3,1999,Neuf,0,1,18200000
+Cocody,97,4,3,Appartement,5.6,2014,Bon état,1,1,32100000
+Abobo,65,2,3,Duplex,32.0,1994,Bon état,1,1,5900000
+Marcory,69,1,3,Duplex,14.2,2003,Neuf,1,1,14300000
+Yopougon,87,2,2,Appartement,19.4,1995,Bon état,1,0,12100000
+Marcory,77,2,4,Studio,2.3,2015,Bon état,0,1,18500000
+Yopougon,24,3,1,Studio,11.8,1990,Bon état,1,0,5000000
+Adjamé,66,3,1,Appartement,2.5,1987,Neuf,0,0,11200000
+Marcory,48,4,0,Villa,1.9,1982,À rénover,1,1,10300000
+Abobo,80,4,0,Appartement,23.1,1998,Bon état,1,0,11000000
+Yopougon,328,2,0,Studio,0.5,2020,Bon état,0,0,51200000
+Adjamé,89,3,0,Appartement,26.9,1982,Bon état,1,0,12800000
+Port-Bouet,63,2,0,Appartement,1.3,2015,Bon état,0,1,11000000
+Adjamé,117,1,0,Appartement,13.7,2004,Bon état,0,1,18200000
+Marcory,94,3,0,Villa,2.6,2015,Bon état,0,1,19500000
+Cocody,91,1,4,Studio,3.5,1990,Neuf,0,1,23200000
+Marcory,100,2,0,Duplex,2.0,1995,Bon état,0,0,22300000
+Abobo,206,2,2,Appartement,7.0,1996,À rénover,0,0,20300000
+Cocody,42,3,0,Appartement,3.4,2021,Bon état,0,0,14400000
+Yopougon,93,3,4,Villa,8.6,2003,Neuf,1,0,12100000
+Abobo,46,2,3,Villa,0.5,1996,Bon état,0,0,6300000
+Yopougon,97,4,2,Appartement,0.5,1999,À rénover,0,0,21100000
+Koumassi,47,2,2,Appartement,0.8,2001,Bon état,1,0,6200000
+Cocody,60,2,0,Villa,4.3,1985,Neuf,1,1,19600000
+Cocody,64,3,5,Appartement,13.5,1986,À rénover,0,1,18500000
+Adjamé,120,3,3,Studio,17.5,1993,Bon état,0,1,24100000
+Yopougon,117,5,3,Villa,2.2,1990,Bon état,1,1,16300000
+Adjamé,40,2,2,Studio,6.8,1991,Bon état,0,0,6900000
+Yopougon,76,3,1,Villa,11.7,1984,À rénover,1,1,10000000
+Marcory,52,3,3,Appartement,2.7,1984,À rénover,0,0,11700000
+Koumassi,39,4,0,Studio,4.2,1999,À rénover,1,1,5700000
+Koumassi,66,2,2,Villa,5.9,1994,Neuf,1,1,11200000
+Adjamé,63,3,0,Appartement,1.2,2005,À rénover,1,1,9600000
+Marcory,248,3,4,Villa,0.5,2012,Neuf,0,1,62300000
+Abobo,92,2,0,Appartement,1.3,2009,Bon état,1,1,10400000
+Yopougon,37,2,0,Studio,7.9,2003,Bon état,0,1,5100000
+Cocody,56,2,2,Appartement,0.6,2002,Bon état,1,0,17300000
+Port-Bouet,123,3,3,Villa,1.7,1988,Bon état,1,1,20200000
+Plateau,209,4,2,Appartement,3.3,1982,Bon état,1,0,93600000
+Treichville,33,3,0,Appartement,0.6,2015,À rénover,1,1,8900000
+Yopougon,29,3,0,Duplex,1.7,1986,Bon état,0,0,5000000
+Plateau,188,3,3,Studio,19.4,2001,Bon état,1,0,89700000
+Abobo,90,1,5,Appartement,0.5,1993,À rénover,1,1,12100000
+Port-Bouet,48,2,3,Appartement,8.5,2008,Neuf,0,0,7300000
+Adjamé,96,2,1,Appartement,3.9,1995,Bon état,0,1,12200000
+Koumassi,20,2,4,Villa,8.9,2013,Bon état,0,0,5000000
+Adjamé,74,2,1,Studio,7.1,1989,Bon état,1,1,11000000
+Adjamé,87,3,1,Villa,2.0,1986,Bon état,1,1,19400000
+Port-Bouet,117,2,1,Villa,15.0,2004,Neuf,1,1,20300000
+Marcory,44,2,1,Studio,5.4,2006,À rénover,1,0,8400000
+Yopougon,77,2,3,Appartement,13.8,1994,Neuf,1,0,9000000
+Marcory,46,1,1,Appartement,4.2,2011,Bon état,0,1,10700000
+Treichville,84,4,1,Villa,33.4,2007,Neuf,1,0,18100000
+Treichville,47,4,0,Duplex,11.8,1988,Bon état,1,0,11100000
+Cocody,60,3,0,Studio,27.0,1986,Bon état,1,1,22300000
+Adjamé,45,1,2,Villa,5.8,1995,À rénover,1,0,6300000
+Port-Bouet,102,3,0,Villa,5.1,2005,Bon état,1,0,18800000
+Plateau,113,4,0,Duplex,11.3,2014,Bon état,0,0,48900000
+Abobo,66,3,2,Appartement,17.0,1996,À rénover,0,0,9300000
+Port-Bouet,75,1,2,Appartement,26.6,2002,Bon état,1,1,13100000
+Cocody,36,3,3,Duplex,3.1,1987,Bon état,1,0,11300000
+Adjamé,63,4,1,Studio,12.8,1981,Bon état,1,1,11800000
+Marcory,72,3,3,Appartement,1.9,2010,Bon état,1,0,15800000
+Port-Bouet,273,3,4,Appartement,6.3,2011,À rénover,0,0,39400000
+Treichville,42,2,3,Appartement,1.6,2008,Neuf,1,1,9000000
+Treichville,153,3,2,Appartement,3.4,1982,Bon état,1,0,43300000
+Yopougon,121,1,1,Duplex,21.4,1987,Bon état,1,1,13600000
+Port-Bouet,85,3,5,Appartement,1.3,1981,À rénover,0,1,13900000
+Port-Bouet,178,1,0,Studio,8.0,2010,À rénover,1,0,24800000
+Marcory,89,2,0,Appartement,7.2,2016,Bon état,1,1,21300000
+Koumassi,90,2,1,Villa,1.0,1999,Bon état,1,0,14500000
+Cocody,72,3,0,Appartement,3.2,2008,Bon état,0,0,22800000
+Abobo,136,1,5,Studio,6.6,1996,Bon état,0,0,12900000
+Marcory,128,3,2,Villa,1.7,1989,À rénover,1,1,30100000
+Plateau,54,3,2,Villa,12.9,2020,À rénover,0,0,16800000
+Cocody,38,2,2,Appartement,28.6,2001,À rénover,1,1,11700000
+Adjamé,67,1,1,Appartement,1.9,1985,Neuf,1,1,11400000
+Yopougon,49,1,0,Appartement,1.7,2022,À rénover,1,0,5200000
+Adjamé,71,4,2,Appartement,4.9,2013,À rénover,0,0,10200000
+Cocody,137,3,2,Villa,11.0,2010,Bon état,0,1,55000000
+Marcory,59,2,1,Villa,2.6,1991,Bon état,1,1,11600000
+Abobo,72,1,3,Villa,0.5,1991,Bon état,1,0,9300000
+Koumassi,76,3,0,Villa,6.2,1995,Bon état,0,1,12100000
+Marcory,113,4,0,Appartement,25.1,2004,À rénover,0,0,27300000
+Abobo,24,4,0,Appartement,4.0,2001,Bon état,1,1,5000000
+Port-Bouet,54,3,1,Appartement,4.4,2006,Bon état,0,1,8700000
+Abobo,82,1,3,Studio,27.8,2003,Bon état,1,1,9200000
+Marcory,134,1,3,Villa,9.5,1991,Bon état,1,1,25300000
+Cocody,58,1,1,Appartement,10.2,1997,À rénover,1,1,13000000
+Port-Bouet,29,2,2,Appartement,6.6,1995,Bon état,1,1,5300000
+Cocody,100,1,2,Studio,29.4,1983,Bon état,1,1,26900000
+Port-Bouet,54,2,0,Villa,9.3,1991,Neuf,0,0,9100000
+Abobo,41,2,0,Villa,18.0,2012,Bon état,1,1,5000000
+Port-Bouet,54,4,5,Appartement,9.6,2001,Bon état,1,0,13300000
+Koumassi,67,3,2,Appartement,10.6,1997,À rénover,1,0,12300000
+Treichville,54,4,5,Duplex,2.7,2012,Bon état,1,0,14600000
+Yopougon,24,3,1,Studio,2.9,2006,Bon état,1,0,5000000
+Koumassi,115,1,2,Appartement,12.2,2021,Neuf,0,0,11900000
+Yopougon,139,3,0,Studio,2.8,1998,Bon état,1,1,27100000
+Yopougon,102,2,0,Studio,6.6,1993,À rénover,0,0,14200000
+Abobo,42,3,1,Appartement,2.3,2004,Bon état,0,1,5000000
+Port-Bouet,67,2,1,Appartement,13.6,2013,Bon état,0,0,12300000
+Treichville,73,5,0,Appartement,0.9,2003,Bon état,0,0,21500000
+Koumassi,99,2,0,Appartement,14.1,2017,Neuf,0,0,14900000
+Yopougon,103,2,0,Villa,7.4,2002,Bon état,0,0,17200000
+Yopougon,51,4,2,Appartement,1.7,1984,Bon état,1,1,9600000
+Adjamé,77,1,1,Studio,6.2,2023,Bon état,0,1,9700000
+Marcory,93,3,0,Duplex,2.7,2015,À rénover,1,0,19400000
+Cocody,153,3,0,Appartement,3.1,2003,Bon état,0,0,56800000
+Yopougon,105,4,0,Appartement,3.5,2015,Bon état,1,1,10000000
+Marcory,109,5,2,Studio,0.5,1984,À rénover,1,0,28100000
+Marcory,77,5,0,Studio,34.1,2018,À rénover,1,0,16000000
+Marcory,149,1,3,Studio,0.5,1985,Bon état,1,1,27700000
+Cocody,90,4,0,Appartement,8.7,2015,Neuf,1,0,29800000
+Cocody,48,3,0,Appartement,3.7,1983,Bon état,1,1,14800000
+Treichville,149,3,3,Villa,8.3,1989,Bon état,0,1,30100000
+Yopougon,104,1,2,Duplex,3.5,1980,Neuf,1,0,11300000
+Yopougon,59,3,0,Appartement,9.0,2000,Neuf,0,0,12000000
+Adjamé,58,5,3,Duplex,10.5,2019,Neuf,0,1,14700000
+Marcory,85,4,1,Appartement,9.4,2018,Bon état,0,0,17400000
+Treichville,93,2,3,Duplex,1.0,2016,Bon état,1,1,23600000
+Koumassi,81,1,2,Villa,8.6,1982,Bon état,1,1,10700000
+Cocody,86,2,2,Appartement,2.6,2010,Neuf,1,0,26500000
+Yopougon,172,4,5,Villa,0.5,2006,Bon état,1,1,27500000
+Port-Bouet,126,3,0,Appartement,4.3,1996,Bon état,0,0,21100000
+Treichville,81,2,2,Appartement,4.5,2002,Bon état,1,0,19100000
+Yopougon,118,1,1,Appartement,5.0,1992,Bon état,1,1,15600000
+Abobo,44,2,0,Appartement,9.8,2006,Bon état,1,1,5000000
+Plateau,90,2,0,Appartement,3.0,1999,Bon état,1,1,27400000
+Treichville,182,4,0,Studio,3.0,1992,Bon état,1,0,37100000
+Marcory,66,3,2,Villa,0.5,2023,Bon état,1,1,11500000
+Treichville,48,2,2,Appartement,9.3,2003,Bon état,0,0,9900000
+Adjamé,53,3,2,Studio,6.7,2020,Bon état,0,1,7600000
+Abobo,43,1,0,Villa,3.4,1982,Neuf,0,1,5000000
+Abobo,50,5,1,Duplex,9.8,2022,Bon état,0,1,8800000
+Marcory,61,2,4,Villa,6.2,1989,Bon état,1,1,15500000
+Plateau,36,2,1,Appartement,5.1,1980,Neuf,1,1,13500000
+Marcory,74,2,2,Appartement,5.7,1992,Neuf,1,1,15800000
+Plateau,116,3,3,Villa,8.1,1993,À rénover,1,1,60400000
+Koumassi,47,3,3,Appartement,8.6,2012,Bon état,1,1,8200000
+Yopougon,158,3,1,Appartement,2.7,1981,Bon état,0,1,22700000
+Cocody,95,2,3,Appartement,1.2,1981,Bon état,0,1,22600000
+Treichville,123,2,1,Appartement,1.4,2018,Neuf,1,1,26700000
+Port-Bouet,53,1,3,Appartement,8.2,2020,Bon état,1,0,9500000
+Port-Bouet,113,3,0,Appartement,16.5,2010,Neuf,1,0,19000000
+Treichville,43,1,0,Appartement,4.2,1983,Bon état,0,1,8500000
+Plateau,115,3,0,Villa,1.5,2013,Neuf,1,0,44100000
+Yopougon,80,4,3,Villa,11.3,1998,Bon état,0,1,12500000
+Koumassi,97,4,1,Appartement,14.3,2016,Bon état,1,0,10600000
+Adjamé,41,2,0,Appartement,17.0,1988,Bon état,1,0,6400000
+Plateau,47,2,0,Appartement,7.5,2003,Neuf,0,1,20300000
+Koumassi,99,1,4,Appartement,15.8,1992,Bon état,0,1,12500000
+Marcory,46,3,3,Appartement,0.5,2023,Bon état,0,0,10800000
+Marcory,93,4,2,Appartement,0.9,2009,Bon état,0,1,20400000
+Abobo,37,2,2,Villa,0.8,1998,Bon état,1,1,5000000
+Abobo,113,2,1,Villa,10.0,2020,Bon état,0,0,13000000
+Abobo,40,4,1,Appartement,0.6,1989,Bon état,1,0,5000000
+Cocody,97,4,4,Appartement,5.5,2021,Bon état,0,0,40400000
+Port-Bouet,101,2,0,Villa,5.1,2023,À rénover,1,0,19900000
+Marcory,52,3,1,Studio,3.0,1993,Neuf,1,0,11000000
+Plateau,99,2,1,Studio,16.3,2019,Neuf,1,0,40200000
+Port-Bouet,84,1,1,Villa,1.5,1999,Bon état,1,0,14500000
+Treichville,56,4,1,Appartement,3.5,1983,À rénover,0,1,14500000
+Port-Bouet,45,4,1,Appartement,11.9,2017,À rénover,1,1,6700000
+Koumassi,28,3,0,Studio,0.5,2023,Bon état,0,1,5200000
+Adjamé,88,1,1,Appartement,8.9,2018,Bon état,0,0,12100000
+Abobo,34,4,0,Duplex,13.6,1984,Bon état,0,1,5000000
+Cocody,77,2,0,Villa,21.5,2021,Bon état,1,1,32500000
+Yopougon,65,2,0,Villa,16.7,2011,Bon état,1,1,9500000
+Yopougon,103,3,3,Appartement,3.1,1985,À rénover,1,1,14600000
+Marcory,63,1,1,Villa,7.1,1993,Bon état,1,1,8400000
+Adjamé,63,3,2,Appartement,0.6,1985,Bon état,0,1,13200000
+Yopougon,106,3,2,Appartement,2.4,1993,Bon état,1,1,12800000
+Cocody,87,2,2,Appartement,0.8,1991,Bon état,1,0,22300000
+Marcory,86,2,1,Studio,3.0,2006,Bon état,1,0,17700000
+Adjamé,93,2,1,Villa,16.6,2005,Bon état,1,0,18300000
+Cocody,34,1,1,Appartement,3.4,1991,Neuf,0,0,10600000
+Port-Bouet,108,3,2,Appartement,6.6,1987,Neuf,0,0,19600000
+Yopougon,100,4,1,Villa,4.5,1989,Bon état,1,1,16900000
+Yopougon,44,1,3,Villa,4.9,1995,À rénover,0,0,5200000
+Abobo,65,1,3,Villa,27.9,2005,Bon état,0,1,7300000
+Koumassi,72,3,0,Villa,2.8,1987,Bon état,1,1,11800000
+Yopougon,69,4,0,Appartement,7.9,2020,Bon état,1,0,12700000
+Adjamé,87,2,2,Villa,4.4,2008,Neuf,1,0,16100000
+Abobo,151,2,1,Appartement,0.5,1999,À rénover,1,0,19300000
+Marcory,127,3,0,Duplex,5.4,1996,À rénover,1,1,27900000
+Port-Bouet,38,2,3,Villa,13.4,1998,Neuf,0,1,7300000
+Koumassi,101,1,0,Appartement,0.8,1996,Bon état,1,0,13900000
+Adjamé,143,3,4,Appartement,0.6,2018,Bon état,1,1,20800000
+Port-Bouet,89,3,2,Studio,1.3,1980,À rénover,0,1,15500000
+Port-Bouet,127,3,3,Appartement,11.6,2008,Bon état,0,0,23900000
+Adjamé,202,3,0,Appartement,10.3,1993,Bon état,1,1,39900000
+Koumassi,123,3,0,Villa,6.7,1996,Bon état,1,1,19400000
+Adjamé,83,2,1,Appartement,5.1,1992,À rénover,0,0,11000000
+Adjamé,124,2,0,Studio,17.5,2008,Neuf,1,1,20300000
+Abobo,79,1,1,Appartement,11.6,2013,Bon état,1,0,8800000
+Koumassi,75,1,1,Studio,13.4,2006,Neuf,1,0,10800000
+Plateau,62,3,0,Appartement,13.4,2012,À rénover,1,0,28600000
+Port-Bouet,161,4,0,Appartement,8.2,2008,Neuf,1,1,36800000
+Port-Bouet,49,5,3,Studio,4.9,2016,À rénover,1,1,9400000
+Cocody,159,3,0,Villa,16.0,2018,Bon état,1,0,46900000
+Koumassi,95,2,0,Appartement,20.8,1998,Bon état,0,0,12100000
+Plateau,37,1,2,Appartement,0.5,2003,À rénover,0,0,14300000
+Yopougon,89,4,5,Villa,0.5,1993,À rénover,0,1,17500000
+Koumassi,26,3,1,Villa,25.5,2016,Bon état,1,0,5000000
+Plateau,101,3,0,Duplex,2.6,1984,Neuf,1,1,39500000
+Koumassi,115,3,2,Duplex,16.5,2003,Bon état,1,1,22800000
+Koumassi,55,3,4,Villa,3.9,2013,Bon état,0,1,9600000
+Abobo,78,4,3,Appartement,1.0,2010,Bon état,0,0,11300000
+Cocody,196,1,2,Appartement,0.7,2009,Bon état,1,0,45100000
+Marcory,57,3,1,Villa,1.4,1988,Neuf,1,0,14600000
+Abobo,43,4,1,Appartement,2.3,2006,Bon état,1,1,5000000
+Treichville,155,2,0,Appartement,5.4,2007,Bon état,1,1,26400000
+Abobo,197,3,2,Appartement,9.7,2021,Neuf,1,1,23800000
+Marcory,74,2,2,Appartement,34.4,2005,Bon état,0,0,14600000
+Abobo,122,5,4,Appartement,4.7,1997,Bon état,1,1,17100000
+Abobo,144,1,0,Appartement,5.8,2015,Bon état,1,0,12400000
+Koumassi,51,3,0,Studio,5.9,1987,Neuf,1,0,9500000
+Cocody,58,2,1,Appartement,6.2,1997,Bon état,0,1,20500000
+Koumassi,136,3,2,Appartement,5.8,1999,Bon état,1,0,15600000
+Abobo,171,2,3,Appartement,0.5,2011,Bon état,1,1,23300000
+Treichville,98,2,0,Villa,0.5,2008,Bon état,0,1,17700000
+Yopougon,47,2,0,Appartement,0.8,1997,Bon état,1,1,7400000
+Abobo,199,4,1,Villa,0.9,1986,Neuf,1,0,26900000
+Port-Bouet,57,2,1,Duplex,9.8,1980,Bon état,0,0,9900000
+Cocody,62,1,3,Appartement,1.8,2007,À rénover,1,0,16900000
+Port-Bouet,87,3,1,Appartement,18.0,2012,Neuf,1,0,19100000
+Adjamé,160,3,3,Appartement,21.1,1983,À rénover,1,1,22700000
+Cocody,113,4,2,Duplex,29.8,1999,Bon état,1,1,42800000
+Marcory,91,1,3,Studio,22.4,2015,Bon état,0,0,21200000
+Adjamé,93,3,1,Studio,2.5,2010,Bon état,0,1,17900000
+Cocody,75,2,3,Appartement,5.7,2017,Bon état,0,1,30600000
+Abobo,97,2,0,Duplex,1.5,2007,À rénover,0,0,10600000
+Yopougon,21,3,1,Appartement,13.1,1982,Bon état,1,0,5000000
+Abobo,64,3,0,Appartement,17.5,1985,Neuf,1,0,8000000
+Cocody,83,3,1,Studio,15.2,2002,Bon état,0,1,31900000
+Port-Bouet,41,2,1,Duplex,4.5,1986,Neuf,1,1,7100000
+Treichville,89,2,0,Appartement,11.4,2015,Bon état,1,1,17200000
+Treichville,67,2,4,Appartement,0.8,1980,Bon état,0,0,16400000
+Koumassi,177,5,0,Appartement,0.5,1985,À rénover,1,1,30300000
+Plateau,162,2,3,Appartement,11.2,2003,Bon état,1,0,48300000
+Koumassi,58,2,5,Appartement,4.4,2016,Neuf,1,1,8100000
+Cocody,68,2,0,Duplex,40.0,2015,Bon état,0,1,22500000
+Cocody,71,3,2,Villa,0.8,2003,Bon état,1,0,27900000
+Yopougon,59,2,0,Studio,15.5,2017,Bon état,1,1,8400000
+Yopougon,81,4,0,Studio,5.2,2008,À rénover,1,1,15600000
+Koumassi,50,2,1,Villa,14.0,2016,Bon état,0,1,6000000
+Adjamé,42,4,4,Studio,13.6,2011,Neuf,1,0,7300000
+Yopougon,101,1,0,Villa,19.8,2004,À rénover,0,0,12600000
+Marcory,101,3,2,Appartement,2.8,1989,Neuf,1,1,23000000
+Treichville,49,4,1,Villa,23.9,2014,Neuf,0,1,11700000
+Yopougon,115,2,3,Villa,1.3,2004,Bon état,0,0,17800000
+Yopougon,54,5,0,Studio,0.7,2006,À rénover,1,1,8600000
+Plateau,84,2,2,Duplex,4.5,2011,Bon état,0,0,32400000
+Koumassi,111,4,2,Appartement,14.1,1991,Bon état,1,1,19100000
+Adjamé,72,3,2,Studio,5.1,1983,Bon état,0,0,10800000
+Marcory,93,2,4,Appartement,14.1,2021,Bon état,0,0,19700000
+Cocody,57,2,3,Studio,10.5,2005,Bon état,1,0,16900000
+Adjamé,67,2,0,Appartement,1.9,1982,Bon état,1,0,10600000
+Adjamé,66,1,1,Appartement,23.8,1996,Bon état,0,1,9900000
+Marcory,51,1,1,Appartement,0.5,1988,À rénover,1,1,10300000
+Treichville,67,1,1,Villa,18.3,2008,Bon état,0,0,11900000
+Plateau,34,2,1,Appartement,2.9,1980,Neuf,1,0,15300000
+Yopougon,58,3,1,Duplex,5.5,1997,À rénover,1,1,7200000
+Treichville,64,1,1,Appartement,4.4,2020,Bon état,0,0,10800000
+Yopougon,65,1,5,Duplex,1.5,1999,À rénover,1,1,12000000
+Abobo,65,3,0,Villa,3.5,2020,Neuf,0,1,7000000
+Yopougon,71,2,4,Appartement,1.7,2013,Neuf,0,1,7900000
+Marcory,94,1,1,Appartement,1.8,2007,Bon état,1,1,20900000
+Treichville,114,2,2,Villa,1.7,2014,Bon état,1,0,16100000
+Yopougon,53,4,3,Villa,5.4,1995,Bon état,1,1,8200000
+Port-Bouet,40,4,1,Villa,12.8,2000,Bon état,1,1,10500000
+Marcory,44,2,1,Appartement,6.7,1992,Neuf,1,0,7300000
+Marcory,58,3,1,Appartement,17.9,2014,Bon état,1,1,9500000
+Cocody,62,3,1,Duplex,8.1,2021,Bon état,0,1,15600000
+Adjamé,50,3,4,Appartement,9.4,2011,Bon état,1,0,9900000
+Yopougon,39,3,3,Appartement,8.8,2017,Bon état,1,0,6900000
+Port-Bouet,59,3,0,Appartement,4.8,1985,Bon état,1,1,10100000
+Yopougon,81,2,0,Studio,9.4,2017,Bon état,1,0,12500000
+Treichville,99,1,1,Studio,0.6,2017,Bon état,0,0,22700000
+Plateau,56,2,0,Appartement,15.7,1992,Bon état,1,0,26800000
+Port-Bouet,60,4,2,Appartement,12.0,2018,Neuf,0,0,11500000
+Koumassi,46,3,0,Appartement,2.3,1992,Bon état,1,0,5000000
+Koumassi,73,4,1,Appartement,11.7,1991,À rénover,1,1,11100000
+Port-Bouet,48,5,0,Appartement,0.5,2012,Bon état,1,0,9500000
+Koumassi,98,2,1,Duplex,2.0,2007,Neuf,1,1,14200000
+Abobo,30,3,2,Appartement,0.5,1982,À rénover,1,0,5000000
+Plateau,62,3,1,Appartement,12.1,1997,Bon état,1,0,29400000
+Cocody,86,5,5,Studio,11.3,2005,Neuf,1,0,37900000
+Port-Bouet,81,5,3,Appartement,13.4,2019,Bon état,1,0,16700000
+Abobo,283,3,1,Villa,0.5,1981,Bon état,1,0,42100000
+Koumassi,88,2,0,Appartement,5.6,1983,Bon état,0,1,14000000
+Yopougon,45,3,3,Appartement,9.8,2007,Bon état,0,1,6900000
+Cocody,70,1,4,Duplex,1.4,2007,Bon état,1,0,22300000
+Plateau,30,3,3,Villa,8.4,2004,Neuf,1,0,12300000
+Adjamé,71,4,0,Appartement,0.7,2005,Bon état,1,0,17300000
+Yopougon,49,2,5,Villa,1.6,1981,Bon état,0,1,5400000
+Marcory,116,3,0,Duplex,5.2,2021,Bon état,1,1,24800000
+Yopougon,56,2,2,Appartement,8.5,2013,Neuf,1,0,7700000
+Cocody,70,2,4,Villa,1.3,2009,Neuf,0,0,22600000
+Abobo,54,2,0,Duplex,1.6,2000,Bon état,1,1,7600000
+Marcory,176,3,4,Appartement,1.8,2023,À rénover,1,0,40700000
+Koumassi,63,4,1,Villa,2.2,2016,Bon état,1,1,8600000
+Marcory,184,4,5,Villa,2.1,2023,Bon état,0,0,51400000
+Yopougon,111,2,0,Villa,4.0,2002,Neuf,0,1,17300000
+Cocody,94,4,4,Appartement,8.5,2012,Bon état,0,1,23100000
+Cocody,89,3,0,Appartement,4.6,1981,Neuf,0,1,28900000
+Yopougon,90,2,2,Villa,12.0,2006,Bon état,0,1,9600000
+Yopougon,28,1,1,Appartement,10.2,2001,Bon état,1,0,5000000
+Abobo,64,2,1,Appartement,1.1,2013,À rénover,0,0,6600000
+Marcory,112,4,0,Appartement,0.5,1995,Bon état,1,0,31100000
+Adjamé,72,3,2,Appartement,16.8,1999,À rénover,1,1,12700000
+Port-Bouet,37,3,0,Duplex,0.7,2005,Bon état,0,1,5500000
+Koumassi,72,2,2,Appartement,1.3,1995,Neuf,1,0,12300000
+Cocody,173,3,0,Duplex,0.5,1985,À rénover,1,0,44100000
+Yopougon,137,1,4,Appartement,7.9,2023,Bon état,1,1,18700000
+Cocody,71,2,0,Villa,7.0,2002,À rénover,0,1,18800000
+Marcory,119,3,0,Appartement,34.7,2021,Neuf,1,1,26100000
+Treichville,61,1,0,Studio,17.4,2016,Bon état,0,0,12500000
+Plateau,31,4,1,Studio,4.2,1987,Bon état,1,0,14500000
+Yopougon,46,2,0,Appartement,3.7,1985,Neuf,0,0,7800000
+Abobo,161,3,1,Duplex,2.8,2016,Bon état,1,1,20300000
+Adjamé,64,2,3,Appartement,1.3,2001,Bon état,0,1,10800000
+Abobo,65,3,2,Villa,1.2,1985,Neuf,0,1,7700000
+Cocody,63,1,2,Duplex,1.1,2011,Bon état,1,1,18100000
+Yopougon,191,1,0,Studio,1.0,1996,Bon état,1,1,26500000
+Abobo,166,4,2,Duplex,2.2,2017,Neuf,1,1,22300000
+Cocody,223,2,0,Appartement,2.9,1996,Bon état,0,1,49200000
+Yopougon,68,4,3,Appartement,26.1,2016,Bon état,1,1,11500000
+Cocody,85,5,0,Appartement,6.9,2002,Bon état,1,0,33100000
+Cocody,35,2,1,Villa,35.1,1992,À rénover,0,1,9500000
+Yopougon,154,2,1,Studio,3.7,2011,Bon état,1,0,17500000
+Plateau,41,3,3,Appartement,4.9,2001,Bon état,1,0,20300000
+Abobo,82,5,0,Villa,3.1,1986,Bon état,0,1,12800000
+Adjamé,43,4,2,Appartement,1.6,2001,À rénover,1,1,7700000
+Koumassi,55,3,0,Appartement,1.2,2000,Neuf,1,1,7400000
+Marcory,48,3,2,Villa,23.2,1985,Bon état,1,0,9800000
+Plateau,54,1,4,Appartement,34.6,1993,Bon état,0,1,22600000
+Cocody,56,5,1,Studio,0.5,1995,Bon état,1,1,21100000
+Abobo,56,5,1,Appartement,1.3,1982,Bon état,0,0,7500000
+Adjamé,112,2,4,Studio,4.4,1988,À rénover,1,1,19500000
+Cocody,42,2,1,Appartement,1.6,2000,À rénover,0,0,11100000
+Port-Bouet,82,1,1,Appartement,3.6,2009,Bon état,1,0,16100000
+Cocody,136,2,2,Villa,1.1,2009,Bon état,1,1,49500000
+Abobo,57,4,2,Studio,4.9,2021,À rénover,0,0,7200000
+Adjamé,51,2,0,Appartement,2.5,2021,Bon état,1,0,7500000
+Port-Bouet,66,1,3,Appartement,3.5,2011,Bon état,1,0,6400000
+Adjamé,133,2,1,Villa,0.8,2002,Bon état,0,0,16800000
+Koumassi,81,5,0,Appartement,4.5,1982,Bon état,1,0,12000000
+Yopougon,57,3,3,Studio,32.7,1980,Bon état,1,0,8800000
+Koumassi,94,2,1,Studio,3.2,1982,À rénover,0,0,13500000
+Cocody,42,2,0,Appartement,16.7,2016,Neuf,1,0,10100000
+Port-Bouet,104,5,2,Appartement,14.8,1986,Neuf,1,0,21000000
+Abobo,90,4,3,Studio,24.3,1982,Bon état,0,0,13200000
+Koumassi,63,2,3,Appartement,12.5,2015,Bon état,1,1,10300000
+Yopougon,48,1,4,Villa,8.6,1982,Neuf,0,1,5000000
+Adjamé,47,1,3,Appartement,15.5,1983,Bon état,1,0,6900000
+Abobo,96,1,0,Villa,0.6,2010,Bon état,1,1,8400000
+Adjamé,136,3,1,Appartement,5.0,1981,À rénover,0,1,26900000
+Cocody,54,4,3,Studio,36.3,1993,Bon état,1,1,21000000
+Cocody,93,2,1,Appartement,11.7,2016,À rénover,1,0,24300000
+Marcory,26,4,2,Appartement,26.2,2010,Bon état,0,1,5700000
+Plateau,55,2,2,Studio,12.1,1981,Bon état,1,0,19400000
+Port-Bouet,73,3,1,Appartement,16.6,2010,Bon état,1,0,9000000
+Marcory,47,3,4,Appartement,9.8,2022,Neuf,1,0,11500000
+Treichville,46,2,1,Appartement,11.4,2001,Bon état,1,0,9100000
+Yopougon,53,2,1,Appartement,5.9,1989,Bon état,0,1,8500000
+Plateau,85,3,5,Duplex,20.6,2009,Neuf,0,1,28800000
+Koumassi,67,1,1,Studio,13.9,2012,Bon état,1,1,8500000
+Adjamé,24,2,0,Appartement,14.9,1998,Bon état,1,0,5000000
+Yopougon,26,3,1,Villa,8.9,2004,Bon état,1,0,5000000
+Abobo,54,5,3,Villa,2.9,1980,Neuf,0,0,6500000
+Adjamé,93,2,3,Duplex,0.5,2011,Neuf,1,0,17300000
+Marcory,20,4,3,Appartement,21.9,2004,Bon état,1,1,5000000
+Treichville,57,2,2,Villa,7.1,2020,Bon état,0,1,11900000
+Treichville,57,3,0,Villa,2.8,1996,Bon état,0,1,11800000
+Adjamé,148,3,3,Appartement,1.3,1993,Neuf,1,1,20800000
+Plateau,61,4,3,Appartement,14.2,1992,Bon état,0,0,25800000
+Adjamé,89,2,0,Appartement,14.5,2017,Bon état,0,0,15700000
+Cocody,79,3,0,Studio,13.5,2018,Bon état,1,0,21000000
+Cocody,25,3,5,Appartement,8.3,1981,À rénover,1,0,9100000
+Marcory,108,2,3,Duplex,3.6,2011,Neuf,1,1,20400000
+Yopougon,82,1,3,Appartement,2.9,2011,À rénover,1,0,9900000
+Port-Bouet,95,1,3,Villa,0.5,2019,Bon état,1,0,16400000
+Adjamé,500,1,1,Duplex,14.3,1985,À rénover,1,1,67500000
+Koumassi,26,4,2,Villa,0.7,2004,Bon état,0,1,5000000
+Yopougon,175,2,1,Studio,8.0,1982,Bon état,0,0,23400000
+Yopougon,64,2,0,Studio,5.6,1997,Bon état,0,1,9200000
+Yopougon,85,3,2,Appartement,6.0,2017,Bon état,0,0,8200000
+Treichville,72,2,1,Villa,20.9,2022,À rénover,0,1,10700000
+Cocody,60,3,2,Appartement,0.5,1982,Bon état,0,0,21300000
+Port-Bouet,55,2,1,Villa,11.9,1984,À rénover,0,0,11000000
+Abobo,87,5,1,Appartement,0.5,2003,Bon état,0,1,10900000
+Yopougon,35,4,0,Villa,0.5,2013,Bon état,1,0,5400000
+Adjamé,107,4,0,Villa,4.5,2018,Neuf,0,1,20800000
+Yopougon,60,2,0,Appartement,0.5,2003,À rénover,1,1,9300000
+Port-Bouet,42,3,0,Appartement,12.5,2015,Bon état,0,0,5400000
+Port-Bouet,59,1,5,Duplex,6.0,2007,Bon état,1,1,8200000
+Yopougon,138,1,0,Appartement,0.5,2013,Bon état,1,1,17000000
+Marcory,56,1,0,Appartement,0.5,1995,Bon état,1,0,12400000
+Abobo,88,3,2,Appartement,7.6,2015,À rénover,1,1,15400000
+Port-Bouet,51,2,2,Duplex,13.1,1986,Neuf,1,1,8500000
+Marcory,108,3,0,Duplex,4.6,1997,Bon état,0,1,19800000
+Abobo,104,1,3,Villa,6.5,1985,Neuf,1,1,12100000
+Abobo,186,2,3,Studio,12.9,2007,Bon état,1,1,26500000
+Adjamé,68,3,0,Appartement,7.5,2018,Neuf,1,1,12000000
+Plateau,103,2,0,Duplex,2.0,2013,Neuf,0,1,33600000
+Adjamé,77,3,4,Appartement,7.6,2020,Bon état,1,0,15300000
+Port-Bouet,141,2,3,Appartement,7.9,2008,Bon état,1,0,26800000
+Plateau,51,4,2,Appartement,10.6,1983,Bon état,1,0,18700000
+Marcory,107,3,0,Villa,7.8,1993,Neuf,1,1,26200000
+Treichville,67,2,1,Studio,27.9,1984,À rénover,0,1,15800000
+Plateau,71,2,2,Appartement,1.8,2004,À rénover,0,0,31600000
+Port-Bouet,77,3,0,Duplex,24.1,2018,Bon état,1,0,14100000
+Yopougon,84,4,1,Appartement,6.2,1987,Bon état,0,0,12800000
+Marcory,70,2,2,Appartement,8.9,1994,Bon état,0,0,17900000
+Port-Bouet,82,2,1,Appartement,0.8,1998,Bon état,0,1,11600000
+Yopougon,162,4,3,Villa,3.8,1990,Bon état,0,1,27800000
+Abobo,121,3,3,Studio,11.7,1999,Bon état,1,1,12300000
+Yopougon,114,2,1,Appartement,9.8,2015,Bon état,0,0,18600000
+Abobo,59,2,3,Villa,0.5,1997,Bon état,1,1,6700000
+Plateau,47,2,0,Appartement,6.3,1993,À rénover,1,1,21100000
+Yopougon,119,3,3,Villa,0.7,2017,Bon état,1,1,19300000
+Treichville,114,2,0,Duplex,40.0,2004,Bon état,0,1,19100000
+Marcory,154,5,0,Appartement,18.2,1995,Neuf,1,0,49300000
+Adjamé,54,2,2,Studio,0.5,1997,Bon état,1,0,10800000
+Yopougon,66,2,1,Villa,15.7,1980,Bon état,1,1,10500000
+Koumassi,32,3,4,Appartement,20.1,2019,Bon état,1,1,5000000
+Plateau,61,4,1,Duplex,3.5,1980,Bon état,1,1,25300000
+Treichville,121,4,0,Appartement,10.2,1980,Bon état,1,0,29100000
+Yopougon,58,2,1,Appartement,4.7,2000,Bon état,0,1,7300000
+Marcory,102,3,1,Appartement,8.5,2004,Bon état,0,0,29700000
+Cocody,67,3,1,Appartement,3.3,2006,À rénover,1,1,22200000
+Plateau,87,2,2,Studio,3.1,1989,Bon état,0,1,19600000
+Abobo,42,2,3,Villa,4.4,1991,Neuf,0,1,5200000
+Yopougon,77,2,3,Duplex,1.3,2007,Bon état,1,1,10200000
+Koumassi,20,2,5,Appartement,14.2,2011,Neuf,0,0,5000000
+Yopougon,67,4,0,Appartement,3.4,2012,À rénover,1,0,10200000
+Marcory,33,2,2,Appartement,4.1,1987,Bon état,1,0,8000000
+Abobo,135,5,1,Villa,18.0,2021,Bon état,0,0,22900000
+Adjamé,109,3,2,Duplex,5.5,2005,Neuf,0,1,19800000
+Plateau,93,3,1,Villa,6.3,2021,Bon état,0,0,35800000
+Plateau,158,3,5,Appartement,25.1,2020,À rénover,0,1,63800000
+Cocody,46,1,2,Studio,17.4,1981,Neuf,0,0,12900000
+Adjamé,177,2,4,Studio,1.5,2014,Bon état,0,1,25200000
+Adjamé,117,1,3,Appartement,5.1,2013,À rénover,1,1,19100000
+Yopougon,65,3,4,Studio,28.4,1985,Bon état,0,0,10500000
+Port-Bouet,130,2,3,Appartement,3.7,2010,Bon état,1,0,27700000
+Koumassi,42,3,1,Appartement,3.7,2002,Bon état,1,0,8100000
+Abobo,49,2,0,Appartement,1.7,1991,Bon état,1,1,5200000
+Port-Bouet,54,2,1,Appartement,1.0,2007,Neuf,1,1,10500000
+Marcory,57,2,0,Appartement,10.8,1994,Neuf,0,0,10600000
+Cocody,43,4,1,Appartement,11.8,1998,Bon état,1,1,16500000
+Marcory,136,3,1,Appartement,27.8,1991,À rénover,0,0,29100000
+Cocody,65,2,1,Studio,11.9,1981,Neuf,0,1,16600000
+Abobo,88,3,5,Duplex,2.2,1990,Bon état,1,0,11700000
+Port-Bouet,55,1,4,Studio,0.5,2023,Bon état,0,1,5300000
+Cocody,30,5,0,Appartement,33.8,2016,À rénover,0,1,8200000
+Plateau,84,3,1,Appartement,3.3,2017,Bon état,1,1,33200000
+Yopougon,28,2,1,Appartement,3.0,2004,À rénover,1,0,5000000
+Port-Bouet,71,3,1,Appartement,18.9,2022,Neuf,0,0,12400000
+Marcory,37,1,3,Villa,7.0,2000,À rénover,0,1,5600000
+Abobo,199,5,1,Villa,1.9,2021,Bon état,1,0,25300000
+Cocody,116,2,2,Villa,17.6,2015,Bon état,1,0,37100000
+Plateau,78,3,3,Villa,40.0,1988,Bon état,0,1,34400000
+Treichville,139,2,3,Appartement,0.7,1991,Bon état,1,0,28500000
+Treichville,48,3,0,Appartement,15.9,1989,Neuf,1,0,12400000
+Cocody,97,3,2,Villa,4.0,1984,Neuf,0,1,33400000
+Treichville,81,3,1,Appartement,5.9,2012,Bon état,1,0,15900000
+Abobo,84,3,0,Appartement,19.7,1984,À rénover,1,0,10300000
+Port-Bouet,139,4,0,Appartement,29.0,1995,Bon état,0,1,21800000
+Yopougon,106,1,1,Appartement,2.4,2016,Bon état,1,1,13600000
+Abobo,85,2,1,Appartement,1.9,2016,Bon état,0,0,11800000
+Yopougon,32,2,0,Studio,0.7,2008,Neuf,1,1,5000000
+Adjamé,46,5,2,Studio,6.6,1997,À rénover,1,1,11000000
+Plateau,69,2,3,Appartement,0.5,2008,Bon état,0,0,24900000
+Cocody,77,3,0,Appartement,4.2,1985,Bon état,1,0,30100000
+Marcory,42,3,0,Villa,0.6,1997,Bon état,1,0,9500000
+Adjamé,246,2,3,Appartement,4.2,2011,À rénover,0,1,48600000
+Marcory,157,2,0,Appartement,0.5,2021,À rénover,0,1,33800000
+Adjamé,100,2,4,Appartement,14.4,2010,Bon état,0,0,17900000
+Treichville,76,2,2,Appartement,1.9,1990,Bon état,1,1,19000000
+Cocody,66,2,1,Studio,3.2,2005,Bon état,1,1,19400000
+Adjamé,46,1,0,Studio,16.3,2007,Bon état,1,0,7100000
+Yopougon,77,4,0,Appartement,11.0,2006,Bon état,1,1,14800000
+Port-Bouet,84,5,0,Appartement,2.0,1998,Bon état,1,0,17400000
+Plateau,40,2,0,Appartement,0.6,2006,Bon état,0,1,12100000
+Adjamé,87,2,2,Appartement,10.1,1999,Bon état,0,1,18600000
+Koumassi,68,1,0,Duplex,4.0,1982,Bon état,1,1,8800000
+Treichville,28,3,1,Villa,11.6,1995,Bon état,1,1,6300000
+Adjamé,48,4,2,Villa,4.7,2018,Bon état,1,1,10500000
+Yopougon,60,1,0,Studio,3.4,2023,Bon état,1,1,7100000
+Abobo,189,2,0,Studio,4.8,2008,Neuf,1,1,19100000
+Port-Bouet,97,3,0,Studio,11.0,1994,Bon état,1,1,18700000
+Abobo,38,3,0,Appartement,18.6,2009,À rénover,0,1,5000000
+Cocody,94,1,2,Appartement,0.5,2019,Bon état,1,0,25200000
+Port-Bouet,34,3,1,Villa,5.9,1980,Bon état,1,1,6500000
+Adjamé,127,2,3,Appartement,0.5,2008,À rénover,1,1,19700000
+Adjamé,58,2,1,Duplex,5.1,2009,Neuf,1,1,7200000
+Marcory,70,3,1,Villa,17.3,2019,À rénover,1,1,20100000
+Adjamé,143,4,1,Duplex,3.6,2011,Bon état,1,0,27000000
+Yopougon,39,2,2,Appartement,21.6,1989,Neuf,0,0,6700000
+Adjamé,37,4,0,Studio,8.0,2006,Bon état,1,0,6600000
+Cocody,55,2,0,Appartement,21.8,1987,Bon état,1,1,14400000
+Adjamé,124,3,2,Duplex,11.3,2015,Bon état,0,1,22400000
+Treichville,34,2,1,Appartement,0.9,2021,Bon état,0,1,6800000
+Cocody,20,4,1,Villa,2.1,2014,À rénover,1,0,5700000
+Treichville,59,4,2,Studio,4.0,2015,Bon état,0,1,17000000
+Yopougon,97,1,1,Appartement,1.5,2015,Bon état,1,1,11400000
+Port-Bouet,134,4,2,Appartement,5.5,2004,Neuf,1,1,19200000
+Koumassi,58,4,1,Duplex,5.1,1999,Neuf,0,0,12100000
+Abobo,60,3,2,Appartement,25.0,1996,Bon état,1,1,7100000
+Adjamé,131,2,2,Villa,4.5,2002,Neuf,1,1,19300000
+Port-Bouet,29,4,1,Appartement,12.3,2004,Bon état,1,1,5000000
+Yopougon,61,4,2,Studio,22.8,2010,Bon état,1,1,12400000
+Yopougon,81,2,3,Villa,16.8,1985,Neuf,1,1,9200000
+Adjamé,92,5,1,Appartement,1.9,2014,Bon état,0,0,18400000
+Koumassi,57,1,1,Appartement,5.5,1983,Neuf,0,0,9100000
+Koumassi,75,1,3,Villa,3.4,2019,Bon état,0,1,11200000
+Koumassi,21,3,2,Appartement,4.1,1999,Bon état,1,0,5000000
+Yopougon,53,3,0,Appartement,3.6,2020,Bon état,1,0,6000000
+Koumassi,92,3,3,Villa,14.0,1980,Neuf,1,0,13100000
+Plateau,45,1,0,Appartement,4.8,2005,Bon état,1,1,16200000
+Abobo,76,5,2,Appartement,5.9,2013,Neuf,0,1,9700000
+Cocody,92,1,3,Villa,32.3,1989,Bon état,0,0,26500000
+Yopougon,62,1,4,Appartement,0.5,2002,Bon état,1,1,8900000
+Yopougon,80,1,0,Appartement,5.4,2003,Bon état,1,1,11900000
+Yopougon,46,3,2,Appartement,11.9,1992,À rénover,1,0,5700000
+Adjamé,66,4,1,Villa,1.3,2008,Bon état,0,0,16300000
+Yopougon,100,3,1,Villa,7.6,2006,Neuf,1,1,16800000
+Yopougon,80,4,0,Villa,2.2,2010,Bon état,1,1,12900000
+Marcory,55,1,2,Appartement,16.2,2022,À rénover,1,0,12800000
+Yopougon,82,3,1,Appartement,3.2,1989,Neuf,0,0,16800000
+Marcory,105,2,0,Appartement,3.2,2010,Bon état,1,0,17800000
+Cocody,26,2,2,Appartement,7.3,2018,Bon état,1,0,7600000
+Abobo,132,1,2,Duplex,1.6,1989,Bon état,1,0,9300000
+Adjamé,62,3,3,Appartement,2.7,2003,Bon état,0,1,11100000
+Abobo,91,3,4,Appartement,4.3,2012,Bon état,0,1,12200000
+Yopougon,134,3,1,Appartement,3.5,1993,Bon état,1,1,20100000
+Yopougon,37,2,4,Villa,6.0,2014,À rénover,0,0,5000000
+Port-Bouet,52,1,3,Villa,7.3,2013,Bon état,1,1,5800000
+Abobo,64,3,0,Villa,6.7,1996,Bon état,0,0,8600000
+Yopougon,50,2,0,Studio,8.5,2000,Bon état,0,0,8600000
+Cocody,175,4,1,Appartement,2.9,2011,Bon état,1,1,55400000
+Yopougon,48,3,1,Appartement,1.1,1982,À rénover,1,1,7700000
+Yopougon,56,2,2,Appartement,11.4,1994,Bon état,1,0,6000000
+Yopougon,82,5,2,Villa,15.2,1987,Bon état,1,1,15000000
+Abobo,40,3,2,Villa,2.4,2011,À rénover,0,1,5000000
+Abobo,60,1,1,Villa,4.2,2017,Bon état,1,1,5800000
+Abobo,86,3,0,Villa,5.5,2005,Neuf,0,1,9700000
+Koumassi,62,2,3,Villa,6.1,2009,Bon état,1,1,8800000
+Koumassi,70,4,1,Studio,8.6,1988,À rénover,0,1,12800000
+Adjamé,57,4,5,Villa,0.5,2011,À rénover,0,1,8500000
+Treichville,35,5,0,Studio,10.2,1990,Bon état,0,0,8300000
+Cocody,87,3,4,Appartement,0.5,2001,Bon état,0,0,28100000
+Plateau,177,2,0,Villa,5.1,2013,À rénover,1,1,55900000
+Cocody,74,3,0,Duplex,14.1,2020,Bon état,1,1,30500000
+Adjamé,82,1,0,Appartement,4.8,1997,À rénover,1,0,10700000
+Port-Bouet,104,3,2,Studio,1.3,1998,Bon état,1,1,17400000
+Marcory,39,3,3,Villa,33.6,1997,Neuf,0,0,7700000
+Port-Bouet,173,1,1,Appartement,17.6,2016,Bon état,0,1,35100000
+Cocody,82,2,4,Villa,11.8,1997,Bon état,0,0,26900000
+Port-Bouet,167,4,2,Appartement,4.2,1991,Bon état,0,0,28500000
+Yopougon,51,4,2,Duplex,1.6,1983,À rénover,1,1,9600000
+Cocody,183,1,3,Studio,22.7,2022,Bon état,1,0,52800000
+Yopougon,109,1,0,Appartement,6.1,2006,À rénover,0,0,14700000
+Marcory,97,2,1,Appartement,15.3,1984,Bon état,0,1,19900000
+Marcory,83,4,4,Villa,3.3,1985,Bon état,0,1,18300000
+Marcory,65,1,4,Appartement,3.3,1992,À rénover,0,1,13700000
+Koumassi,134,3,5,Appartement,33.9,2002,Bon état,0,1,20000000
+Abobo,79,1,4,Villa,5.9,2021,Bon état,1,0,11100000
+Marcory,28,3,0,Appartement,1.2,2004,Bon état,0,1,5300000
+Abobo,42,2,3,Appartement,2.0,1983,Bon état,1,1,6100000
+Adjamé,67,3,1,Studio,5.3,2011,Bon état,0,1,11500000
+Marcory,86,2,5,Duplex,0.5,2023,À rénover,0,1,19400000
+Yopougon,72,3,1,Studio,5.0,1994,À rénover,1,1,12200000
+Plateau,136,2,2,Studio,4.3,2005,Bon état,1,1,46500000
+Plateau,28,3,1,Appartement,12.1,2021,Bon état,0,0,12800000
+Adjamé,79,4,1,Appartement,3.5,1990,Bon état,1,0,8700000
+Plateau,30,1,0,Appartement,32.4,1988,Bon état,0,1,9400000
+Abobo,108,4,3,Studio,1.6,1990,Bon état,0,1,12700000
+Adjamé,70,3,3,Duplex,7.2,1981,À rénover,1,1,9900000
+Cocody,91,1,0,Villa,0.8,2006,Bon état,1,1,24700000
+Abobo,48,2,3,Studio,10.6,2005,Neuf,0,0,6000000
+Marcory,140,2,2,Villa,40.0,1987,À rénover,0,1,33400000
+Treichville,124,3,1,Appartement,13.7,2000,Bon état,1,0,28300000
+Yopougon,99,3,0,Appartement,6.5,2000,À rénover,0,0,13400000
+Koumassi,69,1,3,Appartement,5.3,1987,Neuf,0,0,10200000
+Abobo,98,3,2,Appartement,14.4,1980,Neuf,1,1,12700000
+Cocody,52,4,1,Villa,22.0,2017,À rénover,1,0,20600000
+Abobo,113,4,2,Appartement,36.2,1992,Neuf,0,1,17200000
+Treichville,168,3,0,Villa,4.0,1988,À rénover,1,0,37200000
+Abobo,126,5,1,Villa,37.6,2007,À rénover,1,0,15800000
+Koumassi,51,3,0,Appartement,1.4,1985,Bon état,1,1,7500000
+Port-Bouet,88,2,0,Appartement,2.3,2002,Neuf,1,1,14000000
+Marcory,39,4,2,Appartement,0.7,2015,Bon état,1,0,9200000
+Marcory,98,2,4,Appartement,2.5,1996,À rénover,0,0,22000000
+Abobo,92,2,1,Studio,11.7,1988,Bon état,0,1,12100000
+Yopougon,29,2,0,Appartement,15.3,1991,Bon état,1,0,5000000
+Koumassi,41,4,2,Villa,12.1,2001,Bon état,1,1,7100000
+Port-Bouet,64,4,3,Studio,8.0,1991,Neuf,1,0,13000000
+Yopougon,63,2,2,Studio,5.8,1985,À rénover,1,0,8200000
+Marcory,40,2,3,Studio,9.9,2023,À rénover,1,0,7400000
+Koumassi,90,2,1,Appartement,4.0,1988,À rénover,1,1,10000000
+Marcory,84,3,3,Appartement,14.7,2016,Bon état,1,1,17500000
+Koumassi,67,2,0,Appartement,9.0,1982,Bon état,1,0,10800000
+Yopougon,51,3,1,Appartement,9.6,2013,Bon état,0,1,6900000
+Adjamé,125,2,1,Duplex,6.1,1987,Bon état,1,1,19500000
+Cocody,169,2,1,Villa,17.3,1989,Bon état,1,1,54700000
+Abobo,58,1,4,Appartement,2.3,2020,À rénover,1,0,6900000
+Yopougon,54,2,3,Appartement,3.8,2021,À rénover,1,0,6400000
+Abobo,94,4,0,Appartement,12.0,2022,À rénover,0,1,14700000
+Plateau,62,2,0,Villa,5.4,1988,À rénover,1,0,27400000
+Adjamé,69,2,1,Villa,17.6,1993,À rénover,1,0,9300000
+Port-Bouet,107,2,0,Studio,3.4,2016,Neuf,1,1,16200000
+Marcory,28,2,2,Duplex,3.7,2006,À rénover,1,0,7100000
+Cocody,142,1,4,Appartement,17.6,2020,Bon état,0,0,38900000
+Cocody,76,2,4,Appartement,5.0,2011,Bon état,1,0,15300000
+Adjamé,60,3,2,Appartement,5.8,1983,Neuf,1,1,8200000
+Abobo,70,3,3,Appartement,3.2,1981,Bon état,1,0,8600000
+Abobo,72,2,1,Duplex,2.6,2012,Bon état,1,1,7100000
+Marcory,31,2,0,Villa,8.5,2000,Bon état,1,1,6300000
+Yopougon,156,5,1,Villa,1.0,1980,Bon état,0,1,26900000
+Abobo,75,2,2,Appartement,16.9,2023,À rénover,1,0,10900000
+Yopougon,92,2,2,Appartement,12.1,1990,À rénover,0,0,12400000
+Treichville,119,2,0,Appartement,1.7,1980,Bon état,1,1,28300000
+Plateau,44,2,1,Villa,9.5,1990,Bon état,0,0,20200000
+Adjamé,93,3,1,Villa,7.4,1986,Bon état,0,1,19700000
+Yopougon,64,2,4,Appartement,1.6,1981,Bon état,1,0,9400000
+Yopougon,113,3,1,Villa,2.6,1994,Neuf,1,1,12000000
+Adjamé,25,1,3,Studio,4.2,1987,À rénover,1,0,5000000
+Adjamé,70,2,3,Appartement,9.6,2005,Bon état,1,1,13100000
+Treichville,55,3,0,Villa,8.1,2019,Neuf,1,0,12000000
+Plateau,91,2,2,Appartement,6.1,2021,Bon état,1,0,43400000
+Cocody,93,3,3,Villa,11.7,2014,Bon état,1,1,34100000
+Adjamé,52,2,1,Studio,11.3,2020,Bon état,1,1,9100000
+Abobo,52,3,4,Duplex,7.7,2020,Neuf,1,1,7700000
+Marcory,70,1,0,Appartement,12.4,2000,À rénover,1,1,14700000
+Cocody,47,4,0,Appartement,3.3,2017,Bon état,1,1,10200000
+Cocody,112,2,3,Appartement,17.0,1987,Neuf,0,0,31300000
+Port-Bouet,61,4,3,Appartement,7.6,2022,Neuf,1,0,14300000
+Plateau,20,2,5,Villa,13.8,2011,Bon état,0,1,6600000
+Yopougon,61,3,2,Duplex,6.3,1987,Neuf,0,0,8900000
+Marcory,44,2,4,Appartement,2.0,2023,Neuf,0,1,8000000
+Yopougon,33,4,3,Appartement,6.3,1989,Bon état,1,0,6700000
+Cocody,40,1,3,Appartement,3.7,2002,Bon état,0,0,14000000
+Abobo,78,2,2,Appartement,9.6,1983,Neuf,1,0,8000000
+Cocody,143,2,1,Appartement,5.2,2017,Bon état,1,1,44200000
+Koumassi,86,1,4,Appartement,14.5,2009,Bon état,1,1,10800000
+Marcory,54,2,1,Villa,9.1,2020,Neuf,1,0,12700000
+Abobo,93,4,1,Appartement,9.2,2002,Bon état,1,0,13700000
+Port-Bouet,59,5,1,Villa,2.0,1984,Neuf,1,1,14000000
+Adjamé,52,2,2,Studio,33.2,2000,Neuf,1,0,8800000
+Abobo,41,4,1,Appartement,14.7,1985,Bon état,1,1,8100000
+Yopougon,31,3,0,Villa,12.4,1996,Bon état,1,1,5000000
+Yopougon,61,2,3,Villa,3.2,2004,Neuf,1,1,6400000
+Adjamé,80,3,1,Villa,6.1,2003,Bon état,0,1,13100000
+Treichville,70,3,2,Appartement,1.2,2001,À rénover,1,0,11800000
+Adjamé,60,5,0,Appartement,6.2,1992,Bon état,0,1,9200000
+Abobo,46,2,0,Studio,1.3,1996,À rénover,0,1,5000000
+Adjamé,100,3,0,Studio,6.4,1993,À rénover,1,1,15000000
+Yopougon,38,1,2,Appartement,8.4,2013,À rénover,1,0,5000000
+Cocody,109,1,0,Appartement,4.0,2005,Bon état,1,1,32900000
+Abobo,45,1,4,Appartement,5.5,1998,Bon état,1,1,5000000
+Treichville,51,5,0,Appartement,16.7,2005,Bon état,1,1,12400000
+Plateau,35,4,0,Villa,0.9,1982,Neuf,0,0,17200000
+Adjamé,57,3,0,Appartement,12.6,1981,Bon état,1,0,8800000
+Marcory,120,3,0,Appartement,1.5,2007,À rénover,0,1,26700000
+Abobo,95,2,3,Studio,0.5,1981,Bon état,0,1,11900000
+Cocody,120,2,3,Appartement,1.6,2001,Bon état,1,0,25700000
+Yopougon,96,2,2,Studio,11.6,1986,Bon état,0,1,8700000
+Koumassi,42,2,0,Villa,4.2,1983,Bon état,0,0,6700000
+Yopougon,62,3,0,Appartement,16.5,2017,Bon état,1,0,10000000
+Adjamé,50,3,1,Villa,6.0,2018,Bon état,0,0,11400000
+Koumassi,143,1,4,Villa,0.5,1999,Bon état,0,0,20500000
+Port-Bouet,41,1,0,Appartement,10.1,1985,Bon état,0,0,7400000
+Marcory,115,1,2,Appartement,0.9,1988,À rénover,0,0,22300000
+Yopougon,115,2,1,Villa,12.5,2010,À rénover,0,0,16900000
+Plateau,184,4,0,Duplex,1.5,2005,Bon état,1,1,99800000
+Treichville,60,3,1,Villa,3.4,2015,À rénover,0,1,9000000
+Port-Bouet,105,4,0,Appartement,11.5,2005,Bon état,1,1,22100000
+Abobo,231,2,3,Villa,24.7,2007,Bon état,0,0,36200000
+Port-Bouet,54,2,0,Appartement,3.7,1984,Bon état,1,0,9700000
+Abobo,34,1,2,Villa,14.1,1989,Bon état,1,1,5000000
+Abobo,29,4,0,Villa,1.7,1997,Neuf,1,1,5000000
+Cocody,105,3,4,Villa,13.2,1994,Bon état,1,0,33900000
+Koumassi,29,2,0,Studio,8.6,2012,Bon état,1,0,5000000
+Plateau,61,3,3,Villa,1.7,1984,Bon état,0,1,16500000
+Koumassi,92,2,3,Villa,2.9,2016,Bon état,1,1,11500000
+Koumassi,81,3,4,Appartement,1.1,2019,Bon état,1,0,11000000
+Adjamé,91,4,1,Studio,3.9,2001,Bon état,0,1,19000000
+Cocody,82,3,2,Duplex,1.8,2001,À rénover,0,1,30100000
+Marcory,140,3,1,Appartement,8.3,2001,Bon état,0,1,34100000
+Marcory,46,1,0,Appartement,40.0,1994,Neuf,1,0,10300000
+Yopougon,53,1,1,Appartement,0.5,1996,Bon état,0,1,6700000
+Cocody,50,2,0,Studio,6.2,2007,Bon état,0,0,17800000
+Port-Bouet,112,1,5,Villa,6.8,2001,Bon état,1,1,17900000
+Abobo,116,3,0,Appartement,19.6,2000,Neuf,1,1,14900000
+Marcory,92,3,2,Studio,5.6,2021,Bon état,0,0,20500000
+Yopougon,133,1,2,Appartement,6.3,1996,Bon état,0,1,19100000
+Yopougon,41,4,1,Studio,5.1,1984,Bon état,1,0,6200000
+Abobo,170,2,2,Appartement,2.5,1997,Bon état,1,0,23200000
+Abobo,158,2,0,Appartement,0.5,1996,À rénover,1,0,15600000
+Port-Bouet,106,2,2,Appartement,4.2,1983,Bon état,1,1,15300000
+Yopougon,180,2,0,Appartement,0.5,1986,Bon état,0,0,27900000
+Treichville,32,2,4,Villa,6.4,2004,Bon état,0,1,6500000
+Port-Bouet,57,2,3,Villa,2.9,2016,À rénover,1,0,9200000
+Marcory,51,2,5,Appartement,6.1,2019,Bon état,1,0,12500000
+Port-Bouet,106,5,0,Appartement,1.2,2019,Bon état,1,0,20300000
+Cocody,44,1,0,Appartement,21.6,2022,Bon état,1,1,12000000
+Koumassi,108,1,0,Villa,18.0,1988,Bon état,1,0,18300000
+Yopougon,146,1,0,Villa,1.7,1998,À rénover,0,0,23400000
+Port-Bouet,104,3,0,Appartement,3.4,1988,Neuf,0,0,23900000
+Port-Bouet,85,1,2,Villa,7.6,2002,Neuf,0,0,13000000
+Koumassi,45,4,0,Appartement,0.8,2010,À rénover,0,1,9300000
+Koumassi,48,3,1,Duplex,3.5,2011,À rénover,0,1,6700000
+Marcory,138,3,3,Duplex,2.3,2010,Bon état,1,0,27700000
+Cocody,109,3,2,Villa,19.8,1996,Bon état,0,0,22900000
+Yopougon,72,2,1,Duplex,15.3,2018,Bon état,0,1,12600000
+Plateau,60,2,1,Studio,6.9,2001,Bon état,0,0,19700000
+Adjamé,27,2,1,Studio,5.9,2014,À rénover,1,1,5000000
+Yopougon,43,3,0,Villa,21.4,2009,Neuf,1,0,5600000
+Treichville,192,2,2,Appartement,21.6,2019,Neuf,1,0,43500000
+Adjamé,39,1,1,Appartement,27.9,2016,Bon état,1,1,5500000
+Koumassi,81,5,3,Appartement,1.1,2005,Bon état,1,1,12000000
+Plateau,122,1,3,Villa,1.4,1985,Neuf,0,0,45500000
+Port-Bouet,39,4,2,Appartement,9.0,2013,Neuf,0,0,6100000
+Port-Bouet,81,3,1,Appartement,6.2,2011,Bon état,0,0,13100000
+Yopougon,118,2,0,Appartement,0.5,2004,Neuf,1,1,11300000
+Abobo,74,1,3,Appartement,0.5,1992,À rénover,0,1,6400000
+Koumassi,309,1,1,Villa,17.5,2017,Bon état,0,0,44400000
+Plateau,32,3,0,Duplex,16.3,2017,Bon état,1,0,9200000
+Abobo,125,3,0,Villa,3.5,1981,Bon état,1,0,12400000
+Yopougon,68,3,0,Villa,17.7,1984,Bon état,1,0,10300000
+Plateau,108,4,3,Villa,7.2,1990,Bon état,0,0,43100000
+Yopougon,92,3,0,Appartement,13.1,1990,Bon état,1,1,18000000
+Cocody,51,2,1,Appartement,4.5,2003,Bon état,1,0,19700000
+Cocody,83,2,1,Studio,1.0,1993,Bon état,0,0,21800000
+Plateau,29,4,2,Appartement,4.5,2009,Bon état,1,1,13600000
+Treichville,100,2,3,Appartement,4.9,2019,Bon état,1,0,22800000
+Abobo,86,1,3,Studio,6.4,2023,À rénover,0,0,8600000
+Treichville,101,3,1,Appartement,0.9,2014,Bon état,0,0,17300000
+Yopougon,125,2,0,Appartement,38.0,2000,À rénover,1,0,17500000
+Marcory,89,4,1,Appartement,2.2,1984,À rénover,0,1,21500000
+Abobo,79,3,2,Appartement,1.8,2017,Neuf,1,1,9400000
+Yopougon,47,1,2,Appartement,6.0,1981,Bon état,0,0,6500000
+Cocody,52,4,2,Appartement,6.2,2019,Bon état,1,0,16000000
+Adjamé,133,2,0,Villa,4.6,2016,Bon état,1,0,17800000
+Marcory,151,2,2,Studio,11.8,2013,Bon état,1,1,33100000
+Abobo,65,2,0,Appartement,5.8,1990,Bon état,0,1,8200000
+Adjamé,75,1,3,Studio,7.5,2015,Bon état,0,0,9300000
+Plateau,47,2,1,Appartement,10.3,1990,Neuf,0,0,20200000
+Cocody,132,1,2,Appartement,0.5,1988,Neuf,0,0,27100000
+Koumassi,103,2,0,Appartement,6.8,1985,Bon état,0,1,14200000
+Yopougon,195,2,1,Villa,17.2,2013,Bon état,1,1,26300000
+Cocody,48,3,2,Appartement,0.5,2016,Bon état,0,1,14100000
+Treichville,61,4,0,Villa,4.2,2011,Bon état,1,0,13200000
+Cocody,83,2,3,Studio,20.9,1991,Neuf,1,1,32100000
+Adjamé,102,2,2,Villa,3.5,2011,Neuf,1,1,14400000
+Treichville,66,2,2,Villa,4.9,1996,Bon état,1,1,18500000
+Marcory,48,2,1,Duplex,31.9,1983,Bon état,0,0,11000000
+Plateau,115,3,1,Appartement,1.8,2021,Bon état,1,1,47300000
+Plateau,106,3,2,Appartement,0.5,2012,À rénover,1,0,46100000
+Marcory,47,2,1,Villa,15.7,2022,À rénover,1,1,14000000
+Cocody,145,2,2,Villa,16.2,2022,Neuf,1,0,37300000
+Adjamé,132,1,1,Appartement,5.1,1988,Bon état,1,1,16500000
+Cocody,79,3,0,Appartement,5.8,2013,Bon état,0,1,22800000
+Abobo,77,1,0,Appartement,14.5,2018,Bon état,0,0,8500000
+Treichville,97,5,0,Appartement,10.7,2009,Bon état,1,1,18000000
+Koumassi,48,3,1,Appartement,2.5,1999,Bon état,1,0,7800000
+Abobo,75,2,2,Duplex,0.5,2018,Neuf,1,0,11200000
+Marcory,25,3,3,Studio,5.2,2002,Bon état,0,0,5900000
+Abobo,114,4,0,Appartement,15.7,2020,Bon état,1,0,14900000
+Abobo,34,3,4,Villa,18.1,2023,Bon état,1,1,5000000
+Yopougon,156,2,1,Studio,25.0,2014,Neuf,0,0,24900000
+Plateau,62,2,4,Appartement,16.9,2002,Bon état,0,1,20500000
+Port-Bouet,66,4,2,Appartement,6.9,2018,Bon état,0,1,16700000
+Yopougon,54,3,2,Villa,4.7,2002,Neuf,1,1,10500000
+Plateau,64,3,0,Studio,11.9,2016,Neuf,1,1,27000000
+Yopougon,150,4,0,Appartement,10.8,2002,Bon état,0,0,24100000
+Yopougon,21,4,0,Duplex,6.2,2018,Bon état,0,1,5000000
+Koumassi,140,4,2,Appartement,0.7,2007,Bon état,1,0,28300000
+Adjamé,87,1,1,Appartement,20.8,1998,Neuf,1,1,11500000
+Koumassi,40,3,3,Appartement,4.9,2009,Neuf,1,1,6000000
+Cocody,43,3,1,Appartement,3.6,2000,Bon état,1,1,11200000
+Yopougon,170,3,3,Studio,7.9,2003,Bon état,0,0,27200000
+Yopougon,46,3,0,Duplex,9.0,2000,Neuf,1,1,7600000
+Cocody,41,2,0,Appartement,1.9,2005,Bon état,0,1,9900000
+Marcory,130,3,1,Duplex,14.5,2015,Neuf,1,1,28100000
+Koumassi,87,3,1,Studio,2.7,2005,Bon état,0,0,11300000
+Plateau,46,1,1,Appartement,1.7,2012,Neuf,1,1,13900000
+Abobo,82,2,3,Villa,4.2,2015,Neuf,0,0,10500000
+Marcory,44,2,0,Appartement,10.5,1983,Bon état,1,1,8500000
+Cocody,128,2,1,Villa,26.9,1988,Bon état,0,1,37000000
+Marcory,125,1,3,Appartement,13.3,1987,À rénover,1,0,18900000
+Treichville,96,2,0,Villa,22.6,1981,Neuf,1,0,20300000
+Koumassi,88,3,4,Appartement,1.2,2008,Neuf,0,1,14200000
+Treichville,178,3,5,Studio,0.6,2002,Bon état,1,0,34900000
+Yopougon,74,3,0,Studio,6.5,1985,Bon état,1,0,10800000
+Cocody,41,4,0,Appartement,2.7,2022,Bon état,1,1,14600000
+Abobo,92,2,1,Appartement,14.1,2015,Bon état,1,1,9600000
+Yopougon,209,1,3,Appartement,8.9,2000,Bon état,1,1,21200000
+Port-Bouet,44,4,2,Villa,28.2,2001,Neuf,1,0,11100000
+Cocody,62,2,2,Appartement,2.4,1988,À rénover,1,0,17000000
+Yopougon,91,5,3,Villa,5.3,2013,Bon état,0,1,15400000
+Plateau,72,4,0,Appartement,5.6,2005,Bon état,0,1,36000000
+Yopougon,45,3,3,Appartement,2.2,1980,Bon état,1,1,10400000
+Adjamé,129,5,2,Appartement,7.1,2015,Bon état,0,1,20800000
+Yopougon,235,1,2,Appartement,4.7,2023,Neuf,1,0,32600000
+Yopougon,81,2,3,Studio,4.7,1984,Bon état,0,0,10200000
+Yopougon,47,3,2,Duplex,3.6,2020,Neuf,1,1,6500000
+Yopougon,34,2,0,Appartement,0.5,2001,Bon état,1,1,5000000
+Koumassi,84,4,1,Villa,5.9,1983,Bon état,1,1,12100000
+Port-Bouet,128,1,1,Appartement,3.3,1981,Bon état,1,1,20400000
+Treichville,93,3,0,Villa,0.5,1995,Bon état,1,1,16000000
+Koumassi,74,3,4,Appartement,2.9,1995,Bon état,0,1,13700000
+Marcory,55,3,0,Villa,2.6,2001,Neuf,0,0,12900000
+Adjamé,43,2,2,Duplex,4.0,2022,Bon état,0,1,7400000
+Yopougon,112,2,1,Appartement,1.1,1980,Neuf,1,1,14600000
+Marcory,116,4,0,Studio,5.7,1994,Bon état,0,0,27200000
+Port-Bouet,34,2,4,Appartement,9.4,2003,À rénover,0,1,6100000
+Cocody,163,4,3,Appartement,8.0,1983,Bon état,1,0,46700000
+Port-Bouet,98,3,1,Appartement,13.0,1997,Neuf,1,1,17200000
+Yopougon,148,3,0,Appartement,4.8,1996,Bon état,0,0,19400000
+Abobo,38,3,0,Appartement,5.9,1986,À rénover,0,1,5000000
+Adjamé,37,2,1,Appartement,13.3,1989,Bon état,1,1,5000000
+Port-Bouet,68,3,0,Appartement,4.5,1980,Neuf,1,1,15200000
+Abobo,95,4,1,Appartement,9.7,1981,À rénover,0,1,11600000
+Abobo,181,2,4,Villa,4.6,2001,À rénover,1,1,25300000
+Cocody,105,5,2,Duplex,4.3,2011,Neuf,1,0,45000000
+Abobo,65,2,3,Appartement,11.4,2008,À rénover,1,0,6200000
+Plateau,44,1,2,Appartement,1.5,2014,Bon état,1,1,12900000
+Adjamé,136,2,1,Appartement,3.3,1996,Bon état,1,0,30500000
+Abobo,45,5,3,Studio,2.0,1991,Bon état,1,0,8300000
+Adjamé,166,2,1,Villa,3.6,2003,À rénover,0,0,26800000
+Cocody,64,4,3,Appartement,2.1,2009,Bon état,0,0,23100000
+Cocody,163,4,0,Appartement,6.9,2023,Neuf,1,1,51200000
+Adjamé,103,2,0,Appartement,12.8,2009,À rénover,1,1,17800000
+Cocody,69,1,3,Appartement,12.4,1999,Neuf,1,0,17200000
+Cocody,57,3,2,Duplex,3.6,2021,Bon état,0,1,12900000
+Cocody,62,2,3,Studio,35.9,1986,Bon état,1,0,15000000
+Treichville,91,3,4,Appartement,7.2,2021,Neuf,0,1,20100000
+Adjamé,77,2,0,Villa,4.1,2017,Neuf,1,0,10400000
+Yopougon,55,2,1,Appartement,14.4,1986,À rénover,0,1,7600000
+Marcory,68,3,1,Appartement,10.5,2009,Bon état,1,0,13200000
+Yopougon,77,2,2,Studio,11.1,1991,Bon état,1,0,9500000
+Koumassi,25,2,3,Villa,1.7,2010,Bon état,0,1,5000000
+Adjamé,93,2,0,Appartement,5.1,1997,Bon état,0,0,15600000
+Plateau,45,2,2,Appartement,15.8,2022,Bon état,1,1,17000000
+Plateau,41,3,2,Studio,5.6,1981,Bon état,1,1,18800000
+Cocody,32,4,0,Villa,9.2,2012,Bon état,0,0,11900000
+Adjamé,30,2,3,Appartement,7.1,1990,À rénover,0,1,5900000
+Koumassi,37,3,2,Appartement,14.8,2013,Bon état,0,0,5600000
+Marcory,52,3,4,Appartement,2.7,1995,Bon état,1,1,11300000
+Cocody,196,2,1,Duplex,6.9,2014,À rénover,0,1,47700000
+Cocody,57,2,0,Villa,1.1,2012,Bon état,0,0,16100000
+Treichville,81,4,1,Appartement,9.4,2000,Neuf,1,1,21800000
+Marcory,90,3,0,Villa,10.5,1999,À rénover,1,0,25000000
+Koumassi,79,3,4,Studio,0.5,1987,Bon état,0,1,14700000
+Abobo,71,3,0,Appartement,9.0,2005,Neuf,1,0,6600000
+Yopougon,41,1,3,Appartement,4.3,2012,Bon état,1,0,6200000
+Marcory,152,3,1,Villa,1.1,2005,Bon état,1,1,25500000
+Plateau,182,3,1,Villa,4.4,2016,Bon état,0,0,83800000
+Abobo,32,3,0,Villa,1.7,2009,Bon état,1,1,5000000
+Koumassi,44,2,2,Studio,4.3,2010,Bon état,0,1,7400000
+Adjamé,64,1,2,Appartement,3.9,2012,Bon état,0,1,7700000
+Abobo,46,2,0,Appartement,10.7,1990,Bon état,0,1,6400000
+Cocody,95,5,4,Duplex,11.9,2020,Neuf,1,1,27400000
+Treichville,51,2,1,Appartement,7.5,1984,Neuf,1,0,9400000
+Koumassi,218,2,1,Villa,0.5,1981,Bon état,1,1,28000000
+Marcory,134,1,1,Villa,21.4,1992,Bon état,0,1,19700000
+Treichville,82,1,0,Villa,9.3,1997,Bon état,1,0,15800000
+Abobo,123,3,4,Appartement,0.5,2005,Bon état,1,0,19900000
+Abobo,128,3,1,Studio,13.7,2004,Bon état,0,1,22900000
+Koumassi,56,3,0,Studio,1.8,2023,Bon état,1,1,9200000
+Koumassi,49,2,1,Villa,6.9,1993,À rénover,0,1,8600000
+Adjamé,77,3,2,Appartement,5.0,1984,Bon état,1,1,13900000
+Plateau,113,2,1,Appartement,4.4,2021,Bon état,0,0,45900000
+Yopougon,79,2,2,Appartement,17.6,1981,Bon état,1,1,10500000
+Port-Bouet,33,2,0,Appartement,4.6,1983,Bon état,1,1,5900000
+Marcory,49,2,0,Appartement,0.6,1991,Bon état,1,0,11400000
+Yopougon,71,2,3,Duplex,23.4,1990,Bon état,0,0,9100000
+Yopougon,71,3,0,Studio,20.3,1983,À rénover,1,0,10600000
+Yopougon,198,3,3,Villa,9.2,2022,Bon état,0,1,29600000
+Abobo,37,4,0,Villa,5.0,1988,Bon état,1,0,5700000
+Treichville,95,2,3,Appartement,0.8,1989,À rénover,1,0,16400000
+Marcory,155,1,1,Duplex,12.5,2006,Bon état,0,0,30800000
+Plateau,229,2,2,Appartement,0.6,1985,Bon état,0,0,111400000
+Plateau,60,5,0,Appartement,0.6,1994,À rénover,1,0,32600000
+Port-Bouet,94,3,0,Appartement,6.2,2021,Bon état,1,1,21000000
+Adjamé,98,3,0,Studio,1.4,2010,Bon état,0,0,17100000
+Marcory,81,1,0,Studio,0.5,2001,À rénover,0,1,17000000
+Koumassi,70,3,1,Appartement,4.4,1985,Bon état,0,1,13100000
+Port-Bouet,92,1,1,Studio,1.2,2012,À rénover,1,1,18200000
+Port-Bouet,21,3,2,Appartement,1.4,2008,Neuf,1,1,5000000
+Port-Bouet,104,4,3,Appartement,0.6,2000,Bon état,1,0,16600000
+Marcory,78,5,2,Studio,1.8,2009,Neuf,1,0,24600000
+Koumassi,66,3,2,Studio,10.1,2000,Bon état,1,0,10300000
+Yopougon,205,2,1,Villa,13.2,2015,Neuf,1,1,25900000
+Port-Bouet,53,4,1,Villa,4.8,2001,Neuf,0,0,8500000
+Adjamé,60,3,1,Studio,5.7,1999,Neuf,1,1,9600000
+Koumassi,199,1,3,Studio,0.5,2001,Bon état,0,1,22000000
+Adjamé,49,2,0,Studio,0.6,2019,Bon état,0,1,10400000
+Plateau,56,2,0,Villa,2.4,1990,Neuf,1,1,21100000
+Abobo,68,2,2,Duplex,6.3,2010,Bon état,0,1,8000000
+Treichville,112,2,0,Duplex,10.8,2019,Neuf,1,0,25000000
+Port-Bouet,82,3,3,Appartement,7.4,1992,À rénover,1,1,17400000
+Cocody,39,2,3,Studio,4.0,1997,Bon état,1,0,13500000
+Plateau,56,2,0,Appartement,1.0,2001,Bon état,0,1,24600000
+Plateau,54,3,0,Appartement,12.1,1996,À rénover,0,1,19800000
+Adjamé,71,4,1,Villa,3.6,2017,Bon état,0,0,12600000
+Koumassi,91,3,2,Appartement,10.7,2004,Bon état,1,1,16500000
+Marcory,91,2,0,Villa,5.8,2011,Bon état,1,0,18100000
+Abobo,30,4,2,Studio,10.7,1994,À rénover,1,1,5000000
+Port-Bouet,125,4,2,Appartement,19.0,1992,Bon état,1,1,26300000
+Adjamé,84,2,1,Appartement,20.3,2005,À rénover,1,1,15200000
+Abobo,147,1,0,Duplex,6.1,1990,À rénover,1,0,11900000
+Abobo,92,3,3,Appartement,5.7,1992,Bon état,1,0,13000000
+Abobo,128,4,0,Appartement,2.5,2012,Bon état,0,1,16800000
+Marcory,93,5,3,Appartement,22.0,2016,Bon état,1,1,27200000
+Abobo,144,4,1,Villa,4.9,2017,Neuf,1,0,21900000
+Adjamé,96,3,2,Villa,1.1,1980,Bon état,0,0,20700000
+Port-Bouet,70,3,3,Studio,4.5,2018,À rénover,0,0,15600000
+Abobo,230,1,3,Appartement,1.1,2006,Bon état,0,1,30400000
+Koumassi,115,2,1,Studio,5.6,2015,Bon état,1,0,21200000
+Plateau,98,2,0,Villa,6.6,2011,Bon état,0,0,38700000
+Yopougon,39,3,3,Appartement,3.3,2020,Bon état,1,1,5900000
+Cocody,39,3,1,Villa,0.6,1994,Neuf,1,0,14300000
+Marcory,85,3,0,Villa,23.0,2010,Bon état,1,1,21900000
+Adjamé,79,2,4,Villa,11.9,1985,Bon état,0,0,12200000
+Treichville,54,3,0,Appartement,14.6,2004,Neuf,0,0,12600000
+Cocody,79,1,0,Appartement,3.7,1997,À rénover,0,1,22000000
+Yopougon,163,2,0,Appartement,11.4,2001,Bon état,0,0,20000000
+Koumassi,104,3,2,Appartement,5.3,2010,Bon état,1,0,20200000
+Marcory,42,3,2,Villa,1.8,2015,Neuf,0,0,9800000
+Abobo,70,5,1,Appartement,1.1,1988,Bon état,1,0,13300000
+Adjamé,49,2,1,Studio,3.4,1982,Bon état,0,1,6000000
+Abobo,61,2,1,Appartement,1.2,2012,Bon état,1,0,6600000
+Plateau,60,2,2,Appartement,40.0,2006,À rénover,1,1,22800000
+Yopougon,58,2,0,Villa,0.5,2022,Neuf,1,1,9500000
+Koumassi,39,4,4,Appartement,4.7,1980,Bon état,1,0,7200000
+Abobo,69,3,0,Studio,4.8,2023,Bon état,0,0,9200000
+Cocody,56,4,5,Appartement,2.9,1988,À rénover,1,1,16200000
+Koumassi,20,2,0,Appartement,6.8,1984,Bon état,1,0,5000000
+Cocody,206,4,3,Studio,1.3,1994,Neuf,1,0,75000000
+Koumassi,127,1,0,Villa,12.3,1988,Neuf,1,0,14100000
+Marcory,61,4,0,Appartement,3.2,2007,À rénover,1,1,13900000
+Treichville,74,2,3,Appartement,7.2,1992,À rénover,1,1,16300000
+Yopougon,41,2,3,Villa,10.1,2003,Bon état,1,0,5000000
+Yopougon,172,3,1,Duplex,17.6,1989,Bon état,1,1,32200000
+Plateau,190,4,2,Studio,14.5,2021,Bon état,0,1,97600000
+Marcory,80,1,2,Appartement,7.5,2001,À rénover,1,0,12200000
+Port-Bouet,123,2,3,Duplex,3.9,2018,À rénover,1,1,18300000
+Treichville,80,4,1,Appartement,5.6,2001,À rénover,1,1,12400000
+Yopougon,38,2,1,Appartement,11.7,2016,À rénover,1,1,5000000
+Yopougon,60,2,1,Studio,16.8,2018,À rénover,0,0,9400000
+Adjamé,79,2,1,Appartement,0.9,1999,Bon état,1,1,12000000
+Port-Bouet,59,2,3,Appartement,3.9,1989,À rénover,1,1,10900000
+Abobo,66,4,0,Appartement,12.0,1989,Bon état,1,1,6900000
+Yopougon,70,3,0,Appartement,4.5,2005,À rénover,0,1,11800000
+Yopougon,71,3,2,Villa,3.2,2004,Bon état,1,0,9800000
+Adjamé,76,5,2,Villa,4.2,2007,Neuf,1,1,15100000
+Cocody,43,2,0,Appartement,7.4,1992,Bon état,1,1,12800000
+Abobo,51,1,1,Villa,40.0,1994,Bon état,1,0,5000000
+Yopougon,39,2,4,Duplex,5.4,1985,Bon état,1,0,5000000
+Koumassi,120,2,0,Studio,1.9,1991,Bon état,1,0,20800000
+Cocody,26,2,2,Appartement,1.4,1998,Bon état,1,1,8300000
+Abobo,131,4,2,Duplex,0.5,2011,Bon état,0,1,20700000
+Yopougon,147,3,1,Villa,6.5,1990,Bon état,0,0,23200000
+Adjamé,63,2,4,Appartement,6.3,2017,Neuf,0,0,10400000
+Cocody,20,3,2,Appartement,1.8,2012,À rénover,1,1,5000000
+Abobo,62,3,1,Appartement,9.5,1981,Bon état,1,1,7600000
+Abobo,71,4,2,Villa,10.8,1994,Neuf,1,0,9600000
+Abobo,44,4,2,Appartement,2.4,2015,Bon état,1,0,7800000
+Abobo,57,3,2,Villa,3.4,1984,Bon état,1,0,8000000
+Adjamé,158,3,3,Appartement,37.2,1994,Neuf,1,1,33800000
+Koumassi,103,3,1,Duplex,3.8,2022,Bon état,0,1,18200000
+Marcory,46,3,0,Appartement,11.4,1989,Bon état,1,1,9500000
+Koumassi,33,1,0,Duplex,4.8,1996,Bon état,0,0,5000000
+Yopougon,63,1,0,Duplex,12.6,2013,Bon état,0,1,8500000
+Cocody,66,3,0,Appartement,11.7,2003,Bon état,0,1,18400000
+Cocody,94,2,3,Appartement,8.8,1989,Neuf,0,0,26800000
+Yopougon,56,1,2,Appartement,15.4,2009,À rénover,0,0,7100000
+Koumassi,95,3,2,Duplex,22.4,1982,Bon état,1,1,19100000
+Adjamé,194,1,2,Villa,6.9,2016,Bon état,0,1,20000000
+Koumassi,111,3,3,Appartement,2.2,1982,Neuf,1,0,21300000
+Abobo,72,3,1,Appartement,4.1,2019,Bon état,0,0,7900000
+Yopougon,67,5,3,Appartement,11.4,1984,Bon état,0,1,9100000
+Plateau,62,2,1,Duplex,8.4,2007,Neuf,1,1,27600000
+Yopougon,133,1,4,Villa,1.6,2023,Bon état,1,1,19200000
+Yopougon,54,3,2,Studio,0.5,1993,Neuf,1,0,9700000
+Cocody,75,4,0,Appartement,9.2,2018,Bon état,1,0,29200000
+Marcory,76,5,2,Appartement,2.3,1990,Bon état,1,0,26300000
+Abobo,57,2,1,Duplex,5.5,1987,Neuf,1,1,7300000
+Adjamé,37,2,0,Appartement,11.0,2016,À rénover,1,1,5900000
+Treichville,87,4,2,Duplex,6.6,1987,Neuf,1,1,21600000
+Port-Bouet,71,2,1,Appartement,0.7,1991,Bon état,0,0,14600000
+Adjamé,95,3,0,Appartement,1.6,1994,Bon état,1,1,14600000
+Yopougon,56,2,4,Villa,2.0,1998,Bon état,0,1,7100000
+Abobo,136,1,2,Duplex,2.4,2007,Bon état,1,1,14300000
+Koumassi,48,2,3,Duplex,6.7,1986,Neuf,1,1,5000000
+Cocody,173,2,2,Appartement,5.6,2019,À rénover,0,1,53400000
+Yopougon,31,3,1,Appartement,1.8,1986,Bon état,0,1,5000000
+Koumassi,92,4,1,Villa,0.6,2009,Neuf,0,0,16100000
+Yopougon,93,2,2,Villa,1.5,1997,Bon état,1,1,14800000
+Abobo,50,4,4,Villa,33.3,2003,À rénover,0,0,6300000
+Abobo,91,1,0,Appartement,5.1,1985,Bon état,0,1,12500000
+Plateau,140,3,3,Duplex,16.2,1983,Neuf,1,1,44400000
+Yopougon,24,1,4,Villa,15.1,1982,Bon état,1,0,5000000
+Yopougon,95,4,2,Studio,5.7,1985,Bon état,0,1,16900000
+Cocody,21,3,4,Villa,9.8,2005,Bon état,0,1,5100000
+Cocody,45,3,1,Appartement,1.7,2023,À rénover,0,1,20600000
+Koumassi,166,4,4,Duplex,9.3,2017,Bon état,0,1,28500000
+Marcory,55,3,2,Villa,2.5,1990,Bon état,0,1,11100000
+Abobo,41,5,0,Studio,14.3,2008,À rénover,1,1,5000000
+Marcory,67,3,4,Duplex,0.7,1999,Bon état,1,0,15000000
+Treichville,207,4,1,Villa,11.9,1989,Bon état,1,0,47800000
+Marcory,29,3,1,Villa,0.8,2005,Bon état,1,0,6800000
+Yopougon,44,1,2,Appartement,17.0,2006,Bon état,0,1,5500000
+Port-Bouet,156,3,0,Appartement,2.9,1993,Bon état,0,0,31700000
+Port-Bouet,187,1,1,Appartement,8.5,2015,Bon état,1,1,28200000
+Plateau,70,3,3,Appartement,5.3,1991,À rénover,0,0,20200000
+Koumassi,40,2,0,Appartement,3.6,2002,À rénover,1,1,5900000
+Yopougon,210,3,0,Appartement,8.3,2000,Bon état,1,0,20400000
+Yopougon,164,1,0,Appartement,23.6,1987,Bon état,1,1,22500000
+Plateau,103,2,1,Appartement,0.5,2018,Bon état,0,1,33200000
+Cocody,49,2,2,Appartement,20.1,1988,Neuf,0,1,15200000
+Adjamé,72,5,3,Appartement,7.5,2003,Bon état,1,1,17100000
+Yopougon,68,2,4,Villa,13.2,2010,Bon état,1,1,8200000
+Yopougon,87,2,2,Villa,3.9,2004,Bon état,0,1,14200000
+Adjamé,152,3,0,Appartement,5.1,1996,À rénover,1,1,24700000
+Koumassi,114,3,4,Villa,16.3,2021,Neuf,0,0,23400000
+Plateau,43,2,3,Studio,4.3,2008,Bon état,0,1,15400000
+Abobo,147,2,2,Appartement,6.1,1982,Bon état,1,1,15300000
+Plateau,86,2,2,Villa,0.5,2000,Bon état,1,0,35900000
+Koumassi,104,5,4,Duplex,1.4,1987,À rénover,1,1,18000000
+Adjamé,153,1,2,Studio,8.2,1993,À rénover,1,1,20100000
+Treichville,42,2,1,Appartement,10.1,2018,Neuf,0,1,8000000
+Cocody,72,1,2,Villa,7.0,1995,Neuf,1,1,20000000
+Cocody,57,2,0,Appartement,1.2,1997,Neuf,0,0,20700000
+Marcory,34,3,1,Villa,4.7,2010,Bon état,1,0,5600000

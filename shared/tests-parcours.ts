@@ -28,6 +28,7 @@ import { QUESTIONS_TOF } from "./tof-test.js";
 import { QUESTIONS_FCA } from "./fca-test.js";
 import { QUESTIONS_FCQ } from "./fcq-test.js";
 import { QUESTIONS_COOP } from "./coop-test.js";
+import { QUESTIONS_DATA } from "./data-test.js";
 
 /** Une question telle qu'elle part au navigateur : jamais de réponse attendue. */
 export interface QuestionAdmission {
@@ -48,6 +49,7 @@ export const BANQUES_ADMISSION: Record<string, QuestionAdmission[]> = {
   fca: QUESTIONS_FCA,
   fcq: QUESTIONS_FCQ,
   coop: QUESTIONS_COOP,
+  data: QUESTIONS_DATA,
 };
 
 /** Le parcours a-t-il un test d'admission en ligne ? */
