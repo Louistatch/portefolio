@@ -8,6 +8,7 @@ import {
   AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon, PenLine, Clock, Award,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn } from "@/lib/student";
+import { programOf } from "@shared/programs";
 // Ce module ne pèse que quelques kilo-octets et ne tire aucune dépendance : il ne
 // contient que la logique de chargement. Les 11 Mo de Pyodide arrivent d'un CDN,
 // par un script ajouté au document au premier clic — c'est là qu'est la paresse,
@@ -472,6 +473,19 @@ export default function AcademyClassroom() {
   const isLessonDone = completedLessons.has(lesson?.id);
   const allLessonsDone = course.lessons.every(l => completedLessons.has(l.id));
 
+  // L'attestation se demande au terme du PARCOURS entier, pas d'un seul de ses cours —
+  // un étudiant n'en obtient plus une par cours terminé. weekPlan porte déjà chaque leçon
+  // de chaque cours du parcours (généré dès l'admission, y compris les semaines à venir),
+  // avec un statut tenu à jour par le serveur : pas d'appel réseau de plus ici. Repli sur
+  // allLessonsDone pour un cours sans préfixe reconnu, qui ne relève d'aucun parcours.
+  const parcours = programOf(course.code);
+  const lessonsDuParcours = parcours
+    ? weekPlan.filter((sp: any) => programOf(sp.sms_courses?.code)?.id === parcours.id)
+    : [];
+  const allCoursesInParcoursDone = parcours
+    ? lessonsDuParcours.length > 0 && lessonsDuParcours.every((sp: any) => sp.status === "completed" || completedLessons.has(sp.lesson_id))
+    : allLessonsDone;
+
   // La leçon suivante DANS ce cours. « missed » vaut « en retard », pas « fermée » : elle
   // reste à faire, donc elle compte comme ouverte pour l'enchaînement.
   const isOpenStatus = (st?: string) => st === "available" || st === "missed";
@@ -846,7 +860,7 @@ export default function AcademyClassroom() {
             {isLessonDone && nextInCourse && nextInCourseOpen && (
               <Button onClick={() => goToLesson(activeLesson + 1)} className="gap-2">Suivant <ChevronRight className="w-4 h-4" /></Button>
             )}
-            {allLessonsDone && (
+            {allCoursesInParcoursDone && (
               <Button onClick={requestAttestation} disabled={submitting} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">
                 <Trophy className="w-4 h-4" /> Demander l'attestation
               </Button>

@@ -703,7 +703,9 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
       .order("demarre_at", { ascending: false }).limit(60),
     supabase.from("attestations")
       .select("id, student_id, course_id, certificate_no, final_score")
-      .eq("status", "pending").eq("cert_type", "course"),
+      // "final" est la seule valeur écrite pour une nouvelle demande de parcours payant ou
+      // gratuit ; "course" reste pour les anciennes lignes par cours, encore présentes.
+      .eq("status", "pending").in("cert_type", ["course", "final"]),
   ]);
 
   const students = studentsQ.data || [];
@@ -803,10 +805,13 @@ app.get("/api/admin/dashboard", requireAuth, async (req, res) => {
   const attentes = (enAttenteQ.data || []).map((a: any) => {
     const etu = students.find((s: any) => s.id === a.student_id);
     const co = courses.find((c: any) => c.id === a.course_id);
+    // Une ligne "final" est rattachée à un cours du parcours, choisi comme représentant —
+    // le titre du parcours parle davantage à l'administration que ce seul cours.
+    const parcours = co ? programOf(co.code) : null;
     return {
       id: a.id,
       etudiant: etu?.full_name || etu?.email || `#${a.student_id}`,
-      cours: co?.code || `#${a.course_id}`,
+      cours: parcours?.title || co?.code || `#${a.course_id}`,
       note: a.final_score == null ? null : Number(a.final_score),
       numero: a.certificate_no,
     };
@@ -2264,6 +2269,12 @@ async function delivrerCertificatFinalSiComplet(sid: number, courseIdPourAttesta
   return { certificate_no: certNo, average: avg };
 }
 
+/** Identifiants des cours publiés du cursus MEAL. */
+async function idsCoursMeal(): Promise<number[]> {
+  const { data } = await supabase.from("sms_courses").select("id").like("code", `${MEAL_PROGRAM_PREFIX}%`);
+  return (data || []).map((c: any) => c.id);
+}
+
 /**
  * Octroie l'admission : verrou, inscription à tous les cours, planning hebdomadaire,
  * attestation et email. Idempotent — un second appel ne réoctroie rien.
@@ -2303,11 +2314,12 @@ async function grantAdmission(sid: number, score: number, now: Date, previousAdm
   // `lesson_progress` de l'étudiant : depuis que la formation de formateurs a sa propre
   // admission, un tel effacement emporterait une progression qui n'a rien à voir avec cette
   // ré-admission, et que rien ne permettrait de reconstituer.
-  await supabase.from("attestations").delete().eq("student_id", sid).eq("cert_type", "admission").then(() => {}, () => {});
-  const { data: coursMeal } = await supabase.from("sms_courses")
-    .select("id").like("code", `${MEAL_PROGRAM_PREFIX}%`);
-  const idsMeal = (coursMeal || []).map((c: any) => c.id);
+  const idsMeal = await idsCoursMeal();
+  // Restreinte aux mêmes cours MEAL : un étudiant admis à un second parcours porte
+  // aussi sa propre ligne d'attestation d'admission, rattachée aux cours de CE
+  // parcours-là. Un delete sans ce filtre l'aurait emportée en même temps.
   if (idsMeal.length) {
+    await supabase.from("attestations").delete().eq("student_id", sid).eq("cert_type", "admission").in("course_id", idsMeal).then(() => {}, () => {});
     await supabase.from("lesson_progress").delete().eq("student_id", sid).in("course_id", idsMeal).then(() => {}, () => {});
   }
 
@@ -2326,7 +2338,10 @@ async function grantAdmission(sid: number, score: number, now: Date, previousAdm
 
   const certNo = `DMA-ADM-${sid}-${Date.now().toString(36).toUpperCase()}`;
   await supabase.from("attestations").insert({
-    student_id: sid, course_id: courses?.[0]?.id ?? null, cert_type: "admission",
+    // Un cours MEAL, jamais le premier cours publié du catalogue tous parcours confondus :
+    // depuis que d'autres parcours existent, rien ne garantit plus que ce premier cours en
+    // soit un — course_id sert au classement de l'attestation, pas à en changer le sens.
+    student_id: sid, course_id: idsMeal[0] ?? null, cert_type: "admission",
     certificate_no: certNo, final_score: Math.round(score / 30 * 100),
     status: "issued", issued_at: now.toISOString(), expires_at: admissionExpires,
   }).then(() => {}, () => {});
@@ -2397,6 +2412,27 @@ async function grantProgramAdmission(sid: number, programId: string, score: numb
   }
   await generateLessonSchedule(sid, now, programId);
   await refreshLessonStates(sid);
+
+  // ── L'attestation d'admission, gratuite, la même pour tous les parcours ──
+  //
+  // grantAdmission (cursus MEAL) en délivrait une ; celui-ci n'en délivrait aucune — un
+  // étudiant admis à COOP ou à Data Analytics réussissait son test et n'en gardait aucune
+  // trace téléchargeable. Supprimée puis réinsérée sur une réadmission après expiration,
+  // comme le fait déjà grantAdmission : la précédente n'a plus lieu d'être une fois la
+  // fenêtre rouverte avec une nouvelle date et un nouveau score.
+  const idsParcours = duParcours.map((c: any) => c.id);
+  if (idsParcours.length) {
+    await supabase.from("attestations").delete()
+      .eq("student_id", sid).eq("cert_type", "admission").in("course_id", idsParcours)
+      .then(() => {}, () => {});
+    const parcoursDef = programById(programId);
+    const certNo = `DMA-ADM-${programId.toUpperCase()}-${sid}-${Date.now().toString(36).toUpperCase()}`;
+    await supabase.from("attestations").insert({
+      student_id: sid, course_id: idsParcours[0], cert_type: "admission",
+      certificate_no: certNo, final_score: Math.round(score / parcoursDef.admission.nbQuestions * 100),
+      status: "issued", issued_at: now.toISOString(), expires_at: admissionExpires,
+    }).then(() => {}, () => {});
+  }
   return { ok: true, admissionExpires };
 }
 
@@ -2598,10 +2634,12 @@ app.post("/api/academy/programs/:id/submit-test", rateLimit(10, 10 * 60 * 1000),
   if (passed) {
     const { data: etu } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
     if (etu?.email) {
+      const dlToken = generateStudentToken(sid);
+      const certUrl = `${SITE_URL}/api/academy/certificate/admission?token=${dlToken}&program=${programId}`;
       sendAcademyEmail({
         studentId: sid, to: etu.email, type: "program_admission",
         subject: `🎓 Admis(e) — ${parcours.title}`,
-        html: admissionParcoursEmailHtml(etu.full_name, parcours, score, admissionExpires),
+        html: admissionParcoursEmailHtml(etu.full_name, parcours, score, admissionExpires, certUrl),
         // Une seule fois par parcours : une réadmission après expiration en renverra un,
         // la date d'admission faisant partie de la clé.
         dedupeKey: `prog_admission:${sid}:${programId}:${(admissionExpires ?? "").slice(0, 10)}`,
@@ -5589,6 +5627,9 @@ app.post("/api/admin/academy/late-students/reset", requireAuth, async (req, res)
   if (!cibles.length) return res.json({ message: "Aucun étudiant ne dépasse le seuil de retard.", traites: 0 });
 
   const now = new Date().toISOString();
+  // Calculée une fois : cette action ne remet à zéro que l'admission MEAL, jamais celle
+  // d'un autre parcours auquel l'étudiant en retard serait par ailleurs admis.
+  const idsMeal = await idsCoursMeal();
   for (const c of cibles) {
     await supabase.from("academy_admission_resets").insert({
       student_id: c.id, previous_admitted_at: c.admisLe, previous_cohort: c.cohorte,
@@ -5606,7 +5647,9 @@ app.post("/api/admin/academy/late-students/reset", requireAuth, async (req, res)
     // De toutes ses équipes, celle de chacun des trois travaux : il ne fait plus partie
     // de la promotion, et laisser sa place occupée priverait ses coéquipiers d'un membre.
     await supabase.from("academy_group_members").delete().eq("student_id", c.id).then(() => {}, () => {});
-    await supabase.from("attestations").delete().eq("student_id", c.id).eq("cert_type", "admission").then(() => {}, () => {});
+    if (idsMeal.length) {
+      await supabase.from("attestations").delete().eq("student_id", c.id).eq("cert_type", "admission").in("course_id", idsMeal).then(() => {}, () => {});
+    }
 
     const { data: st } = await supabase.from("students")
       .select("full_name, email, course_emails").eq("id", c.id).maybeSingle();
@@ -6135,12 +6178,16 @@ app.post("/api/academy/paiement/attestation", rateLimit(10, 15 * 60 * 1000), req
     return res.status(409).json({ message: `Aucun paiement requis : ${verdict.motif}.`, ...verdict });
   }
 
-  // On ne fait payer que ce qui est fini. Ouvrir un paiement avant la fin du parcours
-  // reviendrait à vendre une attestation que l'étudiant pourrait ne jamais obtenir.
-  const { data: enr } = await supabase.from("enrollments")
-    .select("progress").eq("student_id", sid).eq("course_id", courseId).maybeSingle();
-  if (!enr || enr.progress < 100) {
-    return res.status(403).json({ message: "Terminez le cours à 100 % avant de régler l'attestation." });
+  // On ne fait payer que ce qui est fini — TOUS les cours du parcours, pas seulement celui
+  // d'où le paiement a été ouvert. Ouvrir un paiement avant la fin du parcours reviendrait
+  // à vendre une attestation que l'étudiant pourrait ne jamais obtenir.
+  const idsParcours = await coursDuParcours(programId!);
+  const { data: enrs } = await supabase.from("enrollments")
+    .select("course_id, progress").eq("student_id", sid).in("course_id", idsParcours);
+  const parcoursComplet = idsParcours.length > 0
+    && idsParcours.every(cid => (enrs || []).some((e: any) => e.course_id === cid && e.progress >= 100));
+  if (!parcoursComplet) {
+    return res.status(403).json({ message: "Terminez tous les cours du parcours avant de régler l'attestation." });
   }
 
   const { data: etu } = await supabase.from("students")
@@ -6351,9 +6398,39 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   const { course_id } = req.body;
   if (!course_id) return res.status(400).json({ message: "course_id requis" });
 
-  const { data: enr } = await supabase.from("enrollments")
-    .select("progress, status").eq("student_id", sid).eq("course_id", course_id).maybeSingle();
-  if (!enr || enr.progress < 100) return res.status(403).json({ message: "Vous devez compléter 100% du cours avant de demander l'attestation." });
+  const programId = await parcoursDuCours(course_id);
+  if (!programId) return res.status(400).json({ message: "Ce cours ne relève d'aucun parcours." });
+
+  // ── Le cursus MEAL a son propre mécanisme, automatique ──
+  //
+  // delivrerCertificatFinalSiComplet exige en plus la correction des travaux de groupe, une
+  // condition qu'aucun autre parcours ne porte : on s'y branche plutôt que de dupliquer une
+  // logique déjà éprouvée en production. C'est aussi ce qui ferme la porte par laquelle un
+  // étudiant MEAL obtenait jusqu'à trois attestations — une par cours terminé — en plus de
+  // son certificat final délivré automatiquement à la fin du cursus.
+  if (programId === "meal") {
+    const { data: verif } = await supabase.from("students").select("email_verified").eq("id", sid).single();
+    if (verif && verif.email_verified === false)
+      return res.status(403).json({ message: "Confirmez votre adresse email pour recevoir votre attestation.", needVerification: true });
+    const resultat = await delivrerCertificatFinalSiComplet(sid, course_id);
+    if (resultat) return res.status(201).json({ certificate_no: resultat.certificate_no, final_score: resultat.average, status: "issued" });
+    const { data: existant } = await supabase.from("students").select("final_certificate_no").eq("id", sid).maybeSingle();
+    if (existant?.final_certificate_no) {
+      return res.status(409).json({ message: "Attestation déjà délivrée", status: "issued", certificate_no: existant.final_certificate_no });
+    }
+    return res.status(403).json({ message: "Terminez les 3 cours du cursus et vos travaux de groupe avant de demander le certificat final." });
+  }
+
+  const parcours = programById(programId);
+  const idsParcours = await coursDuParcours(programId);
+
+  // Tous les cours du parcours doivent être terminés — pas seulement celui-ci — pour que
+  // l'étudiant n'obtienne qu'UNE attestation par parcours, à la fin du cursus complet.
+  const { data: enrs } = await supabase.from("enrollments")
+    .select("course_id, progress").eq("student_id", sid).in("course_id", idsParcours);
+  const complet = idsParcours.length > 0
+    && idsParcours.every(cid => (enrs || []).some((e: any) => e.course_id === cid && e.progress >= 100));
+  if (!complet) return res.status(403).json({ message: `Terminez tous les cours du parcours « ${parcours.title} » avant de demander l'attestation.` });
 
   // Un document nominatif n'est délivré qu'à une adresse email confirmée.
   const { data: verif } = await supabase.from("students").select("email_verified").eq("id", sid).single();
@@ -6369,63 +6446,70 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   // 402 « Payment Required » plutôt que 403 : c'est exactement ce que ce code veut dire,
   // et il permet au navigateur de distinguer « il vous manque un paiement » de « vous
   // n'avez pas le droit ». Les deux appellent des écrans différents.
-  const parcoursVise = await parcoursDuCours(course_id);
-  const du = await attestationEstDue(sid, parcoursVise);
+  const du = await attestationEstDue(sid, programId);
   if (du.du) {
     return res.status(402).json({
       message: `L'attestation de ce parcours coûte ${du.prix.toLocaleString("fr-FR")} F CFA.`,
-      paiementRequis: true, prix: du.prix, devise: "XOF", programId: parcoursVise,
+      paiementRequis: true, prix: du.prix, devise: "XOF", programId,
     });
   }
 
-  // Ne regarder que les attestations DE COURS : l'attestation d'admission et le certificat final
-  // sont rattachés au même course_id et feraient croire, à tort, à une demande déjà déposée.
+  // Déjà délivrée : academy_program_admissions est la source de vérité du certificat final
+  // d'un parcours (comme students.final_certificate_no pour le MEAL).
+  const { data: admissionRow } = await supabase.from("academy_program_admissions")
+    .select("final_certificate_no").eq("student_id", sid).eq("program_id", programId).maybeSingle();
+  if (admissionRow?.final_certificate_no) {
+    return res.status(409).json({ message: "Attestation déjà délivrée", status: "issued", certificate_no: admissionRow.final_certificate_no });
+  }
+
+  // Déjà demandée (en attente) ? Une demande rejetée peut être refaite : on remplace
+  // l'ancienne ligne par une nouvelle demande "pending".
   const { data: priorRows } = await supabase.from("attestations")
-    .select("id, status").eq("student_id", sid).eq("course_id", course_id).eq("cert_type", "course")
+    .select("id, status").eq("student_id", sid).eq("cert_type", "final").in("course_id", idsParcours)
     .order("id", { ascending: false });
   const existing = (priorRows || [])[0];
   if (existing && existing.status !== "rejected") return res.status(409).json({ message: "Attestation déjà demandée", status: existing.status });
-  // Une demande rejetée peut être refaite : on remplace l'ancienne ligne par une nouvelle demande "pending".
   if (existing) await supabase.from("attestations").delete().eq("id", existing.id);
 
-  // Score final = moyenne des notes du cours
+  // Score final = moyenne des notes de TOUT le parcours, pas d'un seul cours.
   const { data: courseGrades } = await supabase.from("grades")
-    .select("score, max_score").eq("student_id", sid).eq("course_id", course_id);
+    .select("score, max_score").eq("student_id", sid).in("course_id", idsParcours);
   const arr = courseGrades || [];
   const finalScore = arr.length ? Math.round(arr.reduce((a, g) => a + (Number(g.score) / Number(g.max_score)) * 100, 0) / arr.length * 10) / 10 : 0;
-  const certNo = `DMA-${course_id}-${sid}-${Date.now().toString(36).toUpperCase()}`;
+  const certNo = `DMA-FINAL-${programId.toUpperCase()}-${sid}-${Date.now().toString(36).toUpperCase()}`;
 
   // ── Payé ne veut pas dire « en attente » ──
   //
   // `du.motif === "déjà payée"` ne repose sur aucune déclaration du navigateur : c'est
   // notre propre table `academy_paiements`, mise à `paye` par le webhook signé de
   // l'opérateur — la seule source de vérité sur un paiement, comme le rappelle le
-  // commentaire au-dessus d'`attestationEstDue`. Une revue humaine de 24 à 48 h a un sens
-  // pour la gratuité d'antériorité, où c'est notre propre promesse qui justifie de ne pas
-  // faire payer ; elle n'en a aucun ici, l'argent ayant déjà tranché. La preuve que
-  // personne ne fait cette revue à temps : l'attestation n°25 (étudiant 7, cours 3),
-  // posée le 26 août, toujours `pending` dix jours plus tard.
+  // commentaire au-dessus d'`attestationEstDue`.
   const payee = du.motif === "déjà payée";
   const now = new Date().toISOString();
 
   const { data, error } = await supabase.from("attestations")
     .insert({
-      student_id: sid, course_id, cert_type: "course", certificate_no: certNo, final_score: finalScore,
+      student_id: sid, course_id: idsParcours.at(-1), cert_type: "final", certificate_no: certNo, final_score: finalScore,
       status: payee ? "issued" : "pending", issued_at: payee ? now : null,
     })
     .select().single();
   if (error) return res.status(400).json({ message: error.message });
 
+  if (payee) {
+    await supabase.from("academy_program_admissions")
+      .update({ final_certificate_no: certNo, final_certified_at: now })
+      .eq("student_id", sid).eq("program_id", programId);
+  }
+
   const { data: stud } = await supabase.from("students").select("full_name, email").eq("id", sid).single();
-  const { data: course } = await supabase.from("sms_courses").select("code, title").eq("id", course_id).single();
 
   if (payee) {
     // Le certificat lui-même, pas un accusé de réception : rien ne reste à valider.
-    if (stud?.email && course) {
+    if (stud?.email) {
       sendAcademyEmail({
         studentId: sid, to: stud.email, type: "attestation_issued",
-        subject: `🎓 Votre attestation est prête — ${course.title}`,
-        html: attestationIssuedEmailHtml(stud.full_name, course, certNo, finalScore),
+        subject: `🎓 Votre attestation est prête — ${parcours.title}`,
+        html: attestationIssuedEmailHtml(stud.full_name, parcours, certNo, finalScore),
         dedupeKey: `attestation:${data.id}:issued`,
       });
     }
@@ -6439,20 +6523,18 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
     // raison d'ouvrir.
     //
     // Une file d'attente qui dépend d'un humain doit aller le chercher, pas l'attendre.
-    if (course) {
-      sendAcademyEmail({
-        studentId: null, to: EMAIL_ALERTE, type: "attestation_a_valider",
-        subject: `📋 Attestation à valider — ${stud?.full_name || "étudiant"} · ${course.code}`,
-        html: attestationAValiderEmailHtml(stud?.full_name || "—", course, certNo, finalScore),
-        dedupeKey: `attest_admin:${data?.id ?? certNo}`,
-      }).catch(() => {});
-    }
-    if (stud?.email && course) {
+    sendAcademyEmail({
+      studentId: null, to: EMAIL_ALERTE, type: "attestation_a_valider",
+      subject: `📋 Attestation à valider — ${stud?.full_name || "étudiant"} · ${parcours.title}`,
+      html: attestationAValiderEmailHtml(stud?.full_name || "—", parcours, certNo, finalScore),
+      dedupeKey: `attest_admin:${data?.id ?? certNo}`,
+    }).catch(() => {});
+    if (stud?.email) {
       sendAcademyEmail({
         studentId: sid, to: stud.email, type: "attestation_requested",
-        subject: `📋 Demande d'attestation reçue — ${course.title}`,
-        html: attestationRequestedEmailHtml(stud.full_name, course, certNo, finalScore),
-        dedupeKey: `attest_req:${sid}:${course_id}`,
+        subject: `📋 Demande d'attestation reçue — ${parcours.title}`,
+        html: attestationRequestedEmailHtml(stud.full_name, parcours, certNo, finalScore),
+        dedupeKey: `attest_req:${sid}:${programId}`,
       });
     }
   }
@@ -6472,39 +6554,44 @@ app.get("/api/academy/my-attestations", requireStudent, async (req, res) => {
 // ── Portefeuille de credentials (style Credly) : toutes les attestations stockées ──
 app.get("/api/academy/my-credentials", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const { data: stud } = await supabase.from("students")
-    .select("full_name, admitted_at, admission_expires, final_certificate_no, final_certified_at, entry_score").eq("id", sid).single();
-  const { data: atts } = await supabase.from("attestations")
-    .select("*, sms_courses(code, title)").eq("student_id", sid);
+  const [{ data: stud }, { data: autresAdmissions }, { data: atts }] = await Promise.all([
+    supabase.from("students")
+      .select("full_name, admitted_at, admission_expires, final_certificate_no, final_certified_at, entry_score").eq("id", sid).single(),
+    supabase.from("academy_program_admissions")
+      .select("program_id, admitted_at, admission_expires, entry_score, final_certificate_no, final_certified_at")
+      .eq("student_id", sid).not("admitted_at", "is", null),
+    supabase.from("attestations").select("*, sms_courses(code, title)").eq("student_id", sid),
+  ]);
 
   const dlToken = generateStudentToken(sid);
   const credentials: any[] = [];
+  // Une ligne d'attestation se rattache à un cours, pas directement à un parcours : on
+  // retrouve celui-ci par le préfixe de code, comme partout ailleurs dans ce fichier.
+  const parcoursDeLaLigne = (a: any) => programOf(a?.sms_courses?.code ?? null);
 
-  // Attestation d'admission
+  // ── Cursus MEAL : colonnes historiques de `students` ──
   if (stud?.admitted_at) {
-    const adm = (atts || []).find((a: any) => a.cert_type === "admission");
+    const adm = (atts || []).find((a: any) => a.cert_type === "admission" && parcoursDeLaLigne(a)?.id === "meal");
     const expired = stud.admission_expires && new Date(stud.admission_expires) < new Date();
     credentials.push({
-      id: "admission",
+      id: "admission-meal",
       type: "admission",
       title: "Attestation d'admission",
-      subtitle: "Programme MEAL — LouisFarm Learning",
+      subtitle: "Cursus MEAL — DataMEAL Academy",
       issued_at: stud.admitted_at,
       expires_at: stud.admission_expires,
       status: expired ? "expired" : "active",
       certificate_no: adm?.certificate_no || null,
       score: Math.round((stud.entry_score ?? 0) / 30 * 100),
-      download_url: `/api/academy/certificate/admission?token=${dlToken}`,
+      download_url: `/api/academy/certificate/admission?token=${dlToken}&program=meal`,
       skills: ["MEAL", "Collecte de données", "Méthodologie"],
       color: "#0d9488",
     });
   }
-
-  // Certificat final (Super-Expert)
   if (stud?.final_certificate_no) {
-    const fin = (atts || []).find((a: any) => a.cert_type === "final");
+    const fin = (atts || []).find((a: any) => a.cert_type === "final" && parcoursDeLaLigne(a)?.id === "meal");
     credentials.push({
-      id: "final",
+      id: "final-meal",
       type: "final",
       title: "Certificat Super-Expert MEAL",
       subtitle: "Les 3 projets complétés — KoboCollect · QGIS · Pipeline",
@@ -6513,20 +6600,65 @@ app.get("/api/academy/my-credentials", requireStudent, async (req, res) => {
       status: "active",
       certificate_no: stud.final_certificate_no,
       score: fin?.final_score ?? null,
-      download_url: `/api/academy/certificate/final?token=${dlToken}`,
+      download_url: `/api/academy/certificate/final?token=${dlToken}&program=meal`,
       skills: ["KoboCollect", "QGIS", "Python", "Automatisation", "Reporting MEAL"],
       color: "#7c3aed",
     });
   }
 
-  // Attestations par cours (si émises)
+  // ── Autres parcours : academy_program_admissions, au plus 2 credentials chacun ──
+  for (const adm of (autresAdmissions || [])) {
+    const parcours = PROGRAMS.find(p => p.id === adm.program_id);
+    if (!parcours) continue;
+    const admCert = (atts || []).find((a: any) => a.cert_type === "admission" && parcoursDeLaLigne(a)?.id === parcours.id);
+    const expired = adm.admission_expires && new Date(adm.admission_expires) < new Date();
+    credentials.push({
+      id: `admission-${parcours.id}`,
+      type: "admission",
+      title: "Attestation d'admission",
+      subtitle: `${parcours.title} — LouisFarm Learning`,
+      issued_at: adm.admitted_at,
+      expires_at: adm.admission_expires,
+      status: expired ? "expired" : "active",
+      certificate_no: admCert?.certificate_no || null,
+      score: Math.round((adm.entry_score ?? 0) / parcours.admission.nbQuestions * 100),
+      download_url: `/api/academy/certificate/admission?token=${dlToken}&program=${parcours.id}`,
+      skills: [],
+      color: parcours.accent,
+    });
+    if (adm.final_certificate_no) {
+      const finCert = (atts || []).find((a: any) => a.cert_type === "final" && parcoursDeLaLigne(a)?.id === parcours.id);
+      credentials.push({
+        id: `final-${parcours.id}`,
+        type: "final",
+        title: parcours.credential || `Certificat — ${parcours.title}`,
+        subtitle: parcours.title,
+        issued_at: adm.final_certified_at,
+        expires_at: null,
+        status: "active",
+        certificate_no: adm.final_certificate_no,
+        score: finCert?.final_score ?? null,
+        download_url: `/api/academy/certificate/final?token=${dlToken}&program=${parcours.id}`,
+        skills: [],
+        color: parcours.accent,
+      });
+    }
+  }
+
+  // ── Lignes "course" antérieures à cette correction ──
+  //
+  // Une attestation par cours terminé, jusqu'à trois pour un même étudiant MEAL : c'est
+  // précisément ce que cette correction ferme (voir /api/academy/attestation). Les lignes
+  // déjà émises avant elle restent affichées telles quelles plutôt que supprimées — aucune
+  // n'en émettra plus de nouvelle.
   for (const a of (atts || [])) {
     if (a.cert_type === "course" && a.status === "issued") {
+      const parcours = parcoursDeLaLigne(a);
       credentials.push({
         id: `course-${a.id}`,
         type: "course",
         title: `Attestation — ${a.sms_courses?.title || "Cours"}`,
-        subtitle: a.sms_courses?.code || "",
+        subtitle: parcours?.title || a.sms_courses?.code || "",
         issued_at: a.issued_at,
         expires_at: a.expires_at,
         status: "active",
@@ -6965,9 +7097,14 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
         const toAdd = coursMeal.filter((co: any) => !already.has(co.id)).map((co: any) => ({ student_id: id, course_id: co.id, started_at: now.toISOString() }));
         if (toAdd.length) await supabase.from("enrollments").insert(toAdd);
       }
-      // Remplace toute attestation d'admission existante (évite les doublons si "admit" est cliqué
-      // plusieurs fois ou après un revoke_admission — verify-certificate suppose une seule ligne par étudiant).
-      await supabase.from("attestations").delete().eq("student_id", id).eq("cert_type", "admission").then(() => {}, () => {});
+      // Remplace toute attestation d'admission MEAL existante (évite les doublons si "admit" est
+      // cliqué plusieurs fois ou après un revoke_admission — verify-certificate suppose une seule
+      // ligne par étudiant et par parcours). Restreint aux cours MEAL : cette action n'admet qu'à
+      // ce cursus, une attestation d'un autre parcours n'a pas à en pâtir.
+      const idsMealAdmit = coursMeal.map((c: any) => c.id);
+      if (idsMealAdmit.length) {
+        await supabase.from("attestations").delete().eq("student_id", id).eq("cert_type", "admission").in("course_id", idsMealAdmit).then(() => {}, () => {});
+      }
       const certNo = `DMA-ADM-${id}-${Date.now().toString(36).toUpperCase()}`;
       await supabase.from("attestations").insert({ student_id: id, course_id: coursMeal[0]?.id ?? null, cert_type: "admission", certificate_no: certNo, status: "issued", issued_at: now.toISOString(), expires_at: expires }).then(() => {}, () => {});
       // Planning reparti de zéro à la date d'admission : c'est aussi le moyen pour l'admin de
@@ -7000,7 +7137,12 @@ app.post("/api/admin/academy/students/:id/action", requireAuth, async (req, res)
       // laisser l'étudiant dans une équipe qu'il ne peut plus rejoindre bloquerait une place.
       await supabase.from("group_work_progress").delete().eq("student_id", id).then(() => {}, () => {});
       await supabase.from("academy_group_members").delete().eq("student_id", id).then(() => {}, () => {});
-      await supabase.from("attestations").delete().eq("student_id", id).eq("cert_type", "admission").then(() => {}, () => {});
+      // Restreint aux cours MEAL : cette action ne révoque que l'admission MEAL, jamais celle
+      // d'un autre parcours auquel l'étudiant serait par ailleurs admis.
+      const idsMealRevoke = await idsCoursMeal();
+      if (idsMealRevoke.length) {
+        await supabase.from("attestations").delete().eq("student_id", id).eq("cert_type", "admission").in("course_id", idsMealRevoke).then(() => {}, () => {});
+      }
     } else if (action === "delete") {
       await supabase.from("students").delete().eq("id", id);
     } else {
@@ -7074,22 +7216,39 @@ app.put("/api/admin/academy/attestations/:id", requireAuth, async (req, res) => 
   const { data, error } = await supabase.from("attestations").update(update).eq("id", Number(req.params.id)).select("*, students(full_name, email), sms_courses(code, title)").single();
   if (error) return res.status(400).json({ message: error.message });
 
-  // Email automatique selon la décision admin
   const stud = (data as any).students;
   const course = (data as any).sms_courses;
-  if (stud?.email && course) {
+  const parcours = programOf(course?.code ?? null);
+
+  // ── Le certificat final d'un parcours autre que MEAL vit sur academy_program_admissions,
+  // symétriquement à students pour le MEAL (voir /api/academy/attestation). Une validation
+  // admin doit y écrire le numéro : sans ça la ligne "issued" existerait dans `attestations`
+  // sans que /my-credentials ni la route de téléchargement ne la voient jamais.
+  //
+  // "course" est inclus : des lignes posées par l'ancien mécanisme, avant cette correction,
+  // restent en attente pour des parcours non-MEAL (ex. TOF-FIN-01) — les rejeter ou les
+  // valider doit rester possible, et les valider doit continuer à délivrer un vrai
+  // certificat, pas une ligne "issued" sans effet.
+  if (status === "issued" && (data.cert_type === "final" || data.cert_type === "course") && parcours && parcours.id !== "meal") {
+    await supabase.from("academy_program_admissions")
+      .update({ final_certificate_no: data.certificate_no, final_certified_at: update.issued_at })
+      .eq("student_id", data.student_id).eq("program_id", parcours.id);
+  }
+
+  // Email automatique selon la décision admin
+  if (stud?.email && parcours) {
     if (status === "issued") {
       sendAcademyEmail({
         studentId: data.student_id, to: stud.email, type: "attestation_issued",
-        subject: `🎓 Votre attestation est prête — ${course.title}`,
-        html: attestationIssuedEmailHtml(stud.full_name, course, data.certificate_no, Number(data.final_score)),
+        subject: `🎓 Votre attestation est prête — ${parcours.title}`,
+        html: attestationIssuedEmailHtml(stud.full_name, parcours, data.certificate_no, Number(data.final_score)),
         dedupeKey: `attestation:${data.id}:issued`,
       });
     } else if (status === "rejected") {
       sendAcademyEmail({
         studentId: data.student_id, to: stud.email, type: "attestation_rejected",
-        subject: `Attestation — complément requis (${course.title})`,
-        html: attestationRejectedEmailHtml(stud.full_name, course),
+        subject: `Attestation — complément requis (${parcours.title})`,
+        html: attestationRejectedEmailHtml(stud.full_name, parcours),
         dedupeKey: `attestation:${data.id}:rejected`,
       });
     }
@@ -8009,7 +8168,7 @@ function cohortAnnouncementEmailHtml(name: string, cohorte: string, corps: strin
 // le dossier, et le lien pour le faire quand elle ne peut pas l'être.
 function attestationAValiderEmailHtml(
   nom: string,
-  cours: { code: string; title: string },
+  parcours: Program,
   certNo: string,
   score: number,
 ) {
@@ -8018,21 +8177,21 @@ function attestationAValiderEmailHtml(
     `<div class="hd">
        <div class="logo"><span>LOUISFARM LEARNING</span></div>
        <h1>Une attestation attend votre validation</h1>
-       <p class="sub">${esc(cours.code)}</p>
+       <p class="sub">${esc(parcours.title)}</p>
      </div>
      <div class="bd">
-       <p><strong>${esc(nom)}</strong> a terminé <strong>${esc(cours.title)}</strong> et demande son attestation.</p>
+       <p><strong>${esc(nom)}</strong> a terminé <strong>${esc(parcours.title)}</strong> et demande son attestation.</p>
        <div class="info">
          <h3>Ce sur quoi décider</h3>
          <ul style="margin:10px 0 0;padding-left:18px;color:#6b7280;font-size:14px;line-height:1.7">
-           <li>Cours achevé à 100&nbsp;%, adresse email confirmée — les deux conditions exigées avant la demande.</li>
-           <li>Moyenne du cours&nbsp;: <strong>${esc(String(score))}&nbsp;%</strong></li>
+           <li>Parcours achevé à 100&nbsp;%, adresse email confirmée — les deux conditions exigées avant la demande.</li>
+           <li>Moyenne du parcours&nbsp;: <strong>${esc(String(score))}&nbsp;%</strong></li>
            <li>Numéro réservé&nbsp;: <span style="font-family:monospace">${esc(certNo)}</span></li>
          </ul>
        </div>
        <p style="text-align:center"><a href="${SITE_URL}/pagesecure/students" class="btn">Ouvrir le dossier de l'étudiant</a></p>
        <p class="muted">Tant que la demande n'est pas validée, l'étudiant ne reçoit rien : il a terminé
-       son cours et attend. Un refus se motive et lui est notifié ; il peut alors redemander.</p>
+       son parcours et attend. Un refus se motive et lui est notifié ; il peut alors redemander.</p>
      </div>`
   );
 }
@@ -8217,7 +8376,7 @@ function retardEmailHtml(name: string, a: ReturnType<typeof alerteDeRetard>) {
  * « 0 F » : une gratuité qui s'annonce comme un prix n'en est plus une.
  */
 function admissionParcoursEmailHtml(
-  name: string, parcours: Program, score: number, expire: string | null,
+  name: string, parcours: Program, score: number, expire: string | null, certUrl: string,
 ) {
   const fin = expire
     ? new Date(expire).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })
@@ -8242,6 +8401,8 @@ function admissionParcoursEmailHtml(
           + `<strong>${prix.toLocaleString("fr-FR")} F CFA</strong>. Vous ne réglez rien avant de l'avoir terminé.</p></div>`
         : "")
     + `<p style="text-align:center"><a href="${SITE_URL}/academy/parcours/${parcours.id}" class="btn">Commencer le parcours</a></p>`
+    + `<p class="muted" style="text-align:center;margin-top:10px">Votre attestation d'admission (gratuite) est prête : `
+    + `<a href="${certUrl}">la télécharger</a>.</p>`
     + `</div>`);
 }
 
@@ -8297,18 +8458,18 @@ function groupWorkGradedEmailHtml(
 }
 
 // ── Email : demande d'attestation reçue (accusé) ──
-function attestationRequestedEmailHtml(name: string, course: { code: string; title: string }, certNo: string, score: number) {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Demande reçue 📋</h1><p class="sub">Votre attestation est en cours de validation</p></div><div class="bd"><span class="badge">⏳ En traitement</span><p>Bonjour ${name},</p><p>Nous avons bien reçu votre demande d'attestation pour le projet :</p><div class="info"><h3>${course.title}</h3><p style="margin-top:6px">Score final : <strong style="color:#0d9488">${score}%</strong></p><p style="margin-top:6px;font-size:12px;color:#6b7280">N° de certificat : <span style="font-family:monospace">${certNo}</span></p></div><p>Notre équipe vérifie votre parcours et validera votre attestation sous <strong>24 à 48 heures</strong>. Vous recevrez un email dès qu'elle sera émise.</p><p class="muted">Aucune action n'est requise de votre part pour le moment. Merci de votre patience.</p></div>`);
+function attestationRequestedEmailHtml(name: string, parcours: Program, certNo: string, score: number) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Demande reçue 📋</h1><p class="sub">Votre attestation est en cours de validation</p></div><div class="bd"><span class="badge">⏳ En traitement</span><p>Bonjour ${name},</p><p>Nous avons bien reçu votre demande d'attestation pour le parcours :</p><div class="info"><h3>${parcours.title}</h3><p style="margin-top:6px">Score final : <strong style="color:#0d9488">${score}%</strong></p><p style="margin-top:6px;font-size:12px;color:#6b7280">N° de certificat : <span style="font-family:monospace">${certNo}</span></p></div><p>Notre équipe vérifie votre parcours et validera votre attestation sous <strong>24 à 48 heures</strong>. Vous recevrez un email dès qu'elle sera émise.</p><p class="muted">Aucune action n'est requise de votre part pour le moment. Merci de votre patience.</p></div>`);
 }
 
 // ── Email : attestation émise (validée par l'admin) ──
-function attestationIssuedEmailHtml(name: string, course: { code: string; title: string }, certNo: string, score: number) {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Attestation délivrée ! 🎉</h1><p class="sub">Félicitations pour votre réussite</p></div><div class="bd"><span class="badge">🏆 Certifié</span><p>Bravo ${name},</p><p>Votre attestation de compétence est officiellement délivrée :</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><h3 style="color:#0d9488">${course.title}</h3><p style="margin-top:8px">Score final : <strong style="font-size:18px;color:#0d9488">${score}%</strong></p><p style="margin-top:10px;font-size:12px;color:#6b7280">Certificat N° <span style="font-family:monospace;font-weight:700">${certNo}</span></p></div><p>Vous pouvez désormais valoriser cette compétence dans votre CV, sur LinkedIn et auprès de vos employeurs. Ce certificat atteste de votre maîtrise pratique des outils MEAL.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mon attestation</a></p><p class="muted">Conservez votre numéro de certificat — il permet de vérifier l'authenticité de votre attestation.</p></div>`);
+function attestationIssuedEmailHtml(name: string, parcours: Program, certNo: string, score: number) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Attestation délivrée ! 🎉</h1><p class="sub">Félicitations pour votre réussite</p></div><div class="bd"><span class="badge">🏆 Certifié</span><p>Bravo ${name},</p><p>Votre attestation de compétence est officiellement délivrée :</p><div class="info" style="text-align:center;border-color:#5eead4;background:#f0fdfa"><h3 style="color:#0d9488">${parcours.title}</h3><p style="margin-top:8px">Score final : <strong style="font-size:18px;color:#0d9488">${score}%</strong></p><p style="margin-top:10px;font-size:12px;color:#6b7280">Certificat N° <span style="font-family:monospace;font-weight:700">${certNo}</span></p></div><p>Vous pouvez désormais valoriser cette compétence dans votre CV, sur LinkedIn et auprès de vos employeurs. Ce certificat atteste de votre maîtrise pratique du parcours « ${parcours.title} ».</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Voir mon attestation</a></p><p class="muted">Conservez votre numéro de certificat — il permet de vérifier l'authenticité de votre attestation.</p></div>`);
 }
 
 // ── Email : attestation refusée (complément requis) ──
-function attestationRejectedEmailHtml(name: string, course: { code: string; title: string }) {
-  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Complément requis</h1><p class="sub">Votre attestation nécessite une vérification</p></div><div class="bd"><span class="badge">📝 À compléter</span><p>Bonjour ${name},</p><p>Après examen de votre demande d'attestation pour <strong>${course.title}</strong>, notre équipe a besoin que vous complétiez ou révisiez certains éléments du projet avant de pouvoir délivrer le certificat.</p><p>Reconnectez-vous à votre espace pour revoir le projet et le finaliser. Vous pourrez ensuite soumettre à nouveau votre demande.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Revoir mon projet</a></p><p class="muted">Besoin d'aide ? Répondez simplement à cet email, nous vous accompagnerons.</p></div>`);
+function attestationRejectedEmailHtml(name: string, parcours: Program) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Complément requis</h1><p class="sub">Votre attestation nécessite une vérification</p></div><div class="bd"><span class="badge">📝 À compléter</span><p>Bonjour ${name},</p><p>Après examen de votre demande d'attestation pour <strong>${parcours.title}</strong>, notre équipe a besoin que vous complétiez ou révisiez certains éléments du parcours avant de pouvoir délivrer le certificat.</p><p>Reconnectez-vous à votre espace pour revoir vos projets et les finaliser. Vous pourrez ensuite soumettre à nouveau votre demande.</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Revoir mon projet</a></p><p class="muted">Besoin d'aide ? Répondez simplement à cet email, nous vous accompagnerons.</p></div>`);
 }
 
 
@@ -8322,27 +8483,82 @@ const SIGNATURE_B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAH0AAACQCAY
  * serverless, et tout le texte y sortait en carrés. Le texte est dessiné ensuite par
  * pdf-lib avec une police embarquée dans le PDF.
  */
+/**
+ * Contenu textuel d'un certificat — habillage MEAL inchangé, générique pour tout autre
+ * parcours.
+ *
+ * Les trois générateurs (SVG d'aperçu, PDF, HTML de repli) affichaient chacun leur propre
+ * copie de ces mêmes phrases, câblées sur le cursus MEAL : « PROGRAMME MEAL · ADMISSION »,
+ * « DataMEAL Academy », les trois projets KoboCollect/QGIS/Pipeline. Une attestation
+ * Data Analytics ou Coopératives serait donc sortie du même moule, MEAL écrit dessus.
+ *
+ * Le cursus MEAL est laissé identique bit à bit — c'est le seul déjà vu par des dizaines
+ * d'étudiants, rien ne justifie d'y toucher — et sert de repli si `program` est absent.
+ * Tout autre parcours tire son texte du registre (shared/programs.ts) : son titre, son
+ * accent, l'intitulé du diplôme délivré, ce qu'on sait faire à la sortie.
+ */
+function certificateContent(type: "admission" | "final", program?: Program | null) {
+  const isFinal = type === "final";
+  if (!program || program.id === "meal") {
+    return {
+      accent: isFinal ? "#7c3aed" : "#0d9488",
+      nameColor: isFinal ? "#6d28d9" : "#0f766e",
+      brand: "DataMEAL Academy",
+      sealBrand: "DATAMEAL",
+      brandSub: "FORMATION MEAL · AFRIQUE DE L'OUEST",
+      kicker: isFinal ? "SUPER-EXPERT MEAL" : "PROGRAMME MEAL · ADMISSION",
+      titleA: isFinal ? "Certificat" : "Attestation",
+      titleB: isFinal ? "de Réussite" : "d'Admission",
+      subtitle: isFinal
+        ? "a complété avec succès l'intégralité du parcours par projets et démontré sa maîtrise opérationnelle du cycle MEAL."
+        : "est admis(e) au programme de formation MEAL par projets de DataMEAL Academy.",
+      skills: isFinal
+        ? "Compétences validées : KoboCollect · XLSForm · Python · pandas · QGIS · PyQGIS · Automatisation · Reporting MEAL"
+        : "Programme : 3 projets terrain · KoboCollect, QGIS et pipeline de reporting automatisé",
+      courses: [
+        ["01", "KoboCollect", "Concevoir & déployer des enquêtes terrain"],
+        ["02", "QGIS", "Cartographier & analyser les données spatiales"],
+        ["03", "Pipeline MEAL", "Automatiser le reporting de bout en bout"],
+      ] as [string, string, string][],
+    };
+  }
+  const titreParcours = program.title.toUpperCase();
+  return {
+    accent: program.accent,
+    nameColor: program.accent,
+    brand: "LouisFarm Learning",
+    sealBrand: "LOUISFARM",
+    brandSub: "ACADEMY · AFRIQUE DE L'OUEST",
+    kicker: isFinal ? `${titreParcours} · RÉUSSITE` : `${titreParcours} · ADMISSION`,
+    titleA: isFinal ? "Certificat" : "Attestation",
+    titleB: isFinal ? "de Réussite" : "d'Admission",
+    subtitle: isFinal
+      ? `a complété avec succès le parcours « ${program.title} » et obtient le titre de ${program.credential ?? program.title}.`
+      : `est admis(e) au parcours « ${program.title} », LouisFarm Learning.`,
+    skills: program.outcome,
+    // Aucune carte « trois projets » pour ces parcours : compter sur un nombre de cours fixe
+    // casserait pour le premier parcours à un seul cours (FCA, FCQ, TOF) comme pour celui à
+    // quatre. Le résumé de compétences ci-dessus porte seul le contenu descriptif.
+    courses: [] as [string, string, string][],
+  };
+}
+
 function certificateSvg(opts: {
   name: string; type: "admission" | "final"; certNo: string;
-  score?: number; issuedAt: string; expiresAt?: string | null;
+  score?: number; issuedAt: string; expiresAt?: string | null; program?: Program | null;
 }, withText: boolean = true): string {
   const txt = (markup: string) => (withText ? markup : "");
   const isFinal = opts.type === "final";
-  const accent = isFinal ? "#7c3aed" : "#0d9488";
-  const kicker = isFinal ? "SUPER-EXPERT MEAL" : "PROGRAMME MEAL · ADMISSION";
-  const titleA = isFinal ? "Certificat" : "Attestation";
-  const titleB = isFinal ? "de Réussite" : "d'Admission";
-  const subtitle = isFinal
-    ? "a complété avec succès l'intégralité du parcours par projets et démontré sa maîtrise opérationnelle du cycle MEAL."
-    : "est admis(e) au programme de formation MEAL par projets de DataMEAL Academy.";
+  const c = certificateContent(opts.type, opts.program);
+  const accent = c.accent;
+  const kicker = c.kicker;
+  const titleA = c.titleA;
+  const titleB = c.titleB;
+  const subtitle = c.subtitle;
   const issued = new Date(opts.issuedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const expires = opts.expiresAt ? new Date(opts.expiresAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : null;
   const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const courses = [
-    ["01", "KoboCollect", "Concevoir & déployer des enquêtes terrain"],
-    ["02", "QGIS", "Cartographier & analyser les données spatiales"],
-    ["03", "Pipeline MEAL", "Automatiser le reporting de bout en bout"],
-  ];
+  const courses = c.courses;
   const courseCards = courses.map((co, i) => {
     const x = 90 + i * 510;
     return `<g transform="translate(${x},735)">
@@ -8354,9 +8570,10 @@ function certificateSvg(opts: {
     </g>`;
   }).join("");
 
-  const skills = isFinal
-    ? "Compétences certifiées : collecte numérique, cartographie SIG, analyse Python, automatisation et reporting MEAL."
-    : "Parcours couvrant la collecte de données (KoboCollect), la cartographie (QGIS) et l'automatisation du reporting MEAL.";
+  const skills = c.skills;
+  // Sans cartes de cours, le texte de compétences remonte combler l'espace qu'elles
+  // auraient occupé plutôt que de laisser un tiers de page vide.
+  const skillsY = courses.length ? 860 : 660;
 
   // A4 paysage en px @ ~200dpi : 1684 x 1191
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1684" height="1191" viewBox="0 0 1684 1191" font-family="Arial, Helvetica, sans-serif">
@@ -8375,12 +8592,12 @@ function certificateSvg(opts: {
     <g transform="translate(90,95)">
       <rect width="48" height="48" rx="12" fill="${accent}"/>
       ${txt(`<text x="24" y="34" font-size="26" font-weight="800" fill="#fff" text-anchor="middle">D</text>`)}
-      ${txt(`<text x="64" y="22" font-size="22" font-weight="800" fill="#0f172a">DataMEAL Academy</text>`)}
-      ${txt(`<text x="64" y="42" font-size="13" fill="#64748b" letter-spacing="2">FORMATION MEAL · AFRIQUE DE L'OUEST</text>`)}
+      ${txt(`<text x="64" y="22" font-size="22" font-weight="800" fill="#0f172a">${esc(c.brand)}</text>`)}
+      ${txt(`<text x="64" y="42" font-size="13" fill="#64748b" letter-spacing="2">${esc(c.brandSub)}</text>`)}
     </g>
     <g transform="translate(1280,100)">
       <rect width="314" height="40" rx="20" fill="#f0fdfa" stroke="#99f6e4"/>
-      ${txt(`<text x="157" y="26" font-size="14" font-weight="700" fill="${accent}" text-anchor="middle" letter-spacing="3">${kicker}</text>`)}
+      ${txt(`<text x="157" y="26" font-size="14" font-weight="700" fill="${accent}" text-anchor="middle" letter-spacing="3">${esc(kicker)}</text>`)}
     </g>
 
     ${opts.score != null ? `<g transform="translate(1470,250)"><circle r="62" fill="${isFinal ? "#faf5ff" : "#f0fdfa"}" stroke="${accent}" stroke-width="6"/>${txt(`<text y="-2" font-size="42" font-weight="800" fill="${accent}" text-anchor="middle">${opts.score}%</text>`)}${txt(`<text y="28" font-size="16" fill="#64748b" text-anchor="middle" letter-spacing="2">SCORE</text>`)}</g>` : ""}
@@ -8388,14 +8605,14 @@ function certificateSvg(opts: {
     <!-- title -->
     ${txt(`<text x="90" y="330" font-size="86" font-weight="800" fill="#0f172a"><tspan fill="${accent}">${titleA}</tspan> ${titleB}</text>`)}
     ${txt(`<text x="92" y="400" font-size="20" fill="#64748b" letter-spacing="3">CE DOCUMENT CERTIFIE QUE</text>`)}
-    ${txt(`<text x="90" y="500" font-size="72" font-weight="bold" fill="${isFinal ? "#6d28d9" : "#0f766e"}" font-family="Georgia, serif">${esc(opts.name)}</text>`)}
+    ${txt(`<text x="90" y="500" font-size="72" font-weight="bold" fill="${c.nameColor}" font-family="Georgia, serif">${esc(opts.name)}</text>`)}
     <rect x="92" y="528" width="700" height="4" rx="2" fill="${accent}"/>
     ${txt(`<text x="92" y="588" font-size="24" fill="#334155">${esc(subtitle)}</text>`)}
 
-    <!-- 3 cours -->
+    <!-- cours (parcours à plusieurs cours seulement) -->
     ${courseCards}
 
-    ${txt(`<text x="90" y="860" font-size="17" fill="#94a3b8" font-style="italic">${esc(skills)}</text>`)}
+    ${txt(`<text x="90" y="${skillsY}" font-size="17" fill="#94a3b8" font-style="italic">${esc(skills)}</text>`)}
 
     <!-- footer : signature + meta + seal -->
     <g transform="translate(120,980)">
@@ -8422,7 +8639,7 @@ function certificateSvg(opts: {
       <circle r="72" fill="none" stroke="${accent}" stroke-width="3"/>
       <circle r="58" fill="none" stroke="${accent}" stroke-width="1.5" stroke-dasharray="3 3"/>
       <circle r="46" fill="${accent}"/>
-      ${txt(`<text y="-4" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">DATAMEAL</text>`)}
+      ${txt(`<text y="-4" font-size="15" font-weight="bold" fill="#fff" text-anchor="middle">${esc(c.sealBrand)}</text>`)}
       ${txt(`<text y="16" font-size="12" fill="#fff" text-anchor="middle">★ TOGO ★</text>`)}
       ${txt(`<text y="-58" font-size="11" font-weight="bold" fill="${accent}" text-anchor="middle">CERTIFIÉ</text>`)}
     </g>
@@ -8447,6 +8664,13 @@ function certificateFonts() {
   return fontCache;
 }
 
+/** #rrggbb → triplet 0-1, pour pdf-lib rgb(). Les couleurs d'accent des parcours (shared/programs.ts) sont écrites en hexadécimal, pdf-lib les veut en flottants. */
+function hexRgb(hex: string): [number, number, number] {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex) ?? [, "0d9488"];
+  const n = parseInt(m[1]!, 16);
+  return [((n >> 16) & 255) / 255, ((n >> 8) & 255) / 255, (n & 255) / 255];
+}
+
 async function certificatePdf(opts: Parameters<typeof certificateSvg>[0]): Promise<Buffer> {
   // Chargés ici et pas en tête de fichier. L'API est UNE seule fonction serverless : tout ce
   // qui est importé au sommet est chargé à chaque démarrage à froid, y compris pour une
@@ -8459,7 +8683,9 @@ async function certificatePdf(opts: Parameters<typeof certificateSvg>[0]): Promi
   const sharp = (await import("sharp")).default;
 
   const isFinal = opts.type === "final";
-  const accent = isFinal ? rgb(0.486, 0.227, 0.929) : rgb(0.051, 0.580, 0.533);
+  const c = certificateContent(opts.type, opts.program);
+  const accent = rgb(...hexRgb(c.accent));
+  const nameColor = rgb(...hexRgb(c.nameColor));
   const slate900 = rgb(0.059, 0.090, 0.165);
   const slate600 = rgb(0.392, 0.455, 0.545);
   const slate400 = rgb(0.580, 0.639, 0.722);
@@ -8501,22 +8727,14 @@ async function certificatePdf(opts: Parameters<typeof certificateSvg>[0]): Promi
     }
   };
 
-  const kicker = isFinal ? "SUPER-EXPERT MEAL" : "PROGRAMME MEAL · ADMISSION";
-  const titleA = isFinal ? "Certificat" : "Attestation";
-  const titleB = isFinal ? "de Réussite" : "d'Admission";
-  const subtitle = isFinal
-    ? "a complété avec succès l'intégralité du parcours par projets et démontré sa maîtrise opérationnelle du cycle MEAL."
-    : "est admis(e) au programme de formation MEAL par projets de DataMEAL Academy.";
-  const skills = isFinal
-    ? "Compétences validées : KoboCollect · XLSForm · Python · pandas · QGIS · PyQGIS · Automatisation · Reporting MEAL"
-    : "Programme : 3 projets terrain · KoboCollect, QGIS et pipeline de reporting automatisé";
+  const { kicker, titleA, titleB, subtitle, skills } = c;
   const issued = new Date(opts.issuedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const expires = opts.expiresAt ? new Date(opts.expiresAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : null;
 
   // En-tête
   draw(90 + 24, 95 + 34, "D", { size: 26, font: bold, color: white, anchor: "middle" });
-  draw(90 + 64, 95 + 22, "DataMEAL Academy", { size: 22, font: bold });
-  draw(90 + 64, 95 + 42, "FORMATION MEAL · AFRIQUE DE L'OUEST", { size: 13, color: slate600, spacing: 2 });
+  draw(90 + 64, 95 + 22, c.brand, { size: 22, font: bold });
+  draw(90 + 64, 95 + 42, c.brandSub, { size: 13, color: slate600, spacing: 2 });
   draw(1280 + 157, 100 + 26, kicker, { size: 14, font: bold, color: accent, anchor: "middle", spacing: 3 });
 
   // Pastille de score
@@ -8530,23 +8748,19 @@ async function certificatePdf(opts: Parameters<typeof certificateSvg>[0]): Promi
   draw(90 + bold.widthOfTextAtSize(titleA, 86 * K) / K + 20, 330, titleB, { size: 86, font: bold });
 
   draw(92, 400, "CE DOCUMENT CERTIFIE QUE", { size: 20, color: slate600, spacing: 3 });
-  draw(90, 500, opts.name, { size: 72, font: serif, color: isFinal ? rgb(0.427, 0.157, 0.851) : rgb(0.059, 0.463, 0.431) });
+  draw(90, 500, opts.name, { size: 72, font: serif, color: nameColor });
   draw(92, 588, subtitle, { size: 24, color: slate700 });
 
-  // Les trois projets
-  const courses = [
-    ["01", "KoboCollect", "Concevoir & déployer des enquêtes terrain"],
-    ["02", "QGIS", "Cartographier & analyser les données spatiales"],
-    ["03", "Pipeline MEAL", "Automatiser le reporting de bout en bout"],
-  ];
-  courses.forEach((co, i) => {
+  // Cours du parcours (MEAL seulement — voir le commentaire sur certificateContent)
+  c.courses.forEach((co, i) => {
     const x = 90 + i * 510;
     draw(x + 28, 735 + 44, co[0], { size: 30, font: bold, color: accent, opacity: 0.45 });
     draw(x + 74, 735 + 36, co[1], { size: 22, font: bold });
     draw(x + 74, 735 + 60, co[2], { size: 14, color: slate600 });
   });
 
-  draw(90, 860, skills, { size: 17, color: slate400 });
+  const skillsY = c.courses.length ? 860 : 660;
+  draw(90, skillsY, skills, { size: 17, color: slate400 });
 
   // Signature
   draw(120, 980 + 48, "TATCHIDA Issodo Louis", { size: 22, font: bold });
@@ -8563,7 +8777,7 @@ async function certificatePdf(opts: Parameters<typeof certificateSvg>[0]): Promi
        { size: 15, font: bold, color: accent, anchor: "middle" });
 
   // Sceau
-  draw(1480, 1010 - 4, "DATAMEAL", { size: 15, font: bold, color: white, anchor: "middle" });
+  draw(1480, 1010 - 4, c.sealBrand, { size: 15, font: bold, color: white, anchor: "middle" });
   draw(1480, 1010 + 16, "TOGO", { size: 12, color: white, anchor: "middle" });
   draw(1480, 1010 - 58, "CERTIFIÉ", { size: 11, font: bold, color: accent, anchor: "middle" });
 
@@ -8601,31 +8815,20 @@ function certFileName(name: string, type: string, certNo: string): string {
 
 function certificateHtml(opts: {
   name: string; type: "admission" | "final"; certNo: string;
-  score?: number; issuedAt: string; expiresAt?: string | null;
+  score?: number; issuedAt: string; expiresAt?: string | null; program?: Program | null;
 }) {
   const isFinal = opts.type === "final";
-  const title = isFinal ? "Certificat de Réussite" : "Attestation d'Admission";
-  const kicker = isFinal ? "SUPER-EXPERT MEAL" : "PROGRAMME MEAL · ADMISSION";
-  const subtitle = isFinal
-    ? "a complété avec succès l'intégralité du parcours par projets et démontré sa maîtrise opérationnelle du cycle MEAL."
-    : "est admis(e) au programme de formation MEAL par projets de DataMEAL Academy.";
+  const c = certificateContent(opts.type, opts.program);
+  const accent = c.accent;
+  const title = `${c.titleA} ${c.titleB}`;
   const issued = new Date(opts.issuedAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" });
   const expires = opts.expiresAt ? new Date(opts.expiresAt).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }) : null;
 
-  // Les 3 projets + ce qu'ils permettent de faire
-  const courses = [
-    { code: "01", t: "KoboCollect", v: "Concevoir & déployer des enquêtes terrain" },
-    { code: "02", t: "QGIS", v: "Cartographier & analyser les données spatiales" },
-    { code: "03", t: "Pipeline MEAL", v: "Automatiser le reporting de bout en bout" },
-  ];
-  const coursesHtml = courses.map(c => `
+  const coursesHtml = c.courses.map(([code, t, v]) => `
     <div class="course">
-      <div class="course-num">${c.code}</div>
-      <div class="course-txt"><strong>${c.t}</strong><span>${c.v}</span></div>
+      <div class="course-num">${code}</div>
+      <div class="course-txt"><strong>${t}</strong><span>${v}</span></div>
     </div>`).join("");
-  const skillsLine = isFinal
-    ? "Compétences certifiées : collecte numérique de données, cartographie SIG, analyse Python, automatisation et reporting pour le suivi-évaluation humanitaire et de développement."
-    : "Parcours couvrant la collecte de données (KoboCollect), la cartographie (QGIS) et l'automatisation du reporting MEAL.";
 
   return `<!DOCTYPE html><html lang="fr"><head><meta charset="utf-8"><title>${title} — ${opts.name}</title>
 <style>
@@ -8635,67 +8838,67 @@ function certificateHtml(opts: {
   .sheet { width:297mm; height:210mm; background:#fff; margin:0 auto; position:relative; overflow:hidden; }
   /* fond SVG moderne */
   .bg { position:absolute; inset:0; z-index:0; }
-  .frame { position:absolute; inset:7mm; border:1.5px solid rgba(13,148,136,.25); border-radius:4mm; z-index:1; }
+  .frame { position:absolute; inset:7mm; border:1.5px solid ${accent}40; border-radius:4mm; z-index:1; }
   .content { position:absolute; inset:7mm; z-index:2; display:flex; flex-direction:column; padding:13mm 16mm 10mm; }
   .top { display:flex; justify-content:space-between; align-items:flex-start; }
   .brand { display:flex; align-items:center; gap:9px; }
-  .brand-logo { width:34px; height:34px; border-radius:9px; background:linear-gradient(135deg,#0d9488,#0f766e); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:17px; }
+  .brand-logo { width:34px; height:34px; border-radius:9px; background:${accent}; display:flex; align-items:center; justify-content:center; color:#fff; font-weight:800; font-size:17px; }
   .brand-txt b { font-size:15px; color:#0f172a; letter-spacing:.5px; display:block; }
   .brand-txt span { font-size:9px; color:#64748b; letter-spacing:2px; }
-  .kicker { font-size:9px; font-weight:700; letter-spacing:3px; color:#0d9488; background:#f0fdfa; border:1px solid #99f6e4; padding:4px 11px; border-radius:20px; }
+  .kicker { font-size:9px; font-weight:700; letter-spacing:3px; color:${accent}; background:#f0fdfa; border:1px solid ${accent}55; padding:4px 11px; border-radius:20px; }
   .head { margin-top:9mm; }
   .ttl { font-size:42px; font-weight:800; color:#0f172a; letter-spacing:-.5px; line-height:1; }
-  .ttl em { color:#0d9488; font-style:normal; }
+  .ttl em { color:${accent}; font-style:normal; }
   .pre { font-size:12px; color:#64748b; margin-top:5mm; letter-spacing:.5px; }
-  .name { font-family:Georgia,serif; font-size:38px; color:#0f766e; font-weight:bold; margin-top:2mm; }
-  .name-rule { width:78mm; height:2px; background:linear-gradient(90deg,#0d9488,transparent); margin-top:2.5mm; }
+  .name { font-family:Georgia,serif; font-size:38px; color:${c.nameColor}; font-weight:bold; margin-top:2mm; }
+  .name-rule { width:78mm; height:2px; background:linear-gradient(90deg,${accent},transparent); margin-top:2.5mm; }
   .sub { font-size:13px; color:#334155; margin-top:4mm; max-width:165mm; line-height:1.6; }
-  /* 3 cours */
+  /* cours (parcours à plusieurs cours seulement) */
   .courses { display:flex; gap:5mm; margin-top:6mm; }
-  .course { flex:1; display:flex; align-items:center; gap:7px; background:#f8fafc; border:1px solid #e2e8f0; border-left:3px solid #0d9488; border-radius:7px; padding:7px 9px; }
-  .course-num { font-size:15px; font-weight:800; color:#0d9488; opacity:.5; }
+  .course { flex:1; display:flex; align-items:center; gap:7px; background:#f8fafc; border:1px solid #e2e8f0; border-left:3px solid ${accent}; border-radius:7px; padding:7px 9px; }
+  .course-num { font-size:15px; font-weight:800; color:${accent}; opacity:.5; }
   .course-txt { display:flex; flex-direction:column; }
   .course-txt strong { font-size:12px; color:#0f172a; }
   .course-txt span { font-size:8.5px; color:#64748b; line-height:1.3; }
-  .skills { font-size:9.5px; color:#94a3b8; margin-top:4mm; max-width:200mm; line-height:1.5; font-style:italic; }
+  .skills { font-size:9.5px; color:#94a3b8; margin-top:${c.courses.length ? "4mm" : "10mm"}; max-width:200mm; line-height:1.5; font-style:italic; }
   /* footer */
   .footer { margin-top:auto; display:flex; justify-content:space-between; align-items:flex-end; }
   .sig { text-align:center; }
   .sig img { height:19mm; margin-bottom:-3mm; }
   .sig-name { border-top:1.5px solid #0f172a; padding-top:2mm; font-size:12px; font-weight:700; color:#0f172a; min-width:62mm; }
   .sig-role { font-size:9px; color:#64748b; margin-top:1px; }
-  .sig-role b { color:#0d9488; }
+  .sig-role b { color:${accent}; }
   .meta { text-align:center; font-size:9px; color:#94a3b8; line-height:1.7; }
   .meta .valid { color:#d97706; font-weight:600; }
-  .meta .no { font-family:monospace; color:#0d9488; font-weight:700; }
-  .meta .site { color:#0d9488; font-weight:600; }
+  .meta .no { font-family:monospace; color:${accent}; font-weight:700; }
+  .meta .site { color:${accent}; font-weight:600; }
   .badge-seal { width:30mm; height:30mm; position:relative; }
   /* Le QR reprend la place et la taille qu'il occupe dans le SVG et le PDF : un même
      document doit se présenter pareil quel que soit le format téléchargé. */
   .qr { text-align:center; }
   .qr svg { width:22mm; height:22mm; display:block; }
   .qr span { display:block; margin-top:1.5mm; font-size:8px; color:#94a3b8; }
-  ${opts.score != null ? '.score { position:absolute; top:13mm; right:16mm; text-align:center; z-index:3; }\n  .score-ring { width:20mm; height:20mm; border-radius:50%; border:2.5px solid #0d9488; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f0fdfa; }\n  .score-ring b { font-size:17px; color:#0d9488; font-weight:800; line-height:1; }\n  .score-ring span { font-size:7px; color:#64748b; letter-spacing:1px; }' : ''}
+  ${opts.score != null ? `.score { position:absolute; top:13mm; right:16mm; text-align:center; z-index:3; }\n  .score-ring { width:20mm; height:20mm; border-radius:50%; border:2.5px solid ${accent}; display:flex; flex-direction:column; align-items:center; justify-content:center; background:#f0fdfa; }\n  .score-ring b { font-size:17px; color:${accent}; font-weight:800; line-height:1; }\n  .score-ring span { font-size:7px; color:#64748b; letter-spacing:1px; }` : ''}
   @media print { body{background:#fff;} .no-print{display:none;} }
   .no-print { position:fixed; top:12px; right:12px; z-index:99; }
-  .btn { background:#0d9488; color:#fff; border:none; padding:11px 22px; border-radius:9px; font-size:14px; cursor:pointer; font-weight:600; box-shadow:0 4px 14px rgba(13,148,136,.4); }
+  .btn { background:${accent}; color:#fff; border:none; padding:11px 22px; border-radius:9px; font-size:14px; cursor:pointer; font-weight:600; box-shadow:0 4px 14px ${accent}66; }
 </style></head><body>
 <div class="no-print"><button class="btn" onclick="window.print()">⬇ Télécharger en PDF</button></div>
 <div class="sheet">
   <svg class="bg" viewBox="0 0 297 210" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">
     <defs>
       <linearGradient id="g1" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0" stop-color="#0d9488" stop-opacity="0.06"/><stop offset="1" stop-color="#0d9488" stop-opacity="0"/>
+        <stop offset="0" stop-color="${accent}" stop-opacity="0.06"/><stop offset="1" stop-color="${accent}" stop-opacity="0"/>
       </linearGradient>
       <linearGradient id="g2" x1="0" y1="1" x2="1" y2="0">
-        <stop offset="0" stop-color="#7c3aed" stop-opacity="${isFinal ? '0.07' : '0'}"/><stop offset="1" stop-color="#0d9488" stop-opacity="0.05"/>
+        <stop offset="0" stop-color="${accent}" stop-opacity="${isFinal ? '0.07' : '0'}"/><stop offset="1" stop-color="${accent}" stop-opacity="0.05"/>
       </linearGradient>
     </defs>
     <rect width="297" height="210" fill="#ffffff"/>
     <path d="M0 0 L120 0 L0 95 Z" fill="url(#g1)"/>
     <path d="M297 210 L180 210 L297 110 Z" fill="url(#g2)"/>
-    <circle cx="268" cy="34" r="55" fill="none" stroke="#0d9488" stroke-opacity="0.05" stroke-width="14"/>
-    <path d="M0 170 Q75 150 150 175 T297 168" fill="none" stroke="#0d9488" stroke-opacity="0.08" stroke-width="1"/>
+    <circle cx="268" cy="34" r="55" fill="none" stroke="${accent}" stroke-opacity="0.05" stroke-width="14"/>
+    <path d="M0 170 Q75 150 150 175 T297 168" fill="none" stroke="${accent}" stroke-opacity="0.08" stroke-width="1"/>
   </svg>
   <div class="frame"></div>
   ${opts.score != null ? `<div class="score"><div class="score-ring"><b>${opts.score}%</b><span>SCORE</span></div></div>` : ""}
@@ -8703,19 +8906,19 @@ function certificateHtml(opts: {
     <div class="top">
       <div class="brand">
         <div class="brand-logo">D</div>
-        <div class="brand-txt"><b>DataMEAL Academy</b><span>FORMATION MEAL · AFRIQUE DE L'OUEST</span></div>
+        <div class="brand-txt"><b>${c.brand}</b><span>${c.brandSub}</span></div>
       </div>
-      <div class="kicker">${kicker}</div>
+      <div class="kicker">${c.kicker}</div>
     </div>
     <div class="head">
-      <div class="ttl">${isFinal ? '<em>Certificat</em> de Réussite' : "<em>Attestation</em> d'Admission"}</div>
+      <div class="ttl"><em>${c.titleA}</em> ${c.titleB}</div>
       <p class="pre">CE DOCUMENT CERTIFIE QUE</p>
       <div class="name">${opts.name}</div>
       <div class="name-rule"></div>
-      <p class="sub">${subtitle}</p>
+      <p class="sub">${c.subtitle}</p>
     </div>
     <div class="courses">${coursesHtml}</div>
-    <p class="skills">${skillsLine}</p>
+    <p class="skills">${c.skills}</p>
     <div class="footer">
       <div class="sig">
         <img src="${SIGNATURE_B64}" alt="signature"/>
@@ -8733,12 +8936,12 @@ function certificateHtml(opts: {
         <span>Scanner pour vérifier</span>
       </div>
       <svg class="badge-seal" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-        <circle cx="50" cy="50" r="46" fill="none" stroke="#0d9488" stroke-width="2"/>
-        <circle cx="50" cy="50" r="38" fill="none" stroke="#0d9488" stroke-width="0.8" stroke-dasharray="2 2"/>
-        <circle cx="50" cy="50" r="30" fill="#0d9488"/>
-        <text x="50" y="46" font-size="9" font-weight="bold" fill="#fff" text-anchor="middle" font-family="Arial">DATAMEAL</text>
+        <circle cx="50" cy="50" r="46" fill="none" stroke="${accent}" stroke-width="2"/>
+        <circle cx="50" cy="50" r="38" fill="none" stroke="${accent}" stroke-width="0.8" stroke-dasharray="2 2"/>
+        <circle cx="50" cy="50" r="30" fill="${accent}"/>
+        <text x="50" y="46" font-size="9" font-weight="bold" fill="#fff" text-anchor="middle" font-family="Arial">${c.sealBrand}</text>
         <text x="50" y="57" font-size="7" fill="#fff" text-anchor="middle" font-family="Arial">★ TOGO ★</text>
-        <text x="50" y="14" font-size="6" fill="#0d9488" text-anchor="middle" font-family="Arial" font-weight="bold">CERTIFIÉ</text>
+        <text x="50" y="14" font-size="6" fill="${accent}" text-anchor="middle" font-family="Arial" font-weight="bold">CERTIFIÉ</text>
       </svg>
     </div>
   </div>
@@ -8749,17 +8952,51 @@ function certificateHtml(opts: {
 // Certificat d'admission (HTML téléchargeable)
 app.get("/api/academy/certificate/admission", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const { data: stud } = await supabase.from("students")
-    .select("full_name, first_name, middle_name, last_name, admitted_at, admission_expires, entry_score").eq("id", sid).single();
-  if (!stud?.admitted_at) return res.status(403).send("Vous n'êtes pas encore admis(e).");
-  const { data: cert } = await supabase.from("attestations")
-    .select("certificate_no").eq("student_id", sid).eq("cert_type", "admission").maybeSingle();
-  const opts = {
-    name: officialName(stud), type: "admission" as const,
-    certNo: cert?.certificate_no || `DMA-ADM-${sid}`,
-    score: Math.round((stud.entry_score ?? 0) / 30 * 100),
-    issuedAt: stud.admitted_at, expiresAt: stud.admission_expires,
-  };
+  const q = typeof req.query.program === "string" ? req.query.program : null;
+  const parcours = q ? PROGRAMS.find(p => p.id === q) : null;
+
+  let opts: Parameters<typeof certificateSvg>[0];
+  if (parcours && parcours.id !== "meal") {
+    const { data: adm } = await supabase.from("academy_program_admissions")
+      .select("admitted_at, admission_expires, entry_score").eq("student_id", sid).eq("program_id", parcours.id).maybeSingle();
+    if (!adm?.admitted_at) return res.status(403).send("Vous n'êtes pas encore admis(e) à ce parcours.");
+    const { data: person } = await supabase.from("students")
+      .select("full_name, first_name, middle_name, last_name").eq("id", sid).single();
+    const idsParcours = await coursDuParcours(parcours.id);
+    let certNo: string | null = null;
+    if (idsParcours.length) {
+      const { data: cert } = await supabase.from("attestations").select("certificate_no")
+        .eq("student_id", sid).eq("cert_type", "admission").in("course_id", idsParcours).maybeSingle();
+      certNo = cert?.certificate_no ?? null;
+    }
+    opts = {
+      name: officialName(person ?? {}), type: "admission", program: parcours,
+      certNo: certNo || `DMA-ADM-${parcours.id.toUpperCase()}-${sid}`,
+      score: Math.round((adm.entry_score ?? 0) / parcours.admission.nbQuestions * 100),
+      issuedAt: adm.admitted_at, expiresAt: adm.admission_expires,
+    };
+  } else {
+    // ── MEAL, ou aucun `program` fourni : compatibilité avec les liens déjà envoyés ──
+    const { data: stud } = await supabase.from("students")
+      .select("full_name, first_name, middle_name, last_name, admitted_at, admission_expires, entry_score").eq("id", sid).single();
+    if (!stud?.admitted_at) return res.status(403).send("Vous n'êtes pas encore admis(e).");
+    // Restreint aux cours MEAL : un étudiant admis à un second parcours porte aussi sa
+    // propre ligne d'attestation d'admission, et .maybeSingle() échouerait sur les deux.
+    const idsMeal = await idsCoursMeal();
+    let certNo: string | null = null;
+    if (idsMeal.length) {
+      const { data: cert } = await supabase.from("attestations").select("certificate_no")
+        .eq("student_id", sid).eq("cert_type", "admission").in("course_id", idsMeal).maybeSingle();
+      certNo = cert?.certificate_no ?? null;
+    }
+    opts = {
+      name: officialName(stud), type: "admission",
+      certNo: certNo || `DMA-ADM-${sid}`,
+      score: Math.round((stud.entry_score ?? 0) / 30 * 100),
+      issuedAt: stud.admitted_at, expiresAt: stud.admission_expires,
+    };
+  }
+
   // Aperçu HTML si demandé, sinon téléchargement PDF direct
   if (req.query.format === "html") {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
@@ -8779,17 +9016,41 @@ app.get("/api/academy/certificate/admission", requireStudent, async (req, res) =
 // Certificat final (HTML téléchargeable)
 app.get("/api/academy/certificate/final", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
-  const { data: stud } = await supabase.from("students")
-    .select("full_name, first_name, middle_name, last_name, final_certificate_no, final_certified_at").eq("id", sid).single();
-  if (!stud?.final_certificate_no) return res.status(403).send(
-    "Le certificat final s'obtient après les 3 cours du cursus ET la correction de vos travaux de groupe.");
-  const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
-  const ga = allGrades || [];
-  const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
-  const opts = {
-    name: officialName(stud), type: "final" as const,
-    certNo: stud.final_certificate_no, score: avg, issuedAt: stud.final_certified_at,
-  };
+  const q = typeof req.query.program === "string" ? req.query.program : null;
+  const parcours = q ? PROGRAMS.find(p => p.id === q) : null;
+
+  let opts: Parameters<typeof certificateSvg>[0];
+  if (parcours && parcours.id !== "meal") {
+    const { data: adm } = await supabase.from("academy_program_admissions")
+      .select("final_certificate_no, final_certified_at").eq("student_id", sid).eq("program_id", parcours.id).maybeSingle();
+    if (!adm?.final_certificate_no) return res.status(403).send(
+      `L'attestation de fin de parcours s'obtient après avoir terminé tous les cours de « ${parcours.title} ».`);
+    const { data: person } = await supabase.from("students")
+      .select("full_name, first_name, middle_name, last_name").eq("id", sid).single();
+    const idsParcours = await coursDuParcours(parcours.id);
+    const { data: noteRows } = idsParcours.length
+      ? await supabase.from("grades").select("score, max_score").eq("student_id", sid).in("course_id", idsParcours)
+      : { data: [] };
+    const gr = noteRows || [];
+    const avg = gr.length ? Math.round(gr.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / gr.length) : 0;
+    opts = {
+      name: officialName(person ?? {}), type: "final", program: parcours,
+      certNo: adm.final_certificate_no, score: avg, issuedAt: adm.final_certified_at,
+    };
+  } else {
+    const { data: stud } = await supabase.from("students")
+      .select("full_name, first_name, middle_name, last_name, final_certificate_no, final_certified_at").eq("id", sid).single();
+    if (!stud?.final_certificate_no) return res.status(403).send(
+      "Le certificat final s'obtient après les 3 cours du cursus ET la correction de vos travaux de groupe.");
+    const { data: allGrades } = await supabase.from("grades").select("score, max_score").eq("student_id", sid);
+    const ga = allGrades || [];
+    const avg = ga.length ? Math.round(ga.reduce((a, g) => a + Number(g.score) / Number(g.max_score) * 100, 0) / ga.length) : 0;
+    opts = {
+      name: officialName(stud), type: "final",
+      certNo: stud.final_certificate_no, score: avg, issuedAt: stud.final_certified_at,
+    };
+  }
+
   if (req.query.format === "html") {
     res.setHeader("Content-Type", "text/html; charset=utf-8");
     return res.send(certificateHtml(opts));
@@ -8840,9 +9101,15 @@ app.get("/api/academy/verify-certificate/:certNo", rateLimit(30, 5 * 60 * 1000),
 
   if (att) {
     const expired = att.expires_at && new Date(att.expires_at) < new Date();
-    const typeLabel = att.cert_type === "admission" ? "Attestation d'admission"
-      : att.cert_type === "final" ? "Certificat Super-Expert MEAL"
-      : `Attestation — ${(att as any).sms_courses?.title || "Cours"}`;
+    // Le parcours se retrouve par le code du cours rattaché à l'attestation — admission et
+    // cursus final n'ont pas de programId en propre, ils sont posés sur la table
+    // `attestations` avec un course_id (voir grantProgramAdmission et /api/academy/attestation).
+    const parcours = programOf((att as any).sms_courses?.code ?? null);
+    const meal = !parcours || parcours.id === "meal";
+    const typeLabel = att.cert_type === "admission"
+      ? `Attestation d'admission${meal ? "" : ` — ${parcours!.title}`}`
+      : att.cert_type === "final" ? (parcours?.credential ?? "Certificat Super-Expert MEAL")
+      : (parcours?.credential ?? `Attestation — ${(att as any).sms_courses?.title || "Cours"}`);
     return res.json({
       valid: !expired && att.status !== "rejected",
       // Même nom que celui imprimé sur le document, sinon la vérification publique
@@ -8854,7 +9121,7 @@ app.get("/api/academy/verify-certificate/:certNo", rateLimit(30, 5 * 60 * 1000),
       issued_at: att.issued_at,
       expires_at: att.expires_at,
       status: expired ? "expired" : (att.status || "issued"),
-      issuer: "DataMEAL Academy",
+      issuer: meal ? "DataMEAL Academy" : "LouisFarm Learning",
     });
   }
 
