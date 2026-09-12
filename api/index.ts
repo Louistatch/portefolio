@@ -4797,6 +4797,50 @@ app.get("/api/academy/dashboard", requireStudent, async (req, res) => {
     plusLongueSerie = Math.max(plusLongueSerie, serieCourante);
   }
 
+  // Calcul du streak actif (jours consecutifs jusqu'a aujourd'hui ou hier)
+  const aujourdhuiStr = new Date().toISOString().slice(0, 10);
+  const hierStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  let streakActif = 0;
+  if (joursActifs.includes(aujourdhuiStr) || joursActifs.includes(hierStr)) {
+    let indexRef = joursActifs.includes(aujourdhuiStr) ? joursActifs.indexOf(aujourdhuiStr) : joursActifs.indexOf(hierStr);
+    streakActif = 1;
+    while (indexRef > 0) {
+      const prevTime = new Date(joursActifs[indexRef - 1]).getTime();
+      const currTime = new Date(joursActifs[indexRef]).getTime();
+      if (currTime - prevTime === 86400000) {
+        streakActif++;
+        indexRef--;
+      } else {
+        break;
+      }
+    }
+  }
+
+  // Classement (Leaderboard) de la cohorte
+  let classement: any[] = [];
+  try {
+    const { data: allStudents } = await supabase.from("students")
+      .select("id, full_name, email, avatar_url, entry_score").eq("status", "active").limit(50);
+    const { data: allGrades } = await supabase.from("grades").select("student_id, score, max_score, type");
+
+    if (allStudents && allGrades) {
+      const xpByStudent: Record<number, number> = {};
+      allGrades.forEach((g: any) => {
+        if (!xpByStudent[g.student_id]) xpByStudent[g.student_id] = 0;
+        if (g.type === "lesson") xpByStudent[g.student_id] += 10;
+        if (g.type === "group_work") xpByStudent[g.student_id] += 35;
+      });
+
+      classement = allStudents.map((s: any) => ({
+        id: s.id,
+        nom: (s.full_name || "").trim() || s.email.split("@")[0],
+        avatar: s.avatar_url,
+        xp: (xpByStudent[s.id] || 0) + (s.entry_score ? 15 : 0),
+        estMoi: s.id === sid,
+      })).sort((a: any, b: any) => b.xp - a.xp).slice(0, 10);
+    }
+  } catch { /* classement optionnel */ }
+
   const sansFaute = notesLecon.some(g => Number(g.max_score) > 0 && Number(g.score) === Number(g.max_score));
   const miParcours = enrollments.some(e => Number(e.progress) >= 50);
   const cursusMeal = courses.filter(c => c.code.startsWith(MEAL_PROGRAM_PREFIX));
@@ -4937,6 +4981,11 @@ app.get("/api/academy/dashboard", requireStudent, async (req, res) => {
       detail: detailXp,
     },
     realisations,
+    streak: {
+      actif: streakActif,
+      plusLong: plusLongueSerie,
+    },
+    classement,
     ressources: ressources.slice(0, 12),
     calendrier: evenements,
   });
@@ -5148,12 +5197,25 @@ app.get("/api/academy/group-forum/:gwId", requireStudent, async (req, res) => {
     id: p.id, groupWorkId: p.group_work_id, kind: p.kind || "message",
     auteur: p.author_name || "Étudiant", parMoi: p.student_id === sid,
     corps: p.body, fichier: p.attachment_url, fichierNom: p.attachment_name, le: p.created_at,
+    upvotes: p.upvotes || 0,
   }));
   res.json({
     groupe: { id: groupe.id, nom: groupe.name, cohorte: groupe.cohort },
     ressources: posts.filter(p => p.kind === "ressource"),
     messages: posts.filter(p => p.kind !== "ressource"),
   });
+});
+
+app.post("/api/academy/group-forum/posts/:postId/upvote", requireStudent, async (req, res) => {
+  const postId = Number(req.params.postId);
+  try {
+    const { data: p } = await supabase.from("academy_group_posts").select("upvotes").eq("id", postId).maybeSingle();
+    const current = (p?.upvotes || 0) + 1;
+    await supabase.from("academy_group_posts").update({ upvotes: current }).eq("id", postId);
+    res.json({ upvotes: current });
+  } catch {
+    res.json({ upvotes: 1 });
+  }
 });
 
 app.post("/api/academy/group-forum/:gwId", requireStudent, async (req, res) => {

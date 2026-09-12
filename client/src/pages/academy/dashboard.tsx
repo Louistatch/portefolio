@@ -6,7 +6,8 @@ import { SocialShare } from "@/components/social-share";
 import {
   GraduationCap, User, Award, BookOpen, Loader2, CheckCircle2, Clock,
   Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
-  Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink, Send } from "lucide-react";
+  Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink, Send,
+  Flame, Medal, Crown } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
 import { groupByProgram } from "@shared/programs";
 import { motion } from "framer-motion";
@@ -226,9 +227,10 @@ export default function AcademyDashboard() {
         </div>
       )}
 
-      {/* ───── Stats cards ───── */}
-      <MountStagger className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* ───── Stats cards + Série (Streak) ───── */}
+      <MountStagger className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         {[
+          { label: "Série d'apprentissage", value: `${bord?.streak?.actif ?? 0} j`, icon: Flame, tint: "text-orange-500 bg-orange-500/10" },
           { label: "Moyenne générale", value: `${overall}%`, icon: TrendingUp, tint: "text-primary bg-primary/10" },
           { label: "Cours terminés", value: `${completedCourses}/${mesCours.length}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
           { label: "Credentials", value: creds.length, icon: Award, tint: "text-purple-600 bg-purple-500/10" },
@@ -236,8 +238,6 @@ export default function AcademyDashboard() {
         ].map((s) => (
           <MountItem key={s.label} className="bg-card rounded-2xl border border-border/50 p-4">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${s.tint}`}><s.icon className="w-[18px] h-[18px]" /></div>
-            {/* Chasse fixe : sans elle, « 100 % » est plus large que « 88 % » et la rangée
-                de chiffres sautille d'une carte à l'autre. */}
             <p className="text-[28px] leading-none font-bold chiffres-tabulaires tracking-tight">{s.value}</p>
             <p className="text-xs text-muted-foreground mt-1.5">{s.label}</p>
           </MountItem>
@@ -296,6 +296,7 @@ export default function AcademyDashboard() {
 
         </div>
         <div className="space-y-6">
+          {bord?.classement?.length > 0 && <Leaderboard classement={bord.classement} />}
           {bord?.calendrier?.length > 0 && <Calendrier evenements={bord.calendrier} />}
           {bord?.realisations?.length > 0 && <Realisations realisations={bord.realisations} xp={bord.xp} />}
           {bord?.ressources?.length > 0 && <Ressources ressources={bord.ressources} />}
@@ -678,6 +679,34 @@ export function Calendrier({ evenements }: { evenements: any[] }) {
 }
 
 /** Réalisations obtenues, puis celles qui restent à décrocher — la suite compte autant que l'acquis. */
+/** Classement general / cohorte des etudiants */
+export function Leaderboard({ classement }: { classement: any[] }) {
+  return (
+    <Bloc titre="Classement de la cohorte" icone={Crown}>
+      <div className="p-3 space-y-1">
+        {classement.map((item, index) => {
+          const medailleColor = index === 0 ? "text-amber-500" : index === 1 ? "text-slate-400" : index === 2 ? "text-amber-700" : "text-muted-foreground";
+          return (
+            <div key={item.id} className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${item.estMoi ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"}`}>
+              <div className={`w-6 text-center text-xs font-bold ${medailleColor}`}>
+                {index < 3 ? <Medal className={`w-4 h-4 mx-auto ${medailleColor}`} /> : `#${index + 1}`}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-medium truncate ${item.estMoi ? "font-bold text-primary" : ""}`}>
+                  {item.nom} {item.estMoi ? "(Vous)" : ""}
+                </p>
+              </div>
+              <div className="text-xs font-mono font-bold text-primary">
+                {item.xp} XP
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Bloc>
+  );
+}
+
 export function Realisations({ realisations, xp }: { realisations: any[]; xp: any }) {
   const obtenues = realisations.filter(r => r.obtenue);
   const restantes = realisations.filter(r => !r.obtenue);

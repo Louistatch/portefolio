@@ -6,6 +6,7 @@ import {
   Users, Loader2, Lock, Clock, CheckCircle2, Send, AlertCircle, Link2,
   Plus, X, Mail, Trophy, FileText, MessageSquare, Download,
   Paperclip, Upload, Pin, Shuffle, Calendar, BarChart3, PencilLine, Sparkles, BookOpen,
+  ThumbsUp, Award, Star,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn, getStudent } from "@/lib/student";
 import {
@@ -1118,6 +1119,44 @@ function ChampFichier({ travailId, libelle, accept, fichier, onFichier, obligato
  * ne le confonde jamais avec le forum de la promotion plus bas sur la même page : l'un se
  * lit par toute la cohorte, l'autre par trois personnes tout au plus.
  */
+function ForumMessageItem({ message: m }: { message: any }) {
+  const [votes, setVotes] = useState(m.upvotes || 0);
+  const [voted, setVoted] = useState(false);
+
+  const handleUpvote = async () => {
+    if (voted) return;
+    setVotes(v => v + 1);
+    setVoted(true);
+    try {
+      await studentFetch(`/api/academy/group-forum/posts/${m.id}/upvote`, { method: "POST" });
+    } catch {}
+  };
+
+  return (
+    <div className="flex gap-2.5 items-start">
+      <span className={`w-7 h-7 rounded-full grid place-items-center text-[10px] font-bold shrink-0 ${
+        m.parMoi ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+        {initiales(m.auteur)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 flex-wrap">
+          <span className="text-[11px] font-medium text-foreground">{m.parMoi ? "Vous" : m.auteur}</span>
+          {(m.upvotes > 0 || m.parMoi) && (
+            <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600">
+              <Star className="w-2.5 h-2.5" /> Top Contributeur
+            </span>
+          )}
+          <span className="text-[11px] text-muted-foreground">· {dateHeure(m.le)}</span>
+        </div>
+        <p className="text-sm whitespace-pre-wrap break-words mt-0.5">{m.corps}</p>
+      </div>
+      <button onClick={handleUpvote} disabled={voted} className={`flex items-center gap-1 text-xs px-2 py-1 rounded-lg border transition-colors shrink-0 ${voted ? "bg-primary/10 border-primary/30 text-primary" : "border-border/60 hover:bg-muted text-muted-foreground"}`}>
+        <ThumbsUp className="w-3 h-3" /> {votes}
+      </button>
+    </div>
+  );
+}
+
 function ForumGroupe({ travailId, forum, nbMembres, onPoste }:
   { travailId: number; forum: any; nbMembres: number; onPoste: () => Promise<void> }) {
   const [corps, setCorps] = useState("");
@@ -1170,19 +1209,7 @@ function ForumGroupe({ travailId, forum, nbMembres, onPoste }:
           </p>
         )}
         {messages.map(m => (
-          <div key={m.id} className="flex gap-2.5">
-            <span className={`w-7 h-7 rounded-full grid place-items-center text-[10px] font-bold shrink-0 ${
-              m.parMoi ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
-              {initiales(m.auteur)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] text-muted-foreground">
-                <span className="font-medium text-foreground">{m.parMoi ? "Vous" : m.auteur}</span>
-                {" · "}{dateHeure(m.le)}
-              </p>
-              <p className="text-sm whitespace-pre-wrap break-words">{m.corps}</p>
-            </div>
-          </div>
+          <ForumMessageItem key={m.id} message={m} />
         ))}
 
         <div className="flex gap-2 pt-1">

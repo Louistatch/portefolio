@@ -3,7 +3,8 @@ import { useRoute, useLocation, Link } from "wouter";
 import { SEO } from "@/components/seo";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ShieldCheck, ShieldX, Loader2, Search, Award, Calendar, Hash, User, BadgeCheck } from "lucide-react";
+import { ShieldCheck, ShieldX, Loader2, Search, Award, Calendar, Hash, User, BadgeCheck, QrCode } from "lucide-react";
+import qrcode from "qrcode-generator";
 
 export default function VerifyCertificate() {
   const [, params] = useRoute("/academy/verify-certificate/:certNo");
@@ -70,6 +71,31 @@ export default function VerifyCertificate() {
               {result.status === "expired" && (
                 <p className="text-sm text-amber-600 bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3">⚠ Ce certificat est expiré mais a bien été délivré.</p>
               )}
+
+              {/* Affichage du QR Code du certificat */}
+              <div className="pt-4 border-t border-border/50 flex flex-col items-center justify-center text-center">
+                <p className="text-xs font-semibold text-muted-foreground mb-3 flex items-center gap-1.5">
+                  <QrCode className="w-4 h-4 text-primary" /> Flashcode de vérification directe
+                </p>
+                {(() => {
+                  try {
+                    const qr = qrcode(0, 'M');
+                    qr.addData(window.location.href);
+                    qr.make();
+                    const qrDataUrl = qr.createDataURL(4, 0);
+                    return (
+                      <div className="p-3 bg-white rounded-2xl border border-border shadow-sm inline-block">
+                        <img src={qrDataUrl} alt="QR Code de vérification du certificat" className="w-32 h-32" />
+                      </div>
+                    );
+                  } catch (e) {
+                    return null;
+                  }
+                })()}
+                <p className="text-[11px] text-muted-foreground mt-2">
+                  Scannez ce QR Code pour vérifier directement ce document en ligne.
+                </p>
+              </div>
             </div>
           </div>
         ) : (
