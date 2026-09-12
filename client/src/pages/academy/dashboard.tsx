@@ -84,7 +84,6 @@ export default function AcademyDashboard() {
   const [meetings, setMeetings] = useState<any[]>([]);
   const [gw, setGw] = useState<any>(null);
   const [bord, setBord] = useState<any>(null);
-  const [classement, setClassement] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   // Les cours terminés sont repliés par défaut, parcours par parcours.
 
@@ -113,38 +112,6 @@ export default function AcademyDashboard() {
     })();
   }, []);
 
-  // Les parcours ont désormais chacun leur admission : n'afficher que ceux auxquels
-  // l'étudiant est réellement inscrit. /api/academy/courses renvoie tout le catalogue publié,
-  // si bien qu'un étudiant admis au seul cursus MEAL voyait la formation de formateurs à 0 %,
-  // comme un cours qu'il aurait négligé — alors qu'il n'y a simplement pas accès.
-  //
-  // Le test porte sur l'inscription OU sur la présence d'une leçon planifiée : se fier à la
-  // seule inscription ferait disparaître le parcours d'un étudiant dont l'insertion aurait
-  // échoué, alors que son planning existe et qu'il travaille dedans.
-  //
-  // Calculé avant le retour anticipé du chargement (donc avec des tableaux vides le temps
-  // du premier rendu) pour rester utilisable par l'effet du classement juste en dessous —
-  // les Hooks ne peuvent pas suivre un `if (loading) return`.
-  const idsAccessibles = new Set<number>([
-    ...enrollments.map((e: any) => e.course_id),
-    ...schedule.map((s: any) => s.course_id),
-  ]);
-  const mesCours = (allCourses as any[]).filter(c => idsAccessibles.has(c.id));
-  const programGroups = groupByProgram(mesCours);
-
-  // Classement de son parcours principal (le premier dans l'ordre déclaré de PROGRAMS) —
-  // /api/academy/leaderboard/:programId est LA définition du classement, déjà partagée par
-  // l'e-mail hebdomadaire et la vue admin (voir classementPoints côté serveur) : il respecte
-  // notamment exclude_from_leaderboard. Un calcul refait ici recréerait exactement l'écart
-  // que cette fonction unique a été construite pour fermer.
-  const parcoursPrincipal = programGroups[0]?.program.id;
-  useEffect(() => {
-    if (!parcoursPrincipal) { setClassement([]); return; }
-    studentFetch(`/api/academy/leaderboard/${parcoursPrincipal}`)
-      .then(r => r.json()).then(d => setClassement(Array.isArray(d?.classement) ? d.classement : []))
-      .catch(() => setClassement([]));
-  }, [parcoursPrincipal]);
-
   if (loading) return <SquelettePage />;
 
   const completedCourses = enrollments.filter(e => e.status === "completed").length;
@@ -156,6 +123,21 @@ export default function AcademyDashboard() {
   const overall = transcript?.overall ?? 0;
   const firstName = student?.full_name?.split(" ")[0] || "étudiant";
   const emailVerified = testStatus ? testStatus.emailVerified !== false : true;
+
+  // Les parcours ont désormais chacun leur admission : n'afficher que ceux auxquels
+  // l'étudiant est réellement inscrit. /api/academy/courses renvoie tout le catalogue publié,
+  // si bien qu'un étudiant admis au seul cursus MEAL voyait la formation de formateurs à 0 %,
+  // comme un cours qu'il aurait négligé — alors qu'il n'y a simplement pas accès.
+  //
+  // Le test porte sur l'inscription OU sur la présence d'une leçon planifiée : se fier à la
+  // seule inscription ferait disparaître le parcours d'un étudiant dont l'insertion aurait
+  // échoué, alors que son planning existe et qu'il travaille dedans.
+  const idsAccessibles = new Set<number>([
+    ...enrollments.map((e: any) => e.course_id),
+    ...schedule.map((s: any) => s.course_id),
+  ]);
+  const mesCours = (allCourses as any[]).filter(c => idsAccessibles.has(c.id));
+  const programGroups = groupByProgram(mesCours);
 
   const initials = student?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "ET";
 
@@ -314,7 +296,7 @@ export default function AcademyDashboard() {
 
         </div>
         <div className="space-y-6">
-          {classement.length > 0 && <Leaderboard classement={classement} moi={student?.id} />}
+          {bord?.classement?.length > 0 && <Leaderboard classement={bord.classement} />}
           {bord?.calendrier?.length > 0 && <Calendrier evenements={bord.calendrier} />}
           {bord?.realisations?.length > 0 && <Realisations realisations={bord.realisations} xp={bord.xp} />}
           {bord?.ressources?.length > 0 && <Ressources ressources={bord.ressources} />}
@@ -696,31 +678,26 @@ export function Calendrier({ evenements }: { evenements: any[] }) {
   );
 }
 
-/**
- * Classement du parcours principal de l'étudiant — top 10 par points de notes, la même
- * définition que l'e-mail hebdomadaire et la vue admin (classementPoints côté serveur),
- * donc la même place annoncée partout, et les comptes exclus (exclude_from_leaderboard)
- * en sont déjà écartés côté serveur.
- */
-export function Leaderboard({ classement, moi }: { classement: { student_id: number; full_name: string; total: number }[]; moi?: number }) {
+/** Réalisations obtenues, puis celles qui restent à décrocher — la suite compte autant que l'acquis. */
+/** Classement general / cohorte des etudiants */
+export function Leaderboard({ classement }: { classement: any[] }) {
   return (
-    <Bloc titre="Classement du parcours" icone={Crown}>
+    <Bloc titre="Classement de la cohorte" icone={Crown}>
       <div className="p-3 space-y-1">
         {classement.map((item, index) => {
-          const estMoi = item.student_id === moi;
           const medailleColor = index === 0 ? "text-amber-500" : index === 1 ? "text-slate-400" : index === 2 ? "text-amber-700" : "text-muted-foreground";
           return (
-            <div key={item.student_id} className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${estMoi ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"}`}>
+            <div key={item.id} className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${item.estMoi ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"}`}>
               <div className={`w-6 text-center text-xs font-bold ${medailleColor}`}>
                 {index < 3 ? <Medal className={`w-4 h-4 mx-auto ${medailleColor}`} /> : `#${index + 1}`}
               </div>
               <div className="min-w-0 flex-1">
-                <p className={`text-xs font-medium truncate ${estMoi ? "font-bold text-primary" : ""}`}>
-                  {item.full_name} {estMoi ? "(Vous)" : ""}
+                <p className={`text-xs font-medium truncate ${item.estMoi ? "font-bold text-primary" : ""}`}>
+                  {item.nom} {item.estMoi ? "(Vous)" : ""}
                 </p>
               </div>
               <div className="text-xs font-mono font-bold text-primary">
-                {item.total} pts
+                {item.xp} XP
               </div>
             </div>
           );
@@ -730,7 +707,6 @@ export function Leaderboard({ classement, moi }: { classement: { student_id: num
   );
 }
 
-/** Réalisations obtenues, puis celles qui restent à décrocher — la suite compte autant que l'acquis. */
 export function Realisations({ realisations, xp }: { realisations: any[]; xp: any }) {
   const obtenues = realisations.filter(r => r.obtenue);
   const restantes = realisations.filter(r => !r.obtenue);

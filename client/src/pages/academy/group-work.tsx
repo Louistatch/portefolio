@@ -1121,19 +1121,14 @@ function ChampFichier({ travailId, libelle, accept, fichier, onFichier, obligato
  */
 function ForumMessageItem({ message: m }: { message: any }) {
   const [votes, setVotes] = useState(m.upvotes || 0);
-  // Initialisé depuis m.jaiVote (renvoyé par le serveur, qui seul sait qui a déjà voté) :
-  // un état local à false par défaut permettait de revoter à chaque rechargement de page.
-  const [voted, setVoted] = useState(!!m.jaiVote);
+  const [voted, setVoted] = useState(false);
 
   const handleUpvote = async () => {
     if (voted) return;
-    setVotes((v: number) => v + 1);
+    setVotes(v => v + 1);
     setVoted(true);
     try {
-      const r = await studentFetch(`/api/academy/group-forum/posts/${m.id}/upvote`, { method: "POST" });
-      const d = await r.json();
-      // Le compte réel du serveur prime sur l'incrément optimiste, au cas où il aurait dérivé.
-      if (typeof d?.upvotes === "number") setVotes(d.upvotes);
+      await studentFetch(`/api/academy/group-forum/posts/${m.id}/upvote`, { method: "POST" });
     } catch {}
   };
 
@@ -1146,9 +1141,7 @@ function ForumMessageItem({ message: m }: { message: any }) {
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[11px] font-medium text-foreground">{m.parMoi ? "Vous" : m.auteur}</span>
-          {/* Un mérite reconnu par les autres, pas le fait d'être l'auteur : sinon chaque
-              étudiant verrait ce badge sur tous ses propres messages, votés ou non. */}
-          {votes > 0 && (
+          {(m.upvotes > 0 || m.parMoi) && (
             <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600">
               <Star className="w-2.5 h-2.5" /> Top Contributeur
             </span>
