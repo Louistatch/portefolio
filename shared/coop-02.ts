@@ -11,7 +11,7 @@
  *
  * Les « Directives opérationnelles sur le développement des filières agricoles en faveur
  * des pauvres » du FIDA, Division production durable, marchés et institutions, version
- * française de septembre 2026 : définition de la chaîne de valeur, les trois niveaux du
+ * française utilisée comme support pédagogique : définition de la chaîne de valeur, les trois niveaux du
  * système, les trois piliers de l'approche, les trois trajectoires pro-pauvres, et les
  * exercices de ciblage, de priorisation et de cartographie.
  *
@@ -1429,3 +1429,18 @@ export const LECONS_COOP_02: LeconCoop[] = [
     ],
   },
 ];
+
+// Ateliers professionnels : les identifiants des exercices existants sont conservés.
+const ateliersProfessionnels = [
+  "Commencer le dossier professionnel : choisir une filière et décrire le problème économique. Séparer acteurs directs, prestataires de services et environnement institutionnel. Livrable : note de cadrage.",
+  "Construire une matrice de ciblage incluant femmes, jeunes et groupes moins dotés. Documenter les critères et les risques d’exclusion. Livrable : grille d’entretien et synthèse anonymisée, ou cas simulé explicitement identifié.",
+  "Comparer deux options de service collectif : débouchés, volumes, saisonnalité et contraintes. Livrable : matrice de priorisation justifiée ; distinguer preuves et hypothèses.",
+  "Cartographier produits, argent, information et pouvoir de négociation. Chiffrer un service de collecte : coûts fixes 300 000 FCFA, coût variable 15 FCFA/kg, tarif 25 FCFA/kg. Seuil d’équilibre : 30 000 kg, avant autres charges et pertes. Tester une baisse de volume de 20 %. Livrable : carte et budget avec scénario défavorable.",
+  "Déposer le dossier final : diagnostic, choix juridique référencé, projets de statuts/PV, carte des acteurs, budget du service, trésorerie et plan d’action à 90 jours. Préciser responsables, échéances, indicateurs et limites. Évaluation sur 100, validation à 75 sans défaut critique non résolu ; retour écrit et nouvelle soumission possible."
+];
+LECONS_COOP_02.forEach((lecon, i) => {
+  lecon.cellules.push({ type: "md", content: "## Atelier professionnel — livrable à conserver\n\n" + ateliersProfessionnels[i] });
+});
+LECONS_COOP_02[0].cellules.push({"type": "resource", "title": "My.COOP — gérer votre coopérative agricole", "url": "https://www.ilo.org/fr/publications/mycoop-gerer-votre-cooperative-agricole", "provider": "OIT", "desc": "Modules en français : services, intrants et commercialisation."});
+LECONS_COOP_02[0].cellules.push({"type": "resource", "title": "Développement des filières favorables aux pauvres", "url": "https://www.ifad.org/en/w/publications/operations-academy-ifad-operational-guidelines-on-pro-poor-value-chain-development", "provider": "FIDA", "desc": "Formation sur le ciblage, la priorisation et la planification."});
+LECONS_COOP_02[0].cellules.push({"type": "resource", "title": "25 questions pour le diagnostic de filière", "url": "https://www.unido.org/sites/default/files/2011-12/Pro-poor_value_chain_development_2011_0.pdf", "provider": "ONUDI/FIDA", "desc": "Utiliser les questions pour structurer un entretien et une note de diagnostic."});

@@ -2332,3 +2332,19 @@ export const LECONS_COOP_01: LeconCoop[] = [
     ],
   },
 ];
+
+// Ateliers professionnels : les identifiants des exercices existants sont conservés.
+const ateliersProfessionnels = [
+  "Décrire un groupement et son besoin collectif avant de proposer une forme juridique. Livrable : diagnostic d’une page séparant faits, hypothèses et pièces à vérifier.",
+  "Traduire les principes en règles concrètes : adhésion, information des membres, vote, prévention des conflits d’intérêts. Livrable : charte de gouvernance ; vérifier chaque obligation dans le texte OHADA.",
+  "Comparer SCOOPS et COOP-CA pour le cas étudié. Justifier le choix par les membres, les organes et la capacité de gestion. Livrable : note de choix juridique avec articles applicables.",
+  "Construire un tableau des apports, parts, échéances et remboursements. Séparer capital, cotisations et recettes de services. Livrable : plan de financement initial et hypothèses.",
+  "Préparer un projet de statuts et de règlement intérieur avec une matrice clause/article/pièce. Les modèles sont des outils de travail à adapter et à faire vérifier, pas des actes automatiquement conformes.",
+  "Préparer le dossier constitutif : convocations, liste de présence, procès-verbal et pièces requises. Vérifier auprès du service compétent du pays les démarches, coûts et délais actualisés. Livrable : checklist datée avec source administrative.",
+  "Construire un budget de trésorerie et un circuit de contrôle : autorisation, paiement, justificatif, rapprochement et compte rendu. Livrable : budget mensuel et tableau de responsabilités.",
+  "Dessiner une architecture base/union/faîtière en indiquant le service rendu à chaque niveau. Livrable : carte des responsabilités et mécanisme de redevabilité aux membres."
+];
+LECONS_COOP_01.forEach((lecon, i) => {
+  lecon.cellules.push({ type: "md", content: "## Atelier professionnel — livrable à conserver\n\n" + ateliersProfessionnels[i] });
+});
+LECONS_COOP_01[0].cellules.push({"type": "resource", "title": "Texte de référence des sociétés coopératives", "url": "https://www.ohada.org/en/cooperative-societies-law/", "provider": "OHADA", "desc": "Consulter le texte de référence et vérifier les articles et formalités nationales applicables."});

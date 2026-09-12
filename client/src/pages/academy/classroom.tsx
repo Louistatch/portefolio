@@ -1,3 +1,4 @@
+import ProfessionalProject from "@/components/academy/professional-project";
 import { useEffect, useState, memo } from "react";
 import { useLocation, useRoute } from "wouter";
 import { SEO } from "@/components/seo";
@@ -766,7 +767,9 @@ export default function AcademyClassroom() {
         )}
 
         {/* Attestation demandée — annoncé ici plutôt que dans une alerte du navigateur. */}
-        {confirmation && (
+        {(course.code === "DATA-02" || course.code === "COOP-02") && <ProfessionalProject program={course.code === "DATA-02" ? "data" : "coop"} />}
+
+      {confirmation && (
           <div className="bg-primary/5 border border-primary/30 rounded-2xl p-4 mb-4 flex items-start gap-3">
             <Award className="w-4 h-4 text-primary shrink-0 mt-0.5" />
             <div>

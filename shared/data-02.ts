@@ -209,7 +209,7 @@ export const LECONS_DATA_02: LeconData[] = [
           + "0,835 ; **1000 → 0,559** — un effondrement net : au-delà d'un certain point, "
           + "la régularisation ne protège plus du surapprentissage, elle empêche le modèle "
           + "d'apprendre quoi que ce soit d'utile. Un bon `alpha` se choisit en comparant "
-          + "plusieurs valeurs sur le jeu de test, jamais en devinant.",
+          + "plusieurs valeurs par validation croisée sur l’entraînement ; réserver le test au bilan final.",
       },
       {
         type: "callout",
@@ -309,7 +309,7 @@ export const LECONS_DATA_02: LeconData[] = [
         answer: "le modele sous apprend",
         accept: ["le r2 s'effondre", "performance degradee", "modele trop simplifie", "sous apprentissage"],
         hint: "Le R² test tombe de 0,873 à 0,559 : ce n'est plus de la régularisation utile.",
-        explain: "Le R² test s'effondre de 0,873 à 0,559 : une régularisation excessive empêche le modèle d'apprendre un signal pourtant réel dans les données — c'est du sous-apprentissage (underfitting) induit artificiellement. Le bon alpha se choisit en comparant plusieurs valeurs sur le jeu de test, jamais en prenant la plus grande par prudence supposée.",
+        explain: "Le R² test s'effondre de 0,873 à 0,559 : une régularisation excessive empêche le modèle d'apprendre un signal pourtant réel dans les données — c'est du sous-apprentissage (underfitting) induit artificiellement. Choisir alpha par validation croisée sur le jeu d’entraînement, avec la préparation des données dans un Pipeline. Le jeu de test reste intact jusqu’à l’évaluation finale : y sélectionner alpha biaiserait le score annoncé.",
       },
     ],
   },
@@ -626,14 +626,14 @@ export const LECONS_DATA_02: LeconData[] = [
       {
         type: "callout",
         variant: "real",
-        title: "Sur le prix du cacao réel — la différenciation simple ne suffit pas",
+        title: "Sur le prix du cacao simulé — la différenciation simple ne suffit pas",
         content:
           "ADF sur la série brute : p-value = 0,4595 → non stationnaire, comme attendu "
           + "d'une série avec tendance. ADF après UNE différenciation : p-value = 0,1499 — "
           + "toujours au-dessus de 0,05, donc **toujours pas stationnaire** au sens "
           + "strict. Ce n'est qu'après une SECONDE différenciation que le test devient "
           + "concluant : p-value < 0,0001. Une seule différenciation, qui suffit dans "
-          + "l'exemple pédagogique ci-dessus, ne suffit pas toujours sur une série réelle — "
+          + "l'exemple pédagogique ci-dessus, ne suffit pas toujours sur une série simulée — "
           + "c'est pourquoi on revérifie toujours avec le test, plutôt que de supposer "
           + "qu'une différenciation d'ordre 1 résout systématiquement le problème.",
       },
@@ -779,9 +779,9 @@ export const LECONS_DATA_02: LeconData[] = [
       {
         type: "md",
         content:
-          "## Deux compétences nouvelles, utiles au-delà du choix de piste\n\n"
+          "## Approfondissements facultatifs après le projet\n\n"
           + "Le notebook de cette semaine introduit deux outils qu'aucune leçon précédente "
-          + "n'a couverts, utiles quelle que soit la piste choisie ci-dessous :\n\n"
+          + "n'a couverts, facultatifs et non requis pour valider le projet :\n\n"
           + "- **Clustering (K-Means)** — regrouper des observations similaires sans "
           + "étiquette préexistante (« quels segments de clients existent réellement dans "
           + "ce portefeuille ? »), le nombre de groupes se choisissant avec le **score de "
@@ -809,7 +809,7 @@ export const LECONS_DATA_02: LeconData[] = [
           + "visualisation cartographique). "
           + "Les jeux de données déjà utilisés dans le parcours — mobile money, "
           + "microcrédit, agriculture togolaise, cacao ivoirien — conviennent aux trois "
-          + "pistes ; un jeu de données personnel, s'il est réel et documenté, est aussi "
+          + "pistes ; un jeu de données personnel, si sa provenance et ses droits sont documentés, est aussi "
           + "accepté.",
       },
       {
@@ -921,3 +921,17 @@ export const LECONS_DATA_02: LeconData[] = [
     ],
   },
 ];
+
+// Ateliers professionnels : les identifiants des exercices existants sont conservés.
+const ateliersProfessionnels = [
+  "Démarrer le capstone dès cette semaine : question métier, source documentée et plan. Comparer la régression à une prédiction de référence. Séparer entraînement et test avant tout ajustement ; choisir les hyperparamètres par validation croisée dans un Pipeline. Livrable : notebook reproductible et protocole de validation.",
+  "Présenter matrice de confusion, précision, rappel et coût des erreurs. Ajuster le seuil sur une validation, jamais sur le test final. Examiner les résultats par sous-groupe sans conclure à la causalité. Livrable : note de choix du seuil.",
+  "Fixer un horizon, respecter la chronologie et comparer la prévision à une référence naïve. Évaluer sur plusieurs fenêtres temporelles et préciser les informations disponibles à la date de prévision. Livrable : graphique des prévisions et bilan des erreurs.",
+  "Finaliser le projet commencé en semaine 6. Déposer un lien HTTPS vers un dossier accessible au correcteur : README, notebook, sources et dictionnaire, résultats, limites et recommandations. Ne jamais inclure de secrets ou de données personnelles identifiantes. Une première correction peut demander une nouvelle version. Le seuil est 75/100, sans défaut critique non résolu. K-Means et le chi-carré sont des approfondissements facultatifs."
+];
+LECONS_DATA_02.forEach((lecon, i) => {
+  lecon.cellules.push({ type: "md", content: "## Atelier professionnel — livrable à conserver\n\n" + ateliersProfessionnels[i] });
+});
+LECONS_DATA_02[0].cellules.push({"type": "resource", "title": "Validation croisée et jeu de test", "url": "https://scikit-learn.org/stable/modules/cross_validation.html", "provider": "Scikit-learn", "desc": "Réserver le test à l’évaluation finale."});
+LECONS_DATA_02[0].cellules.push({"type": "resource", "title": "Prévenir les fuites de données", "url": "https://scikit-learn.org/stable/common_pitfalls.html", "provider": "Scikit-learn", "desc": "Appliquer la préparation dans un Pipeline ajusté sur l’entraînement."});
+for (const lecon of LECONS_DATA_02) lecon.cellules.unshift({type: "callout", variant: "info", title: "Données pédagogiques synthétiques", content: "Les fichiers générés par utils_louisfarm.py simulent des situations ouest-africaines. Ils ne proviennent pas d’une enquête réelle. Leurs résultats ne décrivent pas les populations de ces pays. Pour une source externe, documenter producteur, date, unités, licence et limites."});
