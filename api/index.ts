@@ -37,7 +37,7 @@ import {
 import {
   GROUP_WORKS, GROUP_WORK_WINDOW_WEEKS, GROUP_TARGET_SIZE, GROUP_MAX_MEMBERS,
   GROUP_WORK_ELIGIBILITY_WEEKS, GROUP_FORMATION_LEAD_WEEKS,
-  PEER_REVIEW_CRITERIA, PEER_REVIEW_MAX_PER_CRITERION, INSTRUCTOR_RUBRIC,
+  PEER_REVIEW_CRITERIA, PEER_REVIEW_MAX_PER_CRITERION, PEER_REVIEW_MAX_TOTAL, INSTRUCTOR_RUBRIC,
   SUBMISSION_INSTRUCTIONS, groupNameFor, cohortOf,
 } from "../shared/groupwork.js";
 
@@ -1940,19 +1940,42 @@ async function applyGroupWorkGrade(submissionId: number) {
   if (!ids.length) return { notified: 0 };
 
   const max = gw.max_score ?? 100;
-  // L'intitulé porte toujours le rang du travail (« GW2 — … »), y compris si l'énoncé a été
-  // renommé depuis l'administration. C'est ce qui permet de retrouver — et donc de remplacer —
-  // les notes d'une correction précédente : sans ce repère stable, un titre modifié entre deux
-  // corrections aurait laissé deux notes pour le même travail dans le relevé.
+  const groupScoreNorm = (Number(sub.score) / max) * 100; // Note sur 100 Gemini / Formateur
+
+  // Recuperer les peer reviews du groupe pour pondérer 40% Peer Review + 60% Gemini/Formateur
+  const { data: peerReviews } = await supabase.from("academy_group_peer_reviews")
+    .select("reviewee_id, total")
+    .eq("group_work_id", gw.id).eq("group_id", sub.group_id);
+
+  const peerScoreByStudent: Record<number, number[]> = {};
+  (peerReviews || []).forEach((pr: any) => {
+    if (!peerScoreByStudent[pr.reviewee_id]) peerScoreByStudent[pr.reviewee_id] = [];
+    peerScoreByStudent[pr.reviewee_id].push((Number(pr.total || 0) / PEER_REVIEW_MAX_TOTAL) * 100);
+  });
+
   const etiquette = /^GW\d/i.test(gw.title) ? gw.title : `GW${gw.gw_index} — ${gw.title}`;
   await supabase.from("grades").delete()
     .in("student_id", ids).eq("type", "group_work").like("title", `GW${gw.gw_index} %`)
     .then(() => {}, () => {});
-  await supabase.from("grades").insert(ids.map(id => ({
-    student_id: id, course_id: null, lesson_id: null,
-    title: etiquette, score: sub.score, max_score: max, type: "group_work",
-    feedback: sub.feedback ?? null, program_id: "meal", // GW n'existe que dans le modèle WQU du cursus MEAL
-  }))).then(() => {}, () => {});
+
+  const gradeInserts = ids.map(id => {
+    const reviewsReceived = peerScoreByStudent[id] || [];
+    const avgPeerNorm = reviewsReceived.length
+      ? reviewsReceived.reduce((a, b) => a + b, 0) / reviewsReceived.length
+      : 100; // Si pas encore de peer review, 100% par défaut
+
+    // Note finale ponderee : 60% Gemini / Formateur + 40% Peer Review
+    const finalScoreNorm = Math.round(0.6 * groupScoreNorm + 0.4 * avgPeerNorm);
+    const finalScore = Math.round((finalScoreNorm / 100) * max);
+
+    return {
+      student_id: id, course_id: null, lesson_id: null,
+      title: etiquette, score: finalScore, max_score: max, type: "group_work",
+      feedback: sub.feedback ?? null, program_id: "meal",
+    };
+  });
+
+  await supabase.from("grades").insert(gradeInserts).then(() => {}, () => {});
 
   await supabase.from("group_work_progress")
     .update({ status: "completed", score: sub.score, completed_at: sub.graded_at || new Date().toISOString() })
@@ -5349,6 +5372,14 @@ app.post("/api/academy/group-work/:id/peer-review", requireStudent, async (req, 
     created_at: new Date().toISOString(),
   }, { onConflict: "group_work_id,reviewer_id,reviewee_id" });
   if (error) return res.status(500).json({ message: error.message });
+
+  // Recalculer les notes du groupe si une soumission existe deja
+  try {
+    const { data: sub } = await supabase.from("academy_group_submissions")
+      .select("id").eq("group_work_id", gwId).eq("group_id", groupe.id).eq("status", "graded").maybeSingle();
+    if (sub) await applyGroupWorkGrade(sub.id);
+  } catch {}
+
   res.json({ message: "Évaluation enregistrée.", total });
 });
 
