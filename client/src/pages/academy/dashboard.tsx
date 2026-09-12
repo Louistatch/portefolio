@@ -6,7 +6,8 @@ import { SocialShare } from "@/components/social-share";
 import {
   GraduationCap, User, Award, BookOpen, Loader2, CheckCircle2, Clock,
   Trophy, ChevronRight, Target, Lock, X, Download, Share2, ShieldCheck,
-  Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink, Send } from "lucide-react";
+  Sparkles, TrendingUp, Calendar, AlertCircle, Video, Radio, Users, ExternalLink, Send,
+  Flame, Medal, Crown } from "lucide-react";
 import { getStudent, studentFetch, isStudentLoggedIn, getStudentToken } from "@/lib/student";
 import { groupByProgram } from "@shared/programs";
 import { motion } from "framer-motion";
@@ -83,6 +84,7 @@ export default function AcademyDashboard() {
   const [meetings, setMeetings] = useState<any[]>([]);
   const [gw, setGw] = useState<any>(null);
   const [bord, setBord] = useState<any>(null);
+  const [classement, setClassement] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   // Les cours terminés sont repliés par défaut, parcours par parcours.
 
@@ -111,6 +113,38 @@ export default function AcademyDashboard() {
     })();
   }, []);
 
+  // Les parcours ont désormais chacun leur admission : n'afficher que ceux auxquels
+  // l'étudiant est réellement inscrit. /api/academy/courses renvoie tout le catalogue publié,
+  // si bien qu'un étudiant admis au seul cursus MEAL voyait la formation de formateurs à 0 %,
+  // comme un cours qu'il aurait négligé — alors qu'il n'y a simplement pas accès.
+  //
+  // Le test porte sur l'inscription OU sur la présence d'une leçon planifiée : se fier à la
+  // seule inscription ferait disparaître le parcours d'un étudiant dont l'insertion aurait
+  // échoué, alors que son planning existe et qu'il travaille dedans.
+  //
+  // Calculé avant le retour anticipé du chargement (donc avec des tableaux vides le temps
+  // du premier rendu) pour rester utilisable par l'effet du classement juste en dessous —
+  // les Hooks ne peuvent pas suivre un `if (loading) return`.
+  const idsAccessibles = new Set<number>([
+    ...enrollments.map((e: any) => e.course_id),
+    ...schedule.map((s: any) => s.course_id),
+  ]);
+  const mesCours = (allCourses as any[]).filter(c => idsAccessibles.has(c.id));
+  const programGroups = groupByProgram(mesCours);
+
+  // Classement de son parcours principal (le premier dans l'ordre déclaré de PROGRAMS) —
+  // /api/academy/leaderboard/:programId est LA définition du classement, déjà partagée par
+  // l'e-mail hebdomadaire et la vue admin (voir classementPoints côté serveur) : il respecte
+  // notamment exclude_from_leaderboard. Un calcul refait ici recréerait exactement l'écart
+  // que cette fonction unique a été construite pour fermer.
+  const parcoursPrincipal = programGroups[0]?.program.id;
+  useEffect(() => {
+    if (!parcoursPrincipal) { setClassement([]); return; }
+    studentFetch(`/api/academy/leaderboard/${parcoursPrincipal}`)
+      .then(r => r.json()).then(d => setClassement(Array.isArray(d?.classement) ? d.classement : []))
+      .catch(() => setClassement([]));
+  }, [parcoursPrincipal]);
+
   if (loading) return <SquelettePage />;
 
   const completedCourses = enrollments.filter(e => e.status === "completed").length;
@@ -122,21 +156,6 @@ export default function AcademyDashboard() {
   const overall = transcript?.overall ?? 0;
   const firstName = student?.full_name?.split(" ")[0] || "étudiant";
   const emailVerified = testStatus ? testStatus.emailVerified !== false : true;
-
-  // Les parcours ont désormais chacun leur admission : n'afficher que ceux auxquels
-  // l'étudiant est réellement inscrit. /api/academy/courses renvoie tout le catalogue publié,
-  // si bien qu'un étudiant admis au seul cursus MEAL voyait la formation de formateurs à 0 %,
-  // comme un cours qu'il aurait négligé — alors qu'il n'y a simplement pas accès.
-  //
-  // Le test porte sur l'inscription OU sur la présence d'une leçon planifiée : se fier à la
-  // seule inscription ferait disparaître le parcours d'un étudiant dont l'insertion aurait
-  // échoué, alors que son planning existe et qu'il travaille dedans.
-  const idsAccessibles = new Set<number>([
-    ...enrollments.map((e: any) => e.course_id),
-    ...schedule.map((s: any) => s.course_id),
-  ]);
-  const mesCours = (allCourses as any[]).filter(c => idsAccessibles.has(c.id));
-  const programGroups = groupByProgram(mesCours);
 
   const initials = student?.full_name?.split(" ").map((n: string) => n[0]).slice(0, 2).join("") || "ET";
 
@@ -226,9 +245,10 @@ export default function AcademyDashboard() {
         </div>
       )}
 
-      {/* ───── Stats cards ───── */}
-      <MountStagger className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      {/* ───── Stats cards + Série (Streak) ───── */}
+      <MountStagger className="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-4">
         {[
+          { label: "Série d'apprentissage", value: `${bord?.streak?.actif ?? 0} j`, icon: Flame, tint: "text-orange-500 bg-orange-500/10" },
           { label: "Moyenne générale", value: `${overall}%`, icon: TrendingUp, tint: "text-primary bg-primary/10" },
           { label: "Cours terminés", value: `${completedCourses}/${mesCours.length}`, icon: BookOpen, tint: "text-blue-600 bg-blue-500/10" },
           { label: "Credentials", value: creds.length, icon: Award, tint: "text-purple-600 bg-purple-500/10" },
@@ -236,8 +256,6 @@ export default function AcademyDashboard() {
         ].map((s) => (
           <MountItem key={s.label} className="bg-card rounded-2xl border border-border/50 p-4">
             <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-3 ${s.tint}`}><s.icon className="w-[18px] h-[18px]" /></div>
-            {/* Chasse fixe : sans elle, « 100 % » est plus large que « 88 % » et la rangée
-                de chiffres sautille d'une carte à l'autre. */}
             <p className="text-[28px] leading-none font-bold chiffres-tabulaires tracking-tight">{s.value}</p>
             <p className="text-xs text-muted-foreground mt-1.5">{s.label}</p>
           </MountItem>
@@ -296,6 +314,7 @@ export default function AcademyDashboard() {
 
         </div>
         <div className="space-y-6">
+          {classement.length > 0 && <Leaderboard classement={classement} moi={student?.id} />}
           {bord?.calendrier?.length > 0 && <Calendrier evenements={bord.calendrier} />}
           {bord?.realisations?.length > 0 && <Realisations realisations={bord.realisations} xp={bord.xp} />}
           {bord?.ressources?.length > 0 && <Ressources ressources={bord.ressources} />}
@@ -672,6 +691,40 @@ export function Calendrier({ evenements }: { evenements: any[] }) {
             </span>
           ))}
         </div>
+      </div>
+    </Bloc>
+  );
+}
+
+/**
+ * Classement du parcours principal de l'étudiant — top 10 par points de notes, la même
+ * définition que l'e-mail hebdomadaire et la vue admin (classementPoints côté serveur),
+ * donc la même place annoncée partout, et les comptes exclus (exclude_from_leaderboard)
+ * en sont déjà écartés côté serveur.
+ */
+export function Leaderboard({ classement, moi }: { classement: { student_id: number; full_name: string; total: number }[]; moi?: number }) {
+  return (
+    <Bloc titre="Classement du parcours" icone={Crown}>
+      <div className="p-3 space-y-1">
+        {classement.map((item, index) => {
+          const estMoi = item.student_id === moi;
+          const medailleColor = index === 0 ? "text-amber-500" : index === 1 ? "text-slate-400" : index === 2 ? "text-amber-700" : "text-muted-foreground";
+          return (
+            <div key={item.student_id} className={`flex items-center gap-3 px-3 py-2 rounded-xl transition-colors ${estMoi ? "bg-primary/10 border border-primary/20" : "hover:bg-muted/50"}`}>
+              <div className={`w-6 text-center text-xs font-bold ${medailleColor}`}>
+                {index < 3 ? <Medal className={`w-4 h-4 mx-auto ${medailleColor}`} /> : `#${index + 1}`}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className={`text-xs font-medium truncate ${estMoi ? "font-bold text-primary" : ""}`}>
+                  {item.full_name} {estMoi ? "(Vous)" : ""}
+                </p>
+              </div>
+              <div className="text-xs font-mono font-bold text-primary">
+                {item.total} pts
+              </div>
+            </div>
+          );
+        })}
       </div>
     </Bloc>
   );
