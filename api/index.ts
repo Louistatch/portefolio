@@ -5427,7 +5427,23 @@ app.get("/api/academy/cohort-forum", requireStudent, async (req, res) => {
     .eq("cohort", cohorte).order("created_at");
   if (error) return res.json({ actif: false, cohorte, annonces: [], messages: [] });
 
-  const posts = (data || []).map((p: any) => formaterPost(p, sid));
+  // Comptés depuis academy_cohort_post_upvotes (une ligne par vote), sur le même principe
+  // que le forum de groupe : voir la route d'upvote plus bas.
+  const idsPosts = (data || []).map((p: any) => p.id);
+  const { data: votes } = idsPosts.length
+    ? await supabase.from("academy_cohort_post_upvotes").select("post_id, student_id").in("post_id", idsPosts)
+    : { data: [] as { post_id: number; student_id: number }[] };
+  const votesParPost = new Map<number, number>();
+  const mesVotes = new Set<number>();
+  for (const v of votes || []) {
+    votesParPost.set(v.post_id, (votesParPost.get(v.post_id) || 0) + 1);
+    if (v.student_id === sid) mesVotes.add(v.post_id);
+  }
+
+  const posts = (data || []).map((p: any) => ({
+    ...formaterPost(p, sid),
+    upvotes: votesParPost.get(p.id) || 0, jaiVote: mesVotes.has(p.id),
+  }));
   // L'effectif affiché est celui de CETTE promotion, pas de tous les admis depuis l'origine —
   // même calcul que le fan-out des notifications ci-dessous, à partir de la date d'admission.
   const { data: admis } = await supabase.from("students")
@@ -5441,6 +5457,27 @@ app.get("/api/academy/cohort-forum", requireStudent, async (req, res) => {
     annonces: posts.filter(p => p.kind === "annonce"),
     messages: posts.filter(p => p.kind !== "annonce"),
   });
+});
+
+app.post("/api/academy/cohort-forum/posts/:postId/upvote", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const postId = Number(req.params.postId);
+  if (!postId) return res.status(400).json({ message: "Publication invalide." });
+
+  const { data: post } = await supabase.from("academy_cohort_posts").select("id, cohort").eq("id", postId).maybeSingle();
+  if (!post) return res.status(404).json({ message: "Publication introuvable." });
+
+  // On ne vote que dans sa propre promotion : sans ce contrôle, n'importe quel étudiant
+  // connecté pourrait voter sur un post d'une cohorte à laquelle il n'appartient pas.
+  const cohorte = await cohorteDeLEtudiant(sid);
+  if (!cohorte || cohorte !== post.cohort) return res.status(403).json({ message: "Vous ne faites pas partie de cette promotion." });
+
+  // Une insertion, pas une lecture-puis-écriture d'un compteur — voir la route équivalente
+  // du forum de groupe pour le détail du raisonnement.
+  await supabase.from("academy_cohort_post_upvotes").insert({ post_id: postId, student_id: sid }).then(() => {}, () => {});
+  const { count } = await supabase.from("academy_cohort_post_upvotes")
+    .select("student_id", { count: "exact", head: true }).eq("post_id", postId);
+  res.json({ upvotes: count || 0 });
 });
 
 app.post("/api/academy/cohort-forum", rateLimit(20, 10 * 60 * 1000), requireStudent, async (req, res) => {
