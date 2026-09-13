@@ -1112,36 +1112,47 @@ function ChampFichier({ travailId, libelle, accept, fichier, onFichier, obligato
 }
 
 /**
- * Le fil du groupe de CE travail. Il naît et meurt avec l'équipe : les coéquipiers du
- * travail suivant ne sont pas les mêmes, et n'ont pas à lire cette conversation.
- *
- * L'en-tête dit explicitement à qui ce fil s'adresse — « Privé · 3 membres » — pour qu'on
- * ne le confonde jamais avec le forum de la promotion plus bas sur la même page : l'un se
- * lit par toute la cohorte, l'autre par trois personnes tout au plus.
+ * Un message, dans l'un ou l'autre forum — le fil du groupe de CE travail (3 coéquipiers)
+ * ou celui de la promotion entière. Même mécanique de vote dans les deux : `endpoint`
+ * pointe vers la bonne route serveur (chaque forum a sa propre table de posts, donc sa
+ * propre table de votes). `variant` ne change que la teinte de « c'est vous » : le fil de
+ * groupe et celui de la promotion la distinguent délibérément, pour qu'on ne les confonde
+ * jamais l'un avec l'autre au premier coup d'œil.
  */
-function ForumMessageItem({ message: m }: { message: any }) {
+function ForumMessageItem({ message: m, endpoint, variant = "groupe" }: { message: any; endpoint: string; variant?: "groupe" | "promotion" }) {
   const [votes, setVotes] = useState(m.upvotes || 0);
-  const [voted, setVoted] = useState(false);
+  // Initialisé depuis m.jaiVote (renvoyé par le serveur, qui seul sait qui a déjà voté) :
+  // un état local à false par défaut permettait de revoter à chaque rechargement de page.
+  const [voted, setVoted] = useState(!!m.jaiVote);
 
   const handleUpvote = async () => {
     if (voted) return;
-    setVotes(v => v + 1);
+    setVotes((v: number) => v + 1);
     setVoted(true);
     try {
-      await studentFetch(`/api/academy/group-forum/posts/${m.id}/upvote`, { method: "POST" });
+      const r = await studentFetch(endpoint, { method: "POST" });
+      const d = await r.json();
+      // Le compte réel du serveur prime sur l'incrément optimiste, au cas où il aurait dérivé.
+      if (typeof d?.upvotes === "number") setVotes(d.upvotes);
     } catch {}
   };
 
+  const avatarClass = m.formateur ? "bg-primary text-white"
+    : m.parMoi ? (variant === "promotion" ? "bg-primary/20 text-primary" : "bg-primary text-white")
+    : "bg-muted text-muted-foreground";
+
   return (
     <div className="flex gap-2.5 items-start">
-      <span className={`w-7 h-7 rounded-full grid place-items-center text-[10px] font-bold shrink-0 ${
-        m.parMoi ? "bg-primary text-white" : "bg-muted text-muted-foreground"}`}>
+      <span className={`w-7 h-7 rounded-full grid place-items-center text-[10px] font-bold shrink-0 ${avatarClass}`}>
         {initiales(m.auteur)}
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-1.5 flex-wrap">
           <span className="text-[11px] font-medium text-foreground">{m.parMoi ? "Vous" : m.auteur}</span>
-          {(m.upvotes > 0 || m.parMoi) && (
+          {m.formateur && <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/15 text-primary">FORMATEUR</span>}
+          {/* Un mérite reconnu par les autres, pas le fait d'être l'auteur : sinon chaque
+              étudiant verrait ce badge sur tous ses propres messages, votés ou non. */}
+          {votes > 0 && (
             <span className="inline-flex items-center gap-0.5 text-[9px] font-semibold px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-600">
               <Star className="w-2.5 h-2.5" /> Top Contributeur
             </span>
@@ -1209,7 +1220,7 @@ function ForumGroupe({ travailId, forum, nbMembres, onPoste }:
           </p>
         )}
         {messages.map(m => (
-          <ForumMessageItem key={m.id} message={m} />
+          <ForumMessageItem key={m.id} message={m} endpoint={`/api/academy/group-forum/posts/${m.id}/upvote`} />
         ))}
 
         <div className="flex gap-2 pt-1">
@@ -1284,20 +1295,7 @@ function ForumPromotion({ promo, onPoste }: { promo: any; onPoste: () => Promise
           </p>
         )}
         {messages.map(m => (
-          <div key={m.id} className="flex gap-2.5">
-            <span className={`w-8 h-8 rounded-full grid place-items-center text-[10px] font-bold shrink-0 ${
-              m.formateur ? "bg-primary text-white" : m.parMoi ? "bg-primary/20 text-primary" : "bg-muted text-muted-foreground"}`}>
-              {initiales(m.auteur)}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-[11px] text-muted-foreground">
-                <span className="font-medium text-foreground">{m.parMoi ? "Vous" : m.auteur}</span>
-                {m.formateur && <span className="ml-1.5 text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/15 text-primary">FORMATEUR</span>}
-                {" · "}{dateHeure(m.le)}
-              </p>
-              <p className="text-sm whitespace-pre-wrap break-words">{m.corps}</p>
-            </div>
-          </div>
+          <ForumMessageItem key={m.id} message={m} endpoint={`/api/academy/cohort-forum/posts/${m.id}/upvote`} variant="promotion" />
         ))}
 
         <div className="flex gap-2 pt-1">

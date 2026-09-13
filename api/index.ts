@@ -4820,7 +4820,8 @@ app.get("/api/academy/dashboard", requireStudent, async (req, res) => {
     plusLongueSerie = Math.max(plusLongueSerie, serieCourante);
   }
 
-  // Calcul du streak actif (jours consecutifs jusqu'a aujourd'hui ou hier)
+  // Série active : jours consécutifs d'activité jusqu'à aujourd'hui ou hier (un jour de
+  // battement — sinon la série retombe à zéro entre le réveil et la première leçon du jour).
   const aujourdhuiStr = new Date().toISOString().slice(0, 10);
   const hierStr = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   let streakActif = 0;
@@ -4838,31 +4839,6 @@ app.get("/api/academy/dashboard", requireStudent, async (req, res) => {
       }
     }
   }
-
-  // Classement (Leaderboard) de la cohorte
-  let classement: any[] = [];
-  try {
-    const { data: allStudents } = await supabase.from("students")
-      .select("id, full_name, email, avatar_url, entry_score").eq("status", "active").limit(50);
-    const { data: allGrades } = await supabase.from("grades").select("student_id, score, max_score, type");
-
-    if (allStudents && allGrades) {
-      const xpByStudent: Record<number, number> = {};
-      allGrades.forEach((g: any) => {
-        if (!xpByStudent[g.student_id]) xpByStudent[g.student_id] = 0;
-        if (g.type === "lesson") xpByStudent[g.student_id] += 10;
-        if (g.type === "group_work") xpByStudent[g.student_id] += 35;
-      });
-
-      classement = allStudents.map((s: any) => ({
-        id: s.id,
-        nom: (s.full_name || "").trim() || s.email.split("@")[0],
-        avatar: s.avatar_url,
-        xp: (xpByStudent[s.id] || 0) + (s.entry_score ? 15 : 0),
-        estMoi: s.id === sid,
-      })).sort((a: any, b: any) => b.xp - a.xp).slice(0, 10);
-    }
-  } catch { /* classement optionnel */ }
 
   const sansFaute = notesLecon.some(g => Number(g.max_score) > 0 && Number(g.score) === Number(g.max_score));
   const miParcours = enrollments.some(e => Number(e.progress) >= 50);
@@ -5008,7 +4984,6 @@ app.get("/api/academy/dashboard", requireStudent, async (req, res) => {
       actif: streakActif,
       plusLong: plusLongueSerie,
     },
-    classement,
     ressources: ressources.slice(0, 12),
     calendrier: evenements,
   });
@@ -5214,13 +5189,27 @@ app.get("/api/academy/group-forum/:gwId", requireStudent, async (req, res) => {
     .eq("group_id", groupe.id).order("created_at");
   if (error) return res.status(500).json({ message: error.message });
 
+  // Comptés depuis academy_group_post_upvotes (une ligne par vote) plutôt qu'une colonne sur
+  // academy_group_posts : c'est ce qui rend le vote atomique côté écriture (voir la route
+  // d'upvote plus bas) et permet de savoir ICI si CET étudiant a déjà voté.
+  const idsPosts = (data || []).map((p: any) => p.id);
+  const { data: votes } = idsPosts.length
+    ? await supabase.from("academy_group_post_upvotes").select("post_id, student_id").in("post_id", idsPosts)
+    : { data: [] as { post_id: number; student_id: number }[] };
+  const votesParPost = new Map<number, number>();
+  const mesVotes = new Set<number>();
+  for (const v of votes || []) {
+    votesParPost.set(v.post_id, (votesParPost.get(v.post_id) || 0) + 1);
+    if (v.student_id === sid) mesVotes.add(v.post_id);
+  }
+
   // Les ressources remontent en tête quel que soit leur âge : elles se consultent, elles ne
   // se lisent pas dans l'ordre chronologique comme les messages.
   const posts = (data || []).map((p: any) => ({
     id: p.id, groupWorkId: p.group_work_id, kind: p.kind || "message",
     auteur: p.author_name || "Étudiant", parMoi: p.student_id === sid,
     corps: p.body, fichier: p.attachment_url, fichierNom: p.attachment_name, le: p.created_at,
-    upvotes: p.upvotes || 0,
+    upvotes: votesParPost.get(p.id) || 0, jaiVote: mesVotes.has(p.id),
   }));
   res.json({
     groupe: { id: groupe.id, nom: groupe.name, cohorte: groupe.cohort },
@@ -5230,15 +5219,27 @@ app.get("/api/academy/group-forum/:gwId", requireStudent, async (req, res) => {
 });
 
 app.post("/api/academy/group-forum/posts/:postId/upvote", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
   const postId = Number(req.params.postId);
-  try {
-    const { data: p } = await supabase.from("academy_group_posts").select("upvotes").eq("id", postId).maybeSingle();
-    const current = (p?.upvotes || 0) + 1;
-    await supabase.from("academy_group_posts").update({ upvotes: current }).eq("id", postId);
-    res.json({ upvotes: current });
-  } catch {
-    res.json({ upvotes: 1 });
-  }
+  if (!postId) return res.status(400).json({ message: "Publication invalide." });
+
+  const { data: post } = await supabase.from("academy_group_posts").select("id, group_id").eq("id", postId).maybeSingle();
+  if (!post) return res.status(404).json({ message: "Publication introuvable." });
+
+  // On ne vote que dans sa propre équipe : sans ce contrôle, n'importe quel étudiant
+  // connecté pourrait voter sur un post d'un groupe dont il ne fait pas partie.
+  const { data: appartenance } = await supabase.from("academy_group_members")
+    .select("student_id").eq("group_id", post.group_id).eq("student_id", sid).maybeSingle();
+  if (!appartenance) return res.status(403).json({ message: "Vous ne faites pas partie de cette équipe." });
+
+  // Une insertion, pas une lecture-puis-écriture d'un compteur : la clé primaire (post_id,
+  // student_id) empêche nativement un second vote du même étudiant — le conflit est ignoré
+  // en silence, un second clic reste sans effet plutôt que de renvoyer une erreur — et deux
+  // votes arrivés au même instant ne s'écrasent jamais l'un l'autre.
+  await supabase.from("academy_group_post_upvotes").insert({ post_id: postId, student_id: sid }).then(() => {}, () => {});
+  const { count } = await supabase.from("academy_group_post_upvotes")
+    .select("student_id", { count: "exact", head: true }).eq("post_id", postId);
+  res.json({ upvotes: count || 0 });
 });
 
 app.post("/api/academy/group-forum/:gwId", requireStudent, async (req, res) => {
@@ -5426,7 +5427,23 @@ app.get("/api/academy/cohort-forum", requireStudent, async (req, res) => {
     .eq("cohort", cohorte).order("created_at");
   if (error) return res.json({ actif: false, cohorte, annonces: [], messages: [] });
 
-  const posts = (data || []).map((p: any) => formaterPost(p, sid));
+  // Comptés depuis academy_cohort_post_upvotes (une ligne par vote), sur le même principe
+  // que le forum de groupe : voir la route d'upvote plus bas.
+  const idsPosts = (data || []).map((p: any) => p.id);
+  const { data: votes } = idsPosts.length
+    ? await supabase.from("academy_cohort_post_upvotes").select("post_id, student_id").in("post_id", idsPosts)
+    : { data: [] as { post_id: number; student_id: number }[] };
+  const votesParPost = new Map<number, number>();
+  const mesVotes = new Set<number>();
+  for (const v of votes || []) {
+    votesParPost.set(v.post_id, (votesParPost.get(v.post_id) || 0) + 1);
+    if (v.student_id === sid) mesVotes.add(v.post_id);
+  }
+
+  const posts = (data || []).map((p: any) => ({
+    ...formaterPost(p, sid),
+    upvotes: votesParPost.get(p.id) || 0, jaiVote: mesVotes.has(p.id),
+  }));
   // L'effectif affiché est celui de CETTE promotion, pas de tous les admis depuis l'origine —
   // même calcul que le fan-out des notifications ci-dessous, à partir de la date d'admission.
   const { data: admis } = await supabase.from("students")
@@ -5440,6 +5457,27 @@ app.get("/api/academy/cohort-forum", requireStudent, async (req, res) => {
     annonces: posts.filter(p => p.kind === "annonce"),
     messages: posts.filter(p => p.kind !== "annonce"),
   });
+});
+
+app.post("/api/academy/cohort-forum/posts/:postId/upvote", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const postId = Number(req.params.postId);
+  if (!postId) return res.status(400).json({ message: "Publication invalide." });
+
+  const { data: post } = await supabase.from("academy_cohort_posts").select("id, cohort").eq("id", postId).maybeSingle();
+  if (!post) return res.status(404).json({ message: "Publication introuvable." });
+
+  // On ne vote que dans sa propre promotion : sans ce contrôle, n'importe quel étudiant
+  // connecté pourrait voter sur un post d'une cohorte à laquelle il n'appartient pas.
+  const cohorte = await cohorteDeLEtudiant(sid);
+  if (!cohorte || cohorte !== post.cohort) return res.status(403).json({ message: "Vous ne faites pas partie de cette promotion." });
+
+  // Une insertion, pas une lecture-puis-écriture d'un compteur — voir la route équivalente
+  // du forum de groupe pour le détail du raisonnement.
+  await supabase.from("academy_cohort_post_upvotes").insert({ post_id: postId, student_id: sid }).then(() => {}, () => {});
+  const { count } = await supabase.from("academy_cohort_post_upvotes")
+    .select("student_id", { count: "exact", head: true }).eq("post_id", postId);
+  res.json({ upvotes: count || 0 });
 });
 
 app.post("/api/academy/cohort-forum", rateLimit(20, 10 * 60 * 1000), requireStudent, async (req, res) => {
