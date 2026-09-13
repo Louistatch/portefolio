@@ -60,6 +60,7 @@ const AdminStudentMessages = lazy(() => import("@/pages/admin/student-messages-a
 const AdminAmbassadors = lazy(() => import("@/pages/admin/ambassadors-admin"));
 const AdminGroupWork = lazy(() => import("@/pages/admin/group-work-admin"));
 const AdminSupport = lazy(() => import("@/pages/admin/support-admin"));
+const AdminProjects = lazy(() => import("@/pages/admin/projects-admin"));
 const AdminCourses = lazy(() => import("@/pages/admin/courses-admin"));
 const Stats = lazy(() => import("@/pages/stats"));
 
@@ -121,6 +122,7 @@ function App() {
                 rien renommé. */}
             <Route path={`${ADMIN_BASE}/login`} component={AdminLogin} />
             <Route path={ADMIN_BASE}>{() => <RequireAuth><Dashboard /></RequireAuth>}</Route>
+            <Route path={`${ADMIN_BASE}/projects`}>{() => <RequireAuth><AdminProjects /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/profile`}>{() => <RequireAuth><AdminProfile /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/posts`}>{() => <RequireAuth><AdminPosts /></RequireAuth>}</Route>
             <Route path={`${ADMIN_BASE}/publications`}>{() => <RequireAuth><AdminPublications /></RequireAuth>}</Route>

@@ -1,3 +1,5 @@
+import { registerProjectRoutes } from "./project-routes.js";
+import { projectRequiredForCourse } from "../shared/professional-projects.js";
 import express, { type Request, Response, NextFunction } from "express";
 import { createClient } from "@supabase/supabase-js";
 import jwt from "jsonwebtoken";
@@ -6477,6 +6479,8 @@ async function crediterCommissionAmbassadeur(paiement: { id: number; student_id:
   }
 }
 
+registerProjectRoutes(app, supabase, requireStudent, requireAuth);
+
 app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { course_id } = req.body;
@@ -6501,6 +6505,19 @@ app.post("/api/academy/attestation", requireStudent, async (req, res) => {
   // et il permet au navigateur de distinguer « il vous manque un paiement » de « vous
   // n'avez pas le droit ». Les deux appellent des écrans différents.
   const parcoursVise = await parcoursDuCours(course_id);
+  const { data: coursProjet, error: erreurCoursProjet } = await supabase.from("sms_courses").select("code").eq("id", course_id).maybeSingle();
+  if (erreurCoursProjet || !coursProjet) return res.status(503).json({ message: "Vérification du cours indisponible." });
+  if (projectRequiredForCourse(coursProjet.code)) {
+    const { data: projet, error: erreurProjet } = await supabase.from("academy_professional_projects")
+      .select("id").eq("student_id", sid).eq("program_id", parcoursVise).eq("status", "approved").maybeSingle();
+    if (erreurProjet) return res.status(503).json({ message: "Vérification du projet indisponible. Réessayez plus tard." });
+    if (!projet) return res.status(403).json({ message: "Faites valider votre projet professionnel (75/100, sans défaut critique) avant de demander cette attestation." });
+    const { data: coursParcours, error: erreurParcours } = await supabase.from("sms_courses").select("id").like("code", parcoursVise === "data" ? "DATA-%" : "COOP-%");
+    if (erreurParcours || !coursParcours?.length) return res.status(503).json({ message: "Vérification du parcours indisponible." });
+    const { data: inscriptions, error: erreurInscriptions } = await supabase.from("enrollments").select("course_id,progress").eq("student_id", sid).in("course_id", coursParcours.map(c => c.id));
+    if (erreurInscriptions) return res.status(503).json({ message: "Vérification de la progression indisponible." });
+    if (!coursParcours.every(c => inscriptions?.some(i => i.course_id === c.id && i.progress >= 100))) return res.status(403).json({ message: "Terminez tous les cours du parcours avant de demander cette attestation." });
+  }
   const du = await attestationEstDue(sid, parcoursVise);
   if (du.du) {
     return res.status(402).json({

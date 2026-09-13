@@ -52,12 +52,12 @@ lignes.push(`-- ══════════════ Cours COOP-02 — org
 --
 -- Les insertions de leçons sont gardées par un \`not exists\` sur (course_id, order_index) :
 -- rejouer ce fichier ne crée pas de doublons, mais ne met pas non plus à jour une leçon
--- existante. Pour republier une leçon modifiée, la supprimer d'abord.
+-- existante. Les UPDATE ci-dessous republient le contenu sans changer les IDs ni la progression.
 --
 -- ── Sur les sources ──
 --
 -- La méthode vient des « Directives opérationnelles sur le développement des filières
--- agricoles en faveur des pauvres » du FIDA, version française de septembre 2026 : les trois
+-- agricoles en faveur des pauvres » du FIDA, version française utilisée comme support pédagogique : les trois
 -- niveaux du système, les quatre flux, les trois trajectoires pro-pauvres, les sept critères
 -- de priorisation. Le territoire, les cinq groupes de ménages et les trois filières viennent
 -- des fiches d'exercice du même document et sont annoncés fictifs par leurs auteurs ; ils
@@ -79,6 +79,8 @@ on conflict (code) do update set
 
 for (const l of LECONS_COOP_02) {
   const contenu = JSON.stringify({ cells: l.cellules });
+  lignes.push(`update sms_lessons l set title = ${q(l.titre)}, content = ${q(contenu)}::jsonb
+from sms_courses c where l.course_id = c.id and c.code = ${q(COOP_02.code)} and l.order_index = ${l.ordre};`);
   lignes.push(`insert into sms_lessons (course_id, title, content, type, points, order_index)
 select c.id, ${q(l.titre)}, ${q(contenu)}::jsonb, 'lesson', ${l.points}, ${l.ordre}
 from sms_courses c where c.code = ${q(COOP_02.code)}
