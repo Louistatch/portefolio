@@ -214,7 +214,7 @@ export const PROGRAMS: Program[] = [
     id: "data",
     prefix: "DATA-",
     title: "Data Analytics",
-    subtitle: "Nettoyer, explorer, visualiser et prédire, avec de vraies données ouest-africaines",
+    subtitle: "Nettoyer, explorer, visualiser et prédire, avec des cas ouest-africains et des sources documentées",
     // Sixième titre délivré par LouisFarm, et second parcours payant après « coop ». Public
     // distinct de tous les autres : ni agent de terrain MEAL, ni juriste coopératif, ni
     // spécialiste du crédit — quiconque veut savoir transformer un tableau de chiffres en

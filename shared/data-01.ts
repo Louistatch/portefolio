@@ -3,7 +3,7 @@
  *
  * Premier des deux cours du parcours « Data Analytics ». Celui-ci construit les gestes de
  * base — lire un jeu de données, le nettoyer, l'explorer, le visualiser, l'interroger en
- * SQL — sur cinq jeux de données réels d'Afrique de l'Ouest. DATA-02 y ajoutera la
+ * SQL — sur cinq jeux de données synthétiques contextualisés d'Afrique de l'Ouest. DATA-02 y ajoutera la
  * modélisation prédictive et le projet de fin de parcours.
  *
  * ── Sur l'origine du contenu ──
@@ -55,7 +55,7 @@ export const DATA_01 = {
     "Cinq semaines pour poser les gestes qui reviennent dans chaque mission d'analyste : "
     + "inspecter un jeu de données brut, le nettoyer sans en fausser le sens, en tirer des "
     + "statistiques qui tiennent, les mettre en image pour un décideur, et interroger une "
-    + "base relationnelle en SQL. Chaque semaine s'appuie sur un jeu de données réel — "
+    + "base relationnelle en SQL. Chaque semaine s'appuie sur un jeu de données synthétique — "
     + "agriculture togolaise, mobile money sénégalais, banque de microfinance béninoise.",
   niveau: "debutant",
   outils: ["Python", "Pandas", "NumPy", "Matplotlib/Seaborn", "SQL"],
@@ -67,7 +67,7 @@ export const LECONS_DATA_01: LeconData[] = [
   // ═══════════════════════════════════════════════════════════════════════
   {
     ordre: 1,
-    titre: "Semaine 1 — Les fondations : un premier diagnostic de données réelles",
+    titre: "Semaine 1 — Les fondations : un premier diagnostic de données simulées",
     points: 100,
     cellules: [
       {
@@ -236,7 +236,7 @@ export const LECONS_DATA_01: LeconData[] = [
         type: "resource",
         title: "togo_agriculture.csv — jeu de données complet (1 200 lignes)",
         url: "/academy/data/datasets/togo_agriculture.csv",
-        desc: "Le fichier réel de la semaine : cinq régions, cinq années, deux colonnes avec de vraies valeurs manquantes. Nécessaire pour le projet et pour vérifier les exercices ci-dessous.",
+        desc: "Le fichier synthétique de la semaine : cinq régions, cinq années, deux colonnes avec de vraies valeurs manquantes. Nécessaire pour le projet et pour vérifier les exercices ci-dessous.",
         provider: "LouisFarm",
       },
       {
@@ -334,7 +334,7 @@ export const LECONS_DATA_01: LeconData[] = [
       {
         type: "md",
         content:
-          "## Un jeu de données réel n'arrive jamais propre\n\n"
+          "## Un jeu de données synthétique n'arrive jamais propre\n\n"
           + "senegal_mobilemoney.csv rassemble 5 100 transactions de mobile money, saisies "
           + "dans plusieurs villes du Sénégal sur dix-huit mois. Il n'a pas été sali "
           + "artificiellement pour l'exercice : c'est la conséquence ordinaire de plusieurs "
@@ -1122,3 +1122,18 @@ export const LECONS_DATA_01: LeconData[] = [
     ],
   },
 ];
+
+// Ateliers professionnels : les identifiants des exercices existants sont conservés.
+const ateliersProfessionnels = [
+  "Créer une fiche de provenance : producteur, date, unité d’observation, licence, variables et limites. Distinguer fichier synthétique et enquête réelle. Livrable : dictionnaire de données et diagnostic de qualité.",
+  "Conserver le fichier brut, écrire un nettoyage reproductible et comparer les effectifs avant/après. Justifier chaque suppression et traiter les doublons sur une clé stable. Livrable : données nettoyées et journal des décisions.",
+  "Décrire population, échantillon, valeurs manquantes et incertitude. Une association ne prouve pas une causalité. Livrable : note de deux pages avec trois constats et leurs limites.",
+  "Choisir un destinataire et une décision. Construire trois graphiques avec unités, sources, titres explicites et couleurs lisibles. Livrable : tableau de bord accompagné d’une recommandation.",
+  "Écrire cinq requêtes dont une jointure et une agrégation. Contrôler les doublons de clés et la multiplication des lignes après jointure. Livrable : fichier SQL commenté et contrôles de cohérence."
+];
+LECONS_DATA_01.forEach((lecon, i) => {
+  lecon.cellules.push({ type: "md", content: "## Atelier professionnel — livrable à conserver\n\n" + ateliersProfessionnels[i] });
+});
+LECONS_DATA_01[0].cellules.push({"type": "resource", "title": "FAOSTAT — données agricoles documentées", "url": "https://www.fao.org/faostat/en/", "provider": "FAO", "desc": "Choisir un pays, un produit, des années et des unités comparables. Les séries nationales ne remplacent pas une enquête individuelle."});
+for (const lecon of LECONS_DATA_01) lecon.cellules.unshift({type: "callout", variant: "info", title: "Données pédagogiques synthétiques", content: "Les fichiers générés par utils_louisfarm.py simulent des situations ouest-africaines. Ils ne proviennent pas d’une enquête réelle. Leurs résultats ne décrivent pas les populations de ces pays. Pour une source externe, documenter producteur, date, unités, licence et limites."});
+LECONS_DATA_01[0].cellules.unshift({type:"md",content:"## Préparation et rythme de travail\n\nPrévoyez 10 à 15 heures par semaine, à ajuster selon votre niveau. Avant la semaine 1 : savoir gérer des fichiers, lire un CSV, calculer un pourcentage et exécuter une cellule Python. Si nécessaire, consacrez une semaine préparatoire à ces gestes. Neuf semaines constituent un parcours appliqué ; elles ne garantissent pas une expertise dans toutes les spécialités."});

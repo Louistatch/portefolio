@@ -34,6 +34,7 @@ const SECTIONS: Section[] = [
     titre: "Academy",
     items: [
       { href: `${ADMIN_BASE}/students`, label: "Étudiants", icon: GraduationCap, badge: "emailsNonVerifies" },
+      { href: `${ADMIN_BASE}/projects`, label: "Projets professionnels", icon: FileText },
       { href: `${ADMIN_BASE}/courses`, label: "Cours", icon: Library },
       { href: `${ADMIN_BASE}/student-messages`, label: "Écrire à un étudiant", icon: Send },
       { href: `${ADMIN_BASE}/ambassadors`, label: "Programme ambassadeur", icon: Megaphone },
