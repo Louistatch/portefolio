@@ -32,6 +32,8 @@ export type ConstatRetard = {
   leconsEnRetard: number;
   /** Fin de la fenêtre d'admission, si connue (ISO). */
   finAdmission?: string | null;
+  /** La plus ancienne échéance non tenue — c'est elle que le bouton d'action rouvre. */
+  prochaineLecon?: { courseId: number; lessonId: number } | null;
   /** Pour les tests : instant de référence. */
   maintenant?: number;
 };
@@ -115,7 +117,15 @@ export function alerteDeRetard(c: ConstatRetard): Alerte | null {
   const fin = c.finAdmission ? jourMois(c.finAdmission) : null;
   const enRetard = pluriel(c.leconsEnRetard, "leçon en retard", "leçons en retard");
 
-  const action = { libelle: "Reprendre ma prochaine leçon", href: "/academy/dashboard" };
+  // Vers la leçon en retard elle-même, pas vers le tableau de bord : l'alerte s'affiche
+  // déjà là, et un lien vers la page courante ne produit aucune navigation — le clic
+  // paraît alors ne rien faire.
+  const action = {
+    libelle: "Reprendre ma prochaine leçon",
+    href: c.prochaineLecon
+      ? `/academy/classroom/${c.prochaineLecon.courseId}?lesson=${c.prochaineLecon.lessonId}`
+      : "/academy/dashboard",
+  };
 
   if (niveau === "rappel") {
     return {

@@ -3262,6 +3262,7 @@ async function corpsAlertesDeRetard(): Promise<Record<string, unknown>> {
       jours: c.joursDeRetard,
       leconsEnRetard: c.leconsEnRetard,
       finAdmission: c.finAdmission,
+      prochaineLecon: c.prochaineLecon,
     });
     if (!alerte) { ignorees++; continue; }
 
@@ -5675,7 +5676,7 @@ async function constatDeRetard() {
   if (!admis?.length) return [];
 
   const lp = lire(await supabase.from("lesson_progress")
-    .select("student_id, course_id, status, due_at"), "des plannings de leçons");
+    .select("student_id, course_id, lesson_id, status, due_at"), "des plannings de leçons");
 
   // Ne compter que les leçons des parcours auxquels l'étudiant est admis.
   //
@@ -5711,9 +5712,12 @@ async function constatDeRetard() {
       return prog == null || siens.has(prog);
     });
     const enRetard = siennes.filter((l: any) => l.status !== "completed" && new Date(l.due_at).getTime() < now);
-    const jours = enRetard.length
-      ? Math.floor(Math.max(...enRetard.map((l: any) => now - new Date(l.due_at).getTime())) / JOUR_MS)
-      : 0;
+    // La plus ancienne échéance non tenue : elle mesure le retard, et c'est vers elle que
+    // le bouton « Reprendre » de l'alerte (écran comme email) doit renvoyer.
+    const plusAncienne = enRetard.length
+      ? enRetard.reduce((a: any, b: any) => new Date(a.due_at).getTime() < new Date(b.due_at).getTime() ? a : b)
+      : null;
+    const jours = plusAncienne ? Math.floor((now - new Date(plusAncienne.due_at).getTime()) / JOUR_MS) : 0;
     return {
       id: s.id,
       nom: (s.full_name || "").trim() || s.email,
@@ -5729,6 +5733,7 @@ async function constatDeRetard() {
       emailsCours: s.course_emails !== false,
       joursDeRetard: jours,
       aExclure: jours > RETARD_EXCLUSION_JOURS,
+      prochaineLecon: plusAncienne ? { courseId: plusAncienne.course_id, lessonId: plusAncienne.lesson_id } : null,
     };
   }).sort((a, b) => b.joursDeRetard - a.joursDeRetard);
 }

@@ -123,8 +123,13 @@ export function constatDepuisPlanning(
     (l: any) => l?.status !== "completed" && l?.due_at && new Date(l.due_at).getTime() < now,
   );
   if (!enRetard.length) return null;
-  const jours = Math.floor(
-    Math.max(...enRetard.map((l: any) => now - new Date(l.due_at).getTime())) / 86400000,
-  );
-  return { jours, leconsEnRetard: enRetard.length, finAdmission: finAdmission ?? null };
+  // La plus ancienne échéance non tenue : c'est elle qui mesure le retard, et c'est donc
+  // elle que le bouton « Reprendre » doit rouvrir.
+  const plusAncienne = enRetard.reduce((a: any, b: any) =>
+    new Date(a.due_at).getTime() < new Date(b.due_at).getTime() ? a : b);
+  const jours = Math.floor((now - new Date(plusAncienne.due_at).getTime()) / 86400000);
+  return {
+    jours, leconsEnRetard: enRetard.length, finAdmission: finAdmission ?? null,
+    prochaineLecon: { courseId: plusAncienne.course_id, lessonId: plusAncienne.lesson_id },
+  };
 }
