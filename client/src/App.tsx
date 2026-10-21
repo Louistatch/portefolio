@@ -18,6 +18,7 @@ const Publications = lazy(() => import("@/pages/publications"));
 const FAQ = lazy(() => import("@/pages/faq"));
 const Booking = lazy(() => import("@/pages/booking"));
 const Contact = lazy(() => import("@/pages/contact"));
+const Privacy = lazy(() => import("@/pages/privacy"));
 const ELearning = lazy(() => import("@/pages/elearning"));
 
 // LouisFarm Learning
@@ -178,6 +179,7 @@ function App() {
             <Route path="/faq">{() => <Layout><FAQ /></Layout>}</Route>
             <Route path="/booking">{() => <Layout><Booking /></Layout>}</Route>
             <Route path="/contact">{() => <Layout><Contact /></Layout>}</Route>
+            <Route path="/privacy">{() => <Layout><Privacy /></Layout>}</Route>
             <Route path="/stats">{() => <Layout><Stats /></Layout>}</Route>
             <Route path="/elearning">{() => <Layout><ELearning /></Layout>}</Route>
             {/* L'article AVANT l'index : wouter sert la première route qui correspond, et

@@ -1294,7 +1294,7 @@ export default function ELearning() {
               <Download className="w-3.5 h-3.5" /> Télécharger le livret
             </span>
           </a>
-          <Button variant="outline" onClick={() => setView("landing")}>Retour a l'accueil</Button>
+          <Button variant="outline" onClick={() => setView("landing")}>Retour à l'accueil</Button>
         </div>
       );
     }
@@ -1303,13 +1303,17 @@ export default function ELearning() {
       <div className="max-w-2xl mx-auto px-6 py-12 text-center">
         <div className={`w-28 h-28 rounded-full mx-auto mb-6 flex flex-col items-center justify-center border-4 ${passed ? "border-primary" : "border-destructive"}`}>
           <span className="text-3xl font-black">{score}</span>
-          <span className="text-xs text-muted-foreground">sur 30</span>
+          <span className="text-xs text-muted-foreground">sur {BANQUE.length}</span>
         </div>
-        <h2 className="text-2xl font-bold mb-3">{passed ? "🎉 Félicitations !" : "📚 Continue à réviser"}</h2>
+        <h2 className="text-2xl font-bold mb-3 flex items-center justify-center gap-2.5">
+          {passed
+            ? <><GraduationCap className="w-6 h-6 text-primary shrink-0" aria-hidden="true" />Félicitations</>
+            : <><BookOpen className="w-6 h-6 text-muted-foreground shrink-0" aria-hidden="true" />Continuez à réviser</>}
+        </h2>
         <p className="text-muted-foreground mb-8 font-serif">
           {passed
-            ? "Score : " + pct + "% — Vous etes admis(e) ! Votre attestation d\u0027admission (valable 3 mois) est disponible. Une lecon se debloque chaque semaine."
-            : "Score : " + pct + "% — Score requis : 70% (21/30). Vous pourrez repasser le test dans une semaine."}
+            ? `Score : ${pct} % — vous êtes admis(e). Votre attestation d'admission (valable 3 mois) est disponible, et une leçon se débloque chaque semaine.`
+            : `Score : ${pct} % — score requis : ${Math.round((SEUIL / BANQUE.length) * 100)} % (${SEUIL}/${BANQUE.length}). Vous pourrez repasser le test dans une semaine.`}
         </p>
         {/* Non admis : plutôt que de renvoyer réviser sans rien, on donne le support. */}
         {!passed && (
@@ -1352,7 +1356,7 @@ export default function ELearning() {
                   <Download className="w-4 h-4" /> Mon attestation
                 </Button>
               </>
-            : <Button size="lg" className="gap-2" onClick={() => setView("landing")}>Retour a l'accueil</Button>}
+            : <Button size="lg" className="gap-2" onClick={() => setView("landing")}>Retour à l'accueil</Button>}
         </div>
 
 
