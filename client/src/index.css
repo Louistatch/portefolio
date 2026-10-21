@@ -39,7 +39,10 @@
     --accent: 152 76% 36%;
     --accent-foreground: 222 47% 11%;
     
-    --destructive: 0 84% 60%;
+    /* 60% de clarte donnait 3,78:1 sur blanc, que le rouge serve de texte (« Deconnexion »,
+       messages d'erreur) ou de fond a du texte blanc : sous le seuil dans les deux sens.
+       48% en donne 4,87. Le mode sombre, a 0 62% 30%, n'est pas concerne. */
+    --destructive: 0 84% 48%;
     --destructive-foreground: 210 40% 98%;
     
     --border: 214 32% 91%;

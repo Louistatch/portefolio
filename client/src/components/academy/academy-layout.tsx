@@ -209,10 +209,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
         </Link>
       </div>
 
-      {/* min-h-0 : sans lui, `min-height: auto` empêche un enfant de colonne flex de
-          descendre sous la hauteur de son contenu, donc overflow-y-auto ne défilait pas —
-          la navigation débordait et le bloc du bas se peignait par-dessus « Ressources ». */}
-      <nav className="flex-1 min-h-0 overflow-y-auto px-3 space-y-0.5">
+      <nav className="flex-1 overflow-y-auto px-3 space-y-0.5">
         {navItems.map(item => {
           const actif = item.exact ? location === item.href : false;
           return (
@@ -243,6 +240,12 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
+      {/* shrink-0 : par défaut un enfant de colonne flex est compressible. Ce bloc-ci —
+          carte de niveau, identité, aide — mesure environ 250 px ; quand la navigation
+          au-dessus devenait trop haute, il était écrasé sous sa taille de contenu et
+          débordait par-dessus la dernière entrée du menu (« Ressources » passait dessous).
+          Le bloc équivalent du gabarit d'administration n'a jamais montré le défaut : il
+          ne fait que deux lignes, donc il n'y avait rien à écraser. */}
       <div className="p-3 space-y-2 shrink-0">
         {bord?.xp && (
           <div className="rounded-2xl bg-primary/5 border border-primary/15 p-3">
