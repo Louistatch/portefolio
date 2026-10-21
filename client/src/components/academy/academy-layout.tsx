@@ -45,6 +45,30 @@ const BAS: Item[] = [
   { href: "/academy/profile", label: "Mon profil", icon: UserCircle, exact: true },
 ];
 
+/**
+ * Le libellé du fil d'Ariane, déduit de l'adresse.
+ *
+ * Il venait d'une cascade de conditions qui retombait sur « Page » : Mes notes, les six
+ * pages de parcours, le programme ambassadeur, un quiz ou un paiement affichaient donc tous
+ * « Mon espace › Page ». La liste de navigation porte déjà le nom de chacune de ces pages —
+ * on la lit, plutôt que d'entretenir une seconde liste qui oublie la moitié des écrans.
+ */
+function filDAriane(chemin: string): string {
+  if (chemin.startsWith("/academy/classroom")) return "Salle de cours";
+  if (chemin.startsWith("/academy/live")) return "Rencontre en ligne";
+  if (chemin.startsWith("/academy/quiz")) return "Quiz de leçon";
+  if (chemin.startsWith("/academy/paiement")) return "Paiement de l'attestation";
+  if (chemin.startsWith("/academy/test")) return "Test d'admission";
+  if (chemin.startsWith("/academy/verify")) return "Vérification";
+
+  // Le plus long préfixe qui corresponde : /academy/parcours/data l'emporte sur /academy.
+  const connu = [...NAV, ...BAS]
+    .map(i => ({ ...i, base: i.href.split("#")[0] }))
+    .filter(i => chemin === i.base)
+    .sort((a, b) => b.base.length - a.base.length)[0];
+  return connu?.label ?? "Mon espace";
+}
+
 function initiales(nom?: string | null) {
   return (nom || "")
     .split(" ").filter(Boolean).map(m => m[0]).slice(0, 2).join("").toUpperCase() || "ET";
@@ -190,12 +214,15 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
           const actif = item.exact ? location === item.href : false;
           return (
             <Link key={item.href} href={item.href}
+              title={item.label}
               className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
                 actif ? "bg-primary/10 text-primary font-medium"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}>
               <item.icon className="w-4 h-4 shrink-0" />
-              <span className="truncate">{item.label}</span>
+              {/* Deux lignes plutôt qu'une ellipse : « Finance climatique agric… » et
+                  « Coopératives et organisa… » ne se distinguaient plus de leur voisin. */}
+              <span className="line-clamp-2 leading-snug">{item.label}</span>
             </Link>
           );
         })}
@@ -328,13 +355,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
             <div className="px-4 sm:px-6 pb-2.5 -mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <Link href="/academy/dashboard" className="hover:text-foreground">Mon espace</Link>
               <ChevronRight className="w-3 h-3" />
-              <span className="text-foreground font-medium">
-                {location.startsWith("/academy/classroom") ? "Salle de cours"
-                  : location === "/academy/group-work" ? "Travaux de groupe"
-                  : location === "/academy/profile" ? "Mon profil"
-                  : location === "/academy/certifications" ? "Certifications"
-                  : location.startsWith("/academy/live") ? "Rencontre en ligne" : "Page"}
-              </span>
+              <span className="text-foreground font-medium">{filDAriane(location)}</span>
             </div>
           )}
         </header>
