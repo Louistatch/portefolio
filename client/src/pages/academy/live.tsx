@@ -324,11 +324,11 @@ export default function AcademyLive() {
           <AlertCircle className="w-7 h-7 text-red-400" />
         </div>
         <p className="font-semibold mb-4">{error}</p>
-        <Link href="/academy/dashboard">
-          <Button variant="outline" size="sm" className="gap-2 bg-white/5 border-white/15 text-slate-200 hover:bg-white/10 hover:text-white">
-            <ArrowLeft className="w-4 h-4" /> Retour au tableau de bord
-          </Button>
-        </Link>
+        <Button asChild variant="outline" size="sm" className="gap-2 bg-white/5 border-white/15 text-slate-200 hover:bg-white/10 hover:text-white">
+          <Link href="/academy/dashboard">
+            <ArrowLeft className="w-4 h-4" aria-hidden="true" /> Retour au tableau de bord
+          </Link>
+        </Button>
       </div>
     </div>
   );

@@ -110,7 +110,7 @@ export default function VerifyCertificate() {
       )}
 
       <div className="text-center mt-8">
-        <Link href="/elearning"><Button variant="outline" size="sm">Découvrir LouisFarm Learning</Button></Link>
+        <Button asChild variant="outline" size="sm"><Link href="/elearning">Découvrir LouisFarm Learning</Link></Button>
       </div>
     </div>
   );

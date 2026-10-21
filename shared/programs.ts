@@ -77,7 +77,12 @@ export const PROGRAMS: Program[] = [
     subtitle: "Trois projets terrain, de la collecte au rapport automatisé",
     credential: "Certificat Super-Expert MEAL",
     outcome: "Concevoir une collecte, cartographier les résultats, automatiser le reporting.",
-    accent: "#0d9488",
+    // Un cran plus foncé que le teal-600 d'origine (#0d9488). Cet accent ne sert pas qu'à
+    // colorer un trait : il est écrit, en 10 à 14 px, sur les codes de cours, les notes et
+    // les pourcentages. À #0d9488 il donnait 3,74:1 sur blanc, sous le seuil de 4,5 — et
+    // c'était le seul des sept accents à échouer, les six autres tenant de 5,0 à 10,4:1.
+    // #0f766e en donne 5,47 et garde la teinte.
+    accent: "#0f766e",
     lessonsPerWeek: 2,
     // Gratuite, et elle le reste : ce parcours a été publié sous la promesse
     // « c'est gratuit, et ça le restera ».

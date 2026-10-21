@@ -463,9 +463,11 @@ export default function AdminStudents() {
                               {cert.expires_at && <p className="text-[11px] text-muted-foreground">Valable jusqu'au {new Date(cert.expires_at).toLocaleDateString("fr-FR")}</p>}
                             </div>
                           </div>
-                          <a href={cert.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                            <Button size="sm" className="gap-1.5 h-8"><Download className="w-3.5 h-3.5" /> Ouvrir</Button>
-                          </a>
+                          <Button asChild size="sm" className="gap-1.5 h-8 shrink-0">
+                            <a href={cert.url} target="_blank" rel="noopener noreferrer">
+                              <Download className="w-3.5 h-3.5" aria-hidden="true" /> Ouvrir
+                            </a>
+                          </Button>
                         </div>
                       ))}
                     </div>

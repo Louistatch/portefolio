@@ -28,7 +28,12 @@
     --secondary-foreground: 210 40% 98%;
     
     --muted: 210 40% 96%;
-    --muted-foreground: 215 16% 47%;
+    /* 47% de clarté donnait 4,70:1 sur blanc pur — au-dessus du seuil de 4,5, mais sans
+       marge : posé sur une carte teintée (bg-muted, bg-primary/5) ou atténué d'un cran, le
+       même gris retombait à 4,3:1 voire 3,7:1 sur des mentions de 10 à 12 px. 43% tient
+       5,4:1 sur blanc, ce qui laisse de quoi absorber ces fonds. Le mode sombre, lui,
+       était déjà à 7,3:1 et ne bouge pas. */
+    --muted-foreground: 215 16% 43%;
     
     /* Accent: A vibrant, clear green for highlights */
     --accent: 152 76% 36%;

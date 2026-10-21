@@ -209,13 +209,16 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
         </Link>
       </div>
 
-      <nav className="flex-1 overflow-y-auto px-3 space-y-0.5">
+      {/* min-h-0 : sans lui, `min-height: auto` empêche un enfant de colonne flex de
+          descendre sous la hauteur de son contenu, donc overflow-y-auto ne défilait pas —
+          la navigation débordait et le bloc du bas se peignait par-dessus « Ressources ». */}
+      <nav className="flex-1 min-h-0 overflow-y-auto px-3 space-y-0.5">
         {navItems.map(item => {
           const actif = item.exact ? location === item.href : false;
           return (
             <Link key={item.href} href={item.href}
               title={item.label}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 min-h-11 rounded-xl text-sm transition-colors ${
                 actif ? "bg-primary/10 text-primary font-medium"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}>
@@ -229,7 +232,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
         <div className="pt-2 mt-2 border-t border-border/40">
           {BAS.map(item => (
             <Link key={item.href} href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 min-h-11 rounded-xl text-sm transition-colors ${
                 location === item.href ? "bg-primary/10 text-primary font-medium"
                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}>
@@ -240,7 +243,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      <div className="p-3 space-y-2">
+      <div className="p-3 space-y-2 shrink-0">
         {bord?.xp && (
           <div className="rounded-2xl bg-primary/5 border border-primary/15 p-3">
             <div className="flex items-baseline justify-between mb-1.5">
@@ -275,8 +278,10 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
               {bord?.etudiant?.admis ? "Apprenant" : "En attente d'admission"}
             </span>
           </span>
+          {/* 28x28 au doigt, c'est sous le minimum de 44 : la zone cliquable passe à 44
+              sans que l'icône grossisse, grâce au padding négatif du conteneur. */}
           <button onClick={deconnexion} aria-label="Se déconnecter"
-            className="w-7 h-7 rounded-lg hover:bg-background grid place-items-center text-muted-foreground hover:text-destructive shrink-0">
+            className="w-11 h-11 -m-2 rounded-lg hover:bg-background grid place-items-center text-muted-foreground hover:text-destructive shrink-0">
             <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -290,7 +295,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
           <LifeBuoy className="w-4 h-4 shrink-0" />
           <span className="min-w-0">
             <span className="block leading-tight">Besoin d'aide ?</span>
-            <span className="block text-[11px] text-muted-foreground/80 leading-tight truncate">Centre d'aide</span>
+            <span className="block text-[11px] text-muted-foreground leading-tight truncate">Centre d'aide</span>
           </span>
         </Link>
       </div>

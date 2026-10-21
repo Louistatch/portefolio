@@ -416,11 +416,11 @@ function CarteRencontre({ m, onStatus, onDelete, toast, past }: any) {
           onClick={() => { navigator.clipboard.writeText(joinUrl); toast({ title: "Lien copié" }); }}>
           <Copy className="w-3.5 h-3.5" />
         </Button>
-        <a href={joinUrl} target="_blank" rel="noopener noreferrer">
-          <Button size="sm" variant="ghost" className="h-8 w-8 p-0" title="Ouvrir la salle">
-            <ExternalLink className="w-3.5 h-3.5" />
-          </Button>
-        </a>
+        <Button asChild size="sm" variant="ghost" className="h-8 w-8 p-0">
+          <a href={joinUrl} target="_blank" rel="noopener noreferrer" aria-label="Ouvrir la salle de réunion">
+            <ExternalLink className="w-3.5 h-3.5" aria-hidden="true" />
+          </a>
+        </Button>
         {!past && (enDirect
           ? <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={() => onStatus("ended")}>
               <Square className="w-3.5 h-3.5" /> Terminer
