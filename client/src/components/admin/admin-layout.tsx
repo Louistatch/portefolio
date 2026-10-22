@@ -296,7 +296,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-20 bg-background/85 backdrop-blur border-b border-border/50">
           <div className="flex items-center gap-3 px-4 sm:px-6 h-16">
             <button onClick={() => setMenuOuvert(true)} aria-label="Ouvrir le menu"
-              className="lg:hidden w-9 h-9 rounded-lg hover:bg-muted grid place-items-center shrink-0">
+              className="lg:hidden w-11 h-11 -ml-1.5 rounded-lg hover:bg-muted grid place-items-center shrink-0">
               <Menu className="w-5 h-5" />
             </button>
 
@@ -312,12 +312,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <div className="ml-auto flex items-center gap-1 shrink-0">
               <button onClick={basculerTheme}
                 aria-label={sombre ? "Passer en thème clair" : "Passer en thème sombre"}
-                className="w-9 h-9 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-foreground">
+                className="w-11 h-11 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-foreground">
                 {sombre ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
               </button>
 
               <Link href={`${ADMIN_BASE}/messages`} aria-label="Notifications"
-                className="relative w-9 h-9 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-foreground">
+                className="relative w-11 h-11 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-foreground">
                 <Bell className="w-[18px] h-[18px]" />
                 {(badges?.total ?? 0) > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold grid place-items-center">
