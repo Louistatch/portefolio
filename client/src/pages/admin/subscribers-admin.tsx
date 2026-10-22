@@ -154,7 +154,7 @@ export default function AdminSubscribers() {
                   </td>
                   <td className="p-3"><span className="text-xs px-2 py-0.5 bg-muted rounded-full">{s.source}</span></td>
                   <td className="p-3">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.status === "active" ? "bg-emerald-500/10 text-emerald-600" : "bg-orange-500/10 text-orange-600"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${s.status === "active" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-orange-500/10 text-orange-700 dark:text-orange-400"}`}>
                       {s.status === "active" ? "Actif" : "Désabonné"}
                     </span>
                   </td>
@@ -162,11 +162,11 @@ export default function AdminSubscribers() {
                   <td className="p-3 text-right">
                     <div className="flex gap-1 justify-end">
                       {s.status === "active" ? (
-                        <Button variant="ghost" size="sm" className="text-orange-600 h-7 text-xs" onClick={() => updateStatus.mutate({ id: s.id, status: "unsubscribed" })}>Désabonner</Button>
+                        <Button variant="ghost" size="sm" className="text-orange-700 dark:text-orange-400 h-7 text-xs" onClick={() => updateStatus.mutate({ id: s.id, status: "unsubscribed" })}>Désabonner</Button>
                       ) : (
-                        <Button variant="ghost" size="sm" className="text-emerald-600 h-7 text-xs" onClick={() => updateStatus.mutate({ id: s.id, status: "active" })}>Réactiver</Button>
+                        <Button variant="ghost" size="sm" className="text-emerald-700 dark:text-emerald-400 h-7 text-xs" onClick={() => updateStatus.mutate({ id: s.id, status: "active" })}>Réactiver</Button>
                       )}
-                      <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => { if (confirm("Supprimer ?")) del.mutate(s.id); }}><Trash2 className="w-3 h-3" /></Button>
+                      <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" aria-label={`Supprimer l'abonné ${s.email}`} onClick={() => { if (confirm(`Supprimer l'abonné ${s.email} ?`)) del.mutate(s.id); }}><Trash2 className="w-3 h-3" /></Button>
                     </div>
                   </td>
                 </tr>

@@ -116,7 +116,7 @@ export default function AmbassadorsAdmin() {
           <p className="text-xs text-muted-foreground">Ambassadeurs</p>
         </div>
         <div className="bg-card rounded-2xl border border-border/50 p-4">
-          <Wallet className="w-4 h-4 text-amber-600 mb-1.5" />
+          <Wallet className="w-4 h-4 text-amber-700 dark:text-amber-400 mb-1.5" />
           <p className="text-2xl font-bold">{totalEnAttente.toLocaleString("fr-FR")} F</p>
           <p className="text-xs text-muted-foreground">En attente de versement</p>
         </div>
@@ -137,7 +137,7 @@ export default function AmbassadorsAdmin() {
               <span className="text-xs bg-muted px-2 py-1 rounded-full shrink-0">{a.nbFilleuls} filleul{a.nbFilleuls > 1 ? "s" : ""}</span>
               <span className="text-xs font-semibold text-primary shrink-0">{a.totalGagne.toLocaleString("fr-FR")} F gagnés</span>
               {a.enAttente > 0 && (
-                <span className="text-xs font-semibold text-amber-600 dark:text-amber-400 shrink-0">{a.enAttente.toLocaleString("fr-FR")} F en attente</span>
+                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 shrink-0">{a.enAttente.toLocaleString("fr-FR")} F en attente</span>
               )}
             </div>
           ))}
@@ -163,7 +163,7 @@ export default function AmbassadorsAdmin() {
             <div className="divide-y divide-border/30">
               {(commissions || []).map(c => (
                 <div key={c.id} className="flex items-center gap-3 px-4 py-3 flex-wrap">
-                  <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full shrink-0 ${c.status === "payee" ? "bg-primary/10 text-primary" : "bg-amber-500/10 text-amber-600 dark:text-amber-400"}`}>
+                  <span className={`inline-flex items-center gap-1 text-[10px] font-medium px-2 py-1 rounded-full shrink-0 ${c.status === "payee" ? "bg-primary/10 text-primary" : "bg-amber-500/10 text-amber-700 dark:text-amber-400"}`}>
                     {c.status === "payee" ? <CheckCircle2 className="w-3 h-3" /> : <Clock className="w-3 h-3" />}
                     {c.status === "payee" ? "payée" : "en attente"}
                   </span>

@@ -316,7 +316,7 @@ function PanneauDetail({ groupe, travaux, onCorrige }:
         <ChevronDown className={`w-3.5 h-3.5 transition-transform ${ouvert ? "rotate-180" : ""}`} />
         {ouvert ? "Masquer le détail" : "Rendus, notation et évaluations par les pairs"}
         {aCorriger > 0 && (
-          <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600">
+          <span className="ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400">
             {aCorriger} à corriger
           </span>
         )}
@@ -401,7 +401,7 @@ function LigneRendu({ travail, rendu, pairs, onCorrige }:
           </span>
         )}
         <span className={`ml-auto text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-          corrige ? "bg-primary text-white" : "bg-amber-500/15 text-amber-600"}`}>
+          corrige ? "bg-primary text-white" : "bg-amber-500/15 text-amber-700 dark:text-amber-400"}`}>
           {corrige ? `${rendu.note}/${travail.maxScore}` : "à corriger"}
         </span>
         <button onClick={() => setOuvert(v => !v)}
@@ -836,7 +836,7 @@ function Retardataires() {
                     {e.joursDeRetard === 0
                       ? <span className="text-xs text-muted-foreground">à jour</span>
                       : <span className={`text-xs font-semibold inline-flex items-center gap-1 ${
-                          e.aExclure ? "text-destructive" : "text-amber-600"}`}>
+                          e.aExclure ? "text-destructive" : "text-amber-700 dark:text-amber-400"}`}>
                           <Clock className="w-3 h-3" />{e.joursDeRetard} j
                         </span>}
                   </td>

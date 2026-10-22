@@ -67,9 +67,9 @@ export default function AdminComments() {
   };
 
   const statusClass = (status: string) => {
-    if (status === "approved") return "bg-emerald-500/10 text-emerald-600";
+    if (status === "approved") return "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400";
     if (status === "rejected") return "bg-red-500/10 text-red-600";
-    return "bg-amber-500/10 text-amber-600";
+    return "bg-amber-500/10 text-amber-700 dark:text-amber-400";
   };
 
   const FILTERS: { key: Filter; label: string }[] = [
@@ -84,7 +84,7 @@ export default function AdminComments() {
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-3xl font-bold">Modération Commentaires</h1>
         {pendingCount > 0 && (
-          <span className="text-sm px-3 py-1 bg-amber-500/10 text-amber-600 rounded-full font-medium">{pendingCount} en attente</span>
+          <span className="text-sm px-3 py-1 bg-amber-500/10 text-amber-700 dark:text-amber-400 rounded-full font-medium">{pendingCount} en attente</span>
         )}
       </div>
 
@@ -148,7 +148,7 @@ export default function AdminComments() {
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap mb-3">{c.content}</p>
                   <div className="flex gap-2">
                     {c.status !== "approved" && (
-                      <Button size="sm" variant="outline" className="h-7 text-xs text-emerald-600 border-emerald-200 hover:bg-emerald-50" onClick={() => setStatus.mutate({ id: c.id, status: "approved" })}>
+                      <Button size="sm" variant="outline" className="h-7 text-xs text-emerald-700 dark:text-emerald-400 border-emerald-200 hover:bg-emerald-50" onClick={() => setStatus.mutate({ id: c.id, status: "approved" })}>
                         <CheckCircle2 className="w-3 h-3 mr-1" /> Approuver
                       </Button>
                     )}

@@ -55,7 +55,7 @@ export default function AdminPosts() {
         <div className="bg-card p-6 rounded-2xl border border-border/50 mb-8 space-y-4">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-bold">{editing === "new" ? "New Post" : "Edit Post"}</h2>
-            <Button variant="ghost" size="icon" onClick={() => setEditing(null)}><X className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Fermer l'éditeur" onClick={() => setEditing(null)}><X className="w-4 h-4" aria-hidden="true" /></Button>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div><label className="text-sm font-medium mb-1 block">Title</label>
@@ -109,8 +109,8 @@ export default function AdminPosts() {
                   </td>
                   <td className="p-4 text-right">
                     <div className="flex gap-2 justify-end">
-                      <Button variant="ghost" size="icon" onClick={() => startEdit(post)}><Edit className="w-4 h-4" /></Button>
-                      <Button variant="ghost" size="icon" className="text-destructive" onClick={() => { if (confirm("Delete this post?")) deleteMutation.mutate(post.id); }}><Trash2 className="w-4 h-4" /></Button>
+                      <Button variant="ghost" size="icon" aria-label={`Modifier « ${post.title} »`} onClick={() => startEdit(post)}><Edit className="w-4 h-4" aria-hidden="true" /></Button>
+                      <Button variant="ghost" size="icon" className="text-destructive" aria-label={`Supprimer « ${post.title} »`} onClick={() => { if (confirm(`Supprimer l'article « ${post.title} » ? Cette action est irréversible.`)) deleteMutation.mutate(post.id); }}><Trash2 className="w-4 h-4" /></Button>
                     </div>
                   </td>
                 </tr>

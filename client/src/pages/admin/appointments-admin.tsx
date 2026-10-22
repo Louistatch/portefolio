@@ -42,8 +42,8 @@ export default function AdminAppointments() {
                 <p className="text-xs text-muted-foreground mt-1">{a.date ? format(new Date(a.date), "PPP") : ""}</p>
               </div>
               <div className="flex gap-2">
-                <Button size="sm" variant="outline" className="gap-1 text-green-600" onClick={() => updateStatus.mutate({ id: a.id, status: "confirmed" })}><CheckCircle2 className="w-3 h-3" /> Confirm</Button>
-                <Button size="sm" variant="outline" className="gap-1 text-amber-600" onClick={() => updateStatus.mutate({ id: a.id, status: "pending" })}><Clock className="w-3 h-3" /> Pending</Button>
+                <Button size="sm" variant="outline" className="gap-1 text-green-700 dark:text-green-400" onClick={() => updateStatus.mutate({ id: a.id, status: "confirmed" })}><CheckCircle2 className="w-3 h-3" /> Confirm</Button>
+                <Button size="sm" variant="outline" className="gap-1 text-amber-700 dark:text-amber-400" onClick={() => updateStatus.mutate({ id: a.id, status: "pending" })}><Clock className="w-3 h-3" /> Pending</Button>
                 <Button size="sm" variant="outline" className="gap-1 text-red-600" onClick={() => updateStatus.mutate({ id: a.id, status: "cancelled" })}><XCircle className="w-3 h-3" /> Cancel</Button>
                 <Button size="sm" variant="ghost" className="text-destructive" onClick={() => { if (confirm("Delete?")) del.mutate(a.id); }}><Trash2 className="w-3 h-3" /></Button>
               </div>

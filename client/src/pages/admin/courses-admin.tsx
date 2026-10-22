@@ -327,9 +327,9 @@ function VueCours({ cours, onRetour, onEditerCours, dialogueCours, onFermerDialo
                 </button>
                 <div className="flex items-center gap-1 shrink-0">
                   <Button size="icon" variant="ghost" aria-label={`Modifier la leçon « ${l.title} »`} onClick={() => setLeconOuverte(l)}><Pencil className="w-4 h-4" aria-hidden="true" /></Button>
-                  <Button size="icon" variant="ghost" onClick={() => {
+                  <Button size="icon" variant="ghost" aria-label={`Supprimer la leçon « ${l.title} »`} onClick={() => {
                     if (confirm(`Supprimer la leçon « ${l.title} » ?`)) supprimerLecon.mutate(l.id);
-                  }}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  }}><Trash2 className="w-4 h-4 text-destructive" aria-hidden="true" /></Button>
                 </div>
               </div>
             );
@@ -625,9 +625,9 @@ function EditeurParametres({ cellule, onChange }: { cellule: CelluleExercise; on
             onChange={e => majParametre(i, { max: Number(e.target.value) })} />
           <Input type="number" placeholder="décimales" value={p.decimales ?? 0}
             onChange={e => majParametre(i, { decimales: Number(e.target.value) })} />
-          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0"
+          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" aria-label={`Supprimer le paramètre ${i + 1}`}
             onClick={() => onChange({ ...cellule, parametres: parametres.filter((_, j) => j !== i) })}>
-            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+            <Trash2 className="w-3.5 h-3.5 text-destructive" aria-hidden="true" />
           </Button>
         </div>
       ))}

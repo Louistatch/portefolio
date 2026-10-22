@@ -205,11 +205,11 @@ export default function AdminNewsletter() {
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.status === "sent" ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"}`}>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${c.status === "sent" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-amber-500/10 text-amber-700 dark:text-amber-400"}`}>
                       {c.status === "sent" ? "Envoyée" : "Brouillon"}
                     </span>
                     <span className="text-xs text-muted-foreground">{c.created_at ? format(new Date(c.created_at), "d MMM yyyy", { locale: fr }) : ""}</span>
-                    {c.sent_at && <span className="text-xs text-emerald-600">Envoyée le {format(new Date(c.sent_at), "d MMM yyyy HH:mm", { locale: fr })}</span>}
+                    {c.sent_at && <span className="text-xs text-emerald-700 dark:text-emerald-400">Envoyée le {format(new Date(c.sent_at), "d MMM yyyy HH:mm", { locale: fr })}</span>}
                   </div>
                   <h3 className="text-lg font-bold mb-1">{c.subject}</h3>
                   <p className="text-sm text-muted-foreground line-clamp-2">{c.content}</p>
@@ -260,7 +260,7 @@ export default function AdminNewsletter() {
 
               {/* Stats */}
               <div className="flex items-center gap-4 p-3 bg-amber-50 dark:bg-amber-950/20 rounded-xl border border-amber-200 dark:border-amber-800/30">
-                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0" />
+                <AlertTriangle className="w-5 h-5 text-amber-700 dark:text-amber-400 shrink-0" />
                 <div className="text-sm">
                   <p className="font-medium text-amber-800 dark:text-amber-200">
                     {countFor(sendDialog)} destinataire{countFor(sendDialog) > 1 ? "s" : ""}
@@ -268,7 +268,7 @@ export default function AdminNewsletter() {
                       ? ` du groupe « ${sendDialog.target_source} »`
                       : " (tous les abonnés actifs)"}
                   </p>
-                  <p className="text-amber-600 dark:text-amber-400 text-xs mt-0.5">Cette action est irréversible.</p>
+                  <p className="text-amber-700 dark:text-amber-400 text-xs mt-0.5">Cette action est irréversible.</p>
                 </div>
               </div>
             </div>
