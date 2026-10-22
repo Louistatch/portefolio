@@ -513,23 +513,30 @@ export function CredentialCard({ cred }: { cred: Cred }) {
           )}
           <span className="text-muted-foreground truncate">{issued}</span>
         </div>
+        {/* asChild plutôt qu'un Button enveloppé dans un <a> : un <button> imbriqué dans un
+            lien est du HTML invalide, et la cible du clavier devenait ambiguë. */}
         <div className="flex gap-1.5">
           {cred.download_url && (
-            <a href={`${cred.download_url}`} target="_blank" rel="noopener noreferrer" className="flex-1">
-              <Button size="sm" variant="outline" className="gap-1.5 h-8 text-xs w-full"><Download className="w-3.5 h-3.5" /> PDF</Button>
-            </a>
+            <Button asChild size="sm" variant="outline" className="gap-1.5 h-9 text-xs flex-1">
+              <a href={`${cred.download_url}`} target="_blank" rel="noopener noreferrer">
+                <Download className="w-3.5 h-3.5" aria-hidden="true" /> PDF
+              </a>
+            </Button>
           )}
           {cred.certificate_no && (
-            <a href={`/academy/verify-certificate/${cred.certificate_no}`} target="_blank" rel="noopener noreferrer">
-              <Button size="sm" variant="ghost" className="h-8 px-2.5" title="Page de vérification publique">
-                <ShieldCheck className="w-3.5 h-3.5" />
-              </Button>
-            </a>
+            <Button asChild size="sm" variant="ghost" className="h-9 px-3">
+              <a href={`/academy/verify-certificate/${cred.certificate_no}`} target="_blank" rel="noopener noreferrer"
+                aria-label="Ouvrir la page de vérification publique de ce certificat">
+                <ShieldCheck className="w-3.5 h-3.5" aria-hidden="true" />
+              </a>
+            </Button>
           )}
         </div>
       </div>
+      {/* Le numéro est ce qu'on recopie pour faire vérifier son certificat : il était la
+          mention la MOINS lisible de la carte (9 px à 60 % d'opacité, soit 2,3:1). */}
       {cred.certificate_no && (
-        <div className="px-5 pb-3"><p className="text-[9px] font-mono text-muted-foreground/60">N° {cred.certificate_no}</p></div>
+        <div className="px-5 pb-3"><p className="text-[11px] font-mono text-muted-foreground">N° {cred.certificate_no}</p></div>
       )}
     </div>
   );

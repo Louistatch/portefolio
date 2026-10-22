@@ -199,18 +199,27 @@ export default function AcademyParcours() {
       </div>
 
       {/* ── Reprendre où l'on s'est arrêté ── */}
-      {prochaine && (
+      {/* Une leçon en retard s'annonce en ambre, comme le badge du planning et l'alerte de
+          retard : l'accent du parcours disait « en retard » dans la même teinte rassurante
+          que « prochaine leçon », si bien que les deux situations se ressemblaient. */}
+      {prochaine && (() => {
+        const enRetard = prochaine.status === "missed";
+        return (
         <button
           onClick={() => navigate(`/academy/classroom/${prochaine.course_id}?lesson=${prochaine.lesson_id}`)}
-          className="w-full text-left rounded-2xl border p-4 sm:p-5 hover:shadow-md transition-shadow"
-          style={{ borderColor: `${parcours.accent}40`, background: `${parcours.accent}0A` }}>
-          <p className="text-[10px] uppercase tracking-wide font-semibold" style={{ color: parcours.accent }}>
-            {prochaine.status === "missed" ? "En retard — à reprendre" : "Prochaine leçon"}
+          className={`w-full text-left rounded-2xl border p-4 sm:p-5 hover:shadow-md transition-shadow ${
+            enRetard ? "border-amber-300 bg-amber-50 dark:border-amber-900/40 dark:bg-amber-900/15" : ""}`}
+          style={enRetard ? undefined : { borderColor: `${parcours.accent}40`, background: `${parcours.accent}0A` }}>
+          <p className={`text-[10px] uppercase tracking-wide font-semibold ${
+              enRetard ? "text-amber-700 dark:text-amber-400" : ""}`}
+            style={enRetard ? undefined : { color: parcours.accent }}>
+            {enRetard ? "En retard — à reprendre" : "Prochaine leçon"}
           </p>
           <p className="font-semibold mt-1">{prochaine.sms_lessons?.title || "Leçon suivante"}</p>
           <p className="text-[13px] text-muted-foreground mt-0.5">{prochaine.sms_courses?.title}</p>
         </button>
-      )}
+        );
+      })()}
 
       {/* ── Les cours du parcours ── */}
       {stats.length > 0 && (
@@ -248,7 +257,9 @@ export default function AcademyParcours() {
           {termines > 0 && (
             <button onClick={() => setVoirTermines(v => !v)}
               className="text-xs text-muted-foreground hover:underline mt-3">
-              {voirTermines ? "Masquer les cours terminés" : `Voir les ${termines} cours terminé${termines > 1 ? "s" : ""}`}
+              {voirTermines
+                ? "Masquer les cours terminés"
+                : termines > 1 ? `Voir les ${termines} cours terminés` : "Voir le cours terminé"}
             </button>
           )}
         </section>

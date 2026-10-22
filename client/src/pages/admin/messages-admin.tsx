@@ -156,7 +156,7 @@ export default function AdminMessages() {
                     <span>De: {m.name} ({m.email})</span>
                     <span>·</span>
                     <span>{m.created_at ? format(new Date(m.created_at), "PPPp", { locale: fr }) : ""}</span>
-                    {m.replied_at && <><span>·</span><span className="text-emerald-600">Répondu le {format(new Date(m.replied_at), "d MMM", { locale: fr })}</span></>}
+                    {m.replied_at && <><span>·</span><span className="text-emerald-700 dark:text-emerald-400">Répondu le {format(new Date(m.replied_at), "d MMM", { locale: fr })}</span></>}
                   </div>
                   <div className="bg-muted/30 p-4 rounded-xl mb-4">
                     <p className="text-sm whitespace-pre-wrap">{m.message}</p>

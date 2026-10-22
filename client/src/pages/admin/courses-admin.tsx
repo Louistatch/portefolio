@@ -143,10 +143,10 @@ export default function AdminCourses() {
                     <p className="text-sm text-muted-foreground mt-1">{c.total_lessons} leçon(s)</p>
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
-                    <Button size="icon" variant="ghost" onClick={() => setDialogueCours(c)}><Pencil className="w-4 h-4" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => {
+                    <Button size="icon" variant="ghost" aria-label={`Modifier le cours ${c.code}`} onClick={() => setDialogueCours(c)}><Pencil className="w-4 h-4" aria-hidden="true" /></Button>
+                    <Button size="icon" variant="ghost" aria-label={`Supprimer le cours ${c.code}`} onClick={() => {
                       if (confirm(`Supprimer « ${c.title} » ? Cette action est irréversible.`)) supprimerCours.mutate(c.id);
-                    }}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                    }}><Trash2 className="w-4 h-4 text-destructive" aria-hidden="true" /></Button>
                   </div>
                 </div>
               ))}
@@ -326,10 +326,10 @@ function VueCours({ cours, onRetour, onEditerCours, dialogueCours, onFermerDialo
                   </p>
                 </button>
                 <div className="flex items-center gap-1 shrink-0">
-                  <Button size="icon" variant="ghost" onClick={() => setLeconOuverte(l)}><Pencil className="w-4 h-4" /></Button>
-                  <Button size="icon" variant="ghost" onClick={() => {
+                  <Button size="icon" variant="ghost" aria-label={`Modifier la leçon « ${l.title} »`} onClick={() => setLeconOuverte(l)}><Pencil className="w-4 h-4" aria-hidden="true" /></Button>
+                  <Button size="icon" variant="ghost" aria-label={`Supprimer la leçon « ${l.title} »`} onClick={() => {
                     if (confirm(`Supprimer la leçon « ${l.title} » ?`)) supprimerLecon.mutate(l.id);
-                  }}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                  }}><Trash2 className="w-4 h-4 text-destructive" aria-hidden="true" /></Button>
                 </div>
               </div>
             );
@@ -458,9 +458,9 @@ function EditeurLecon({ coursId, initial, onClose }: { coursId: number; initial:
                     {c.type === "md" ? "Texte" : c.type === "callout" ? "Encadré" : "Exercice"}
                   </Badge>
                   <div className="flex items-center gap-1">
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deplacer(i, -1)} disabled={i === 0}><ChevronUp className="w-4 h-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => deplacer(i, 1)} disabled={i === cellules.length - 1}><ChevronDown className="w-4 h-4" /></Button>
-                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => supprimerCellule(i)}><Trash2 className="w-3.5 h-3.5 text-destructive" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Monter ce bloc" onClick={() => deplacer(i, -1)} disabled={i === 0}><ChevronUp className="w-4 h-4" aria-hidden="true" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Descendre ce bloc" onClick={() => deplacer(i, 1)} disabled={i === cellules.length - 1}><ChevronDown className="w-4 h-4" aria-hidden="true" /></Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" aria-label="Supprimer ce bloc" onClick={() => supprimerCellule(i)}><Trash2 className="w-3.5 h-3.5 text-destructive" aria-hidden="true" /></Button>
                   </div>
                 </div>
                 <EditeurCellule cellule={c} onChange={nc => majCellule(i, nc)} />
@@ -538,9 +538,9 @@ function EditeurCellule({ cellule, onChange }: { cellule: Cellule; onChange: (c:
             <div key={i} className="flex items-center gap-2">
               <input type="radio" checked={Number(cellule.answer) === i} onChange={() => onChange({ ...cellule, answer: i })} />
               <Input value={o} onChange={e => onChange({ ...cellule, opts: opts.map((x, j) => j === i ? e.target.value : x) })} />
-              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0"
+              <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" aria-label={`Supprimer la réponse ${i + 1}`}
                 onClick={() => onChange({ ...cellule, opts: opts.filter((_, j) => j !== i), answer: Number(cellule.answer) === i ? "" : cellule.answer })}>
-                <Trash2 className="w-3.5 h-3.5 text-destructive" />
+                <Trash2 className="w-3.5 h-3.5 text-destructive" aria-hidden="true" />
               </Button>
             </div>
           ))}
@@ -625,9 +625,9 @@ function EditeurParametres({ cellule, onChange }: { cellule: CelluleExercise; on
             onChange={e => majParametre(i, { max: Number(e.target.value) })} />
           <Input type="number" placeholder="décimales" value={p.decimales ?? 0}
             onChange={e => majParametre(i, { decimales: Number(e.target.value) })} />
-          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0"
+          <Button size="icon" variant="ghost" className="h-8 w-8 shrink-0" aria-label={`Supprimer le paramètre ${i + 1}`}
             onClick={() => onChange({ ...cellule, parametres: parametres.filter((_, j) => j !== i) })}>
-            <Trash2 className="w-3.5 h-3.5 text-destructive" />
+            <Trash2 className="w-3.5 h-3.5 text-destructive" aria-hidden="true" />
           </Button>
         </div>
       ))}

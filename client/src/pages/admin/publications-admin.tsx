@@ -45,7 +45,7 @@ export default function AdminPublications() {
         <div className="bg-card p-6 rounded-2xl border border-border/50 mb-8 space-y-4">
           <div className="flex justify-between">
             <h2 className="text-xl font-bold">{editing === "new" ? "New" : "Edit"} Publication</h2>
-            <Button variant="ghost" size="icon" onClick={() => setEditing(null)}><X className="w-4 h-4" /></Button>
+            <Button variant="ghost" size="icon" aria-label="Fermer l'éditeur" onClick={() => setEditing(null)}><X className="w-4 h-4" aria-hidden="true" /></Button>
           </div>
           <Input placeholder="Title" value={form.title} onChange={e => setForm((f: any) => ({ ...f, title: e.target.value }))} />
           <Textarea placeholder="Abstract" value={form.abstract} onChange={e => setForm((f: any) => ({ ...f, abstract: e.target.value }))} className="min-h-[100px]" />
@@ -102,8 +102,8 @@ export default function AdminPublications() {
                   ) : <span className="text-muted-foreground text-xs">No file</span>}
                 </td>
                 <td className="p-4 text-right flex gap-2 justify-end">
-                  <Button variant="ghost" size="icon" onClick={() => { setForm({ ...p, image_url: (p as any).image_url || "" }); setEditing(p.id); }}><Edit className="w-4 h-4" /></Button>
-                  <Button variant="ghost" size="icon" className="text-destructive" onClick={() => { if (confirm("Delete?")) del.mutate(p.id); }}><Trash2 className="w-4 h-4" /></Button>
+                  <Button variant="ghost" size="icon" aria-label={`Modifier « ${p.title} »`} onClick={() => { setForm({ ...p, image_url: (p as any).image_url || "" }); setEditing(p.id); }}><Edit className="w-4 h-4" /></Button>
+                  <Button variant="ghost" size="icon" className="text-destructive" aria-label={`Supprimer « ${p.title} »`} onClick={() => { if (confirm(`Supprimer la publication « ${p.title} » ? Cette action est irréversible.`)) del.mutate(p.id); }}><Trash2 className="w-4 h-4" /></Button>
                 </td>
               </tr>
             ))}</tbody>

@@ -139,7 +139,7 @@ export default function FAQPage() {
           <Alert className="bg-primary/5 border-primary/20">
             <AlertCircle className="h-4 w-4 text-primary" />
             <AlertDescription className="text-foreground">
-              <strong>+ 11 ans d'expérience</strong> en agrofinance et digitalisation agricole en Afrique de l'Ouest. Accompagnement de <strong>3000+ agriculteurs</strong> et structuration de <strong>200+ coopératives</strong>.
+              <strong>9 ans d'expérience professionnelle</strong> en agrofinance et digitalisation agricole en Afrique de l'Ouest. Accompagnement de <strong>3000+ agriculteurs</strong> et structuration de <strong>200+ coopératives</strong>.
             </AlertDescription>
           </Alert>
         </div>

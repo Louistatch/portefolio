@@ -271,7 +271,7 @@ export default function AdminStudents() {
                     {dureeCourte(l.minutesTotal)}
                   </span>
                   <span className={`hidden sm:block w-28 text-right shrink-0 text-xs ${
-                    l.lastLogin ? "text-muted-foreground" : "text-amber-600 dark:text-amber-400"}`}>
+                    l.lastLogin ? "text-muted-foreground" : "text-amber-700 dark:text-amber-400"}`}>
                     {depuisQuand(l.lastLogin)}
                   </span>
                 </button>
@@ -324,7 +324,7 @@ export default function AdminStudents() {
                   )}
                 </div>
                 <div className="relative shrink-0">
-                  <button onClick={() => setMenuId(menuId === s.id ? null : s.id)} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center"><MoreVertical className="w-4 h-4 text-muted-foreground" /></button>
+                  <button onClick={() => setMenuId(menuId === s.id ? null : s.id)} aria-label={`Actions sur ${s.full_name || s.email}`} aria-expanded={menuId === s.id} className="w-11 h-11 -my-1.5 rounded-lg hover:bg-muted flex items-center justify-center"><MoreVertical className="w-4 h-4 text-muted-foreground" aria-hidden="true" /></button>
                   {menuId === s.id && (
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setMenuId(null)} />
@@ -372,7 +372,7 @@ export default function AdminStudents() {
                       <p className="text-xs text-muted-foreground">{detail.student.email}</p>
                     </div>
                   </div>
-                  <button onClick={() => setSelectedId(null)} className="w-8 h-8 rounded-lg hover:bg-muted flex items-center justify-center"><X className="w-4 h-4" /></button>
+                  <button onClick={() => setSelectedId(null)} aria-label="Fermer le dossier de l'étudiant" className="w-11 h-11 -m-1.5 rounded-lg hover:bg-muted flex items-center justify-center"><X className="w-4 h-4" aria-hidden="true" /></button>
                 </div>
 
                 <div className="flex flex-wrap gap-2">
@@ -463,9 +463,11 @@ export default function AdminStudents() {
                               {cert.expires_at && <p className="text-[11px] text-muted-foreground">Valable jusqu'au {new Date(cert.expires_at).toLocaleDateString("fr-FR")}</p>}
                             </div>
                           </div>
-                          <a href={cert.url} target="_blank" rel="noopener noreferrer" className="shrink-0">
-                            <Button size="sm" className="gap-1.5 h-8"><Download className="w-3.5 h-3.5" /> Ouvrir</Button>
-                          </a>
+                          <Button asChild size="sm" className="gap-1.5 h-8 shrink-0">
+                            <a href={cert.url} target="_blank" rel="noopener noreferrer">
+                              <Download className="w-3.5 h-3.5" aria-hidden="true" /> Ouvrir
+                            </a>
+                          </Button>
                         </div>
                       ))}
                     </div>
@@ -481,7 +483,7 @@ export default function AdminStudents() {
                       return (
                         <div key={g.id} className="flex items-center justify-between text-sm bg-muted/40 rounded-lg px-3 py-2">
                           <span className="truncate flex-1 text-xs">{g.title}</span>
-                          <span className={`font-semibold text-xs ml-2 ${pct >= 70 ? "text-primary" : pct >= 50 ? "text-amber-600" : "text-destructive"}`}>{g.score}/{g.max_score}</span>
+                          <span className={`font-semibold text-xs ml-2 ${pct >= 70 ? "text-primary" : pct >= 50 ? "text-amber-700 dark:text-amber-400" : "text-destructive"}`}>{g.score}/{g.max_score}</span>
                         </div>
                       );
                     })}

@@ -77,7 +77,8 @@ export default function AdminTestimonials() {
               <Label>Note ({form.rating}/5)</Label>
               <div className="flex gap-1 mt-1">
                 {[1,2,3,4,5].map(n => (
-                  <button key={n} onClick={() => setForm({ ...form, rating: n })} className="p-1">
+                  <button key={n} type="button" onClick={() => setForm({ ...form, rating: n })}
+                    aria-label={`Noter ${n} sur 5`} aria-pressed={form.rating === n} className="p-1">
                     <Star className={`w-5 h-5 ${n <= form.rating ? "text-amber-400 fill-amber-400" : "text-border"}`} />
                   </button>
                 ))}

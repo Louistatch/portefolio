@@ -209,7 +209,7 @@ function Demandes() {
                     <MessageSquare className="h-3 w-3" />
                     {m.auteur === "admin" ? "Vous" : detail.data!.nom || "L'étudiant"} · {quand(m.created_at)}
                     {m.auteur === "admin" && (
-                      <span className={m.email_envoye ? "text-emerald-600" : "text-amber-600"}>
+                      <span className={m.email_envoye ? "text-emerald-700 dark:text-emerald-400" : "text-amber-700 dark:text-amber-400"}>
                         {m.email_envoye ? "· courriel envoyé" : "· courriel non parti"}
                       </span>
                     )}
@@ -270,7 +270,7 @@ function Contexte({ contexte, constat }: { contexte: any; constat: string | null
         {constats.map((c: any) => (
           <li key={c.code} className="flex items-start gap-2">
             {c.bloquant
-              ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-600" />
+              ? <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-amber-700 dark:text-amber-400" />
               : <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/50" />}
             <span className={c.bloquant ? "font-medium" : "text-muted-foreground"}>{c.titre}</span>
           </li>
@@ -423,7 +423,7 @@ function Articles() {
                 <td className="px-3 py-2 text-right tabular-nums">
                   {a.utile + a.inutile === 0
                     ? <span className="text-muted-foreground">—</span>
-                    : <span className={a.inutile > a.utile ? "text-amber-600" : ""}>{a.utile} / {a.utile + a.inutile}</span>}
+                    : <span className={a.inutile > a.utile ? "text-amber-700 dark:text-amber-400" : ""}>{a.utile} / {a.utile + a.inutile}</span>}
                 </td>
               </tr>
             ))}

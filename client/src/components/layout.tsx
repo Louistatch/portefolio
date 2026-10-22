@@ -251,7 +251,12 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
         <div className="max-w-7xl mx-auto px-6 mt-12 pt-8 border-t border-border/50 flex flex-col md:flex-row items-center justify-between text-xs text-muted-foreground">
           <p>&copy; {new Date().getFullYear()} Louis TATCHIDA. Tous droits réservés.</p>
-          <p className="mt-2 md:mt-0">Lomé, Togo</p>
+          <div className="mt-2 md:mt-0 flex items-center gap-4">
+            <Link href="/privacy" className="hover:text-primary transition-colors">
+              Conditions &amp; confidentialité
+            </Link>
+            <span>Lomé, Togo</span>
+          </div>
         </div>
       </footer>
     </div>

@@ -77,9 +77,9 @@ export function FileUpload({ type, value, onChange, accept }: FileUploadProps) {
             <p className="text-xs text-muted-foreground truncate">{value}</p>
           </div>
           <div className="flex gap-1">
-            <CheckCircle2 className="w-4 h-4 text-green-500" />
-            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" onClick={() => { onChange(""); setFileName(""); }}>
-              <X className="w-4 h-4" />
+            <CheckCircle2 className="w-4 h-4 text-green-500" aria-hidden="true" />
+            <Button type="button" variant="ghost" size="icon" className="h-8 w-8" aria-label="Retirer le fichier" onClick={() => { onChange(""); setFileName(""); }}>
+              <X className="w-4 h-4" aria-hidden="true" />
             </Button>
           </div>
         </div>

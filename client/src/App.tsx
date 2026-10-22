@@ -18,6 +18,7 @@ const Publications = lazy(() => import("@/pages/publications"));
 const FAQ = lazy(() => import("@/pages/faq"));
 const Booking = lazy(() => import("@/pages/booking"));
 const Contact = lazy(() => import("@/pages/contact"));
+const Privacy = lazy(() => import("@/pages/privacy"));
 const ELearning = lazy(() => import("@/pages/elearning"));
 
 // LouisFarm Learning
@@ -144,8 +145,13 @@ function App() {
             <Route path="/academy/register">{() => <Layout><AcademyRegister /></Layout>}</Route>
             <Route path="/academy/login">{() => <Layout><AcademyLogin /></Layout>}</Route>
             <Route path="/academy/dashboard">{() => <RequireStudentAuth><AcademyLayout><AcademyDashboard /></AcademyLayout></RequireStudentAuth>}</Route>
-            <Route path="/academy/classroom/:id">{() => <Layout><RequireStudentAuth><AcademyClassroom /></RequireStudentAuth></Layout>}</Route>
-            <Route path="/academy/quiz/:courseId/:lessonId">{() => <Layout><RequireStudentAuth><AcademyLessonQuiz /></RequireStudentAuth></Layout>}</Route>
+            {/* La leçon et son quiz sont les deux écrans les plus fréquentés du parcours.
+                Ils s'ouvraient dans le gabarit du site public — menu Blog/Contact et pied de
+                page avec inscription à la newsletter — alors que les huit autres pages de
+                l'académie ont la barre latérale étudiante : le décor changeait entièrement
+                entre le tableau de bord et la leçon sur laquelle il renvoie. */}
+            <Route path="/academy/classroom/:id">{() => <RequireStudentAuth><AcademyLayout><AcademyClassroom /></AcademyLayout></RequireStudentAuth>}</Route>
+            <Route path="/academy/quiz/:courseId/:lessonId">{() => <RequireStudentAuth><AcademyLayout><AcademyLessonQuiz /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/test/:id">{() => <RequireStudentAuth><AcademyLayout><AcademyProgramTest /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/paiement/:courseId">{() => <RequireStudentAuth><AcademyLayout><AcademyPaiement /></AcademyLayout></RequireStudentAuth>}</Route>
             <Route path="/academy/parcours/:id">{() => <RequireStudentAuth><AcademyLayout><AcademyParcours /></AcademyLayout></RequireStudentAuth>}</Route>
@@ -178,6 +184,7 @@ function App() {
             <Route path="/faq">{() => <Layout><FAQ /></Layout>}</Route>
             <Route path="/booking">{() => <Layout><Booking /></Layout>}</Route>
             <Route path="/contact">{() => <Layout><Contact /></Layout>}</Route>
+            <Route path="/privacy">{() => <Layout><Privacy /></Layout>}</Route>
             <Route path="/stats">{() => <Layout><Stats /></Layout>}</Route>
             <Route path="/elearning">{() => <Layout><ELearning /></Layout>}</Route>
             {/* L'article AVANT l'index : wouter sert la première route qui correspond, et

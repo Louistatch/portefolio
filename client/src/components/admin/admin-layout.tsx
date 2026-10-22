@@ -229,7 +229,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         {SECTIONS.map((section, si) => (
           <div key={section.titre ?? `s${si}`}>
             {section.titre && (
-              <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground/70 uppercase">
+              <p className="px-3 mb-1.5 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
                 {section.titre}
               </p>
             )}
@@ -239,13 +239,13 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
                 const n = item.badge ? (badges as any)?.[item.badge] ?? 0 : 0;
                 return (
                   <Link key={item.href} href={item.href}
-                    className={`flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-colors ${
+                    className={`flex items-center gap-3 px-3 py-2 min-h-11 rounded-xl text-sm transition-colors ${
                       actif
                         ? "bg-primary/10 text-primary font-medium"
                         : "text-muted-foreground hover:text-foreground hover:bg-muted"
                     }`}>
                     <item.icon className="w-4 h-4 shrink-0" />
-                    <span className="truncate flex-1">{item.label}</span>
+                    <span className="line-clamp-2 leading-snug flex-1">{item.label}</span>
                     {n > 0 && (
                       <span className="shrink-0 min-w-[20px] h-5 px-1.5 rounded-full bg-primary text-primary-foreground text-[10px] font-bold grid place-items-center">
                         {n > 99 ? "99+" : n}
@@ -260,11 +260,11 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
       </nav>
 
       <div className="border-t border-border/50 p-3 space-y-0.5">
-        <a href="/" className="flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted">
+        <a href="/" className="flex items-center gap-3 px-3 py-2 min-h-11 rounded-xl text-sm text-muted-foreground hover:text-foreground hover:bg-muted">
           <ExternalLink className="w-4 h-4" /> Voir le site
         </a>
         <button onClick={deconnexion}
-          className="w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm text-destructive hover:bg-destructive/10">
+          className="w-full flex items-center gap-3 px-3 py-2 min-h-11 rounded-xl text-sm text-destructive hover:bg-destructive/10">
           <LogOut className="w-4 h-4" /> Déconnexion
         </button>
       </div>
@@ -296,7 +296,7 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
         <header className="sticky top-0 z-20 bg-background/85 backdrop-blur border-b border-border/50">
           <div className="flex items-center gap-3 px-4 sm:px-6 h-16">
             <button onClick={() => setMenuOuvert(true)} aria-label="Ouvrir le menu"
-              className="lg:hidden w-9 h-9 rounded-lg hover:bg-muted grid place-items-center shrink-0">
+              className="lg:hidden w-11 h-11 -ml-1.5 rounded-lg hover:bg-muted grid place-items-center shrink-0">
               <Menu className="w-5 h-5" />
             </button>
 
@@ -312,12 +312,12 @@ export function AdminLayout({ children }: { children: React.ReactNode }) {
             <div className="ml-auto flex items-center gap-1 shrink-0">
               <button onClick={basculerTheme}
                 aria-label={sombre ? "Passer en thème clair" : "Passer en thème sombre"}
-                className="w-9 h-9 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-foreground">
+                className="w-11 h-11 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-foreground">
                 {sombre ? <Sun className="w-[18px] h-[18px]" /> : <Moon className="w-[18px] h-[18px]" />}
               </button>
 
               <Link href={`${ADMIN_BASE}/messages`} aria-label="Notifications"
-                className="relative w-9 h-9 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-foreground">
+                className="relative w-11 h-11 rounded-lg hover:bg-muted grid place-items-center text-muted-foreground hover:text-foreground">
                 <Bell className="w-[18px] h-[18px]" />
                 {(badges?.total ?? 0) > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-destructive text-white text-[10px] font-bold grid place-items-center">

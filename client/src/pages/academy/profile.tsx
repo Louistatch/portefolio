@@ -11,16 +11,22 @@ import { studentFetch, isStudentLoggedIn, setStudent, getStudent, downloadStuden
 const INTERESTS = ["KoboCollect", "Python", "QGIS", "Analyse de données", "Cartographie", "Reporting", "Évaluation", "Nutrition", "WASH", "Sécurité alimentaire"];
 const LEVELS = [{ v: "debutant", l: "Débutant" }, { v: "intermediaire", l: "Intermédiaire" }, { v: "avance", l: "Avancé" }];
 
+/** Un message affiché à l'étudiant, avec le ton décidé à l'émission et non relu dans le texte. */
+type Avis = { texte: string; ok: boolean } | null;
+
 export default function AcademyProfile() {
   const [, navigate] = useLocation();
   const [p, setP] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [msg, setMsg] = useState("");
+  const [msg, setMsg] = useState<Avis>(null);
   const [pwd, setPwd] = useState({ current: "", next: "", confirm: "" });
-  const [pwdMsg, setPwdMsg] = useState("");
+  // Le ton accompagne le message au lieu d'être deviné à la relecture : la couleur se
+  // décidait en cherchant un « ✓ » dans le texte, si bien qu'« Email de validation envoyé »
+  // — un succès sans coche — s'affichait en rouge.
+  const [pwdMsg, setPwdMsg] = useState<Avis>(null);
   const [code, setCode] = useState("");
-  const [codeMsg, setCodeMsg] = useState("");
+  const [codeMsg, setCodeMsg] = useState<Avis>(null);
   const [transcript, setTranscript] = useState<any>(null);
   const [testStatus, setTestStatus] = useState<any>(null);
 
@@ -46,7 +52,7 @@ export default function AcademyProfile() {
   }
 
   async function save() {
-    setSaving(true); setMsg("");
+    setSaving(true); setMsg(null);
     try {
       const res = await studentFetch("/api/academy/me", {
         method: "PUT",
@@ -70,14 +76,14 @@ export default function AcademyProfile() {
       setP((prev: any) => ({ ...prev, ...data }));
       const cur = getStudent();
       if (cur) setStudent({ ...cur, full_name: data.full_name });
-      setMsg("Profil enregistré ✓");
-      setTimeout(() => setMsg(""), 3000);
-    } catch (e: any) { setMsg(e.message || "Enregistrement impossible."); } finally { setSaving(false); }
+      setMsg({ texte: "Profil enregistré.", ok: true });
+      setTimeout(() => setMsg(null), 3000);
+    } catch (e: any) { setMsg({ texte: e.message || "Enregistrement impossible.", ok: false }); } finally { setSaving(false); }
   }
 
   async function changePwd() {
-    setPwdMsg("");
-    if (pwd.next !== pwd.confirm) { setPwdMsg("Les mots de passe ne correspondent pas."); return; }
+    setPwdMsg(null);
+    if (pwd.next !== pwd.confirm) { setPwdMsg({ texte: "Les mots de passe ne correspondent pas.", ok: false }); return; }
     try {
       const res = await studentFetch("/api/academy/change-password", {
         method: "PUT",
@@ -85,33 +91,33 @@ export default function AcademyProfile() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      setPwdMsg("Mot de passe modifié ✓"); setPwd({ current: "", next: "", confirm: "" });
-      setTimeout(() => setPwdMsg(""), 3000);
-    } catch (e: any) { setPwdMsg(e.message); }
+      setPwdMsg({ texte: "Mot de passe modifié.", ok: true }); setPwd({ current: "", next: "", confirm: "" });
+      setTimeout(() => setPwdMsg(null), 3000);
+    } catch (e: any) { setPwdMsg({ texte: e.message, ok: false }); }
   }
 
   async function resendVerify() {
-    setCodeMsg("");
+    setCodeMsg(null);
     try {
       const res = await studentFetch("/api/academy/resend-verify", { method: "POST" });
       const data = await res.json();
       if (data.emailSent) {
-        setCodeMsg("Email de validation envoyé (vérifiez vos spams)");
+        setCodeMsg({ texte: "Email de validation envoyé (vérifiez vos spams).", ok: true });
       } else {
-        setCodeMsg("Service email temporairement indisponible. Réessayez plus tard.");
+        setCodeMsg({ texte: "Service email temporairement indisponible. Réessayez plus tard.", ok: false });
       }
-    } catch { setCodeMsg("Erreur, réessayez."); }
+    } catch { setCodeMsg({ texte: "Erreur, réessayez.", ok: false }); }
   }
 
   async function verifyCode() {
-    setCodeMsg("");
+    setCodeMsg(null);
     try {
       const res = await studentFetch("/api/academy/verify-code", { method: "POST", body: JSON.stringify({ code }) });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message);
-      setCodeMsg("Email vérifié ✓");
+      setCodeMsg({ texte: "Email vérifié.", ok: true });
       setP((prev: any) => ({ ...prev, email_verified: true }));
-    } catch (e: any) { setCodeMsg(e.message); }
+    } catch (e: any) { setCodeMsg({ texte: e.message, ok: false }); }
   }
 
   if (loading) return <div className="flex justify-center py-32"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>;
@@ -156,7 +162,7 @@ export default function AcademyProfile() {
             <Button size="sm" onClick={verifyCode} disabled={code.length !== 6}>Vérifier</Button>
             <Button size="sm" variant="outline" onClick={resendVerify}>Renvoyer l'email</Button>
           </div>
-          {codeMsg && <p className={`text-sm mt-2 ${codeMsg.includes("✓") ? "text-primary" : "text-destructive"}`}>{codeMsg}</p>}
+          {codeMsg && <p className={`text-sm mt-2 ${codeMsg.ok ? "text-primary" : "text-destructive"}`}>{codeMsg.texte}</p>}
         </div>
       )}
 
@@ -247,7 +253,7 @@ export default function AcademyProfile() {
         </button>
       </section>
 
-      {msg && <p className="text-sm text-primary mb-4">{msg}</p>}
+      {msg && <p className={`text-sm mb-4 ${msg.ok ? "text-primary" : "text-destructive"}`}>{msg.texte}</p>}
       <Button className="gap-2 mb-8" size="lg" onClick={save} disabled={saving}>
         {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />} Enregistrer mon profil
       </Button>
@@ -334,7 +340,7 @@ export default function AcademyProfile() {
           <input className={field} type="password" placeholder="Nouveau mot de passe" value={pwd.next} onChange={e => setPwd({ ...pwd, next: e.target.value })} />
           <input className={field} type="password" placeholder="Confirmer le nouveau mot de passe" value={pwd.confirm} onChange={e => setPwd({ ...pwd, confirm: e.target.value })} />
         </div>
-        {pwdMsg && <p className={`text-sm mt-3 ${pwdMsg.includes("✓") ? "text-primary" : "text-destructive"}`}>{pwdMsg}</p>}
+        {pwdMsg && <p className={`text-sm mt-3 ${pwdMsg.ok ? "text-primary" : "text-destructive"}`}>{pwdMsg.texte}</p>}
         <Button variant="outline" className="mt-4 gap-2" onClick={changePwd} disabled={!pwd.current || !pwd.next}>
           <Lock className="w-4 h-4" /> Changer le mot de passe
         </Button>

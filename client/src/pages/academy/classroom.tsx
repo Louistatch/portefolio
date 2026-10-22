@@ -525,14 +525,16 @@ export default function AcademyClassroom() {
             const isLocked = !done && st === "locked";
             const isMissed = !done && st === "missed";
             return (
-              <button key={l.id} onClick={() => goToLesson(i)}
-                className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-colors flex items-center gap-2 ${activeLesson === i ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
-                {done ? <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0" />
-                  : isMissed ? <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  : isLocked ? <Lock className="w-3.5 h-3.5 shrink-0 opacity-50" />
-                  : <span className="w-3.5 h-3.5 rounded-full border border-current shrink-0" />}
-                <span className="truncate flex-1">{i + 1}. {l.title}</span>
-                {sp && <span className="text-[9px] text-muted-foreground shrink-0">S{sp.week_index}</span>}
+              <button key={l.id} onClick={() => goToLesson(i)} title={l.title}
+                className={`w-full text-left px-3 py-2 rounded-xl text-sm transition-colors flex items-start gap-2 ${activeLesson === i ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:text-foreground hover:bg-muted"}`}>
+                {done ? <CheckCircle2 className="w-3.5 h-3.5 text-primary shrink-0 mt-[3px]" />
+                  : isMissed ? <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-[3px]" />
+                  : isLocked ? <Lock className="w-3.5 h-3.5 shrink-0 opacity-50 mt-[3px]" />
+                  : <span className="w-3.5 h-3.5 rounded-full border border-current shrink-0 mt-[3px]" />}
+                {/* Deux lignes plutôt qu'une ellipse : « 3. Concevoir le questi… » ne disait
+                    pas de quelle leçon il s'agissait. */}
+                <span className="line-clamp-2 leading-snug flex-1">{i + 1}. {l.title}</span>
+                {sp && <span className="text-[9px] text-muted-foreground shrink-0 mt-[3px]">S{sp.week_index}</span>}
               </button>
             );
           })}

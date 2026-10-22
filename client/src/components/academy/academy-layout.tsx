@@ -45,6 +45,30 @@ const BAS: Item[] = [
   { href: "/academy/profile", label: "Mon profil", icon: UserCircle, exact: true },
 ];
 
+/**
+ * Le libellé du fil d'Ariane, déduit de l'adresse.
+ *
+ * Il venait d'une cascade de conditions qui retombait sur « Page » : Mes notes, les six
+ * pages de parcours, le programme ambassadeur, un quiz ou un paiement affichaient donc tous
+ * « Mon espace › Page ». La liste de navigation porte déjà le nom de chacune de ces pages —
+ * on la lit, plutôt que d'entretenir une seconde liste qui oublie la moitié des écrans.
+ */
+function filDAriane(chemin: string): string {
+  if (chemin.startsWith("/academy/classroom")) return "Salle de cours";
+  if (chemin.startsWith("/academy/live")) return "Rencontre en ligne";
+  if (chemin.startsWith("/academy/quiz")) return "Quiz de leçon";
+  if (chemin.startsWith("/academy/paiement")) return "Paiement de l'attestation";
+  if (chemin.startsWith("/academy/test")) return "Test d'admission";
+  if (chemin.startsWith("/academy/verify")) return "Vérification";
+
+  // Le plus long préfixe qui corresponde : /academy/parcours/data l'emporte sur /academy.
+  const connu = [...NAV, ...BAS]
+    .map(i => ({ ...i, base: i.href.split("#")[0] }))
+    .filter(i => chemin === i.base)
+    .sort((a, b) => b.base.length - a.base.length)[0];
+  return connu?.label ?? "Mon espace";
+}
+
 function initiales(nom?: string | null) {
   return (nom || "")
     .split(" ").filter(Boolean).map(m => m[0]).slice(0, 2).join("").toUpperCase() || "ET";
@@ -190,19 +214,22 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
           const actif = item.exact ? location === item.href : false;
           return (
             <Link key={item.href} href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+              title={item.label}
+              className={`flex items-center gap-3 px-3 py-2.5 min-h-11 rounded-xl text-sm transition-colors ${
                 actif ? "bg-primary/10 text-primary font-medium"
                       : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}>
               <item.icon className="w-4 h-4 shrink-0" />
-              <span className="truncate">{item.label}</span>
+              {/* Deux lignes plutôt qu'une ellipse : « Finance climatique agric… » et
+                  « Coopératives et organisa… » ne se distinguaient plus de leur voisin. */}
+              <span className="line-clamp-2 leading-snug">{item.label}</span>
             </Link>
           );
         })}
         <div className="pt-2 mt-2 border-t border-border/40">
           {BAS.map(item => (
             <Link key={item.href} href={item.href}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-colors ${
+              className={`flex items-center gap-3 px-3 py-2.5 min-h-11 rounded-xl text-sm transition-colors ${
                 location === item.href ? "bg-primary/10 text-primary font-medium"
                                        : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}>
@@ -213,7 +240,13 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
 
-      <div className="p-3 space-y-2">
+      {/* shrink-0 : par défaut un enfant de colonne flex est compressible. Ce bloc-ci —
+          carte de niveau, identité, aide — mesure environ 250 px ; quand la navigation
+          au-dessus devenait trop haute, il était écrasé sous sa taille de contenu et
+          débordait par-dessus la dernière entrée du menu (« Ressources » passait dessous).
+          Le bloc équivalent du gabarit d'administration n'a jamais montré le défaut : il
+          ne fait que deux lignes, donc il n'y avait rien à écraser. */}
+      <div className="p-3 space-y-2 shrink-0">
         {bord?.xp && (
           <div className="rounded-2xl bg-primary/5 border border-primary/15 p-3">
             <div className="flex items-baseline justify-between mb-1.5">
@@ -248,8 +281,10 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
               {bord?.etudiant?.admis ? "Apprenant" : "En attente d'admission"}
             </span>
           </span>
+          {/* 28x28 au doigt, c'est sous le minimum de 44 : la zone cliquable passe à 44
+              sans que l'icône grossisse, grâce au padding négatif du conteneur. */}
           <button onClick={deconnexion} aria-label="Se déconnecter"
-            className="w-7 h-7 rounded-lg hover:bg-background grid place-items-center text-muted-foreground hover:text-destructive shrink-0">
+            className="w-11 h-11 -m-2 rounded-lg hover:bg-background grid place-items-center text-muted-foreground hover:text-destructive shrink-0">
             <LogOut className="w-3.5 h-3.5" />
           </button>
         </div>
@@ -263,7 +298,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
           <LifeBuoy className="w-4 h-4 shrink-0" />
           <span className="min-w-0">
             <span className="block leading-tight">Besoin d'aide ?</span>
-            <span className="block text-[11px] text-muted-foreground/80 leading-tight truncate">Centre d'aide</span>
+            <span className="block text-[11px] text-muted-foreground leading-tight truncate">Centre d'aide</span>
           </span>
         </Link>
       </div>
@@ -328,13 +363,7 @@ export function AcademyLayout({ children }: { children: React.ReactNode }) {
             <div className="px-4 sm:px-6 pb-2.5 -mt-0.5 flex items-center gap-1.5 text-[11px] text-muted-foreground">
               <Link href="/academy/dashboard" className="hover:text-foreground">Mon espace</Link>
               <ChevronRight className="w-3 h-3" />
-              <span className="text-foreground font-medium">
-                {location.startsWith("/academy/classroom") ? "Salle de cours"
-                  : location === "/academy/group-work" ? "Travaux de groupe"
-                  : location === "/academy/profile" ? "Mon profil"
-                  : location === "/academy/certifications" ? "Certifications"
-                  : location.startsWith("/academy/live") ? "Rencontre en ligne" : "Page"}
-              </span>
+              <span className="text-foreground font-medium">{filDAriane(location)}</span>
             </div>
           )}
         </header>

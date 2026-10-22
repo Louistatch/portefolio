@@ -5,6 +5,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { X, Shield, AlertCircle, ChevronDown, ChevronUp } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { signalerResolution, EVT_CONDITIONS_RESOLUES } from "@/hooks/use-consent-gate";
+import { CONDITIONS } from "@shared/conditions";
 
 export function TermsPopup() {
   const [show, setShow] = useState(false);
@@ -108,54 +109,12 @@ export function TermsPopup() {
                 {/* Full terms */}
                 <ScrollArea className="max-h-[50vh] p-4">
                   <div className="space-y-5 pr-3">
-                    <section className="space-y-1.5">
-                      <h3 className="text-sm font-semibold text-foreground">1. Services proposés</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Ce site web fournit des informations, réflexions et analyses sur l'agriculture durable, la finance agricole, la résilience climatique et la digitalisation rurale en Afrique de l'Ouest. Les contenus sont à titre informatif uniquement.
-                      </p>
-                    </section>
-
-                    <section className="space-y-1.5">
-                      <h3 className="text-sm font-semibold text-foreground">2. Propriété intellectuelle</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Tous les contenus (textes, images, graphiques) sont protégés par la loi sur la propriété intellectuelle. Toute reproduction ou utilisation sans autorisation préalable est interdite.
-                      </p>
-                    </section>
-
-                    <section className="space-y-1.5">
-                      <h3 className="text-sm font-semibold text-foreground">3. Responsabilité</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Les informations fournies sont à titre informatif. Nous déclinons toute responsabilité quant aux dommages directs ou indirects résultant de l'utilisation de ce site.
-                      </p>
-                    </section>
-
-                    <section className="space-y-1.5">
-                      <h3 className="text-sm font-semibold text-foreground">4. Données personnelles</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Vos données personnelles sont collectées conformément à la politique de confidentialité. Nous respectons les réglementations en vigueur concernant la protection des données.
-                      </p>
-                    </section>
-
-                    <section className="space-y-1.5">
-                      <h3 className="text-sm font-semibold text-foreground">5. Commentaires</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Les commentaires doivent être respectueux. Nous nous réservons le droit de modérer ou supprimer les commentaires jugés inappropriés, offensants ou hors de propos.
-                      </p>
-                    </section>
-
-                    <section className="space-y-1.5">
-                      <h3 className="text-sm font-semibold text-foreground">6. Liens externes</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Ce site peut contenir des liens vers des sites externes. Nous ne sommes pas responsables du contenu ou de la politique de confidentialité de ces sites.
-                      </p>
-                    </section>
-
-                    <section className="space-y-1.5">
-                      <h3 className="text-sm font-semibold text-foreground">7. Modifications</h3>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Nous nous réservons le droit de modifier ces conditions à tout moment. Les modifications seront notifiées aux utilisateurs via ce site.
-                      </p>
-                    </section>
+                    {CONDITIONS.map((s, i) => (
+                      <section key={s.titre} className="space-y-1.5">
+                        <h3 className="text-sm font-semibold text-foreground">{i + 1}. {s.titre}</h3>
+                        <p className="text-xs text-muted-foreground leading-relaxed">{s.corps}</p>
+                      </section>
+                    ))}
 
                     <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/30 rounded-xl p-3 flex gap-2.5">
                       <AlertCircle className="w-4 h-4 text-amber-600 dark:text-amber-500 shrink-0 mt-0.5" />

@@ -47,7 +47,8 @@ function Tendance({ valeur }: { valeur: number | null }) {
     </span>
   );
   const Icone = valeur > 0 ? TrendingUp : valeur < 0 ? TrendingDown : Minus;
-  const couleur = valeur > 0 ? "text-emerald-600" : valeur < 0 ? "text-destructive" : "text-muted-foreground";
+  // emerald-600 tombait a 3,77:1 sur la carte blanche, pour un chiffre de 11 px.
+  const couleur = valeur > 0 ? "text-emerald-700 dark:text-emerald-400" : valeur < 0 ? "text-destructive" : "text-muted-foreground";
   return (
     <span className={`text-[11px] font-medium inline-flex items-center gap-0.5 whitespace-nowrap shrink-0 ${couleur}`}>
       <Icone className="w-3 h-3" />
@@ -117,7 +118,7 @@ function CarteKpi({ titre, valeur, tendance, icone: Icone, teinte, href, note }:
         <AnimatedNumber value={valeur} duration={1.1} />
       </p>
       <p className="text-sm font-medium text-muted-foreground group-hover:text-foreground transition-colors">{titre}</p>
-      {note && <p className="text-[11px] text-muted-foreground/80 mt-1">{note}</p>}
+      {note && <p className="text-[11px] text-muted-foreground mt-1">{note}</p>}
     </Link>
   );
 }
@@ -497,14 +498,14 @@ export default function Dashboard() {
                     <p className="text-[11px] text-muted-foreground truncate">{e.email}</p>
                   </div>
                   {!e.emailVerifie && (
-                    <span className="hidden sm:inline text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 shrink-0">
+                    <span className="hidden sm:inline text-[10px] font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 shrink-0">
                       email non vérifié
                     </span>
                   )}
                   <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full shrink-0 ${
-                    e.statut === "admis" ? "bg-emerald-500/10 text-emerald-600"
+                    e.statut === "admis" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400"
                     : e.statut === "expire" ? "bg-muted text-muted-foreground"
-                    : "bg-amber-500/10 text-amber-600"}`}>
+                    : "bg-amber-500/10 text-amber-700 dark:text-amber-400"}`}>
                     {LIBELLES_STATUT[e.statut]}
                   </span>
                   <div className="hidden md:block w-20 shrink-0">

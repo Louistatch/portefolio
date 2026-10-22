@@ -103,7 +103,7 @@ export default function AdminProfile() {
               <div><Label>Degree</Label><Input value={edu.degree} onChange={e => { const arr = [...form.education]; arr[i] = { ...arr[i], degree: e.target.value }; set("education", arr); }} /></div>
               <div><Label>Institution</Label><Input value={edu.institution} onChange={e => { const arr = [...form.education]; arr[i] = { ...arr[i], institution: e.target.value }; set("education", arr); }} /></div>
               <div><Label>Year</Label><Input value={edu.year} onChange={e => { const arr = [...form.education]; arr[i] = { ...arr[i], year: e.target.value }; set("education", arr); }} /></div>
-              <Button variant="ghost" size="icon" className="text-destructive" onClick={() => set("education", form.education.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="text-destructive" aria-label="Supprimer cette formation" onClick={() => set("education", form.education.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button>
             </div>
           ))}
           <Button variant="outline" size="sm" onClick={() => set("education", [...form.education, { degree: "", institution: "", year: "" }])}><Plus className="w-4 h-4 mr-1" /> Add Education</Button>
@@ -116,7 +116,7 @@ export default function AdminProfile() {
               <div><Label>Role</Label><Input value={exp.role} onChange={e => { const arr = [...form.experience]; arr[i] = { ...arr[i], role: e.target.value }; set("experience", arr); }} /></div>
               <div><Label>Organization</Label><Input value={exp.organization} onChange={e => { const arr = [...form.experience]; arr[i] = { ...arr[i], organization: e.target.value }; set("experience", arr); }} /></div>
               <div><Label>Period</Label><Input value={exp.period} onChange={e => { const arr = [...form.experience]; arr[i] = { ...arr[i], period: e.target.value }; set("experience", arr); }} /></div>
-              <Button variant="ghost" size="icon" className="text-destructive" onClick={() => set("experience", form.experience.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="text-destructive" aria-label="Supprimer cette expérience" onClick={() => set("experience", form.experience.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button>
             </div>
           ))}
           <Button variant="outline" size="sm" onClick={() => set("experience", [...form.experience, { role: "", organization: "", period: "" }])}><Plus className="w-4 h-4 mr-1" /> Add Experience</Button>
@@ -143,7 +143,7 @@ export default function AdminProfile() {
             <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-3 p-3 bg-muted/30 rounded-xl">
               <div><Label>Title</Label><Input value={a.title} onChange={e => { const arr = [...form.awards]; arr[i] = { ...arr[i], title: e.target.value }; set("awards", arr); }} /></div>
               <div><Label>Year</Label><Input value={a.year || ""} onChange={e => { const arr = [...form.awards]; arr[i] = { ...arr[i], year: e.target.value }; set("awards", arr); }} /></div>
-              <Button variant="ghost" size="icon" className="text-destructive" onClick={() => set("awards", form.awards.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="text-destructive" aria-label="Supprimer cette distinction" onClick={() => set("awards", form.awards.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button>
             </div>
           ))}
           <Button variant="outline" size="sm" onClick={() => set("awards", [...form.awards, { title: "", year: "" }])}><Plus className="w-4 h-4 mr-1" /> Add Award</Button>
@@ -153,7 +153,7 @@ export default function AdminProfile() {
         <Section title="Languages">
           <div className="flex flex-wrap gap-2 mb-3">
             {form.languages.map((l, i) => (
-              <span key={i} className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-500/10 text-emerald-600 rounded-full text-sm">
+              <span key={i} className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 rounded-full text-sm">
                 {l} <button onClick={() => set("languages", form.languages.filter((_, j) => j !== i))} className="hover:text-destructive"><Trash2 className="w-3 h-3" /></button>
               </span>
             ))}
@@ -170,7 +170,7 @@ export default function AdminProfile() {
             <div key={i} className="grid grid-cols-1 md:grid-cols-3 gap-3 items-end mb-3 p-3 bg-muted/30 rounded-xl">
               <div><Label>Title</Label><Input value={c.title} onChange={e => { const arr = [...form.certifications]; arr[i] = { ...arr[i], title: e.target.value }; set("certifications", arr); }} /></div>
               <div><Label>Year</Label><Input value={c.year || ""} onChange={e => { const arr = [...form.certifications]; arr[i] = { ...arr[i], year: e.target.value }; set("certifications", arr); }} /></div>
-              <Button variant="ghost" size="icon" className="text-destructive" onClick={() => set("certifications", form.certifications.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button>
+              <Button variant="ghost" size="icon" className="text-destructive" aria-label="Supprimer cette certification" onClick={() => set("certifications", form.certifications.filter((_, j) => j !== i))}><Trash2 className="w-4 h-4" /></Button>
             </div>
           ))}
           <Button variant="outline" size="sm" onClick={() => set("certifications", [...form.certifications, { title: "", year: "" }])}><Plus className="w-4 h-4 mr-1" /> Add Certification</Button>
