@@ -652,6 +652,7 @@ function ForumPromotions() {
   const [annonce, setAnnonce] = useState(false);
   const [envoi, setEnvoi] = useState(false);
   const [msg, setMsg] = useState("");
+  const [erreur, setErreur] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -668,17 +669,25 @@ function ForumPromotions() {
   };
   useEffect(() => { if (choisie) chargerFil(choisie); }, [choisie]);
 
+  // Un message confirmé à l'écran mais absent du fil est pire qu'une erreur franche :
+  // on ne vide le brouillon et on n'annonce un envoi qu'une fois le serveur d'accord.
   async function publier() {
     if (corps.trim().length < 2) return;
-    setEnvoi(true); setMsg("");
+    setEnvoi(true); setMsg(""); setErreur("");
     try {
       const res = await adminFetch(`/api/admin/academy/cohort-forum/${choisie}`, {
         method: "POST", body: JSON.stringify({ corps, annonce }),
       });
       const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setErreur(json?.message || `Publication refusée par le serveur (HTTP ${res.status}). Rien n'a été envoyé — votre texte est conservé.`);
+        return;
+      }
       setMsg(annonce ? `Annonce publiée — ${json?.prevenus ?? 0} étudiant(s) prévenu(s) par email.` : "Message publié.");
       setCorps(""); setAnnonce(false);
       await chargerFil(choisie);
+    } catch {
+      setErreur("Impossible de joindre le serveur. Rien n'a été envoyé — votre texte est conservé.");
     } finally { setEnvoi(false); }
   }
 
@@ -702,6 +711,7 @@ function ForumPromotions() {
       </div>
 
       {msg && <p className="text-sm text-primary bg-primary/5 border border-primary/20 rounded-xl px-3 py-2">{msg}</p>}
+      {erreur && <p role="alert" className="text-sm text-destructive bg-destructive/5 border border-destructive/20 rounded-xl px-3 py-2">{erreur}</p>}
 
       <section className="bg-card rounded-2xl border border-border/50 overflow-hidden">
         <div className="px-4 py-2.5 bg-muted/30 border-b border-border/40">
