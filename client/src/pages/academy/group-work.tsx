@@ -1184,16 +1184,24 @@ function ForumGroupe({ travailId, forum, nbMembres, onPoste }:
   { travailId: number; forum: any; nbMembres: number; onPoste: () => Promise<void> }) {
   const [corps, setCorps] = useState("");
   const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
 
   async function publier() {
     if (corps.trim().length < 2) return;
-    setEnvoi(true);
+    setEnvoi(true); setErreur("");
     try {
-      await studentFetch(`/api/academy/group-forum/${travailId}`, {
+      const res = await studentFetch(`/api/academy/group-forum/${travailId}`, {
         method: "POST", body: JSON.stringify({ corps }),
       });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setErreur(json?.message || "Message non publié. Votre texte est conservé, réessayez.");
+        return;
+      }
       setCorps("");
       await onPoste();
+    } catch {
+      setErreur("Impossible de joindre le serveur. Votre texte est conservé, réessayez.");
     } finally { setEnvoi(false); }
   }
 
@@ -1235,6 +1243,7 @@ function ForumGroupe({ travailId, forum, nbMembres, onPoste }:
           <ForumMessageItem key={m.id} message={m} endpoint={`/api/academy/group-forum/posts/${m.id}/upvote`} />
         ))}
 
+        {erreur && <p role="alert" className="text-[11px] text-destructive">{erreur}</p>}
         <div className="flex gap-2 pt-1">
           <textarea value={corps} onChange={e => setCorps(e.target.value)} rows={2}
             placeholder="Écrire à votre groupe…"
@@ -1257,14 +1266,22 @@ function ForumGroupe({ travailId, forum, nbMembres, onPoste }:
 function ForumPromotion({ promo, onPoste }: { promo: any; onPoste: () => Promise<void> }) {
   const [corps, setCorps] = useState("");
   const [envoi, setEnvoi] = useState(false);
+  const [erreur, setErreur] = useState("");
 
   async function publier() {
     if (corps.trim().length < 2) return;
-    setEnvoi(true);
+    setEnvoi(true); setErreur("");
     try {
-      await studentFetch("/api/academy/cohort-forum", { method: "POST", body: JSON.stringify({ corps }) });
+      const res = await studentFetch("/api/academy/cohort-forum", { method: "POST", body: JSON.stringify({ corps }) });
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}));
+        setErreur(json?.message || "Message non publié. Votre texte est conservé, réessayez.");
+        return;
+      }
       setCorps("");
       await onPoste();
+    } catch {
+      setErreur("Impossible de joindre le serveur. Votre texte est conservé, réessayez.");
     } finally { setEnvoi(false); }
   }
 
@@ -1310,6 +1327,7 @@ function ForumPromotion({ promo, onPoste }: { promo: any; onPoste: () => Promise
           <ForumMessageItem key={m.id} message={m} endpoint={`/api/academy/cohort-forum/posts/${m.id}/upvote`} variant="promotion" />
         ))}
 
+        {erreur && <p role="alert" className="text-[11px] text-destructive">{erreur}</p>}
         <div className="flex gap-2 pt-1">
           <textarea value={corps} onChange={e => setCorps(e.target.value)} rows={2}
             placeholder="Poser une question à la promotion…"
