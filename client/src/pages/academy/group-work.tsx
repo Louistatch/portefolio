@@ -227,6 +227,8 @@ function CarteResume({ travail: t, actif, onSelect }: { travail: Travail; actif:
               </span>
               <span className="truncate">{t.groupe.nom}</span>
             </>
+          ) : t.statut === "completed" ? (
+            <><CheckCircle2 className="w-3.5 h-3.5 shrink-0" /> travail non activé — points accordés</>
           ) : (
             <><Shuffle className="w-3.5 h-3.5 shrink-0" /> équipe pas encore tirée au sort</>
           )}
@@ -291,7 +293,11 @@ function CarteEcheance({ t }: { t: Travail }) {
           <CheckCircle2 className="w-4 h-4" /> Travail corrigé
         </div>
         <p className="titre-affichage text-2xl sm:text-3xl font-semibold mt-2">{t.note}/{t.maxScore}</p>
-        <p className="text-sm text-white/80 mt-1">Rendu déposé le {jour(t.rendu?.le)}</p>
+        <p className="text-sm text-white/80 mt-1">
+          {t.rendu
+            ? `Rendu déposé le ${jour(t.rendu.le)}`
+            : "Travail non activé pour votre promotion — la totalité des points vous est accordée."}
+        </p>
       </div>
     );
   }
@@ -328,6 +334,9 @@ function CarteEcheance({ t }: { t: Travail }) {
  * pas de plan de travail au jour le jour, que rien dans le modèle de données ne porte.
  */
 function PlanningTravail({ t }: { t: Travail }) {
+  // Un travail DISPENSÉ (clos sans rendu : points accordés par l'administration) n'a ni
+  // équipe, ni dépôt, ni correction à dater — la carte d'échéance dit déjà tout.
+  if (t.statut === "completed" && !t.rendu) return null;
   const maintenant = Date.now();
   type Etape = { label: string; date: string | null; fait: boolean; alerte?: boolean };
   const etapes: Etape[] = [];
@@ -451,8 +460,11 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
         {/* ── L'échéance, priorité visuelle ── */}
         <CarteEcheance t={t} />
 
-        {/* ── 1. Le groupe, en tête, comme dans le modèle ── */}
-        <TableauGroupe groupe={t.groupe} groupeLe={t.groupeLe} moiId={moiId} rendu={t.rendu} />
+        {/* ── 1. Le groupe, en tête, comme dans le modèle ── (pas pour un travail dispensé :
+            promettre un tirage au sort pour un travail qui n'aura pas lieu serait faux) */}
+        {!(t.statut === "completed" && !t.rendu) && (
+          <TableauGroupe groupe={t.groupe} groupeLe={t.groupeLe} moiId={moiId} rendu={t.rendu} />
+        )}
 
         {/* ── Le calendrier de ce travail ── */}
         <PlanningTravail t={t} />
@@ -594,7 +606,7 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
                   </Bloc>
                 )}
               </div>
-            ) : (
+            ) : t.statut === "completed" ? null : (
               <p className="text-sm text-muted-foreground">
                 Aucun rendu déposé pour l'instant.
                 {t.statut === "missed" && " L'échéance est passée — le dépôt reste possible jusqu'à la fin de votre période d'admission."}
@@ -615,7 +627,7 @@ function CarteTravail({ travail: t, moiId, consignes, onChange }:
             )}
 
             {/* ── 6. Évaluation du formateur ── */}
-            {t.statut === "completed" && <EvaluationFormateur travail={t} />}
+            {t.statut === "completed" && t.rendu && <EvaluationFormateur travail={t} />}
           </>
         )}
 

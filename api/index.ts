@@ -1703,7 +1703,13 @@ async function ensureGroupsForGw(sid: number, gw: any, ligne: { unlock_at: strin
   if (deja) return deja;
 
   const { data: stud } = await supabase.from("students").select("admitted_at").eq("id", sid).maybeSingle();
-  if (!eligibleAuxTravauxDeGroupe(stud?.admitted_at)) return null;
+  if (!stud?.admitted_at) return null;
+
+  // Pas de contrôle d'éligibilité ici : il vaut pour ENTRER dans le dispositif (voir
+  // generateGroupWorkSchedule), et un étudiant qui a une ligne de calendrier y est déjà.
+  // Posé ici aussi, il interdisait la constitution des équipes du GW2 et du GW3 à toute la
+  // promotion — en semaine 7, plus personne n'est dans sa semaine 2. Les fenêtres du GW2
+  // de la promotion d'août se sont ainsi refermées sans qu'aucune équipe n'ait été tirée.
 
   // La date de constitution se déduit de l'ouverture du travail pour CET étudiant : le
   // calendrier est individuel, donc la semaine 3 de l'un n'est pas celle de l'autre. On
@@ -1856,6 +1862,14 @@ async function refreshGroupWorkStates(sid: number): Promise<{ lignes: any[]; gro
   for (const l of lignes as any[]) {
     const gw = gws.find(g => g.id === l.group_work_id);
     if (!gw) continue;
+    // Un travail déjà clos n'a plus besoin d'équipe. C'est le cas d'un travail DISPENSÉ
+    // (points accordés sans rendu, voir plus bas) : lui tirer une équipe après coup
+    // enverrait à toute la promotion un email d'ouverture pour un travail qui n'aura pas lieu.
+    if (l.status === "completed") {
+      const deja = await groupOfStudent(sid, gw.id);
+      if (deja) groupes[l.group_work_id] = deja;
+      continue;
+    }
     const g = await ensureGroupsForGw(sid, gw, l);
     if (g) groupes[l.group_work_id] = g;
   }
@@ -1877,7 +1891,13 @@ async function refreshGroupWorkStates(sid: number): Promise<{ lignes: any[]; gro
     // initialement prévue. Un groupe qui se forme (tirage au sort, ou l'admin qui
     // l'assigne à la main) rend le travail « available » immédiatement, sans attendre
     // le passage de l'horloge sur `unlock_at`.
-    const etat = rendu?.status === "graded" ? "completed"
+    //
+    // « completed » est définitif, quelle qu'en soit l'origine — une correction, ou une
+    // DISPENSE décidée par l'administration (travail non activé pour une promotion, points
+    // accordés, aucun rendu). Sans cette garde, une ligne dispensée redescendait en
+    // « locked » faute de rendu, et le certificat final ne tombait jamais.
+    const etat = l.status === "completed" ? "completed"
+      : rendu?.status === "graded" ? "completed"
       : rendu ? "submitted"
       : !groupes[l.group_work_id] ? "locked"
       : now > new Date(l.due_at).getTime() ? "missed" : "available";
@@ -3369,15 +3389,23 @@ async function corpsFormationGroupesTravail(): Promise<Record<string, unknown>> 
   const gws = await getGroupWorks();
   if (!gws.length) return { ignoree: true, raison: "Aucun travail de groupe publié." };
 
+  // TOUS les admis, pas seulement ceux encore dans leur semaine 2 : le contrôle d'entrée
+  // dans le dispositif est fait par generateGroupWorkSchedule elle-même (qui ne crée rien
+  // pour qui n'est ni éligible ni déjà dedans). Filtrer ici en amont laissait la tâche
+  // tourner chaque matin sur zéro étudiant pendant que les équipes du GW2 attendaient.
   const { data: admis } = await supabase.from("students")
     .select("id, admitted_at").not("admitted_at", "is", null);
-  const eligibles = (admis || []).filter((s: any) => eligibleAuxTravauxDeGroupe(s.admitted_at));
+  const etudiants = admis || [];
 
-  let traites = 0, echecs = 0;
-  for (const s of eligibles) {
+  let traites = 0, echecs = 0, certificats = 0;
+  for (const s of etudiants) {
     try {
       await generateGroupWorkSchedule(s.id, new Date(s.admitted_at));
       await refreshGroupWorkStates(s.id);
+      // Le certificat final se déclenche d'ordinaire à la dernière correction ou à la fin
+      // du dernier cours. Une dispense accordée après coup ne passe par aucun de ces deux
+      // événements : ce balayage quotidien, idempotent, rattrape ceux dont tout est réuni.
+      if (await delivrerCertificatFinalSiComplet(s.id)) certificats++;
       traites++;
     } catch (e: any) {
       echecs++;
@@ -3385,8 +3413,8 @@ async function corpsFormationGroupesTravail(): Promise<Record<string, unknown>> 
     }
   }
 
-  console.log(`formation-groupes-travail : ${traites} étudiant(s) MEAL passé(s) en revue, ${echecs} échec(s).`);
-  return { etudiantsEligibles: eligibles.length, traites, echecs };
+  console.log(`formation-groupes-travail : ${traites} étudiant(s) MEAL passé(s) en revue, ${certificats} certificat(s) délivré(s), ${echecs} échec(s).`);
+  return { etudiantsAdmis: etudiants.length, traites, certificats, echecs };
 }
 
 const formationGroupesTravail = (req: Request, res: Response) =>
@@ -5106,7 +5134,9 @@ app.get("/api/academy/group-work", requireStudent, async (req, res) => {
         ouvertureLe: groupeLe,
         echeanceLe: l?.due_at ?? null,
         statut: l?.status ?? "locked",
-        note: rendu?.status === "graded" ? rendu.score : null,
+        // Un travail dispensé (points accordés sans rendu) porte sa note sur la ligne de
+        // calendrier, pas sur un rendu — voir refreshGroupWorkStates sur « completed ».
+        note: rendu?.status === "graded" ? rendu.score : (l?.status === "completed" ? l.score ?? null : null),
         feedback: rendu?.status === "graded" ? rendu.feedback ?? null : null,
         rendu: rendu ? {
           le: rendu.submitted_at,
