@@ -74,6 +74,11 @@ import { isStudentLoggedIn } from "@/lib/student";
 import { useEffect } from "react";
 import { CookieConsent } from "@/components/cookie-consent";
 import { AideFlottante } from "@/components/support/aide-flottante";
+import { memoriserCodeParrainage } from "@/lib/parrainage";
+
+// Avant le premier rendu : si l'URL porte un ?ref= d'ambassadeur, le retenir — quelle que
+// soit la page d'arrivée. L'inscription le retrouvera même après plusieurs navigations.
+memoriserCodeParrainage();
 
 function RequireGuard({ isAuthed, loginPath, children }: { isAuthed: () => unknown; loginPath: string; children: React.ReactNode }) {
   const [, navigate] = useLocation();

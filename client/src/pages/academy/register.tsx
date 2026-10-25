@@ -4,6 +4,7 @@ import { useLocation } from "wouter";
 import { SEO } from "@/components/seo";
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle2, Mail, Eye, EyeOff, Check, X, AlertCircle } from "lucide-react";
+import { codeParrainage } from "@/lib/parrainage";
 import { setStudentToken, setStudent } from "@/lib/student";
 import { AuthShell, Etapes, GroupeChamps, Champ, champ, JaugeMotDePasse } from "@/components/academy/auth-shell";
 
@@ -38,10 +39,11 @@ export default function AcademyRegister() {
     if (form.password !== form.confirm) { setError("Les mots de passe ne correspondent pas."); return; }
     setLoading(true);
     try {
-      // Code de parrainage porté par le lien d'un ambassadeur (?ref=CODE) : lu directement
-      // dans l'URL plutôt que stocké dans le formulaire — invisible, et il survit à un
-      // rechargement de la page pendant que l'étudiant remplit ses champs.
-      const referral_code = new URLSearchParams(window.location.search).get("ref") || undefined;
+      // Code de parrainage porté par le lien d'un ambassadeur (?ref=CODE) : l'URL de la
+      // page d'abord, puis la mémoire posée à l'arrivée sur le site (lib/parrainage) —
+      // le code survit ainsi à la navigation depuis une page de cours, pas seulement à un
+      // rechargement du formulaire.
+      const referral_code = codeParrainage();
       const res = await fetch("/api/academy/register", {
         method: "POST", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

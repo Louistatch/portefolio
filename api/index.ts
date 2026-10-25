@@ -6089,6 +6089,27 @@ function lienParrainage(code: string): string {
   return `${SITE_URL}/academy/register?ref=${encodeURIComponent(code)}`;
 }
 
+/**
+ * Tous les liens d'un ambassadeur : l'inscription directe, puis un lien par parcours.
+ *
+ * Un seul lien existait, droit sur le formulaire d'inscription. Or un ambassadeur ne
+ * recommande pas « LouisFarm » en général : il recommande le parcours qui a un sens pour
+ * la personne en face — le MEAL à un agent d'ONG, la finance climatique à un agent de
+ * crédit. Chaque lien ouvre /elearning sur la carte du parcours visé (?parcours=),
+ * et porte le code (?ref=), mémorisé côté client sur n'importe quelle page — voir
+ * client/src/lib/parrainage.ts — pour survivre à la navigation jusqu'à l'inscription.
+ */
+function liensParrainage(code: string): { programId: string | null; titre: string; url: string }[] {
+  const ref = encodeURIComponent(code);
+  return [
+    { programId: null, titre: "Inscription directe", url: `${SITE_URL}/academy/register?ref=${ref}` },
+    ...PROGRAMS.map(p => ({
+      programId: p.id, titre: p.title,
+      url: `${SITE_URL}/elearning?parcours=${encodeURIComponent(p.id)}&ref=${ref}`,
+    })),
+  ];
+}
+
 app.get("/api/academy/ambassador/me", requireStudent, async (req, res) => {
   const sid = (req as any).student.sid;
   const { data: stud } = await supabase.from("students")
@@ -6130,6 +6151,7 @@ app.get("/api/academy/ambassador/me", requireStudent, async (req, res) => {
   res.json({
     isAmbassador: true, ...eligibilite,
     code: stud.ambassador_code, since: stud.ambassador_since, lien: lienParrainage(stud.ambassador_code),
+    liens: liensParrainage(stud.ambassador_code),
     filleuls: filleuls || [], commissions: commissionsDetaillees,
     totalGagne, totalPaye, enAttente: totalGagne - totalPaye,
     taux: AMBASSADOR_TAUX_COMMISSION * 100,
@@ -7947,6 +7969,7 @@ app.get("/api/admin/academy/ambassadors", requireAuth, async (_req, res) => {
     ...a, nbFilleuls: nbFilleuls.get(a.id) || 0,
     totalGagne: gagnePar.get(a.id) || 0, totalPaye: payePar.get(a.id) || 0,
     enAttente: (gagnePar.get(a.id) || 0) - (payePar.get(a.id) || 0),
+    liens: liensParrainage(a.ambassador_code),
   })));
 });
 

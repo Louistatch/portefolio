@@ -131,6 +131,22 @@ export default function ELearning() {
 
   useEffect(() => { topRef.current?.scrollIntoView({ behavior: "smooth" }); }, [view]);
 
+  // Un lien d'ambassadeur ouvre la page sur la carte du parcours recommandé
+  // (?parcours=meal|fca|fcq|tof|coop|data). Une seule fois, et après un délai : l'effet
+  // ci-dessus défile vers le haut à chaque montage, celui-ci doit avoir le dernier mot —
+  // sans le garde-fou, revenir du test ramènerait aussi sur la carte, sans raison.
+  const dejaDefileVersParcours = useRef(false);
+  useEffect(() => {
+    if (view !== "landing" || dejaDefileVersParcours.current) return;
+    const vise = new URLSearchParams(window.location.search).get("parcours");
+    if (!vise) return;
+    dejaDefileVersParcours.current = true;
+    const minuterie = setTimeout(() => {
+      document.getElementById(`parcours-${vise}`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }, 350);
+    return () => clearTimeout(minuterie);
+  }, [view]);
+
   // Les deux admissions sont indépendantes : on lit les deux statuts, sans quoi la page ne
   // saurait pas dire à un étudiant admis au MEAL qu'il lui reste à passer le second test.
   function rafraichirStatuts() {
@@ -624,14 +640,14 @@ export default function ELearning() {
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               {
-                code: "MEAL-01 · 02 · 03", teinte: "#0D9488", titre: "Cursus MEAL",
+                ancre: "meal", code: "MEAL-01 · 02 · 03", teinte: "#0F766E", titre: "Cursus MEAL",
                 texte: "Concevoir une collecte, cartographier les résultats, automatiser le reporting. Trois projets terrain enchaînés.",
                 lignes: [["Leçons", "20"], ["Rythme", "2 / semaine"], ["Test d'entrée", "30 questions · 21"], ["Prérequis", "Aucun code"]],
                 titreDelivre: "Certificat Super-Expert MEAL", fond: "bg-primary/5", encre: "text-primary",
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("meal") },
               },
               {
-                code: "FCA-01", teinte: "#B45309", titre: "Finance climatique agricole",
+                ancre: "fca", code: "FCA-01", teinte: "#B45309", titre: "Finance climatique agricole",
                 texte: "Calculer une perte attendue, mesurer une concentration, auditer un produit indiciel, écrire la note qui débloque un financement.",
                 lignes: [["Leçons", "6"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"], ["Public", "Agents de crédit"]],
                 titreDelivre: "Certificat d'Analyste du Risque Climatique Agricole",
@@ -639,7 +655,7 @@ export default function ELearning() {
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("fca") },
               },
               {
-                code: "FCQ-01", teinte: "#7C2D12", titre: "Finance climatique quantitative",
+                ancre: "fcq", code: "FCQ-01", teinte: "#7C2D12", titre: "Finance climatique quantitative",
                 texte: "Le même portefeuille que le parcours analyste, prêt par prêt : simuler une distribution de pertes, chiffrer l'effet de la corrélation, auditer le risque de base d'un produit indiciel.",
                 lignes: [["Leçons", "7"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"], ["Prérequis", "Python"]],
                 titreDelivre: "Certificat de Quantitativiste du Risque Climatique Agricole",
@@ -647,7 +663,7 @@ export default function ELearning() {
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("fcq") },
               },
               {
-                code: "TOF-FIN-01", teinte: "#7C3AED", titre: "Formation de formateurs",
+                ancre: "tof", code: "TOF-FIN-01", teinte: "#7C3AED", titre: "Formation de formateurs",
                 texte: "Concevoir et animer des sessions de gestion financière adaptées aux réalités paysannes, avec les outils du terrain.",
                 lignes: [["Leçons", "12"], ["Rythme", "1 / semaine"], ["Test d'entrée", "15 questions · 11"], ["Public", "Animateurs ruraux"]],
                 titreDelivre: "Attestation de fin de parcours",
@@ -655,7 +671,7 @@ export default function ELearning() {
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("tof") },
               },
               {
-                code: "COOP-01", teinte: "#1E3A8A", titre: "Coopératives et organisation des acteurs",
+                ancre: "coop", code: "COOP-01", teinte: "#1E3A8A", titre: "Coopératives et organisation des acteurs",
                 texte: "Passer d'un groupement de fait à une organisation solide et reconnue : choisir la forme juridique, rédiger des statuts conformes, immatriculer, affecter les excédents, fédérer — puis organiser les acteurs de la filière autour d'elle.",
                 // Le prix est annoncé ICI, avant l'inscription, et non découvert à la
                 // semaine huit. Un tarif révélé à la fin se lit comme un piège, et un seul
@@ -670,7 +686,7 @@ export default function ELearning() {
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("coop") },
               },
               {
-                code: "DATA-01 · 02", teinte: "#9f1239", titre: "Data Analytics",
+                ancre: "data", code: "DATA-01 · 02", teinte: "#9f1239", titre: "Data Analytics",
                 texte: "Nettoyer un jeu de données réel, en tirer des statistiques et des visualisations qui tiennent, écrire une requête SQL, construire un modèle de régression ou de classification simple, et présenter une recommandation à un décideur.",
                 lignes: [["Leçons", "9"], ["Rythme", "1 / semaine"], ["Test d'entrée", "20 questions · 14"],
                          ["Formation", "Gratuite"], ["Attestation", "10 000 F CFA"]],
@@ -679,7 +695,7 @@ export default function ELearning() {
                 action: { libelle: "Passer le test", onClick: () => demarrerTest("data") },
               },
             ].map(p => (
-              <Spotlight key={p.code} className="lift border border-border rounded-lg bg-card overflow-hidden flex flex-col">
+              <Spotlight key={p.code} id={`parcours-${p.ancre}`} className="lift border border-border rounded-lg bg-card overflow-hidden flex flex-col scroll-mt-24">
                 <div className="h-1" style={{ background: p.teinte }} />
                 <div className="p-6 flex flex-col flex-1">
                   <div className="font-mono text-xs text-muted-foreground tracking-wide">{p.code}</div>

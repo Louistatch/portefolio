@@ -32,6 +32,8 @@ type Etat = {
   code?: string;
   since?: string;
   lien?: string;
+  /** L'inscription directe puis un lien par parcours, construits par le serveur. */
+  liens?: { programId: string | null; titre: string; url: string }[];
   totalGagne?: number;
   totalPaye?: number;
   enAttente?: number;
@@ -62,7 +64,7 @@ export default function AcademyAmbassador() {
   const [loading, setLoading] = useState(true);
   const [rejoindre, setRejoindre] = useState(false);
   const [erreur, setErreur] = useState("");
-  const [copie, setCopie] = useState<"lien" | "texte" | null>(null);
+  const [copie, setCopie] = useState<string | null>(null);
   const [telechargement, setTelechargement] = useState(false);
   const [nbEtudiants, setNbEtudiants] = useState<number | null>(null);
 
@@ -109,7 +111,7 @@ export default function AcademyAmbassador() {
     finally { setRejoindre(false); }
   }
 
-  function copier(valeur: string, quoi: "lien" | "texte") {
+  function copier(valeur: string, quoi: string) {
     navigator.clipboard.writeText(valeur).then(() => {
       setCopie(quoi);
       setTimeout(() => setCopie(c => (c === quoi ? null : c)), 2200);
@@ -485,6 +487,47 @@ export default function AcademyAmbassador() {
           </MountStagger>
 
           {erreur && <p className="text-sm text-destructive mt-4" role="alert">{erreur}</p>}
+
+          {/* ── Un lien par parcours ──
+              Le lien du héros mène droit au formulaire : parfait pour quelqu'un de déjà
+              convaincu. Mais un ambassadeur recommande rarement « LouisFarm » en général —
+              il recommande LE parcours qui parle à la personne en face. Chacun de ces liens
+              ouvre la page publique des formations sur la carte du parcours visé, et le
+              code de parrainage suit la visite jusqu'à l'inscription (lib/parrainage). */}
+          {(etat.liens?.length || 0) > 1 && (
+            <Reveal className="mt-12 sm:mt-16">
+              <TitreSection>Un lien par parcours</TitreSection>
+              <p className="text-[14px] leading-relaxed text-foreground/70 max-w-2xl -mt-3 mb-5 text-pretty">
+                Le lien ci-dessus mène droit à l'inscription. Ceux-ci ouvrent la page des
+                formations sur le parcours que vous recommandez — votre code suit la visite,
+                même si la personne prend le temps de lire avant de s'inscrire.
+              </p>
+              <ul className="rounded-3xl border border-border/60 bg-card overflow-hidden divide-y divide-border/40">
+                {etat.liens!.filter(l => l.programId).map(l => {
+                  const parcours = PROGRAMS.find(pr => pr.id === l.programId);
+                  return (
+                    <li key={l.programId} className="flex items-center gap-3 px-4 sm:px-5 py-3">
+                      <span aria-hidden className="w-2.5 h-2.5 rounded-full shrink-0"
+                        style={{ background: parcours?.accent || "#64748b" }} />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold leading-tight">{l.titre}</p>
+                        <p className="text-[12px] font-mono text-muted-foreground truncate">{l.url}</p>
+                      </div>
+                      <button onClick={() => copier(l.url, l.programId!)}
+                        className="pressable shrink-0 inline-flex items-center gap-1.5 px-3.5 min-h-11 rounded-xl border border-border/70 text-[13px] font-semibold
+                                   transition-colors hover:bg-muted
+                                   focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+                        aria-label={`Copier le lien du parcours ${l.titre}`}>
+                        {copie === l.programId
+                          ? <><Check className="w-4 h-4 text-primary" aria-hidden /> Copié</>
+                          : <><Copy className="w-4 h-4" aria-hidden /> Copier</>}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </Reveal>
+          )}
 
           {/* ── Le tableau de bord ── */}
           <Reveal className="mt-12 sm:mt-16">

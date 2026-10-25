@@ -4,12 +4,16 @@ import { adminFetch } from "@/lib/admin";
 import { Button } from "@/components/ui/button";
 import {
   Loader2, Megaphone, Users, Wallet, Clock, CheckCircle2, AlertCircle, Send,
+  Link2, Copy, Check, ChevronDown, ChevronUp,
 } from "lucide-react";
+import { PROGRAMS } from "@shared/programs";
 import { useToast } from "@/hooks/use-toast";
 
 type Ambassadeur = {
   id: number; full_name: string; email: string; ambassador_code: string; ambassador_since: string;
   nbFilleuls: number; totalGagne: number; totalPaye: number; enAttente: number;
+  /** L'inscription directe puis un lien par parcours, construits par le serveur. */
+  liens: { programId: string | null; titre: string; url: string }[];
 };
 
 type Commission = {
@@ -29,6 +33,16 @@ export default function AmbassadorsAdmin() {
   const qc = useQueryClient();
   const { toast } = useToast();
   const [filtre, setFiltre] = useState<"en_attente" | "toutes">("en_attente");
+  // Les liens d'un seul ambassadeur à la fois : la liste resterait illisible tous dépliés.
+  const [liensOuverts, setLiensOuverts] = useState<number | null>(null);
+  const [copie, setCopie] = useState<string | null>(null);
+
+  function copier(url: string, cle: string) {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopie(cle);
+      setTimeout(() => setCopie(c => (c === cle ? null : c)), 2000);
+    }).catch(() => toast({ title: "Copie impossible — sélectionnez le lien à la main.", variant: "destructive" }));
+  }
 
   const { data: ambassadeurs, isLoading } = useQuery<Ambassadeur[]>({
     queryKey: ["ambassadors"],
@@ -129,15 +143,59 @@ export default function AmbassadorsAdmin() {
         </div>
         <div className="divide-y divide-border/30">
           {(ambassadeurs || []).map(a => (
-            <div key={a.id} className="flex items-center gap-3 px-4 py-3 flex-wrap">
-              <div className="min-w-0 flex-1">
-                <p className="font-medium text-sm truncate">{a.full_name}</p>
-                <p className="text-xs text-muted-foreground truncate">{a.email} · code {a.ambassador_code}</p>
+            <div key={a.id}>
+              <div className="flex items-center gap-3 px-4 py-3 flex-wrap">
+                <div className="min-w-0 flex-1">
+                  <p className="font-medium text-sm truncate">{a.full_name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{a.email} · code {a.ambassador_code}</p>
+                </div>
+                <span className="text-xs bg-muted px-2 py-1 rounded-full shrink-0">{a.nbFilleuls} filleul{a.nbFilleuls > 1 ? "s" : ""}</span>
+                <span className="text-xs font-semibold text-primary shrink-0">{a.totalGagne.toLocaleString("fr-FR")} F gagnés</span>
+                {a.enAttente > 0 && (
+                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 shrink-0">{a.enAttente.toLocaleString("fr-FR")} F en attente</span>
+                )}
+                <Button size="sm" variant="outline" className="gap-1.5 shrink-0"
+                  aria-expanded={liensOuverts === a.id}
+                  onClick={() => setLiensOuverts(o => (o === a.id ? null : a.id))}>
+                  <Link2 className="w-3.5 h-3.5" aria-hidden="true" />
+                  Liens
+                  {liensOuverts === a.id
+                    ? <ChevronUp className="w-3.5 h-3.5" aria-hidden="true" />
+                    : <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />}
+                </Button>
               </div>
-              <span className="text-xs bg-muted px-2 py-1 rounded-full shrink-0">{a.nbFilleuls} filleul{a.nbFilleuls > 1 ? "s" : ""}</span>
-              <span className="text-xs font-semibold text-primary shrink-0">{a.totalGagne.toLocaleString("fr-FR")} F gagnés</span>
-              {a.enAttente > 0 && (
-                <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 shrink-0">{a.enAttente.toLocaleString("fr-FR")} F en attente</span>
+
+              {/* ── Les liens de cet ambassadeur ──
+                  L'inscription directe, puis un lien par parcours : chacun ouvre la page
+                  publique des formations sur la carte du parcours visé, et le code (?ref=)
+                  est mémorisé côté client jusqu'à l'inscription. C'est ici que
+                  l'administration vient chercher le bon lien à transmettre — par WhatsApp,
+                  par email — sans le reconstruire à la main, donc sans faute de frappe
+                  dans le code. */}
+              {liensOuverts === a.id && (
+                <ul className="mx-4 mb-3 rounded-xl border border-border/50 bg-muted/30 divide-y divide-border/40">
+                  {a.liens.map(l => {
+                    const parcours = l.programId ? PROGRAMS.find(pr => pr.id === l.programId) : null;
+                    const cle = `${a.id}:${l.programId ?? "inscription"}`;
+                    return (
+                      <li key={cle} className="flex items-center gap-2.5 px-3 py-2">
+                        <span aria-hidden="true" className="w-2 h-2 rounded-full shrink-0"
+                          style={{ background: parcours?.accent || "#64748b" }} />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs font-semibold leading-tight">{l.titre}</p>
+                          <p className="text-[11px] font-mono text-muted-foreground truncate">{l.url}</p>
+                        </div>
+                        <button onClick={() => copier(l.url, cle)}
+                          aria-label={`Copier le lien « ${l.titre} » de ${a.full_name}`}
+                          className="shrink-0 inline-flex items-center gap-1.5 px-3 min-h-9 rounded-lg border border-border/70 bg-card text-xs font-semibold hover:bg-muted transition-colors">
+                          {copie === cle
+                            ? <><Check className="w-3.5 h-3.5 text-primary" aria-hidden="true" /> Copié</>
+                            : <><Copy className="w-3.5 h-3.5" aria-hidden="true" /> Copier</>}
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
               )}
             </div>
           ))}

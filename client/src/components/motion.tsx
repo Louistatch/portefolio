@@ -355,9 +355,9 @@ export function useSpotlight<T extends HTMLElement = HTMLDivElement>() {
  * Carte au halo. Le hook ne peut pas être appelé dans un `.map()` — un
  * composant le peut, et c'est la seule raison d'être de ce wrapper.
  */
-export function Spotlight({ children, className }: { children: ReactNode; className?: string }) {
+export function Spotlight({ children, className, id }: { children: ReactNode; className?: string; id?: string }) {
   const ref = useSpotlight<HTMLDivElement>();
-  return <div ref={ref} className={`spotlight ${className ?? ""}`}>{children}</div>;
+  return <div ref={ref} id={id} className={`spotlight ${className ?? ""}`}>{children}</div>;
 }
 
 /** Barre de progression du défilement, en haut de page. */
