@@ -1,0 +1,53 @@
+# ══════════════════════════════════════════════════════════════
+# Annonce du livret de révision
+#
+# Une annonce n'a qu'un moment : ce workflow n'a AUCUN calendrier, il ne part qu'à la
+# main (workflow_dispatch, ou le bouton « annonce-livret » de l'administration qui
+# appelle la même tâche). Le relancer est sans danger : chaque e-mail porte la clé
+# d'idempotence annonce_livret:<étudiant> dans academy_emails — un second passage ne
+# réécrit à personne, il ne fait que rattraper d'éventuels échecs d'envoi.
+#
+# Même authentification que les autres workflows : le secret de dépôt CRON_SECRET,
+# identique à la variable d'environnement CRON_SECRET côté hébergeur. Et même règle
+# d'adresse : le www est obligatoire (louisfarm.com répond 307, -L perdrait
+# l'en-tête Authorization en changeant d'hôte).
+# ══════════════════════════════════════════════════════════════
+name: Annonce du livret de révision
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: annonce-livret
+  cancel-in-progress: false
+
+jobs:
+  annoncer:
+    name: Prévenir chaque inscrit que le livret existe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Vérifier que le secret est en place
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "::error::Le secret de dépôt CRON_SECRET est absent."
+            exit 1
+          fi
+          echo "Secret présent."
+
+      - name: Envoyer l'annonce
+        env:
+          BASE: ${{ vars.SITE_URL || 'https://www.louisfarm.com' }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -sS --max-time 120 -o reponse.json -w "%{http_code}" \
+            -H "Authorization: Bearer $CRON_SECRET" "$BASE/api/cron/annonce-livret?forcer=1")
+          cat reponse.json; echo
+          if [ "$code" -ge 300 ]; then
+            echo "::error::HTTP $code sur $BASE/api/cron/annonce-livret"
+            exit 1
+          fi
+          echo "HTTP $code"

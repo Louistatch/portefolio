@@ -3425,6 +3425,102 @@ app.get("/api/cron/formation-groupes-travail", formationGroupesTravail);
 app.post("/api/cron/formation-groupes-travail", formationGroupesTravail);
 
 /**
+ * Annonce du livret de révision — une fois par étudiant, pour toujours.
+ *
+ * Le livret (shared/livret.ts) est né d'une demande d'étudiant ; cette tâche prévient
+ * chaque inscrit qu'il existe : les certifiés qu'il les attend déjà, les autres qu'il se
+ * gagne en terminant le parcours. Une TÂCHE et non un envoi à la main, pour trois
+ * garanties qu'un envoi manuel ne donne pas ensemble : l'expéditeur de la plateforme, le
+ * journal academy_emails, et l'idempotence par étudiant (dedupeKey) — la relancer ne
+ * réécrit jamais à personne.
+ *
+ * Sans calendrier, volontairement : elle se déclenche à la main (bouton de
+ * l'administration, ou workflow annonce-livret.yml) parce qu'une annonce n'a qu'un
+ * moment. Un étudiant admis APRÈS n'est pas concerné : il découvrira le livret dans le
+ * produit, qui l'annonce désormais partout où un parcours se termine.
+ */
+async function corpsAnnonceLivret(): Promise<Record<string, unknown>> {
+  const [surStudents, surAdmissions] = await Promise.all([
+    supabase.from("students")
+      .select("id, full_name, email, course_emails, exclude_from_leaderboard, final_certificate_no")
+      .not("admitted_at", "is", null),
+    supabase.from("academy_program_admissions")
+      .select("program_id, final_certificate_no, students(id, full_name, email, course_emails, exclude_from_leaderboard, final_certificate_no)")
+      .not("admitted_at", "is", null),
+  ]);
+
+  type Destinataire = { id: number; full_name: string; email: string; certifieParcoursId: string | null };
+  const destinataires = new Map<number, Destinataire>();
+  const retenir = (s: any, certifieParcoursId: string | null) => {
+    if (!s?.email || s.course_emails === false || s.exclude_from_leaderboard) return;
+    const existant = destinataires.get(s.id);
+    destinataires.set(s.id, {
+      id: s.id, full_name: s.full_name || "", email: s.email,
+      // Un certifié reste certifié, quelle que soit la source lue en premier.
+      certifieParcoursId: existant?.certifieParcoursId ?? certifieParcoursId,
+    });
+    if (existant && !existant.certifieParcoursId && certifieParcoursId) {
+      destinataires.get(s.id)!.certifieParcoursId = certifieParcoursId;
+    }
+  };
+  for (const s of surStudents.data || []) retenir(s, s.final_certificate_no ? "meal" : null);
+  for (const a of surAdmissions.data || []) {
+    const s = (a as any).students;
+    retenir(s, a.final_certificate_no ? a.program_id : s?.final_certificate_no ? "meal" : null);
+  }
+
+  const nbCertifies = [...destinataires.values()].filter(d => d.certifieParcoursId).length;
+  let envoyes = 0, dejaFaits = 0, echecs = 0;
+  for (const d of destinataires.values()) {
+    const r = await sendAcademyEmail({
+      studentId: d.id, to: d.email, type: "annonce_livret",
+      subject: d.certifieParcoursId
+        ? "🎁 Votre livret de révision est prêt"
+        : "🎁 Nouveau : terminez votre parcours, gagnez son livret",
+      html: d.certifieParcoursId
+        ? livretPretEmailHtml(d.full_name, d.certifieParcoursId)
+        : livretAVenirEmailHtml(d.full_name, nbCertifies),
+      dedupeKey: `annonce_livret:${d.id}`,
+    });
+    if (r?.sent) envoyes++;
+    else if (r?.reason === "already_sent") dejaFaits++;
+    else echecs++;
+  }
+  console.log(`annonce-livret : ${envoyes} envoyé(s), ${dejaFaits} déjà fait(s), ${echecs} échec(s) sur ${destinataires.size} destinataire(s).`);
+  return { destinataires: destinataires.size, certifies: nbCertifies, envoyes, dejaFaits, echecs };
+}
+
+/** Prénom d'affichage : « ESPOIR » redevient « Espoir », « Esso-wassam » reste tel quel. */
+function prenomDe(fullName: string): string {
+  const prenom = (fullName || "").trim().split(/\s+/)[0] || "";
+  return prenom === prenom.toUpperCase() && prenom.length > 1
+    ? prenom[0] + prenom.slice(1).toLowerCase()
+    : prenom;
+}
+
+function livretPretEmailHtml(name: string, programId: string) {
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Votre livret de révision est prêt 🎁</h1><p class="sub">Toutes les leçons de votre parcours, en un PDF</p></div><div class="bd"><p>Bonjour ${prenomDe(name)},</p><p>Vous êtes allé(e) au bout de votre parcours — et une demande d'étudiant est devenue une fonctionnalité. Votre <strong>livret de révision</strong> — toutes les leçons du parcours, réunies en un PDF à garder et relire — vous attend dès maintenant : sur la page de votre parcours, bouton « Livret de révision (PDF) », ou dans la rubrique Mes certifications.</p><p>Merci d'avoir inauguré la promotion des certifiés.</p><p style="text-align:center"><a href="${SITE_URL}/academy/parcours/${programId}" class="btn">Télécharger mon livret</a></p><p class="muted">Sur téléphone : le livret s'ouvre dans le navigateur — menu → Imprimer → « Enregistrer au format PDF ».</p></div>`);
+}
+
+function livretAVenirEmailHtml(name: string, nbCertifies: number) {
+  const camarades = nbCertifies > 1
+    ? `${nbCertifies} de vos camarades l'ont déjà gagné. À vous&nbsp;!`
+    : "À vous de le gagner&nbsp;!";
+  return academyEmailLayout(`<div class="hd"><div class="logo"><span>🎓 LOUISFARM LEARNING</span></div><h1>Terminez votre parcours, gagnez son livret 🎁</h1><p class="sub">Le livret de révision PDF arrive sur LouisFarm Learning</p></div><div class="bd"><p>Bonjour ${prenomDe(name)},</p><p>Désormais, chaque parcours terminé débloque son <strong>livret de révision</strong> : toutes les leçons en un PDF, pour réviser où vous voulez, même hors ligne. Le bouton apparaîtra sur la page de votre parcours dès votre dernier cours terminé — il y est déjà annoncé.</p><p>${camarades}</p><p style="text-align:center"><a href="${SITE_URL}/academy/dashboard" class="btn">Reprendre mon parcours</a></p></div>`);
+}
+
+// `?forcer=1` accepté ici aussi (après authentification) : si un passage échoue à
+// mi-course, le reprendre LE MÊME JOUR doit être possible — les clés d'idempotence
+// garantissent que personne ne reçoit deux fois l'annonce.
+const annonceLivret = (req: Request, res: Response) =>
+  executerTache("annonce-livret", req, res, corpsAnnonceLivret, {
+    forcer: req.query.forcer === "1" || req.query.forcer === "true",
+  });
+
+app.get("/api/cron/annonce-livret", annonceLivret);
+app.post("/api/cron/annonce-livret", annonceLivret);
+
+/**
  * Registre des tâches quotidiennes.
  *
  * Il existe pour une seule raison : permettre de lancer une tâche depuis
@@ -3440,6 +3536,7 @@ const TACHES_PLANIFIEES: Record<string, () => Promise<Record<string, unknown>>> 
   "classement-hebdo": corpsClassementHebdomadaire,
   "formation-groupes-travail": corpsFormationGroupesTravail,
   "correction-ia-group-work": corpsCorrectionIAGroupWork,
+  "annonce-livret": corpsAnnonceLivret,
 };
 
 /**
