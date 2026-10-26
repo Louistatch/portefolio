@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
+import { useToast } from "@/hooks/use-toast";
 import { isStudentLoggedIn, studentFetch } from "@/lib/student";
 import { PROGRAMS, programOf, programById, type Program } from "@shared/programs";
 
@@ -40,6 +41,36 @@ export default function AcademyParcours() {
   const [classement, setClassement] = useState<{ student_id: number; full_name: string; total: number }[]>([]);
   const [voirTermines, setVoirTermines] = useState(false);
   const [toutesSemaines, setToutesSemaines] = useState(false);
+  const [livretEnCours, setLivretEnCours] = useState(false);
+  const { toast } = useToast();
+
+  /**
+   * Le livret s'ouvre dans un onglet qu'on crée AVANT le premier await : un window.open
+   * lancé après un fetch n'est plus couvert par le clic, et les bloqueurs de fenêtres
+   * l'avalent. L'onglet vide reçoit l'adresse du document une fois la réponse arrivée,
+   * ou se referme si le serveur dit non (le serveur reste seul juge de l'achèvement).
+   */
+  async function ouvrirLivret(programId: string) {
+    const onglet = window.open("", "_blank");
+    setLivretEnCours(true);
+    try {
+      const r = await studentFetch(`/api/academy/parcours/${programId}/livret`);
+      if (!r.ok) {
+        onglet?.close();
+        const d = await r.json().catch(() => null);
+        toast({ title: "Livret indisponible", description: d?.message || "Réessayez plus tard.", variant: "destructive" });
+        return;
+      }
+      const url = URL.createObjectURL(await r.blob());
+      if (onglet) onglet.location = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      onglet?.close();
+      toast({ title: "Livret indisponible", description: "Vérifiez votre connexion puis réessayez.", variant: "destructive" });
+    } finally {
+      setLivretEnCours(false);
+    }
+  }
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
@@ -171,6 +202,27 @@ export default function AcademyParcours() {
                     {parcours.prixAttestation.toLocaleString("fr-FR")} F CFA
                   </span>{" "}
                   — vous attend à la fin du parcours.
+                </p>
+              )}
+
+              {/* ── Le livret de révision ──
+                  Demandé par un étudiant le soir même de sa certification : « un pdf de tout
+                  le cours du parcours, pour réviser de temps en temps ». Terminé, il se
+                  télécharge ; en cours, il s'annonce — qu'on sache qu'il s'y gagne quelque
+                  chose. Le serveur revérifie l'achèvement : ce bouton est une porte, pas la
+                  serrure. */}
+              {termines === stats.length && stats.length > 0 ? (
+                <Button size="sm" variant="outline" className="mt-4 gap-2" disabled={livretEnCours}
+                  onClick={() => ouvrirLivret(programId)}>
+                  {livretEnCours
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <BookOpen className="w-3.5 h-3.5" />}
+                  Livret de révision (PDF)
+                </Button>
+              ) : (
+                <p className="mt-3 text-[12.5px] text-muted-foreground leading-relaxed flex items-center gap-1.5">
+                  <Lock className="w-3.5 h-3.5 shrink-0" />
+                  À la fin du parcours : le livret de révision PDF — toutes les leçons, en un document.
                 </p>
               )}
             </div>

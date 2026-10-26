@@ -108,6 +108,29 @@ export default function AdminCourses() {
     groupes.get(cle)!.push(c);
   }
 
+  /**
+   * Le livret de révision du parcours, sans condition d'achèvement côté administration.
+   * L'onglet s'ouvre AVANT le premier await : ouvert après coup, il serait avalé par le
+   * bloqueur de fenêtres. Il reçoit ensuite le document, ou se referme sur échec.
+   */
+  async function ouvrirLivret(programId: string, titre: string) {
+    const onglet = window.open("", "_blank");
+    try {
+      const r = await adminFetch(`/api/admin/academy/parcours/${programId}/livret`);
+      if (!r.ok) {
+        onglet?.close();
+        toast({ title: "Livret indisponible", description: `Le livret « ${titre} » n'a pas pu être généré.`, variant: "destructive" });
+        return;
+      }
+      const url = URL.createObjectURL(await r.blob());
+      if (onglet) onglet.location = url;
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      onglet?.close();
+      toast({ title: "Livret indisponible", description: "Vérifiez la connexion puis réessayez.", variant: "destructive" });
+    }
+  }
+
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-8">
       <div className="flex items-center justify-between">
@@ -128,9 +151,17 @@ export default function AdminCourses() {
         const p = programme(progId);
         return (
           <div key={progId} className="space-y-3">
-            <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: p?.accent }}>
-              {p?.title || "Parcours inconnu"}
-            </h2>
+            <div className="flex items-center justify-between gap-3 flex-wrap">
+              <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: p?.accent }}>
+                {p?.title || "Parcours inconnu"}
+              </h2>
+              {p && (
+                <Button size="sm" variant="outline" className="gap-1.5 min-h-9"
+                  onClick={() => ouvrirLivret(p.id, p.title)}>
+                  <BookOpen className="w-3.5 h-3.5" aria-hidden="true" /> Livret de révision
+                </Button>
+              )}
+            </div>
             <div className="grid gap-3">
               {liste.sort((a, b) => a.order_index - b.order_index).map(c => (
                 <div key={c.id} className="border border-border rounded-lg p-4 flex items-center justify-between gap-4 hover:border-primary/40 transition-colors">

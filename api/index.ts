@@ -18,6 +18,7 @@ import {
   lessonExercises,
 } from "../shared/exercises.js";
 import { programOf, programById, PROGRAMS, type Program } from "../shared/programs.js";
+import { livretHtml, type CoursLivret } from "../shared/livret.js";
 import { leconOuverte, semainesNecessaires, FENETRE_ADMISSION_SEMAINES } from "../shared/rythme.js";
 import { validerLecon, idsExercices } from "../shared/valider-cours.js";
 import {
@@ -3835,6 +3836,82 @@ app.get("/api/academy/courses/:id", async (req, res) => {
     return { ...l, content: stripExerciseAnswers(materialiserExercicesParametres(content, grainesBase)) };
   });
   res.json({ ...course, lessons: safeLessons });
+});
+
+// ── Livret de révision : toutes les leçons d'un parcours, en une page imprimable ──
+//
+// Demande d'étudiant, formulée le soir de sa certification : « un pdf de tout le cours du
+// parcours, pour réviser de temps en temps ». Le gabarit vit dans shared/livret.ts ; ici on
+// ne fait qu'assembler les données et tenir la porte.
+//
+// La porte : le livret ne s'ouvre qu'une fois TOUS les cours du parcours terminés — même
+// contrôle que la demande d'attestation. Ce n'est pas une barrière de confidentialité (les
+// leçons se lisent cours par cours dans l'application), c'est le respect du rythme : les
+// leçons se débloquent semaine par semaine, et un recueil complet remis au premier jour
+// ferait du planning une fiction. Terminer le parcours, c'est aussi gagner son livret.
+async function donneesLivret(programId: string): Promise<{ parcours: Program; cours: CoursLivret[]; idsCours: number[] } | null> {
+  const parcours = PROGRAMS.find(p => p.id === programId);
+  if (!parcours) return null;
+  const { data: courses } = await supabase.from("sms_courses")
+    .select("id, code, title, description, level, tools, order_index")
+    .eq("is_published", true).order("order_index");
+  const duParcours = (courses || []).filter((c: any) => programOf(c.code)?.id === programId);
+  if (!duParcours.length) return null;
+
+  const { data: lessons } = await supabase.from("sms_lessons")
+    .select("course_id, title, order_index, content")
+    .in("course_id", duParcours.map((c: any) => c.id)).order("order_index");
+  const parCours = new Map<number, any[]>();
+  for (const l of lessons || []) {
+    let content = l.content;
+    if (typeof content === "string") { try { content = JSON.parse(content); } catch { content = null; } }
+    const liste = parCours.get(l.course_id) || [];
+    liste.push({ title: l.title, content });
+    parCours.set(l.course_id, liste);
+  }
+  return {
+    parcours,
+    idsCours: duParcours.map((c: any) => c.id),
+    cours: duParcours.map((c: any) => ({
+      code: c.code, title: c.title, description: c.description, level: c.level, tools: c.tools,
+      lessons: parCours.get(c.id) || [],
+    })),
+  };
+}
+
+function envoyerLivret(res: Response, d: { parcours: Program; cours: CoursLivret[] }) {
+  res.setHeader("Content-Type", "text/html; charset=utf-8");
+  res.send(livretHtml({
+    parcours: d.parcours,
+    cours: d.cours,
+    genereLe: new Date().toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" }),
+    siteUrl: SITE_URL,
+  }));
+}
+
+app.get("/api/academy/parcours/:programId/livret", requireStudent, async (req, res) => {
+  const sid = (req as any).student.sid;
+  const d = await donneesLivret(String(req.params.programId));
+  if (!d) return res.status(404).json({ message: "Parcours introuvable." });
+
+  const { data: enrs } = await supabase.from("enrollments")
+    .select("course_id, progress").eq("student_id", sid).in("course_id", d.idsCours);
+  const complet = d.idsCours.length > 0
+    && d.idsCours.every(cid => (enrs || []).some((e: any) => e.course_id === cid && e.progress >= 100));
+  if (!complet) {
+    return res.status(403).json({
+      message: `Le livret de révision se débloque quand tous les cours du parcours « ${d.parcours.title} » sont terminés.`,
+    });
+  }
+  envoyerLivret(res, d);
+});
+
+// Côté administration : même document, sans condition d'achèvement — pour vérifier une
+// édition ou la distribuer directement (groupe WhatsApp d'une promotion).
+app.get("/api/admin/academy/parcours/:programId/livret", requireAuth, async (req, res) => {
+  const d = await donneesLivret(String(req.params.programId));
+  if (!d) return res.status(404).json({ message: "Parcours introuvable." });
+  envoyerLivret(res, d);
 });
 
 // ── Mes inscriptions (avec infos cours) ──
