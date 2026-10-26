@@ -9,6 +9,7 @@ import {
   AlertTriangle, ExternalLink, MapPin, BookMarked, Image as ImageIcon, PenLine, Clock, Award,
 } from "lucide-react";
 import { studentFetch, isStudentLoggedIn } from "@/lib/student";
+import { ouvrirLivret } from "@/lib/livret";
 import { programOf } from "@shared/programs";
 // Ce module ne pèse que quelques kilo-octets et ne tire aucune dépendance : il ne
 // contient que la logique de chargement. Les 11 Mo de Pyodide arrivent d'un CDN,
@@ -864,6 +865,16 @@ export default function AcademyClassroom() {
             )}
             {isLessonDone && nextInCourse && nextInCourseOpen && (
               <Button onClick={() => goToLesson(activeLesson + 1)} className="gap-2">Suivant <ChevronRight className="w-4 h-4" /></Button>
+            )}
+            {/* Le livret apparaît au même moment que l'attestation — c'est ICI, à la
+                dernière leçon validée, que le parcours se termine : les deux récompenses
+                se découvrent côte à côte. Les erreurs passent par completeError, comme
+                le reste de la page. */}
+            {allCoursesInParcoursDone && parcours && (
+              <Button variant="outline" className="gap-2"
+                onClick={() => ouvrirLivret(`/api/academy/parcours/${parcours.id}/livret`, studentFetch, setCompleteError)}>
+                <BookOpen className="w-4 h-4" /> Livret de révision
+              </Button>
             )}
             {allCoursesInParcoursDone && (
               <Button onClick={requestAttestation} disabled={submitting} className="gap-2 bg-amber-600 hover:bg-amber-700 text-white">

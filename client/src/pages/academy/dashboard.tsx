@@ -386,7 +386,16 @@ export default function AcademyDashboard() {
                 {/* Se remplit depuis zéro : un 8 % et un 80 % immobiles se ressemblent au
                     coin de l'œil, remplis jamais. */}
                 <BarreRemplissage pct={pct} className="h-2" couleur={program.accent} />
-                <span className="inline-flex items-center gap-1 text-xs font-medium mt-4"
+                {/* Parcours terminé : signaler le livret ici, le télécharger là-bas. La
+                    carte entière est déjà un bouton — un second bouton imbriqué serait du
+                    HTML invalide ; le clic mène à la page du parcours, où vit le vrai. */}
+                {faits === courses.length && courses.length > 0 && (
+                  <span className="inline-flex items-center gap-1.5 text-[11px] font-medium mt-3 px-2.5 py-1 rounded-full border"
+                    style={{ color: program.accent, borderColor: program.accent }}>
+                    <BookOpen className="w-3 h-3" /> Livret de révision disponible
+                  </span>
+                )}
+                <span className="flex items-center gap-1 text-xs font-medium mt-4"
                   style={{ color: program.accent }}>
                   Ouvrir ce parcours <ChevronRight className="w-3.5 h-3.5" />
                 </span>

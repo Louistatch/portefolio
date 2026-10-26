@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/admin";
+import { ouvrirLivret } from "@/lib/livret";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -108,27 +109,10 @@ export default function AdminCourses() {
     groupes.get(cle)!.push(c);
   }
 
-  /**
-   * Le livret de révision du parcours, sans condition d'achèvement côté administration.
-   * L'onglet s'ouvre AVANT le premier await : ouvert après coup, il serait avalé par le
-   * bloqueur de fenêtres. Il reçoit ensuite le document, ou se referme sur échec.
-   */
-  async function ouvrirLivret(programId: string, titre: string) {
-    const onglet = window.open("", "_blank");
-    try {
-      const r = await adminFetch(`/api/admin/academy/parcours/${programId}/livret`);
-      if (!r.ok) {
-        onglet?.close();
-        toast({ title: "Livret indisponible", description: `Le livret « ${titre} » n'a pas pu être généré.`, variant: "destructive" });
-        return;
-      }
-      const url = URL.createObjectURL(await r.blob());
-      if (onglet) onglet.location = url;
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      onglet?.close();
-      toast({ title: "Livret indisponible", description: "Vérifiez la connexion puis réessayez.", variant: "destructive" });
-    }
+  // Le livret de révision du parcours — sans condition d'achèvement côté administration.
+  function telechargerLivret(programId: string) {
+    ouvrirLivret(`/api/admin/academy/parcours/${programId}/livret`, adminFetch,
+      (m) => toast({ title: "Livret indisponible", description: m, variant: "destructive" }));
   }
 
   return (
@@ -157,7 +141,7 @@ export default function AdminCourses() {
               </h2>
               {p && (
                 <Button size="sm" variant="outline" className="gap-1.5 min-h-9"
-                  onClick={() => ouvrirLivret(p.id, p.title)}>
+                  onClick={() => telechargerLivret(p.id)}>
                   <BookOpen className="w-3.5 h-3.5" aria-hidden="true" /> Livret de révision
                 </Button>
               )}

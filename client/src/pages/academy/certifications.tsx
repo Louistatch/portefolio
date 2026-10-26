@@ -2,8 +2,11 @@ import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { SEO } from "@/components/seo";
 import { studentFetch, isStudentLoggedIn } from "@/lib/student";
+import { ouvrirLivret } from "@/lib/livret";
 import { groupByProgram } from "@shared/programs";
-import { Award, ArrowLeft, Loader2, ShieldCheck, TrendingUp, Lock } from "lucide-react";
+import { Award, ArrowLeft, BookOpen, Loader2, ShieldCheck, TrendingUp, Lock } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
 import { CredentialCard, type Cred } from "./dashboard";
 
 type Onglet = "tous" | "cours" | "parcours" | "expires";
@@ -31,6 +34,7 @@ export default function AcademyCertifications() {
   const [schedule, setSchedule] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [onglet, setOnglet] = useState<Onglet>("tous");
+  const { toast } = useToast();
 
   useEffect(() => {
     if (!isStudentLoggedIn()) { navigate("/academy/login"); return; }
@@ -62,12 +66,15 @@ export default function AcademyCertifications() {
     ...schedule.map((s: any) => s.course_id),
   ]);
   const mesCours = (allCourses as any[]).filter(c => idsAccessibles.has(c.id));
-  const prochain = groupByProgram(mesCours)
+  const parcoursEtat = groupByProgram(mesCours)
     .map(({ program, courses }) => ({
       program, total: courses.length,
       faits: courses.filter(co => enrollments.find((e: any) => e.course_id === co.id)?.status === "completed").length,
-    }))
-    .find(p => p.total > 0 && p.faits < p.total);
+    }));
+  const prochain = parcoursEtat.find(p => p.total > 0 && p.faits < p.total);
+  // Les parcours TERMINÉS ouvrent leur livret de révision — c'est ici, parmi les preuves
+  // de réussite, qu'un certifié revient naturellement le chercher.
+  const parcoursTermines = parcoursEtat.filter(p => p.total > 0 && p.faits === p.total);
 
   const visibles = creds.filter(FILTRES[onglet]);
 
@@ -115,6 +122,26 @@ export default function AcademyCertifications() {
               <p className="text-xs text-muted-foreground mt-1.5">{prochain ? `Cours avant le badge ${prochain.program.title}` : "Aucun badge en préparation"}</p>
             </div>
           </div>
+
+          {parcoursTermines.length > 0 && (
+            <div className="bg-card rounded-2xl border border-border/50 p-4 sm:p-5">
+              <p className="font-medium text-sm flex items-center gap-2">
+                <BookOpen className="w-4 h-4 text-primary" /> Livrets de révision
+              </p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Toutes les leçons d'un parcours terminé, réunies en un PDF à garder et relire.
+              </p>
+              <div className="flex flex-wrap gap-2 mt-3">
+                {parcoursTermines.map(({ program }) => (
+                  <Button key={program.id} size="sm" variant="outline" className="gap-1.5"
+                    onClick={() => ouvrirLivret(`/api/academy/parcours/${program.id}/livret`, studentFetch,
+                      (m) => toast({ title: "Livret indisponible", description: m, variant: "destructive" }))}>
+                    <BookOpen className="w-3.5 h-3.5" /> {program.title}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="inline-flex gap-1 p-1 bg-muted rounded-2xl w-fit">
             {ONGLETS.map(([k, l]) => (

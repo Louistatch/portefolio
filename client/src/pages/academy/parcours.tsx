@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { SEO } from "@/components/seo";
 import { useToast } from "@/hooks/use-toast";
 import { isStudentLoggedIn, studentFetch } from "@/lib/student";
+import { ouvrirLivret } from "@/lib/livret";
 import { PROGRAMS, programOf, programById, type Program } from "@shared/programs";
 
 /**
@@ -44,32 +45,11 @@ export default function AcademyParcours() {
   const [livretEnCours, setLivretEnCours] = useState(false);
   const { toast } = useToast();
 
-  /**
-   * Le livret s'ouvre dans un onglet qu'on crée AVANT le premier await : un window.open
-   * lancé après un fetch n'est plus couvert par le clic, et les bloqueurs de fenêtres
-   * l'avalent. L'onglet vide reçoit l'adresse du document une fois la réponse arrivée,
-   * ou se referme si le serveur dit non (le serveur reste seul juge de l'achèvement).
-   */
-  async function ouvrirLivret(programId: string) {
-    const onglet = window.open("", "_blank");
+  async function telechargerLivret(programId: string) {
     setLivretEnCours(true);
-    try {
-      const r = await studentFetch(`/api/academy/parcours/${programId}/livret`);
-      if (!r.ok) {
-        onglet?.close();
-        const d = await r.json().catch(() => null);
-        toast({ title: "Livret indisponible", description: d?.message || "Réessayez plus tard.", variant: "destructive" });
-        return;
-      }
-      const url = URL.createObjectURL(await r.blob());
-      if (onglet) onglet.location = url;
-      setTimeout(() => URL.revokeObjectURL(url), 60_000);
-    } catch {
-      onglet?.close();
-      toast({ title: "Livret indisponible", description: "Vérifiez votre connexion puis réessayez.", variant: "destructive" });
-    } finally {
-      setLivretEnCours(false);
-    }
+    await ouvrirLivret(`/api/academy/parcours/${programId}/livret`, studentFetch,
+      (m) => toast({ title: "Livret indisponible", description: m, variant: "destructive" }));
+    setLivretEnCours(false);
   }
 
   useEffect(() => {
@@ -213,7 +193,7 @@ export default function AcademyParcours() {
                   serrure. */}
               {termines === stats.length && stats.length > 0 ? (
                 <Button size="sm" variant="outline" className="mt-4 gap-2" disabled={livretEnCours}
-                  onClick={() => ouvrirLivret(programId)}>
+                  onClick={() => telechargerLivret(programId)}>
                   {livretEnCours
                     ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     : <BookOpen className="w-3.5 h-3.5" />}
